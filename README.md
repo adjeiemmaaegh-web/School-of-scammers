@@ -1,0 +1,2 @@
+# School-of-scammers
+3D PLC TRAINING AND HIRING PLATTFORM 
