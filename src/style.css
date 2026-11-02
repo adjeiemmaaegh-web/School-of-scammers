@@ -47,3 +47,24 @@
 .starter-lab .metric b{font-size:clamp(18px,2.4vw,28px);white-space:nowrap;}
 @media(max-width:780px){.starter-lab .starter-control-diagram{grid-template-columns:1fr;}.starter-lab .starter-coil{min-height:78px;}}
 @media(prefers-reduced-motion:reduce){.starter-lab .starter-progress>div{transition:none;}}
+
+
+/* Interactive ideal-24V electrical training bench, accessible without WebGL. */
+.patch-lab .patch-devices{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
+.patch-lab .patch-device{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;min-height:115px;border-radius:12px;border:2px solid #4d6a7c;background:#172f41;padding:12px;text-align:center;}
+.patch-lab .patch-device b{font-size:20px;color:#e7faff;}
+.patch-lab .patch-device strong{font-size:13px;white-space:nowrap;}
+.patch-lab .patch-device small{font-size:11px;}
+.patch-lab .patch-device.patch-light-on{background:#285644;border-color:#7fe5b2;box-shadow:0 0 24px #148d623b;}
+.patch-lab .patch-ports{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:15px 0;}
+.patch-lab .patch-ports code{display:block;padding:12px;text-align:center;background:#112a39;border:1px solid #427f83;border-radius:7px;white-space:nowrap;}
+.patch-lab .patch-edit{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:15px 0;}
+.patch-lab .patch-edit label{display:flex;flex-direction:column;gap:7px;flex:1;min-width:140px;}
+.patch-lab .patch-edit select{margin:0;}
+.patch-lab .patch-wires>div{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #30495a;padding:8px;gap:12px;}
+.patch-lab .patch-wires code{overflow-wrap:anywhere;}
+.patch-lab .patch-wires button{font-size:12px;padding:6px 11px;}
+.patch-lab .patch-meter{font:700 clamp(22px,2vw,32px) ui-monospace,Consolas,monospace;border:2px solid #75c1b6;border-radius:12px;min-height:90px;display:grid;place-items:center;background:#0b2928;color:#6cf0c7;letter-spacing:.03em;padding:15px;overflow-wrap:anywhere;text-align:center;}
+.patch-lab ol{padding-left:20px;line-height:1.85;color:#bfccdb;}
+@media(max-width:990px){.patch-lab .patch-devices{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:520px){.patch-lab .patch-ports{grid-template-columns:repeat(2,minmax(0,1fr));}.patch-lab .patch-device b{font-size:17px;}}
