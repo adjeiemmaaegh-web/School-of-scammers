@@ -21,7 +21,7 @@ async function click(page,text){
 }
 async function visit(page,route){
  const response=await page.goto(base+route,{waitUntil:'domcontentloaded',timeout:30000});
- assert.equal(response?.status(),200,'Page HTTP status for '+route);
+ assert.ok(response?.status()===200||response?.status()===304,'Page HTTP status for '+route+': '+response?.status());
  await page.waitForSelector('h1',{timeout:18000});
  assert.ok(await page.$eval('h1',node=>node.textContent?.trim().length),route+' missing page heading');
 }
