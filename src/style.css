@@ -14,3 +14,13 @@
 
 /* Isolated PLC factory acceptance training lab */
 .factory-acceptance{margin:1.4rem 0}.fat-controls{display:flex;align-items:end;flex-wrap:wrap;gap:12px;margin:17px 0}.fat-controls label{display:flex;flex-direction:column;gap:6px;min-width:220px;flex:1;font-size:12px}.fat-controls select{max-width:100%;width:100%}.fat-controls button{min-height:44px}.fat-summary{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:#101f2f;border:1px solid #375568;border-radius:10px;padding:14px;margin:14px 0}.fat-summary strong{font-size:20px;color:#44d5b5}.fat-summary span{font-size:12px;padding:5px 9px;background:#1e3345;border-radius:6px}.fat-cases{display:grid;gap:8px;margin:16px 0}.fat-case{border:1px solid #3d5369;border-radius:10px;overflow:hidden}.fat-case.fat-pass{border-left:4px solid #2fc59e}.fat-case.fat-fail{border-left:4px solid #e5a052}.fat-case-toggle{width:100%;background:#16283a;border:0;color:#edf4f8;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px;text-align:left}.fat-case-toggle>span:first-child{flex:1}.fat-case-toggle small{display:block;font-size:11px;color:#9aafbf;margin-top:5px}.fat-case-toggle b{font-size:12px}.fat-pass .fat-case-toggle b{color:#54e1bd}.fat-fail .fat-case-toggle b{color:#f5b36a}.fat-case-body{padding:15px}.fat-table-scroll{overflow-x:auto}.fat-case table th,.fat-case table td{text-align:left;padding:9px;border-bottom:1px solid #2f4356;min-width:70px;font-size:12px}.fat-case table th{font-size:11px;color:#9bb2c3}.fat-case summary{margin:12px 0;cursor:pointer}@media(max-width:600px){.fat-controls label{width:100%;min-width:0}.fat-controls button{width:100%}}
+
+
+/* Keep educational I/O and machine status available on CPU-only / WebGL-disabled devices. */
+.scene-shell{position:relative;overflow:hidden;}
+.graphics-fallback{height:100%;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px 28px 58px;background:linear-gradient(125deg,#14283b,#071522);color:#e2e8f0;}
+.graphics-fallback strong{font-size:18px;color:#63e6c7;}
+.graphics-fallback p{margin:0;max-width:570px;font-size:13px;}
+.graphics-toggle{position:absolute;z-index:5;right:12px;bottom:12px;padding:7px 11px;font-size:12px;background:#0b2335ec;border:1px solid #388078;}
+.graphics-toggle:focus-visible{outline:3px solid #64e1ca;outline-offset:2px;}
+@media(prefers-reduced-motion:reduce){.scene-shell *, .app-sidebar{transition:none!important;animation:none!important;}}
