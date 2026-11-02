@@ -31,7 +31,7 @@ async function run(){
  const exceptions=[];page.on('pageerror',e=>exceptions.push(e.message));
  try{
   await page.setViewport({width:1366,height:768});
-  const routes=['/','/labs','/engineering','/simulation','/assessments','/process-control','/starter-lab','/electrical-bench'];
+  const routes=['/','/labs','/engineering','/simulation','/assessments','/process-control','/starter-lab','/electrical-bench','/pneumatics'];
   for(const route of routes){await visit(page,route);console.log('ROUTE PASS',route);}
   await visit(page,'/starter-lab');await page.waitForSelector('.starter-control-diagram');
   await click(page,'Press START');for(let i=0;i<4;i++)await click(page,'Advance 1 s');
@@ -45,12 +45,20 @@ async function run(){
   assert.equal(await page.$eval('.patch-meter',e=>e.textContent?.trim()),'24.0 V DC','Correct loop meter voltage');
   await click(page,'Isolate supply');console.log('PATCH BENCH PASS');
   await visit(page,'/process-control');await click(page,'Run 10 s');console.log('PID SCAN PASS');
+  await visit(page,'/pneumatics');
+  await click(page,'Reference commissioning sequence');
+  const pneumaticText=await page.$eval('body',node=>node.innerText);
+  assert.ok(pneumaticText.includes('PASS — demonstrated extension and retraction without alarms'), 'Pneumatic FAT example must pass');
+  await click(page,'Reset exercise');
+  await click(page,'EXTEND / 100 ms');
+  assert.ok((await page.$eval('body',node=>node.innerText)).includes('8.3%'), 'Pneumatic cylinder must advance under coil command');
+  console.log('PNEUMATIC COMMISSIONING PASS');
   await visit(page,'/simulation');
   for(const b of ['Record visual inspection','Read PLC I/O','Reconnect sensor circuit','START MOTOR','Verify operation','Submit task'])await click(page,b);
   assert.ok((await page.$eval('body',e=>e.innerText)).includes('Assessment report'));
   console.log('ASSESSMENT PASS');
   await page.setViewport({width:390,height:780});
-  for(const route of ['/','/labs','/starter-lab','/electrical-bench']){
+  for(const route of ['/','/labs','/starter-lab','/electrical-bench','/pneumatics']){
    await visit(page,route);
    const size=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:innerWidth}));
    assert.ok(size.scroll<=size.viewport+2,'Horizontal mobile overflow '+route+' '+JSON.stringify(size));
