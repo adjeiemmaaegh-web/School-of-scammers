@@ -77,7 +77,7 @@ export function measurePatchContinuity(s:PatchBenchState,a:PatchPort,b:PatchPort
  for(const [x,y] of s.links)edge(x,y);
  if(s.fuseClosed)edge('F1:IN','F1:OUT');
  if(s.switchClosed)edge('S1:IN','S1:OUT');
- const seen=new Set([a]), todo=[a];
+ const seen=new Set<string>([a]), todo:string[]=[a];
  while(todo.length){for(const v of map.get(todo.pop()!)??[]){if(!seen.has(v)){seen.add(v);todo.push(v);}}}
  return seen.has(b);
 }
