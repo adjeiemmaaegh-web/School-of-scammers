@@ -43,7 +43,8 @@ export function stepTank(state:TankState,control:TankControl,deltaMs=1000,config
   const unsaturated=control.kp*error+candidate+control.kd*derivative;
   const saturatingHigh=unsaturated>1&&error>0;
   const saturatingLow=unsaturated<0&&error<0;
-  if(!saturatingHigh&&!saturatingLow)integral=clamp(candidate,-1,1);
+  // Do not integrate error while the high-high trip or external emergency/permissive keeps the pump isolated.
+  if(!control.emergencyStop&&control.permitPump&&!trip&&!saturatingHigh&&!saturatingLow)integral=clamp(candidate,-1,1);
   duty=clamp(control.kp*error+integral+control.kd*derivative,0,1);
  }
  if(control.emergencyStop||!control.permitPump||trip)duty=0;
