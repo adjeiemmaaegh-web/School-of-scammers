@@ -39,7 +39,7 @@ describe('bounded Structured Text interpreter',()=>{
  });
  it('deterministically replays a retained output',()=>{
   const p=compileStructuredText('IF Start THEN Run := TRUE; END_IF; IF Stop THEN Run := FALSE; END_IF;');
-  const steps=[{scans:2,inputs:{Start:true,Stop:false}},{scans:2,inputs:{Start:false}},{scans:1,inputs:{Stop:true}}];
+  const steps:{scans:number;inputs:Record<string,boolean>}[]=[{scans:2,inputs:{Start:true,Stop:false}},{scans:2,inputs:{Start:false}},{scans:1,inputs:{Stop:true}}];
   const a=runStructuredTextScans(p,steps,{Run:false});const b=runStructuredTextScans(p,steps,{Run:false});
   expect(a).toEqual(b);expect(a.rows.map(x=>x.outputs.Run)).toEqual([true,true,true,true,false]);
  });
