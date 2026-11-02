@@ -1,0 +1,7 @@
+export type LabProgress={completed:string[];favorites:string[];recent:string[]};
+export const emptyProgress=():LabProgress=>({completed:[],favorites:[],recent:[]});
+export function readProgress():LabProgress{try{const raw=localStorage.getItem('plc-skills-lab-progress-v1');if(!raw)return emptyProgress();const parsed=JSON.parse(raw);return {completed:Array.isArray(parsed.completed)?parsed.completed.filter((x:unknown)=>typeof x==='string'):[],favorites:Array.isArray(parsed.favorites)?parsed.favorites.filter((x:unknown)=>typeof x==='string'):[],recent:Array.isArray(parsed.recent)?parsed.recent.filter((x:unknown)=>typeof x==='string'):[]};}catch{return emptyProgress();}}
+export function writeProgress(progress:LabProgress){try{localStorage.setItem('plc-skills-lab-progress-v1',JSON.stringify(progress));return true;}catch{return false;}}
+export function markVisited(progress:LabProgress,id:string):LabProgress{return {...progress,recent:[id,...progress.recent.filter(x=>x!==id)].slice(0,10)}}
+export function toggleFavorite(progress:LabProgress,id:string):LabProgress{return {...progress,favorites:progress.favorites.includes(id)?progress.favorites.filter(x=>x!==id):[...progress.favorites,id]}}
+export function toggleCompleted(progress:LabProgress,id:string):LabProgress{return {...progress,completed:progress.completed.includes(id)?progress.completed.filter(x=>x!==id):[...progress.completed,id]}}

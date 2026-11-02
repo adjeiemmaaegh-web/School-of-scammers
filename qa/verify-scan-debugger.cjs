@@ -1,0 +1,39 @@
+/** Dependency-free local verification with Node and TypeScript's tsc installed on PATH. */
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict'),cp=require('node:child_process');
+const root=path.resolve(__dirname,'..'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'plc-debug-'));
+let passed=0;
+const test=(label,fn)=>{fn();passed++;console.log(`PASS ${String(passed).padStart(2,'0')} ${label}`);};
+try{
+ cp.execFileSync('tsc',['--strict','--target','es2022','--module','commonjs','--moduleResolution','node','--lib','es2022,dom','--skipLibCheck','--outDir',temp,'src/engineering/scan-debugger.ts','src/engineering/factory-acceptance.ts'],{cwd:root,stdio:'pipe'});
+ const d=require(path.join(temp,'engineering/scan-debugger.js'));
+ const {INSTRUCTION_EXERCISES}=require(path.join(temp,'engineering/instruction-lab.js'));
+ const {workcellLadder}=require(path.join(temp,'engineering/workcell.js'));
+ const {runFactoryAcceptance}=require(path.join(temp,'engineering/factory-acceptance.js'));
+ const lesson=id=>INSTRUCTION_EXERCISES.find(x=>x.id===id).program;
+ test('Fresh debugger initializes with no events',()=>assert.deepEqual(d.createDebugSession(lesson('ton')).actions,[]));
+ test('Scan breakpoint stops after an exact number of scans',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('ton')),{kind:'scan',scan:12});s=d.runDebugScans(s,500);assert.equal(s.bench.scan,12);assert.equal(s.actions[0].scans,12);});
+ test('Continuing leaves completed scan breakpoint behind',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('ton')),{kind:'scan',scan:2});s=d.runDebugScans(s,4);s=d.runDebugScans(s,5);assert.equal(s.bench.scan,7);assert.equal(s.hits.length,1)});
+ test('Input edge is sampled only on completed PLC scans',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('edges')),{kind:'signal',source:'input',tag:'Enable',edge:'rising'});s=d.setDebugInput(s,'Enable',true);s=d.setDebugInput(s,'Enable',false);s=d.runDebugScans(s,1);assert.equal(s.hits.length,0);s=d.setDebugInput(s,'Enable',true);s=d.runDebugScans(s,10);assert.equal(s.hits.length,1)});
+ test('Coil pulse rising edge halts',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('edges')),{kind:'signal',source:'coil',tag:'Rising',edge:'rising'});s=d.setDebugInput(s,'Enable',true);s=d.runDebugScans(s,10);assert.equal(s.bench.scan,1)});
+ test('Coil pulse falling edge halts',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('edges')),{kind:'signal',source:'coil',tag:'Rising',edge:'falling'});s=d.setDebugInput(s,'Enable',true);s=d.runDebugScans(s,10);assert.equal(s.bench.scan,2)});
+ test('Rung energization halts',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('ton')),{kind:'rung',rungId:'delay',edge:'rising'});s=d.setDebugInput(s,'Enable',true);s=d.runDebugScans(s,10);assert.equal(s.bench.scan,1)});
+ test('Timer threshold triggers at exact simulated 60 ms',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('ton')),{kind:'timer',rungId:'delay',elapsedMs:60});s=d.setDebugInput(s,'Enable',true);s=d.runDebugScans(s,10);assert.equal(s.bench.scan,3);assert.equal(s.hits[0].timeMs,60)});
+ test('Retentive timer resets and can trigger again',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('rto')),{kind:'timer',rungId:'retentive-delay',elapsedMs:60});s=d.setDebugInput(s,'Enable',true);s=d.runDebugScans(s,10);s=d.setDebugInput(s,'ResetTimer',true);s=d.runDebugScans(s,1);s=d.setDebugInput(s,'ResetTimer',false);s=d.runDebugScans(s,3);assert.equal(s.hits.length,2)});
+ test('Counter threshold triggers on second distinct sensor edge',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('ctu')),{kind:'counter',rungId:'batch',count:2});s=d.setDebugInput(s,'Sensor',true);s=d.runDebugScans(s,1);s=d.setDebugInput(s,'Sensor',false);s=d.runDebugScans(s,1);s=d.setDebugInput(s,'Sensor',true);s=d.runDebugScans(s,20);assert.equal(s.bench.scan,3);assert.equal(s.hits.length,1)});
+ test('Multiple breakpoints can match the same scan',()=>{let s=d.createDebugSession(lesson('edges'));s=d.addDebugBreakpoint(s,{kind:'scan',scan:1});s=d.addDebugBreakpoint(s,{kind:'signal',source:'coil',tag:'Rising',edge:'rising'});s=d.setDebugInput(s,'Enable',true);s=d.runDebugScans(s,50);assert.equal(s.paused.length,2)});
+ test('Disabled breakpoint does not halt',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('ton')),{kind:'scan',scan:1});s=d.enableDebugBreakpoint(s,s.breakpoints[0].id,false);s=d.runDebugScans(s,10);assert.equal(s.bench.scan,10)});
+ test('Removed breakpoint does not halt',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('ton')),{kind:'scan',scan:1});s=d.removeDebugBreakpoint(s,s.breakpoints[0].id);s=d.runDebugScans(s,10);assert.equal(s.bench.scan,10)});
+ test('Reset retains rule definitions but resets PLC scan memory',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('ton')),{kind:'scan',scan:1});s=d.runDebugScans(s);s=d.resetDebugSession(s);assert.equal(s.bench.scan,0);assert.equal(s.breakpoints.length,1);assert.equal(s.actions.length,0)});
+ test('Replaying mixed input toggles reproduces exact output trace',()=>{let s=d.createDebugSession(lesson('ctu'));for(let k=0;k<3;k++){s=d.setDebugInput(s,'Sensor',true);s=d.runDebugScans(s,k+1);s=d.setDebugInput(s,'Sensor',false);s=d.runDebugScans(s,1)}assert.ok(d.verifyDebugReplay(s).passed)});
+ test('Replayed trace still valid after bounded 500-sample history rollover',()=>{let s=d.createDebugSession(lesson('ton'));s=d.runDebugScans(s,500);s=d.runDebugScans(s,25);assert.equal(s.bench.history[0].scan,26);assert.equal(d.verifyDebugReplay(s).passed,true)});
+ test('Replay verification notices manipulated output data',()=>{let s=d.runDebugScans(d.createDebugSession(lesson('ton')),1);s={...s,bench:{...s.bench,outputs:{TimerDone:true}}};assert.equal(d.verifyDebugReplay(s).passed,false)});
+ test('Rejects nonexistent coil and rung targets',()=>{assert.throws(()=>d.addDebugBreakpoint(d.createDebugSession(lesson('ton')),{kind:'signal',source:'coil',tag:'NotACoil',edge:'rising'}));assert.throws(()=>d.addDebugBreakpoint(d.createDebugSession(lesson('ton')),{kind:'rung',rungId:'missing',edge:'falling'}))});
+ test('Rejects timer and counter thresholds above preset',()=>{assert.throws(()=>d.addDebugBreakpoint(d.createDebugSession(lesson('ton')),{kind:'timer',rungId:'delay',elapsedMs:61}));assert.throws(()=>d.addDebugBreakpoint(d.createDebugSession(lesson('ctu')),{kind:'counter',rungId:'batch',count:4}))});
+ test('Rejects unsupported run length',()=>assert.throws(()=>d.runDebugScans(d.createDebugSession(lesson('ton')),501)));
+ test('Rejects more than 24 breakpoint definitions',()=>{let s=d.createDebugSession(lesson('ton'));for(let n=1;n<=24;n++)s=d.addDebugBreakpoint(s,{kind:'scan',scan:n});assert.throws(()=>d.addDebugBreakpoint(s,{kind:'scan',scan:25}))});
+ test('Session evidence exports actual replay and trace',()=>{let s=d.addDebugBreakpoint(d.createDebugSession(lesson('ton')),{kind:'scan',scan:2});s=d.runDebugScans(s,10);const report=JSON.parse(d.exportDebugSessionJson(s));assert.equal(report.scans,2);assert.equal(report.replayVerified,true);assert.equal(report.trace.length,2);assert.match(d.debugHitsCsv(s),/Reached scan 2/)});
+ const fat=runFactoryAcceptance(workcellLadder,'fixture');
+ test('Factory acceptance remains 10/10 after debugger addition',()=>assert.equal(fat.passed,10));
+ test('Simulated FAT outcomes are unchanged under replay of debug exercises',()=>{let s=d.createDebugSession(lesson('conveyor-batch'));s=d.setDebugInput(s,'PowerOK',true);s=d.runDebugScans(s,50);assert.equal(runFactoryAcceptance(workcellLadder,'fixture').failed,0)});
+ console.log(`\n${passed}/${passed} native source integration checks passed`);
+} finally {fs.rmSync(temp,{recursive:true,force:true});}

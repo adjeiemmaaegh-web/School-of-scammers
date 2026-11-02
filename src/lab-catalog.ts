@@ -1,0 +1,23 @@
+export type LabCategory='PLC programming'|'Electrical & wiring'|'Machine commissioning'|'Troubleshooting'|'Process control';
+export type Lab={id:string;title:string;category:LabCategory;level:'Foundation'|'Intermediate'|'Advanced';duration:number;description:string;objectives:string[];route:'/engineering'|'/simulation';status:'available'|'planned'};
+export const labs:Lab[]=[
+{id:'conveyor-start',title:'Conveyor will not start',category:'Troubleshooting',level:'Foundation',duration:25,description:'Investigate a start permissive and safely restore the motor.',objectives:['Inspect PLC I/O','Isolate before repair','Verify the restart'],route:'/simulation',status:'available'},
+{id:'ladder-motor',title:'Motor seal-in and interlocks',category:'PLC programming',level:'Foundation',duration:35,description:'Edit a motor latch, interlocks, timers and counters using ladder logic.',objectives:['Edit and validate ladder','Observe scan power flow','Inspect output state'],route:'/engineering',status:'available'},
+{id:'scan-debugger',title:'PLC scan debugging and watchpoints',category:'PLC programming',level:'Intermediate',duration:45,description:'Debug isolated ladder programs with scan, I/O, rung, timer and counter breakpoints and deterministic replay.',objectives:['Set and hit scan breakpoints','Compare watched I/O and instruction memory','Verify replay and export evidence'],route:'/engineering',status:'available'},
+{id:'sensor-wiring',title:'24V sensor to PLC input',category:'Electrical & wiring',level:'Foundation',duration:40,description:'Wire a discrete sensor and inspect terminal voltages.',objectives:['Isolate the supply','Connect the input and common','Measure voltage'],route:'/engineering',status:'available'},
+{id:'starter-faults',title:'Motor starter diagnostics',category:'Troubleshooting',level:'Intermediate',duration:50,description:'Diagnose fuse, overload, contactor and auxiliary feedback faults.',objectives:['Inspect F1 / OL1 / K1','Identify fault conditions','Validate motor feedback'],route:'/engineering',status:'available'},
+{id:'sorter-commission',title:'Conveyor sorter commissioning',category:'Machine commissioning',level:'Intermediate',duration:60,description:'Commission product sensing, belt movement and diverter timing.',objectives:['Run the scan sequence','Observe products in 3D','Verify sorting outcomes'],route:'/engineering',status:'available'},
+{id:'fat-acceptance',title:'Virtual factory acceptance testing',category:'Machine commissioning',level:'Advanced',duration:55,description:'Run ten scripted PLC, motor starter, sensor and conveyor acceptance procedures on your ladder logic with scan evidence.',objectives:['Check permissives and automatic restart','Inject isolated circuit faults','Export diagnostic evidence'],route:'/engineering',status:'available'},
+{id:'tank-level',title:'Tank filling and level control',category:'Process control',level:'Intermediate',duration:55,description:'Future exercise for pumps, level switches and analog control.',objectives:['Build pump control','Tune level logic','Diagnose faults'],route:'/engineering',status:'planned'},
+{id:'star-delta',title:'Star-delta motor starter',category:'Electrical & wiring',level:'Advanced',duration:70,description:'Future multi-contactor motor starter exercise.',objectives:['Wire power and control','Program safe sequencing','Verify timing'],route:'/engineering',status:'planned'},
+{id:'pid',title:'PID temperature control',category:'Process control',level:'Advanced',duration:80,description:'Future analog process-control laboratory.',objectives:['Tune PID','Monitor process trends','Diagnose overshoot'],route:'/engineering',status:'planned'}
+];
+export const categories:LabCategory[]=['PLC programming','Electrical & wiring','Machine commissioning','Troubleshooting','Process control'];
+export const workspaces=[
+{title:'Ladder programming',detail:'Rungs, contacts, coils, timers, counters, symbols and scan traces',path:'/engineering'},
+{title:'Scan debugger',detail:'Instruction timing, watch values, edge breakpoints and deterministic replay',path:'/engineering'},
+{title:'Electrical wiring',detail:'24V terminal connections, virtual voltmeter, starter diagnostics',path:'/engineering'},
+{title:'3D machine simulator',detail:'Deterministic conveyor process, sensors, products and diverter',path:'/engineering'},
+{title:'Virtual factory acceptance',detail:'Scripted PLC commissioning, negative cases and machine scan evidence',path:'/engineering'},
+{title:'Fault investigation',detail:'Guided fault diagnosis with recorded actions and assessment',path:'/simulation'}
+] as const;

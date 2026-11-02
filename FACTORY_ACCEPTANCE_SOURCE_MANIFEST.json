@@ -1,0 +1,473 @@
+{
+  "name": "PLC Skills Lab Virtual Factory Acceptance development increment",
+  "date": "2026-10-30",
+  "baseline_zip": "PLC_Skills_Lab_Advanced_PLC_Programming_2026-10-30.zip",
+  "baseline_zip_sha256": "3678aa952a822cf31f661d403f518d849923c0d9d59206b06716024d76293b8c",
+  "preserved_previous_source_files": 71,
+  "modified_source_files": [
+    "src/components/EngineeringWorkbench.tsx",
+    "src/components/LabPortal.tsx",
+    "src/lab-catalog.ts",
+    "src/style.css"
+  ],
+  "new_source_files": [
+    "src/components/FactoryAcceptanceLab.tsx",
+    "src/engineering/factory-acceptance.ts",
+    "tests/factory-acceptance.test.ts"
+  ],
+  "tests": "30/30 native; 24/24 test-format via compatibility harness; React/Vite and real Vitest not run",
+  "files": {
+    "ADVANCED_LOGIC_INCREMENT_REPORT.md": {
+      "size": 3424,
+      "sha256": "a5c4b302bfbaa50c0c77eac736f42c53be6de52f35a76c7a9fc742ffcf23d8cc"
+    },
+    "ADVANCED_LOGIC_SOURCE_MANIFEST.json": {
+      "size": 13773,
+      "sha256": "3b36c11d83b36e5dcd849360735bcb073d1ba40c1cb973248255d6ce789d9831"
+    },
+    "ASSESSMENT_RELIABILITY_INCREMENT_REPORT.md": {
+      "size": 1203,
+      "sha256": "e228bb521689b1adb68e297e933985433d0db21cccc53452c50d840d5fc127cb"
+    },
+    "ASSESSMENT_SUITE_INCREMENT_REPORT.md": {
+      "size": 1066,
+      "sha256": "0dc58fba771e433357f62d271f6b46eabc7667ab8316ca54450858222b40a204"
+    },
+    "COMMISSIONING_EVIDENCE_HARDENING_REPORT.md": {
+      "size": 804,
+      "sha256": "344277797b9b6d83fe0006557e5e40b493de122030d0df65490509794f92e0c7"
+    },
+    "COMMISSIONING_INCREMENT_REPORT.md": {
+      "size": 810,
+      "sha256": "fc30fec625c9d500ee7ef7080b889fb3989145ee23a275a2995f54dd8cd72874"
+    },
+    "CONVEYOR_PROCESS_INCREMENT_REPORT.md": {
+      "size": 862,
+      "sha256": "1bc514a458af3e0d88e69af3b97cd195e89c38a95132738bc5afc6fe085af79c"
+    },
+    "DIAGNOSIS_FULL_INCREMENT_REPORT.md": {
+      "size": 663,
+      "sha256": "38697b9d4faedf9c63359a5ef77e3b76b65c228fffd53cc33510a6a14defc6b0"
+    },
+    "ENGINEERING_DEBUGGER_REPORT.md": {
+      "size": 1027,
+      "sha256": "34a0a68a49b748594857b5f31dc4520b750cf5d2e17f6872b3b836bdde068eb9"
+    },
+    "ENGINEERING_EDITOR_REPORT.md": {
+      "size": 1082,
+      "sha256": "aec3c9bb3e6b81f0a853fc6c211b9b66f2425467d01f8ed98f0d487e44147a55"
+    },
+    "FACTORY_ACCEPTANCE_INCREMENT_REPORT.md": {
+      "size": 4197,
+      "sha256": "f1f15bd4921d513dd677385cd17a59697825e8d512d016c079cba13d5c7f40a4"
+    },
+    "FULL_MENU_INCREMENT_REPORT.md": {
+      "size": 1835,
+      "sha256": "53c910e5cfca60438598e91bfff61c6f6749fc733ef5539f4637dbd2c17b4dc0"
+    },
+    "INDUSTRIAL_VISUAL_INCREMENT_REPORT.md": {
+      "size": 704,
+      "sha256": "b4bf212943cf6499f6030498dc2d1f0ff575c999df6d038bb90f965b0c5fa715"
+    },
+    "IO_MAPPING_INCREMENT_REPORT.md": {
+      "size": 1192,
+      "sha256": "8c59db7d1ee8aac1b0ed56a5ecc1fe6563483bc49c297ed51353e09927cc708e"
+    },
+    "LADDER_EDITOR_INCREMENT_REPORT.md": {
+      "size": 1122,
+      "sha256": "b5871db8bdb97c702425471b5800301976d5174452c2fe117505b698e5405f8e"
+    },
+    "MOTOR_BOARD_INTEGRATION_REPORT.md": {
+      "size": 773,
+      "sha256": "2580f6ee04d746975267043af921011043c21ea3e3557c0c7ac1779f61fbb928"
+    },
+    "MOTOR_STARTER_INCREMENT_REPORT.md": {
+      "size": 1222,
+      "sha256": "f5501c7c00c3f307569bbe5198d4a9aa8baa6e8669e20cb22e8b6f1210238c09"
+    },
+    "MULTI_IO_INCREMENT_REPORT.md": {
+      "size": 875,
+      "sha256": "dfd3ada50c7f779896bec6c3c09f323f36cdbdba857e087008a9f749c26ea6d6"
+    },
+    "PHYSICAL_PROCESS_INCREMENT_REPORT.md": {
+      "size": 1124,
+      "sha256": "8303a2dac87bacb71a47743c0fca4741f8924de3d2f7f0d85d3df223cdbcb7ff"
+    },
+    "PROCESS_3D_INCREMENT_REPORT.md": {
+      "size": 754,
+      "sha256": "dbaa9caa1dfb28f1991f1a87f40f3801f40024c6e8964ebd812685906093c1ee"
+    },
+    "PROJECT_LIBRARY_INCREMENT_REPORT.md": {
+      "size": 1312,
+      "sha256": "9fcb8fa1dbf3f2e3320e4c08fec163e74099a5b5ea6acf1837a91765d1871dbf"
+    },
+    "PROJECT_PORTABILITY_INCREMENT_REPORT.md": {
+      "size": 691,
+      "sha256": "b864c2d940cfb3277488dcc3ac257ad0a9fcd6abf633e5b7729136360b0dd097"
+    },
+    "PROJECT_RELIABILITY_INCREMENT_REPORT.md": {
+      "size": 796,
+      "sha256": "8710daf7f8d3b61d3b3b6875be7a8b1b9c79519e3a238a359e02322574dccb20"
+    },
+    "README.md": {
+      "size": 5416,
+      "sha256": "0c05afcbce6c9bce1ed2d5a2718236a70f9c6acf544e4845425d80864abc251c"
+    },
+    "SCAN_INSTRUMENTS_INCREMENT_REPORT.md": {
+      "size": 1134,
+      "sha256": "2c76ef98336c1a1115731a12eb89a35221cc88ea413b0c854e5a898a1b7fbd04"
+    },
+    "SIGNAL_DIAGNOSTICS_INCREMENT_REPORT.md": {
+      "size": 508,
+      "sha256": "bbebfd1b71ffdeb7582b7f58372bf7830db7a8ac71f8e313f0d34cbb52655db5"
+    },
+    "SYMBOL_HISTORY_INCREMENT_REPORT.md": {
+      "size": 357,
+      "sha256": "ca10d3e5996c3ddee42fc59112e71cdefaaa127e889e1affdea88e977e7ead6b"
+    },
+    "TERMINAL_WIRING_INCREMENT_REPORT.md": {
+      "size": 1333,
+      "sha256": "b8fb70cb302c14da67c91a319ed72d65392002afc1db7c3e328225e8d37b9e1c"
+    },
+    "WIRING_BOARD_INCREMENT_REPORT.md": {
+      "size": 1093,
+      "sha256": "d7c07fcb6fdc28c7ce31e4a8bebef500694a89d2ad56dff20c4d1300762693b4"
+    },
+    "WIRING_PLC_INTEGRATION_REPORT.md": {
+      "size": 757,
+      "sha256": "cd69e5c84dc8b98ea0f3247643d1246ff09ffcc2c00d0ab4c86807f8c72ba115"
+    },
+    "docs/ADVANCED_LADDER_INCREMENT.md": {
+      "size": 892,
+      "sha256": "785c4a8d78d50512d0778594c1665fc9ce92e17fa200c2d59414f22a39309ce5"
+    },
+    "docs/INTEGRATED_WORKCELL_REPORT.md": {
+      "size": 1381,
+      "sha256": "0530def7a88705c2015e66f8ce9bdb9db43bcfd6cf6bbfc9dbce229c089797bc"
+    },
+    "docs/STAGE_0_1_REPORT.md": {
+      "size": 1112,
+      "sha256": "9dd9fd64b4fb8a0e33425eb4e4d828872fcbb6af3da374aa21271abc5569c042"
+    },
+    "docs/UPSTREAM_AUDIT_2026-10-30.md": {
+      "size": 2406,
+      "sha256": "a3f0ea5c2328aa0b601648eb8f25d31646d4361e183c5a8fe7660065ab138d7c"
+    },
+    "docs/adr/0001-upstream-boundary.md": {
+      "size": 1739,
+      "sha256": "30112257842b566346db04ce0e54781d5ab00057c0b5f1888bcf7e9557234412"
+    },
+    "docs/adr/0002-runtime-contracts.md": {
+      "size": 1126,
+      "sha256": "d97dea421538377bc76a20537a61084ab1c00c7ebb0ecffda72c05c1108e1ec2"
+    },
+    "docs/product/ARCHITECTURE.md": {
+      "size": 3740,
+      "sha256": "db274441bca37f8e97f75233e856cf9ce9e1db0377510fac39de9a1a6269b1e9"
+    },
+    "docs/product/COMPETITOR_AND_MIT_REVIEW.md": {
+      "size": 2806,
+      "sha256": "7932719f8d9eb7bd36b64307a2d474682773b24af82446676953ba8c7504a7ab"
+    },
+    "docs/product/PRD.md": {
+      "size": 9625,
+      "sha256": "96900aad65d66307b6715217e22124781df7b112dcd7fd66ed7dae892f7718e0"
+    },
+    "docs/product/ROADMAP.md": {
+      "size": 3918,
+      "sha256": "b237d24ebf54917b20dd6dda305978460f85c2aa604a6e5387159ce5e743a4f6"
+    },
+    "index.html": {
+      "size": 257,
+      "sha256": "2d05867c2081d194a66de6e88f0e069e0dac602a55a58ed43caab39a516aae9b"
+    },
+    "package.json": {
+      "size": 549,
+      "sha256": "77446ccab0bfe7156065494448002cbd6fe38bb30ed258db664efee5ab5f74ae"
+    },
+    "qa/verify-fat.cjs": {
+      "size": 4307,
+      "sha256": "8b1da38463743121cda4b90af4bed5fd7261bf0ebfc173a78cba42c650bf3aec"
+    },
+    "src/components/AssessmentSuite.tsx": {
+      "size": 7191,
+      "sha256": "6705622056008d1e97a6ea0b816b18ebaa4df895ad9f35f9f1b24168e7946396"
+    },
+    "src/components/CommissioningGuide.tsx": {
+      "size": 1820,
+      "sha256": "b88e719930beae791fd97b1b7ca1a634c79b2e96ce3e1d91649736c91a326fd3"
+    },
+    "src/components/Conveyor.tsx": {
+      "size": 1438,
+      "sha256": "f150c682f7fc9deacfcce412b9814037bcd37c73a72582145cb6c7ab1c4d6b23"
+    },
+    "src/components/EngineeringWorkbench.tsx": {
+      "size": 14064,
+      "sha256": "9bc174247d56c9028343102769fb164a6eb798cb31fe39e7daecfbbc13420ab3"
+    },
+    "src/components/FactoryAcceptanceLab.tsx": {
+      "size": 5957,
+      "sha256": "76af5d4cff97d2ea6bcb50ad8cf993bdc0ff0b64395e4ee2c4bb5f2205d59a5a"
+    },
+    "src/components/FaultDiagnosisLab.tsx": {
+      "size": 4107,
+      "sha256": "59a7d1762dfe19b5360eff6d4126b49dea66b88081c83f111a7c9076f6b73d14"
+    },
+    "src/components/InstructionLab.tsx": {
+      "size": 4632,
+      "sha256": "06c8bf832a15e8b157ada560a838652dd5122bb3ccc7ec0ea1bd9351838eb3d8"
+    },
+    "src/components/LabPortal.tsx": {
+      "size": 12244,
+      "sha256": "508affc6b92c94100e8bdb1535b1e394a8074ac72f0a20425014cb370b8482d8"
+    },
+    "src/components/LadderEditor.tsx": {
+      "size": 12373,
+      "sha256": "811da48aaaec262d06f47027d37db34ef50665a777bf46f33f495d285a577dab"
+    },
+    "src/components/LadderPowerFlow.tsx": {
+      "size": 1292,
+      "sha256": "aba1f3a68168b89b8f2984a8238bd031d0d2a9ba2cc2ff67e09594865254ce60"
+    },
+    "src/components/ProcessConveyor3D.tsx": {
+      "size": 6105,
+      "sha256": "0c5ef3e5f5dae960ec812bdce8aebd7fb9ee0f1a98cf3615c1e084c87d3b778c"
+    },
+    "src/components/ProjectLibrary.tsx": {
+      "size": 6178,
+      "sha256": "5b39e2403d500a60aaf756eeda8258145e36de576daf81327773335fe07e4ba3"
+    },
+    "src/components/ScanInstruments.tsx": {
+      "size": 3700,
+      "sha256": "872df17bb4326425335aac1d0f72af268d2254f20b7407a39890a0f2c78b3da0"
+    },
+    "src/components/SignalDiagnostics.tsx": {
+      "size": 1871,
+      "sha256": "d02f4eceec0adbd73bdc0b9c0d0a87bc4a351a1dcb3b004750b5bc33b206cbff"
+    },
+    "src/components/WiringBoard.tsx": {
+      "size": 4121,
+      "sha256": "389f80de5abeb4ae317ad33342aa555b2660f357668b9b152f55d1a665480db9"
+    },
+    "src/core/plc.ts": {
+      "size": 5207,
+      "sha256": "cbe02e345b8eedde0615f2a5e0102ca6f0c866c092f0ac8998027685ed45cfeb"
+    },
+    "src/engine/assessment.ts": {
+      "size": 2050,
+      "sha256": "41084e7ada73e55bf9208f82828e140fa9a3baae7ecb7f00169c2f463db588f7"
+    },
+    "src/engine/simulation.ts": {
+      "size": 3213,
+      "sha256": "a50ad7c2c034c2ca9d31934ff0e669a07e3f64ed9356d2ab654f6e19b9c195ca"
+    },
+    "src/engineering/assessment-suite.ts": {
+      "size": 7825,
+      "sha256": "b7025ef9464bf220847a208d581d73825b2378901a8cbe85ee68bcd874e8c898"
+    },
+    "src/engineering/commissioning.ts": {
+      "size": 3710,
+      "sha256": "0f83fc6a1cf8fef66441135fd355ac891981a06d48ee29c205e1be31298656ec"
+    },
+    "src/engineering/control-panel.ts": {
+      "size": 2321,
+      "sha256": "2f51dc338313875f2c1ba83ba8b25b8f8171c795c215272b04940dfe479aa2dc"
+    },
+    "src/engineering/conveyor-process.ts": {
+      "size": 3816,
+      "sha256": "e8ef766d97ccd0ced077b30f3aaf02adc060cfa45d23d2d7284ca3261998abf3"
+    },
+    "src/engineering/diagnostics.ts": {
+      "size": 7001,
+      "sha256": "18f10b7c76e76ad45a532d6154a46def242ad52cfaee8078b3ae7ddd559ee642"
+    },
+    "src/engineering/document-history.ts": {
+      "size": 1068,
+      "sha256": "d1522e12380492d4e8c3d6a48898131f2bbd45ab4ea38d2e0e467c830ae0de32"
+    },
+    "src/engineering/editor-operations.ts": {
+      "size": 1487,
+      "sha256": "0ab6f5cb15f81353e0c1216374e246a87a202198ee7fe477b83e8ac70f67271b"
+    },
+    "src/engineering/electrical.ts": {
+      "size": 2586,
+      "sha256": "9dcdd01e3517a7b903ce5c3b1e86605ba61884c080c0ff62b6f7f049867ed8c0"
+    },
+    "src/engineering/factory-acceptance.ts": {
+      "size": 13689,
+      "sha256": "716edc863716abdcfb05ba357280bd437f07cbb03bd4fd17fdfba2b64a8b8bda"
+    },
+    "src/engineering/instruction-lab.ts": {
+      "size": 7140,
+      "sha256": "4b1a5e3bf8c40c9f4c88f029d67e5a5ca772013d1227a4a94a3e6c25ef7c5dd0"
+    },
+    "src/engineering/io-mapping.ts": {
+      "size": 2879,
+      "sha256": "88446f7a77ef489a6d6148a109b432201b91dcbc14ea83c6ec031652fa4af30d"
+    },
+    "src/engineering/ladder.ts": {
+      "size": 9079,
+      "sha256": "fddb193052856dd6f25569f52161856d0f51f943629d91136721b4a2215d1961"
+    },
+    "src/engineering/project-file.ts": {
+      "size": 3937,
+      "sha256": "2c86d1cfd71c6849666f9ac78580c250ab2b11014ae3e51bf098e383d214d608"
+    },
+    "src/engineering/project-library.ts": {
+      "size": 6661,
+      "sha256": "92a63016bbb1eeaa8689347877835033b71a9ab09aae490067ff3f0a48b633e4"
+    },
+    "src/engineering/scan-instruments.ts": {
+      "size": 3885,
+      "sha256": "c8d6e21addf72ca0f91d01a540db38398fe10e0351caf4740b54e81282edd565"
+    },
+    "src/engineering/signal-diagnostics.ts": {
+      "size": 3892,
+      "sha256": "2cafcb706b80195c46515076f8dad76626ca7a2dd1533427b1280a77613c6de9"
+    },
+    "src/engineering/terminal-wiring.ts": {
+      "size": 2641,
+      "sha256": "50ca141224bae9245cf52d384e011bc19698252507fe6e942fec905a974c435e"
+    },
+    "src/engineering/wiring-board.ts": {
+      "size": 4032,
+      "sha256": "4241728d0d5fbe25939e25104ee89b3d082f097aace30cd7990039a27f5878ef"
+    },
+    "src/engineering/workcell.ts": {
+      "size": 8697,
+      "sha256": "f4d91cf6fe5b00c1769a44afa7f00d3bb1cf9bf5cbadcff85dbfbc57493a0ab5"
+    },
+    "src/lab-catalog.ts": {
+      "size": 4066,
+      "sha256": "3ab574ba32ef582560962a2543923308c86024a86570c9264f3b14f99b514139"
+    },
+    "src/lab-progress.ts": {
+      "size": 1404,
+      "sha256": "c5dc77ddd77d67ade61ffd357a233cd4f3e951d55f29816cba5b6a3397a4ceaa"
+    },
+    "src/main.tsx": {
+      "size": 7726,
+      "sha256": "ed08db793e8ea70e8e80b4c98d0c9b316a113901e46f8a39900522a08989fe39"
+    },
+    "src/style.css": {
+      "size": 13514,
+      "sha256": "495d9d9accd12a3382749cb502544a0d640edbc4ef5d5e7f26532d3e8d735e25"
+    },
+    "tests/assessment-evidence-hardening.test.ts": {
+      "size": 1574,
+      "sha256": "26639d0abb61dcf86102934ad65bd43568825585020bf49f485af289125731a1"
+    },
+    "tests/assessment-suite.test.ts": {
+      "size": 1822,
+      "sha256": "fede6391ddf41b7b3dfb7f30766b816c3a741eda18eb4e9a4d6090eb49f89aed"
+    },
+    "tests/commissioning.test.ts": {
+      "size": 2265,
+      "sha256": "41fb1264861fe9c4fcd31f93dd54da779cb0384f911d3f3890cd60c26b8eb407"
+    },
+    "tests/control-panel.test.ts": {
+      "size": 1933,
+      "sha256": "d6b507ec0dae25ee63ce7b43878cc1338e173c67b17eb652d7cef38e07cb63e5"
+    },
+    "tests/conveyor-process.test.ts": {
+      "size": 1606,
+      "sha256": "9ca349b2623251ddee9fce50e7918d78c407881210475eb09c328f215d3842a4"
+    },
+    "tests/diagnostics.test.ts": {
+      "size": 1122,
+      "sha256": "99296d78b36f580329812c27041048658fb3badac35911be466c41081ab51434"
+    },
+    "tests/document-history.test.ts": {
+      "size": 1122,
+      "sha256": "07d22cff2645ffa99d9e8ec335af280886952775e4ca66bddc9464c640c923d7"
+    },
+    "tests/editor-operations.test.ts": {
+      "size": 1214,
+      "sha256": "ab979dd894a73283c1d6dae71341e84d6bb4da9c5b804f991f1dcd9d4c0a8239"
+    },
+    "tests/engine.test.ts": {
+      "size": 1568,
+      "sha256": "33b033ed8b09d994e85092fbdc95fe8cd0d77447df78269c1f09a3fcaf69536d"
+    },
+    "tests/engineering.test.ts": {
+      "size": 1859,
+      "sha256": "16a19ed7c89332007ae9464abc6fe55fdc4d52c64bcf344340d5fa9a4e20e161"
+    },
+    "tests/factory-acceptance.test.ts": {
+      "size": 6217,
+      "sha256": "b02ca3da6a8569c7f4843b7454c0cb3550fe95bc4183fd14328fb3e73c955d75"
+    },
+    "tests/instruction-lab.test.ts": {
+      "size": 8497,
+      "sha256": "60dd4eccdeebef7a7c42bb510c53db29d97f991613e321d14b356399ad88544f"
+    },
+    "tests/io-mapping.test.ts": {
+      "size": 1128,
+      "sha256": "9bce88834e5a0e98506cf3368273984cd12767c9ece51b5b14443cf1ca8e6adb"
+    },
+    "tests/lab-portal.test.ts": {
+      "size": 1235,
+      "sha256": "418b782be2dbedbc9fe0dd8995c000a7b41ebc987560286e125c53223dc12b0a"
+    },
+    "tests/ladder-advanced.test.ts": {
+      "size": 2210,
+      "sha256": "736b65b6bb04fe75a8dee0ff6d7759dfe6a2dff32a34f1485d0a192397112307"
+    },
+    "tests/ladder-branch-editor.test.ts": {
+      "size": 1484,
+      "sha256": "42f499016fe40d9f3165b07e72ff55ba27310c0d7c2d4d19ec9cc0809c446a86"
+    },
+    "tests/ladder-power-flow.test.ts": {
+      "size": 1192,
+      "sha256": "42cead713a288ce84c70bd703c6e5a8b993e08946c04620dd33906b1db69282f"
+    },
+    "tests/motor-board-integration.test.ts": {
+      "size": 1514,
+      "sha256": "c30fa9633cc743ffeeb83c45be96c3a676756cb50c979515df2e08b7dbaca857"
+    },
+    "tests/multi-io-wiring.test.ts": {
+      "size": 1807,
+      "sha256": "ab1e4e4b49102d1f8e184fe027c70b0453bb8aa84676471898a3d46b29302897"
+    },
+    "tests/plc-core.test.ts": {
+      "size": 1944,
+      "sha256": "67f9588d4cadf2228350642ae3f8808b6da7e686afbb46633960d25b16e0c9eb"
+    },
+    "tests/process-visual-state.test.ts": {
+      "size": 1075,
+      "sha256": "4814f7fac617b17065b4a0ac7cf7fdbe480103e27d7b5854342fdc460c5b695b"
+    },
+    "tests/project-recovery.test.ts": {
+      "size": 1771,
+      "sha256": "59d2c844004f9870e63b0ba1de6a90f820ac43af64cd7f8e8d792b3f5eee5e78"
+    },
+    "tests/scan-instruments.test.ts": {
+      "size": 1492,
+      "sha256": "f761b5d067ce071c19a1ba17de7d67eb63aa17e55930d589523b2b869f98bde0"
+    },
+    "tests/signal-diagnostics.test.ts": {
+      "size": 1449,
+      "sha256": "c8b4f226792fb498c06d30e234a9494c70c15d6d7c1d7939805c35712ba3d25e"
+    },
+    "tests/terminal-wiring.test.ts": {
+      "size": 1685,
+      "sha256": "3eb7ae76e49aacae233e2633223098a28ca4f063c9597fcd4182feceb61f7c87"
+    },
+    "tests/wiring-board.test.ts": {
+      "size": 1368,
+      "sha256": "e447f31d8eb84c451d32d8d169b88eb333893739cfd0bfb422ae3174fa97ee0c"
+    },
+    "tests/workcell.test.ts": {
+      "size": 2086,
+      "sha256": "cb0743da06910a57ff699a86e78c9c89e6da1aaac1c85329bff992199d514620"
+    },
+    "tsconfig.json": {
+      "size": 266,
+      "sha256": "249636520b9014c2f6bbe9e6caa9c68d47d501d513448694ccae5882d1f4fc0a"
+    },
+    "vite.config.ts": {
+      "size": 132,
+      "sha256": "0ea84b4e2909b04e4c1cb1b92392a9f85bcb46605472763b15935d3498ba8ed3"
+    }
+  }
+}

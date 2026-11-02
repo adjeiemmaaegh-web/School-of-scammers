@@ -1,0 +1,31 @@
+PASS 1: 10 scripted acceptance procedures
+PASS 2: Reference implementation satisfies all scenarios
+PASS 3: No scenario failed
+PASS 4: Results deterministic
+PASS 5: All cases use bounded simulation clocks
+PASS 6: Evidence per case increases monotonically
+PASS 7: start-permissives individual scenario
+PASS 8: stop-command individual scenario
+PASS 9: guard-restart individual scenario
+PASS 10: power-cycle individual scenario
+PASS 11: sensor-loss individual scenario
+PASS 12: fuse-failure individual scenario
+PASS 13: overload-trip individual scenario
+PASS 14: conveyor-throughput individual scenario
+PASS 15: belt-slip-recovery individual scenario
+PASS 16: welded-contactor individual scenario
+PASS 17: Hazard shown with motor running after welded-contact STOP
+PASS 18: Hazard cleared when supply isolated
+PASS 19: Unprotected sensor logic fails acceptance
+PASS 20: Unprotected guard logic fails acceptance
+PASS 21: Unwired board fails
+PASS 22: Powered I0.2 board passes
+PASS 23: Configured-board sensor open breaks the actual input circuit
+PASS 24: Automated board fault injection never mutates user board
+PASS 25: Configured mode requires board
+PASS 26: Invalid program rejected
+PASS 27: Duplicate FAT case rejected
+PASS 28: Empty FAT case selection rejected
+PASS 29: CSV contains summary and evidence
+PASS 30: CSV formula cannot become a formula from fixed generated data
+PASS: 30/30 standalone focused checks

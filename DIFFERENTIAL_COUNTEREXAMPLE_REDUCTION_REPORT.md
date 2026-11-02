@@ -1,0 +1,5 @@
+# Differential counterexample reduction — 2026-10-31
+
+Added `src/engineering/differential-minimizer.ts`, a bounded deterministic delta-debugging reducer for differences between two ladder programs. It removes unnecessary sequence steps, shortens scan durations, and removes redundant input assignments while requiring a disagreement on the original first divergent output to survive. The Instruction Lab now offers **Minimize regression counterexample** and places the reduced sequence in the editable test field. The original reference and candidate ladder programs are not changed.
+
+Verification: TypeScript standalone engineering check passed; six focused Node runtime assertions passed. Three Vitest test cases were authored but not executed. Full Vite/React compilation, browser testing, and real hardware acceptance remain unverified. Reduction is heuristic and bounded, not guaranteed globally minimal; changing sequence steps changes inherited input state. Simulation discrepancies are not proof of industrial safety.

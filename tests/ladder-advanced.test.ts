@@ -1,0 +1,11 @@
+import { describe, expect, it } from 'vitest';
+import { executeLadder, validateLadder, type LadderDocument } from '../src/engineering/ladder';
+const program = (kind:'ton'|'tof'|'ctu', preset:number): LadderDocument => ({id:'advanced',version:'1',rungs:[{id:'r1',elements:[{type:'contact',tag:'Start'}],coil:'Done',operation:kind==='ctu'?{kind,preset}:{kind,presetMs:preset}}]});
+describe('deterministic ladder instructions',()=>{
+ it('TON accumulates scan time and resets on false',()=>{const p=program('ton',60);let a=executeLadder(p,{Start:true},{},{},20);expect(a.outputs.Done).toBe(false);a=executeLadder(p,{Start:true},a.outputs,a.memory,20);a=executeLadder(p,{Start:true},a.outputs,a.memory,20);expect(a.outputs.Done).toBe(true);a=executeLadder(p,{Start:false},a.outputs,a.memory,20);expect(a.outputs.Done).toBe(false);expect(a.memory.r1.elapsedMs).toBe(0);});
+ it('TOF remains active until the delay expires',()=>{const p=program('tof',60);let a=executeLadder(p,{Start:true});expect(a.outputs.Done).toBe(true);a=executeLadder(p,{Start:false},a.outputs,a.memory,20);expect(a.outputs.Done).toBe(true);a=executeLadder(p,{Start:false},a.outputs,a.memory,20);expect(a.outputs.Done).toBe(true);a=executeLadder(p,{Start:false},a.outputs,a.memory,20);expect(a.outputs.Done).toBe(false);});
+ it('CTU counts only rising edges',()=>{const p=program('ctu',2);let a=executeLadder(p,{Start:true});expect(a.memory.r1.count).toBe(1);a=executeLadder(p,{Start:true},a.outputs,a.memory);expect(a.memory.r1.count).toBe(1);a=executeLadder(p,{Start:false},a.outputs,a.memory);a=executeLadder(p,{Start:true},a.outputs,a.memory);expect(a.outputs.Done).toBe(true);expect(a.memory.r1.count).toBe(2);});
+ it('rejects duplicate output tags',()=>{const p=program('ton',50);expect(validateLadder({...p,rungs:[...p.rungs,{...p.rungs[0],id:'r2'}]})).toContain('Rung 1: duplicate output tag Done');});
+ it('rejects invalid timer presets',()=>expect(validateLadder(program('ton',0)).length).toBeGreaterThan(0));
+ it('replay produces identical memory and trace',()=>{const p=program('ton',40);const run=()=>{let a=executeLadder(p,{Start:true});return executeLadder(p,{Start:true},a.outputs,a.memory)};expect(run()).toEqual(run());});
+});

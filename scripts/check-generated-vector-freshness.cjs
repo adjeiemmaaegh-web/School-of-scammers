@@ -1,0 +1,14 @@
+const fs=require('node:fs');
+const assert=require('node:assert/strict');
+const src=fs.readFileSync('src/components/InstructionLab.tsx','utf8');
+const generator=src.match(/const result=generateMcdcVectors\(bench\.program\);([\s\S]*?)setNotice\(`Generated /);
+assert.ok(generator,'MC/DC generator action exists');
+const action=generator[1];
+const invalidate=action.indexOf('updateSequenceText(JSON.stringify(result.steps,null,2))');
+const retain=action.indexOf('setGeneratedVectors(result)');
+assert.ok(invalidate>=0&&retain>invalidate,'Invalidate old evidence BEFORE retaining new generator evidence');
+const updater=src.match(/const updateSequenceText=\(next:string\)=>\{([^}]*)\};/);
+assert.ok(updater&&updater[1].indexOf('clearSequenceEvidence()')<updater[1].indexOf('setSequenceText(next)'),'Sequence edits invalidate evidence');
+assert.ok(src.includes('setGeneratedVectors(null)'),'Invalidation clears generated evidence');
+assert.ok(src.includes('disabled={!generatedVectors}'),'Export requires fresh generated evidence');
+console.log('PASS: 5 MC/DC generated-evidence lifecycle assertions');

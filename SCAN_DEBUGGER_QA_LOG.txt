@@ -1,0 +1,26 @@
+PASS 01 Fresh debugger initializes with no events
+PASS 02 Scan breakpoint stops after an exact number of scans
+PASS 03 Continuing leaves completed scan breakpoint behind
+PASS 04 Input edge is sampled only on completed PLC scans
+PASS 05 Coil pulse rising edge halts
+PASS 06 Coil pulse falling edge halts
+PASS 07 Rung energization halts
+PASS 08 Timer threshold triggers at exact simulated 60 ms
+PASS 09 Retentive timer resets and can trigger again
+PASS 10 Counter threshold triggers on second distinct sensor edge
+PASS 11 Multiple breakpoints can match the same scan
+PASS 12 Disabled breakpoint does not halt
+PASS 13 Removed breakpoint does not halt
+PASS 14 Reset retains rule definitions but resets PLC scan memory
+PASS 15 Replaying mixed input toggles reproduces exact output trace
+PASS 16 Replayed trace still valid after bounded 500-sample history rollover
+PASS 17 Replay verification notices manipulated output data
+PASS 18 Rejects nonexistent coil and rung targets
+PASS 19 Rejects timer and counter thresholds above preset
+PASS 20 Rejects unsupported run length
+PASS 21 Rejects more than 24 breakpoint definitions
+PASS 22 Session evidence exports actual replay and trace
+PASS 23 Factory acceptance remains 10/10 after debugger addition
+PASS 24 Simulated FAT outcomes are unchanged under replay of debug exercises
+
+24/24 native source integration checks passed
