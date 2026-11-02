@@ -1,0 +1,25 @@
+/* Analog-process and Structured Text engineering learning workspace. */
+.process-lab .page-heading{margin-bottom:18px}
+.process-lab .process-tabs{margin-bottom:18px}
+.process-lab .process-tabs button[aria-selected="true"]{background:#126e66;color:#f2fffc;border-color:#2fcdb6}
+.process-layout{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(280px,1fr);gap:18px;align-items:start}
+.process-stack{display:grid;gap:18px;min-width:0}
+.process-stack>.panel{min-width:0}
+.process-stack .panel>label:not(.process-check):not(.process-tag-input){display:flex;flex-direction:column;gap:7px;margin:12px 0;font-weight:600;font-size:13px}
+.process-stack input[type=number],.process-stack select,.process-stack textarea{width:100%;max-width:100%;box-sizing:border-box;padding:10px;border:1px solid #466777;border-radius:8px;background:#101f2e;color:#eff8ff;font-family:inherit}
+.process-stack textarea{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;line-height:1.55;min-height:130px;resize:vertical}
+.process-stack input[type=range]{accent-color:#39cbb5;width:100%}
+.process-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.process-check{display:flex;gap:10px;align-items:center;font-size:13px;line-height:1.4;margin:12px 0}
+.process-check input{accent-color:#32ccbd}
+.process-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}
+.process-metrics>div{border:1px solid #325067;border-radius:8px;padding:10px 8px;background:#0b1d2d;display:flex;flex-direction:column;gap:6px}
+.process-metrics small{color:#b9d3e0;font-size:11px}
+.process-metrics strong{color:#ddfff6;font-size:20px}
+.process-tag-input{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:9px 0;padding:7px 0;border-bottom:1px solid #314658}
+.process-tag-input input[type=number]{max-width:105px}
+.process-error{padding:12px 15px;background:#6f283540;border:1px solid #dc7272;border-radius:8px;color:#ffd8db;margin:10px 0}
+.process-feedback{white-space:pre-wrap;padding:12px;background:#102a37;border-radius:8px;border-left:3px solid #35bba7}
+.process-lab svg{max-width:100%;height:auto}
+@media(max-width:1030px){.process-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:570px){.process-controls{grid-template-columns:repeat(3,minmax(0,1fr))}.process-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
