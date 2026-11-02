@@ -15,6 +15,11 @@ describe('3D process rendering adapter',()=>{
  it('shows sensor and motor states from the same snapshot',()=>{
   const p=advanceProcess(initialProcess(),{motor:true,diverter:true},20);
   expect(processVisualState(p).beltRunning).toBe(true);
-  expect(processVisualState(p).diverterActive).toBe(true);
+  expect(processVisualState(p).diverterActive).toBe(false);
+  expect(processVisualState(p).diverterPosition).toBeGreaterThan(0);
+  expect(processVisualState(p).diverterPosition).toBeLessThan(1);
+  const extended=advanceProcess(p,{motor:true,diverter:true},280);
+  expect(processVisualState(extended).diverterActive).toBe(true);
+  expect(processVisualState(extended).diverterPosition).toBe(1);
  });
 });
