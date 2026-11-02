@@ -1,4 +1,5 @@
 import { Canvas } from '@react-three/fiber';
+import {SceneShell} from './SceneShell';
 import { useMemo } from 'react';
 import { OrbitControls, Text } from '@react-three/drei';
 import type { ProcessState } from '../engineering/conveyor-process';
@@ -44,7 +45,7 @@ function SafetyFence({z}:{z:number}) {
 export function ProcessConveyor3D({process}:{process:ProcessState}) {
   const scene = processVisualState(process);
   const rollerPositions=useMemo(()=>Array.from({length:17},(_,i)=>-1.98+i*0.2475),[]);
-  return <div className="scene" aria-label="3D conveyor process driven by deterministic PLC simulation">
+  return <SceneShell title="PLC-driven conveyor process" summary={`Belt: ${scene.beltRunning?'MOVING':'STOPPED'}. Products: ${scene.packages.length}. Photoeye: ${scene.photoeyeActive?'ACTIVE':'CLEAR'}. Diverter: ${scene.diverterActive?'EXTENDED':'RETRACTED/IN TRANSIT'}.`}>
     <Canvas camera={{position:[4.7,3.7,6.7],fov:48}}>
       <color attach="background" args={['#0e1726']}/>
       <ambientLight intensity={0.85}/><hemisphereLight args={["#c6d7ec","#182234",1.15]}/>
@@ -78,5 +79,5 @@ export function ProcessConveyor3D({process}:{process:ProcessState}) {
       <Text position={[0,1.75,0]} fontSize={0.2} color="#e2e8f0">{scene.jammed?'JAM DETECTED':scene.beltRunning?'BELT MOVING':'BELT STOPPED'} · {scene.packages.length} PRODUCTS</Text>
       <OrbitControls makeDefault minDistance={3} maxDistance={12} maxPolarAngle={Math.PI/2.1}/>
     </Canvas>
-  </div>;
+  </SceneShell>;
 }
