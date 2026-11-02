@@ -24,3 +24,26 @@
 .graphics-toggle{position:absolute;z-index:5;right:12px;bottom:12px;padding:7px 11px;font-size:12px;background:#0b2335ec;border:1px solid #388078;}
 .graphics-toggle:focus-visible{outline:3px solid #64e1ca;outline-offset:2px;}
 @media(prefers-reduced-motion:reduce){.scene-shell *, .app-sidebar{transition:none!important;animation:none!important;}}
+
+
+/* Control-state training simulator: keyboard-friendly cabinet display and recorded traces. */
+.starter-lab .starter-control-diagram{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:20px;border:1px solid #3b5869;border-radius:14px;background:linear-gradient(140deg,#122c41,#0c1d2f);}
+.starter-lab .starter-coil{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:11px;min-height:120px;padding:18px 10px;background:#1a2738;border:2px solid #5a6c7c;border-radius:11px;text-align:center;color:#b3c8db;}
+.starter-lab .starter-coil strong{font-size:17px;color:#f3f7fc;letter-spacing:.08em;}
+.starter-lab .starter-coil span{font-size:14px;font-weight:700;}
+.starter-lab .starter-coil small{font-size:12px;line-height:1.35;}
+.starter-lab .starter-coil.energized{border-color:#4bdcb8;background:#13443f;box-shadow:inset 0 0 18px #10584a;}
+.starter-lab .starter-progress{height:15px;border:1px solid #406475;border-radius:99px;overflow:hidden;background:#0c1d2c;}
+.starter-lab .starter-progress>div{height:100%;background:linear-gradient(90deg,#26a9a2,#7ff3cc);transition:width .15s ease;}
+.starter-lab .starter-alarm{border:1px solid #cf5b5b;border-radius:8px;padding:12px;background:#54262a;color:#ffe0df;font-weight:800;}
+.starter-lab .starter-check{display:block;padding:11px 4px;border-bottom:1px solid #263f52;line-height:1.55;}
+.starter-lab .starter-check input{accent-color:#3cdaba;transform:scale(1.2);margin-right:10px;}
+.starter-lab .starter-table-wrap{overflow-x:auto;max-height:480px;}
+.starter-lab table{min-width:780px;font-size:13px;}
+.starter-lab th{text-align:left;padding:11px;border-bottom:2px solid #315768;color:#70dfca;white-space:nowrap;}
+.starter-lab td{padding:8px;vertical-align:top;font-variant-numeric:tabular-nums;}
+.starter-lab ol,.starter-lab ul{color:#bed2e2;padding-left:20px;line-height:1.8;}
+.starter-lab select{max-width:100%;margin-top:10px;}
+.starter-lab .metric b{font-size:clamp(18px,2.4vw,28px);white-space:nowrap;}
+@media(max-width:780px){.starter-lab .starter-control-diagram{grid-template-columns:1fr;}.starter-lab .starter-coil{min-height:78px;}}
+@media(prefers-reduced-motion:reduce){.starter-lab .starter-progress>div{transition:none;}}
