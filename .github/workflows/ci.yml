@@ -22,6 +22,19 @@ jobs:
         run: npm run verify:engineering:offline
       - name: TypeScript, Vitest and Vite production build
         run: npm run verify:full
+      - name: Install headless Chrome for browser acceptance
+        run: |
+          npm install --no-save --no-audit --no-fund puppeteer@24.31.0
+          npx puppeteer browsers install chrome
+      - name: Browser smoke - routes, machine control, meter, assessment and mobile
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 > /tmp/plc-vite-preview.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl --silent --fail http://127.0.0.1:4173/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:4173/ > /dev/null
+          PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
       - name: Upload production build (if successful)
         if: success()
         uses: actions/upload-artifact@v4
