@@ -13,7 +13,7 @@ export function assessSuiteMutations(doc:LadderDocument,cases:readonly Regressio
  for(const c of cases){
   if(!c||typeof c.id!=='string'||!/^[A-Za-z][\w-]{0,63}$/.test(c.id)||ids.has(c.id))throw Error('Invalid or duplicate case ID');
   ids.add(c.id);
-  assertions+=c.steps?.reduce((sum,s)=>sum+Object.keys(s.expect??{}).length,0)??0;
+  assertions+=c.steps?.reduce((sum:number,s:{expect?:Record<string,boolean>})=>sum+Object.keys(s.expect??{}).length,0)??0;
   const result=runLadderSequence(doc,c.steps,deltaMs);scans+=result.totalScans;
   if(!result.passed)throw Error(`Baseline case ${c.id} fails expected-output assertions`);
  }
@@ -23,7 +23,7 @@ export function assessSuiteMutations(doc:LadderDocument,cases:readonly Regressio
  let truncated=false;
  for(const m of mutants){
   // Reserve the full baseline scan cost per mutant, so no partial mutant can be misclassified.
-  if(scans+cases.reduce((n,c)=>n+c.steps.reduce((k,s)=>k+s.scans,0),0)>maxScanWork){truncated=true;break;}
+  if(scans+cases.reduce((n,c)=>n+c.steps.reduce((k:number,s:{scans:number})=>k+s.scans,0),0)>maxScanWork){truncated=true;break;}
   const detectedBy:string[]=[];let firstFailingStep:number|null=null;
   for(const c of cases){
    const result=runLadderSequence(m.document,c.steps,deltaMs);scans+=result.totalScans;
