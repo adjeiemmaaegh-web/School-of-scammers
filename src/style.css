@@ -68,3 +68,16 @@
 .patch-lab ol{padding-left:20px;line-height:1.85;color:#bfccdb;}
 @media(max-width:990px){.patch-lab .patch-devices{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:520px){.patch-lab .patch-ports{grid-template-columns:repeat(2,minmax(0,1fr));}.patch-lab .patch-device b{font-size:17px;}}
+
+
+/* Avoid intrinsic-width tables/selects forcing mobile lab cards to 800+ px. */
+.starter-lab,.patch-lab,.starter-lab .workspace,.patch-lab .workspace{min-width:0;max-width:100%;}
+.starter-lab .workspace,.patch-lab .workspace{grid-template-columns:minmax(0,1.8fr) minmax(0,1fr);}
+.starter-lab .workspace>*,.patch-lab .workspace>*{min-width:0;}
+.starter-lab .starter-table-wrap,.patch-lab .patch-wires{max-width:100%;}
+.starter-lab .panel,.patch-lab .panel{min-width:0;max-width:100%;}
+@media(max-width:850px){
+ .starter-lab .workspace,.patch-lab .workspace{grid-template-columns:minmax(0,1fr);}
+ .starter-lab .starter-table-wrap{overflow-x:auto;}
+ .starter-lab .metric-grid,.patch-lab .metric-grid{min-width:0;}
+}
