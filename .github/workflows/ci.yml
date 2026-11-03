@@ -10,7 +10,7 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,9 +22,11 @@ jobs:
         run: npm run verify:engineering:offline
       - name: TypeScript, Vitest and Vite production build
         run: npm run verify:full
+      - name: Enforce compressed bundle transfer-size budgets
+        run: node scripts/check-performance-budgets.cjs
       - name: Install headless Chrome for browser acceptance
         run: |
-          npm install --no-save --no-audit --no-fund puppeteer@24.31.0
+          npm install --no-save --no-audit --no-fund puppeteer@24.31.0 axe-core@4.10.3
           npx puppeteer browsers install chrome
       - name: Browser smoke - routes, machine control, meter, assessment and mobile
         run: |
@@ -35,10 +37,14 @@ jobs:
           done
           curl --silent --fail http://127.0.0.1:4173/ > /dev/null
           PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
-      - name: Install Firefox for second-browser acceptance
+      - name: Automated WCAG accessibility and keyboard skip-navigation audit
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/accessibility-acceptance.cjs
+      - name: No-WebGL low-resource browser functionality
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/cpu-fallback-acceptance.cjs
+      - name: Install Firefox and Linux WebKit for browser acceptance
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.64.1
-          npx playwright install --with-deps firefox
+          npx playwright install --with-deps firefox webkit
       - name: Firefox browser smoke - DC, PLC workcell and mobile
         run: |
           npx vite preview --host 127.0.0.1 --port 4174 > /tmp/plc-firefox-preview.log 2>&1 &
@@ -48,6 +54,9 @@ jobs:
           done
           curl --silent --fail http://127.0.0.1:4174/ > /dev/null
           PLC_BASE_URL=http://127.0.0.1:4174 node scripts/firefox-acceptance.cjs
+      - name: Linux WebKit browser smoke - DC, workcell and mobile
+        run: |
+          PLC_BASE_URL=http://127.0.0.1:4174 node scripts/webkit-acceptance.cjs
       - name: Upload production build (if successful)
         if: success()
         uses: actions/upload-artifact@v4
