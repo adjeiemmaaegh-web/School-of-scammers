@@ -162,7 +162,8 @@ export function runStructuredTextScans(program:STProgram,steps:readonly {scans:n
  const rows:{scan:number;inputs:STSignals;outputs:STSignals}[]=[];let memory:STSignals={...initialOutputs};let sampled:Record<string,STValue>={};
  for(const step of steps){if(!Number.isSafeInteger(step.scans)||step.scans<1)throw new RangeError('Invalid scan count');assertSignals(step.inputs);
   // Later scan steps replace earlier case-variant spellings of the same tag.
-  for(const [tag,value] of Object.entries(step.inputs)){
+  for(const tag of Object.keys(step.inputs)){
+   const value=step.inputs[tag];
    const former=Object.keys(sampled).find(key=>keyword(key)===keyword(tag));
    if(former!==undefined)delete sampled[former];
    sampled[tag]=value;
