@@ -1,0 +1,32 @@
+.workcell-builder .page-heading{align-items:flex-start}
+.workcell-builder .composer-toolbar{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:20px 0}
+.workcell-builder input[type="text"],.workcell-builder input:not([type]){width:100%;min-width:0;margin:5px 0;padding:10px;border-radius:6px;background:#0c2030;border:1px solid #4e6a7d;color:#edf8ff;font:inherit}
+.workcell-builder .composer-toolbar label{min-width:230px;flex:1;max-width:450px}
+.workcell-builder .composer-import{display:inline-flex;align-items:center;justify-content:center;border:1px solid #3a536a;border-radius:7px;padding:11px 16px;background:#17283a;color:#e8f2fa;cursor:pointer}
+.workcell-builder .composer-import:focus-within{outline:2px solid #71ead4}
+.workcell-builder .composer-import input{width:1px;height:1px;opacity:0;position:absolute}
+.workcell-builder .composer-grid{width:min(100%,620px);display:grid;grid-template-columns:repeat(13,minmax(0,1fr));gap:2px;background:#15283a;padding:6px;border:1px solid #30465e;border-radius:8px}
+.workcell-builder .composer-cell{aspect-ratio:1/1;min-width:0;padding:1px;display:flex;align-items:center;justify-content:center;border-radius:3px;border:1px solid #203b4b;background:#0c1d2c;color:#516679;font-size:10px;font-weight:600}
+.workcell-builder .composer-cell.occupied{background:#284b5f;color:#daf4fa;border-color:#477c83}
+.workcell-builder .composer-cell.selected{outline:2px solid #78efcc;outline-offset:-2px;background:#21645f}
+.workcell-builder .composer-cell:focus-visible{outline:2px solid #ffe08e;outline-offset:1px;z-index:1}
+.workcell-builder .composer-palette{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.workcell-builder .composer-palette button{min-width:0;white-space:normal;padding:12px 8px;min-height:48px;text-align:left;font-size:13px}
+.workcell-builder .composer-arrows{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}
+.workcell-builder .composer-arrows button{min-width:0;padding:10px 6px}
+.workcell-builder .composer-arrows button:first-child{grid-column:2}
+.workcell-builder .composer-arrows button:nth-child(2){grid-column:1}
+.workcell-builder .composer-arrows button:nth-child(3){grid-column:3}
+.workcell-builder .composer-arrows button:nth-child(4){grid-column:2;grid-row:3}
+.workcell-builder .composer-arrows button:nth-child(5),.workcell-builder .composer-arrows button:nth-child(6){grid-column:span 3}
+.workcell-builder .composer-devices{max-height:320px;overflow:auto;display:grid;gap:6px}
+.workcell-builder .composer-device{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:9px;border:1px solid #2a4156;border-radius:6px;padding:6px}
+.workcell-builder .composer-device button{font-size:12px;text-align:left;padding:8px;min-width:0}
+.workcell-builder .composer-device label{white-space:nowrap;font-size:12px}
+.workcell-builder .composer-device span{font-variant-numeric:tabular-nums;font-size:12px;min-width:50px;text-align:right}
+.workcell-builder .composer-signals{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;max-height:260px;overflow:auto}
+.workcell-builder .composer-signals>div{display:flex;justify-content:space-between;gap:10px;background:#0a1828;padding:9px;border-radius:5px}
+.workcell-builder .composer-signals code{font-size:11px;overflow-wrap:anywhere}
+.workcell-builder .composer-signals strong{font-size:12px}
+.workcell-builder aside label{display:block;margin:10px 0;font-size:13px}
+@media(max-width:600px){.workcell-builder .composer-cell{font-size:8px}.workcell-builder .composer-device{grid-template-columns:minmax(0,1fr) auto}.workcell-builder .composer-device span{grid-column:2}.workcell-builder .composer-palette{grid-template-columns:1fr 1fr}}
