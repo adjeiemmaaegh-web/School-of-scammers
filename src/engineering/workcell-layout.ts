@@ -26,7 +26,8 @@ export const defaultLayout=():WorkcellLayout=>({
   {id:'cp1',kind:'control-panel',label:'Control station',tag:'CP1',x:0,z:2,rotation:0}
  ]});
 export function validateLayout(value:unknown):WorkcellLayout{
- if(!plain(value)||value.format!==WORKCELL_FORMAT||value.schemaVersion!==1||typeof value.name!=='string'||value.name.trim().length<1||value.name.length>60||!Array.isArray(value.equipment)||value.equipment.length>32)fail('Invalid scene header or capacity (max 32 devices)');
+ if(!plain(value))throw new Error('Invalid scene header');
+ if(value.format!==WORKCELL_FORMAT||value.schemaVersion!==1||typeof value.name!=='string'||value.name.trim().length<1||value.name.length>60||!Array.isArray(value.equipment)||value.equipment.length>32)throw new Error('Invalid scene header or capacity (max 32 devices)');
  const ids=new Set<string>(),tags=new Set<string>(),places=new Set<string>();
  const equipment:Equipment[]=[];
  for(const unknownDevice of value.equipment){
