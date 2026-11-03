@@ -71,7 +71,7 @@ async function run(){
   assert.ok((await page.$eval('body',e=>e.innerText)).includes('Assessment report'));
   console.log('ASSESSMENT PASS');
   await page.setViewport({width:390,height:780});
-  for(const route of ['/','/labs','/starter-lab','/electrical-bench','/pneumatics']){
+  for(const route of ['/','/labs','/starter-lab','/electrical-bench','/pneumatics','/workcell-composer']){
    await visit(page,route);
    const size=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:innerWidth}));
    assert.ok(size.scroll<=size.viewport+2,'Horizontal mobile overflow '+route+' '+JSON.stringify(size));
