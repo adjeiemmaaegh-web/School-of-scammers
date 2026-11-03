@@ -32,3 +32,13 @@
 .dc-lab .dc-node-list button{padding:5px 8px;font-size:11px}
 .dc-lab button:focus-visible,.dc-lab select:focus-visible,.dc-lab input:focus-visible{outline:2px solid #70efce;outline-offset:2px}
 @media(max-width:760px){.dc-lab .dc-schematic{grid-template-columns:68px minmax(0,1fr) 68px;padding:8px;gap:5px}.dc-lab .dc-schematic-part{grid-template-columns:35px minmax(8px,1fr) minmax(55px,2fr) minmax(8px,1fr) 35px}.dc-lab .dc-rail strong{font-size:12px}.dc-lab .dc-rail span{font-size:10px}.dc-lab .dc-schematic-part strong{font-size:9px}}
+
+/* A wide electrical table must scroll inside its own container, not expand the layout grid. */
+.dc-lab,.dc-lab .workspace,.dc-lab .workspace>div,.dc-lab .workspace>aside,.dc-lab .panel,.dc-lab .dc-table-wrap{min-width:0;max-width:100%}
+.dc-lab .dc-table-wrap{display:block;width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.dc-lab .dc-table-wrap table{min-width:650px}
+@media(max-width:850px){
+ .dc-lab .workspace{grid-template-columns:minmax(0,1fr)}
+ .dc-lab .dc-part-editor{max-width:100%}
+ .dc-lab .dc-part-editor label{min-width:0}
+}
