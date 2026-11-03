@@ -2,7 +2,7 @@ import {describe,it,expect} from 'vitest';
 import {
  defaultLayout,validateLayout,parseLayout,serializeLayout,addEquipment,updateEquipment,
  moveEquipment,rotateEquipment,removeEquipment,initialScan,stepWorkcell,deviceSignals,
- persistLayout,readLayout,WORKCELL_STORAGE_KEY,WORKCELL_RECOVERY_KEY
+ persistLayout,readLayout,restoreLayoutFromRecovery,WORKCELL_STORAGE_KEY,WORKCELL_RECOVERY_KEY,WORKCELL_DAMAGED_KEY
 } from '../src/engineering/workcell-layout';
 const memory=()=>{const m=new Map<string,string>();return {
  getItem:(k:string)=>m.get(k)??null,
@@ -105,6 +105,23 @@ describe('offline factory workcell authoring',()=>{
   const snapshot=readLayout(store);
   expect(snapshot.source).toBe('recovery');expect(snapshot.layout).toEqual(d);
   expect(store.getItem(WORKCELL_STORAGE_KEY)).toBe('broken');
+ });
+ it('restores valid recovery while retaining exact damaged primary bytes',()=>{
+  const store=memory(),backup=addEquipment(defaultLayout(),'pump');
+  store.setItem(WORKCELL_STORAGE_KEY,'unreadable primitive text');
+  store.setItem(WORKCELL_RECOVERY_KEY,serializeLayout(backup));
+  const restored=restoreLayoutFromRecovery(store);
+  expect(restored).toEqual(backup);
+  expect(readLayout(store).source).toBe('primary');
+  expect(store.getItem(WORKCELL_DAMAGED_KEY)).toBe('unreadable primitive text');
+ });
+ it('refuses recovery over a valid primary and leaves both copies unchanged',()=>{
+  const store=memory(),primary=serializeLayout(defaultLayout());
+  store.setItem(WORKCELL_STORAGE_KEY,primary);
+  store.setItem(WORKCELL_RECOVERY_KEY,serializeLayout(addEquipment(defaultLayout(),'pump')));
+  expect(()=>restoreLayoutFromRecovery(store)).toThrow('valid');
+  expect(store.getItem(WORKCELL_STORAGE_KEY)).toBe(primary);
+  expect(store.getItem(WORKCELL_DAMAGED_KEY)).toBeNull();
  });
  it('handles browser storage denial without crashing a lab',()=>{
   const store={getItem:(_key:string):string|null=>{throw new Error('storage blocked');}};
