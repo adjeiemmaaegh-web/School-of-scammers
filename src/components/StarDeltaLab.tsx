@@ -102,7 +102,7 @@ export function StarDeltaLab(){
     <div className="panel">
      <div className="topline"><h2>PLC scan timeline</h2><button disabled={!records.length} onClick={()=>exportCsv(records)}>Export timing CSV</button></div>
      <p className="muted">Latest 18 retained scans are displayed. Export includes up to 3,000 captured scans, without silently inventing earlier history.</p>
-     <div className="starter-table-wrap"><table><thead><tr><th>Time</th><th>State</th><th>Main</th><th>Star</th><th>Delta</th><th>Feedback</th><th>Message</th></tr></thead>
+     <div className="starter-table-wrap" role="region" aria-label="Scrollable PLC scan timeline" tabIndex={0}><table><thead><tr><th>Time</th><th>State</th><th>Main</th><th>Star</th><th>Delta</th><th>Feedback</th><th>Message</th></tr></thead>
       <tbody>{records.slice(-18).map((r,i)=><tr key={r.timeMs+'-'+i}><td>{r.timeMs} ms</td><td>{r.phase}</td><td>{r.main?'ON':'OFF'}</td><td>{r.star?'ON':'OFF'}</td><td>{r.delta?'ON':'OFF'}</td><td>{r.starFeedback?'STAR ':''}{r.deltaFeedback?'DELTA':''}</td><td>{r.hazard?'⚠ ':''}{r.message}</td></tr>)}</tbody></table></div>
      {!records.length&&<p>No scans captured. Press START and advance the clock.</p>}
     </div>
