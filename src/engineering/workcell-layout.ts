@@ -4,6 +4,7 @@
 export const WORKCELL_FORMAT='plc-skills-workcell' as const;
 export const WORKCELL_STORAGE_KEY='plc-skills-workcell-layout-v1';
 export const WORKCELL_RECOVERY_KEY='plc-skills-workcell-layout-recovery-v1';
+export const WORKCELL_DAMAGED_KEY='plc-skills-workcell-layout-damaged-primary-v1';
 export type EquipmentKind='conveyor'|'tank'|'cylinder'|'pump'|'photoeye'|'control-panel'|'fence';
 export const EQUIPMENT_KINDS:readonly EquipmentKind[]=['conveyor','tank','cylinder','pump','photoeye','control-panel','fence'];
 export type Equipment={id:string;kind:EquipmentKind;label:string;tag:string;x:number;z:number;rotation:0|1|2|3};
@@ -127,4 +128,22 @@ export function readLayout(store:Pick<WorkcellStorage,'getItem'>):{layout:Workce
   if(content!==null)try{return {layout:parseLayout(content),source,warning:source==='recovery'?'Primary layout is invalid; using read-only last valid recovery. Export a copy before restoring.':null};}catch{damaged=true;}
  }
  return {layout:defaultLayout(),source:'default',warning:damaged?'Local layout is damaged. Preserved stored bytes; starting an unsaved default scene.':null};
+}
+
+/** Explicit recovery: retain the exact damaged primary bytes before restoring validated backup.
+ * Never silently overwrite a valid current project.
+ */
+export function restoreLayoutFromRecovery(store:WorkcellStorage):WorkcellLayout{
+ const raw=store.getItem(WORKCELL_STORAGE_KEY);
+ if(raw!==null){
+  let valid=false;
+  try{parseLayout(raw);valid=true;}catch{/* deliberately preserve bad input */}
+  if(valid)throw Error('Primary layout is valid; refusing to overwrite it with recovery');
+ }
+ const backup=store.getItem(WORKCELL_RECOVERY_KEY);
+ if(backup===null)throw Error('No saved recovery scene exists');
+ const restored=parseLayout(backup);
+ if(raw!==null)store.setItem(WORKCELL_DAMAGED_KEY,raw);
+ store.setItem(WORKCELL_STORAGE_KEY,serializeLayout(restored));
+ return restored;
 }
