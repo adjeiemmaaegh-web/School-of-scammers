@@ -47,14 +47,14 @@ async function run(){
   await visit(page,'/process-control');await click(page,'Run 10 s');console.log('PID SCAN PASS');
   await visit(page,'/workcell-composer');
   await page.waitForSelector('.composer-grid');
-  const initialCount=await page.$eval('.composer-cell.occupied',cells=>cells.length);
+  const initialCount=await page.evaluate(()=>document.querySelectorAll('.composer-cell.occupied').length);
   await click(page,'Pump skid');
-  const addedCount=await page.$eval('.composer-cell.occupied',cells=>cells.length);
+  const addedCount=await page.evaluate(()=>document.querySelectorAll('.composer-cell.occupied').length);
   assert.equal(addedCount,initialCount+1,'Adding equipment must update floor plan');
   await click(page,'Undo');
-  assert.equal(await page.$eval('.composer-cell.occupied',cells=>cells.length),initialCount,'Undo must restore previous floor plan');
+  assert.equal(await page.evaluate(()=>document.querySelectorAll('.composer-cell.occupied').length),initialCount,'Undo must restore previous floor plan');
   await click(page,'Redo');
-  assert.equal(await page.$eval('.composer-cell.occupied',cells=>cells.length),initialCount+1,'Redo must restore added device');
+  assert.equal(await page.evaluate(()=>document.querySelectorAll('.composer-cell.occupied').length),initialCount+1,'Redo must restore added device');
   await click(page,'Scan 100 ms');
   assert.ok((await page.$eval('body',e=>e.innerText)).includes('100 ms'),'Machine scan advances');
   console.log('WORKCELL COMPOSER PASS');
