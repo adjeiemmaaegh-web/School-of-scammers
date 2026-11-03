@@ -31,7 +31,7 @@ async function run(){
  const exceptions=[];page.on('pageerror',e=>exceptions.push(e.message));
  try{
   await page.setViewport({width:1366,height:768});
-  const routes=['/','/labs','/engineering','/simulation','/assessments','/process-control','/starter-lab','/electrical-bench','/pneumatics'];
+  const routes=['/','/labs','/engineering','/simulation','/assessments','/process-control','/starter-lab','/electrical-bench','/pneumatics','/workcell-composer'];
   for(const route of routes){await visit(page,route);console.log('ROUTE PASS',route);}
   await visit(page,'/starter-lab');await page.waitForSelector('.starter-control-diagram');
   await click(page,'Press START');for(let i=0;i<4;i++)await click(page,'Advance 1 s');
@@ -45,6 +45,19 @@ async function run(){
   assert.equal(await page.$eval('.patch-meter',e=>e.textContent?.trim()),'24.0 V DC','Correct loop meter voltage');
   await click(page,'Isolate supply');console.log('PATCH BENCH PASS');
   await visit(page,'/process-control');await click(page,'Run 10 s');console.log('PID SCAN PASS');
+  await visit(page,'/workcell-composer');
+  await page.waitForSelector('.composer-grid');
+  const initialCount=await page.$eval('.composer-cell.occupied',cells=>cells.length);
+  await click(page,'Pump skid');
+  const addedCount=await page.$eval('.composer-cell.occupied',cells=>cells.length);
+  assert.equal(addedCount,initialCount+1,'Adding equipment must update floor plan');
+  await click(page,'Undo');
+  assert.equal(await page.$eval('.composer-cell.occupied',cells=>cells.length),initialCount,'Undo must restore previous floor plan');
+  await click(page,'Redo');
+  assert.equal(await page.$eval('.composer-cell.occupied',cells=>cells.length),initialCount+1,'Redo must restore added device');
+  await click(page,'Scan 100 ms');
+  assert.ok((await page.$eval('body',e=>e.innerText)).includes('100 ms'),'Machine scan advances');
+  console.log('WORKCELL COMPOSER PASS');
   await visit(page,'/pneumatics');
   await click(page,'Reference commissioning sequence');
   const pneumaticText=await page.$eval('body',node=>node.innerText);
