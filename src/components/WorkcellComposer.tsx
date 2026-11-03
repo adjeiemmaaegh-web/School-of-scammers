@@ -5,7 +5,7 @@ import {SceneShell} from './SceneShell';
 import {
  EQUIPMENT_KINDS,WORKCELL_STORAGE_KEY,defaultLayout,validateLayout,addEquipment,
  updateEquipment,moveEquipment,removeEquipment,rotateEquipment,parseLayout,
- serializeLayout,initialScan,stepWorkcell,deviceSignals,persistLayout,readLayout,
+ serializeLayout,initialScan,stepWorkcell,deviceSignals,persistLayout,readLayout,restoreLayoutFromRecovery,
  type Equipment,type EquipmentKind,type WorkcellLayout,type WorkcellCommands,type WorkcellScan
 } from '../engineering/workcell-layout';
 import {stepWorkcellPlc,initialWorkcellPlcState,DEFAULT_OPERATOR_PANEL,DEMO_WORKCELL_PROGRAM,type OperatorPanel} from '../engineering/workcell-plc';
@@ -95,6 +95,7 @@ export function WorkcellComposer(){
  const [operator,setOperator]=useState<OperatorPanel>(DEFAULT_OPERATOR_PANEL);
  const [programLabel,setProgramLabel]=useState('Sample automatic conveyor / diverter ladder');
  const [note,setNote]=useState(start.warning??'Place machines on the floor plan, then command and scan each device.');
+ const [recoveryAvailable,setRecoveryAvailable]=useState(start.source==='recovery');
  const [saveStatus,setSaveStatus]=useState(start.source==='recovery'?'Recovery loaded — export before replacing damaged primary.':'Stored locally; export JSON for an independent backup.');
  const [labelDraft,setLabelDraft]=useState('');
  const [tagDraft,setTagDraft]=useState('');
@@ -112,6 +113,16 @@ export function WorkcellComposer(){
   }catch(error){setNote('Cannot apply change: '+String(error));}
  };
  const change=(fn:()=>WorkcellLayout,focus?:string|null)=>{try{commit(fn(),focus);}catch(e){setNote('Cannot apply change: '+String(e));}};
+ const restoreBackup=()=>{
+  if(!window.confirm('Restore your last valid scene backup? First export any unsaved edits.'))return;
+  try{
+   const next=restoreLayoutFromRecovery(window.localStorage);
+   setLayout(next);setPast([]);setFuture([]);setSelected(next.equipment[0]?.id??null);
+   setScan(initialScan());setPlc(initialWorkcellPlcState());setCommands({});
+   setRecoveryAvailable(false);setSaveStatus('Recovered scene restored; original damaged bytes preserved separately.');
+   setNote('Scene recovery completed. Export a JSON backup now.');
+  }catch(error){setNote('Could not restore backup: '+String(error));}
+ };
  const useSnapshot=(next:WorkcellLayout,other:'undo'|'redo')=>{
   setLayout(next);setScan(initialScan());setPlc(initialWorkcellPlcState());setCommands({});setSelected(next.equipment[0]?.id??null);
   try{persistLayout(window.localStorage,next);setSaveStatus('Restored layout saved locally.');}
@@ -260,7 +271,7 @@ export function WorkcellComposer(){
      </>}
     </div>
     <div className="panel"><h2>Offline project integrity</h2>
-     <p>{saveStatus}</p><p className="muted">Storage key: <code>{WORKCELL_STORAGE_KEY}</code>. Saved projects contain layout only—not actual machine operation or safety evidence.</p>
+     <p>{saveStatus}</p>{recoveryAvailable&&<button onClick={restoreBackup}>Restore valid scene backup</button>}<p className="muted">Storage key: <code>{WORKCELL_STORAGE_KEY}</code>. Saved projects contain layout only—not actual machine operation or safety evidence.</p>
      <p role="status" aria-live="polite">{note}</p>
     </div>
    </aside>
