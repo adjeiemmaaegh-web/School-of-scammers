@@ -8,6 +8,9 @@ import {
  serializeLayout,initialScan,stepWorkcell,deviceSignals,persistLayout,readLayout,
  type Equipment,type EquipmentKind,type WorkcellLayout,type WorkcellCommands,type WorkcellScan
 } from '../engineering/workcell-layout';
+import {stepWorkcellPlc,initialWorkcellPlcState,DEFAULT_OPERATOR_PANEL,DEMO_WORKCELL_PROGRAM,type OperatorPanel} from '../engineering/workcell-plc';
+import {parseProject} from '../engineering/project-file';
+import type {LadderDocument} from '../engineering/ladder';
 import './workcell-composer.css';
 
 const names:Readonly<Record<EquipmentKind,string>>={
@@ -86,6 +89,11 @@ export function WorkcellComposer(){
  const [future,setFuture]=useState<WorkcellLayout[]>([]);
  const [scan,setScan]=useState<WorkcellScan>(initialScan);
  const [commands,setCommands]=useState<Record<string,boolean>>({});
+ const [controlMode,setControlMode]=useState<'manual'|'ladder'>('manual');
+ const [program,setProgram]=useState<LadderDocument>(DEMO_WORKCELL_PROGRAM);
+ const [plc,setPlc]=useState(initialWorkcellPlcState);
+ const [operator,setOperator]=useState<OperatorPanel>(DEFAULT_OPERATOR_PANEL);
+ const [programLabel,setProgramLabel]=useState('Sample automatic conveyor / diverter ladder');
  const [note,setNote]=useState(start.warning??'Place machines on the floor plan, then command and scan each device.');
  const [saveStatus,setSaveStatus]=useState(start.source==='recovery'?'Recovery loaded — export before replacing damaged primary.':'Stored locally; export JSON for an independent backup.');
  const [labelDraft,setLabelDraft]=useState('');
@@ -97,7 +105,7 @@ export function WorkcellComposer(){
    const valid=validateLayout(next);
    setPast(p=>[...p.slice(-29),layout]);setFuture([]);setLayout(valid);
    if(focus!==undefined)setSelected(focus);
-   setScan(initialScan());setCommands({});
+   setScan(initialScan());setPlc(initialWorkcellPlcState());setCommands({});
    try{persistLayout(window.localStorage,valid);setSaveStatus('Changes saved to this browser. Export a JSON copy for backup.');}
    catch(e){setSaveStatus('NOT SAVED locally: '+String(e)+'. Export JSON to preserve these changes.');}
    setNote('Layout updated. Simulated scan reset; no physical equipment is controlled.');
@@ -105,7 +113,7 @@ export function WorkcellComposer(){
  };
  const change=(fn:()=>WorkcellLayout,focus?:string|null)=>{try{commit(fn(),focus);}catch(e){setNote('Cannot apply change: '+String(e));}};
  const useSnapshot=(next:WorkcellLayout,other:'undo'|'redo')=>{
-  setLayout(next);setScan(initialScan());setCommands({});setSelected(next.equipment[0]?.id??null);
+  setLayout(next);setScan(initialScan());setPlc(initialWorkcellPlcState());setCommands({});setSelected(next.equipment[0]?.id??null);
   try{persistLayout(window.localStorage,next);setSaveStatus('Restored layout saved locally.');}
   catch(e){setSaveStatus('Restore NOT SAVED: '+String(e));}
   setNote(other==='undo'?'Reverted the last placement change.':'Reapplied placement change.');
@@ -129,10 +137,25 @@ export function WorkcellComposer(){
  };
  const step=(count:number)=>{
   try{
-   let current=scan;
-   for(let i=0;i<count;i++)current=stepWorkcell(layout,current,commands,100);
-   setScan(current);setNote('Executed '+count+' deterministic scan(s) at 100 ms each.');
+   if(controlMode==='ladder'){
+    let current=plc;
+    for(let i=0;i<count;i++)current=stepWorkcellPlc(layout,program,current,operator,commands,100);
+    setPlc(current);setScan(current.plant);
+    setNote('Executed '+count+' ladder-controlled scan(s). Field inputs are sampled then coils update the virtual plant.');
+   }else{
+    let current=scan;
+    for(let i=0;i<count;i++)current=stepWorkcell(layout,current,commands,100);
+    setScan(current);setNote('Executed '+count+' deterministic manual scan(s) at 100 ms each.');
+   }
   }catch(error){setNote('Scan stopped: '+String(error));}
+ };
+ const loadLadder=async(event:React.ChangeEvent<HTMLInputElement>)=>{
+  const file=event.target.files?.[0];event.target.value='';if(!file)return;
+  try{if(file.size>250000)throw RangeError('PLC project exceeds 250 KB');
+   const candidate=parseProject(await file.text());
+   setProgram(candidate.program);setProgramLabel(candidate.name);setPlc(initialWorkcellPlcState());setScan(initialScan());
+   setControlMode('ladder');setNote('Validated PLC project loaded. Coils named TAG_CMD drive matching virtual equipment.');
+  }catch(error){setNote('PLC project import rejected: '+String(error));}
  };
  const selectedInput=(id:string)=>{setSelected(id);setLabelDraft('');setTagDraft('');};
  const changeProperties=()=>{if(!item)return;change(()=>updateEquipment(layout,item.id,{label:labelDraft.trim()||item.label,tag:(tagDraft.trim()||item.tag).toUpperCase()}),item.id);};
@@ -183,17 +206,33 @@ export function WorkcellComposer(){
     </div>
     <div className="panel"><h2>Teaching device scan</h2>
      <p className="muted">Toggle commands and advance in 100 ms simulated steps. Motion curves are normalized demonstrations, not calibrated physical models.</p>
+     <div className="composer-controls"><label><input type="radio" name="composer-control" checked={controlMode==='manual'} onChange={()=>{setControlMode('manual');setScan(initialScan());setPlc(initialWorkcellPlcState());}}/> Manual device commands</label>
+     <label><input type="radio" name="composer-control" checked={controlMode==='ladder'} onChange={()=>{setControlMode('ladder');setScan(initialScan());setPlc(initialWorkcellPlcState());}}/> PLC ladder controlled</label></div>
+     {controlMode==='ladder'&&<div className="composer-plc">
+      <p><b>Loaded PLC program:</b> {programLabel}</p>
+      <p className="muted">Sensor/panel switches become sampled PLC inputs. Each virtual actuator listens for its base tag with _CMD appended, e.g. CV1_CMD or CY1_CMD. Virtual feedback appears as TAG_ACTIVE / TAG_EXTENDED / TAG_RETRACTED. No hardware connectivity.</p>
+      <label className="composer-import">Import PLC engineering project<input type="file" accept=".json,application/json" onChange={loadLadder}/></label>
+      <button onClick={()=>{setProgram(DEMO_WORKCELL_PROGRAM);setProgramLabel('Sample automatic conveyor / diverter ladder');setPlc(initialWorkcellPlcState());setScan(initialScan());}}>Load sample ladder</button>
+      <div className="composer-controls">
+       <label><input type="checkbox" checked={operator.EStopOK} onChange={e=>setOperator(s=>({...s,EStopOK:e.target.checked}))}/> Simulated E-stop OK</label>
+       <label><input type="checkbox" checked={operator.GuardClosed} onChange={e=>setOperator(s=>({...s,GuardClosed:e.target.checked}))}/> Simulated guard closed</label>
+       <label><input type="checkbox" checked={operator.AutoEnable} onChange={e=>setOperator(s=>({...s,AutoEnable:e.target.checked}))}/> Auto enable</label>
+      </div>
+      <h3>Committed PLC coils</h3>
+      <div className="composer-signals">{Object.entries(plc.outputs).map(([tag,value])=><div key={tag}><code>{tag}</code><strong>{value?'TRUE':'FALSE'}</strong></div>)}</div>
+      <h3>Last rung execution</h3><div className="composer-signals">{plc.trace.map(t=><div key={t.rungId}><code>{t.rungId}</code><strong>{t.result?'ENERGIZED':'OFF'}</strong></div>)}</div>
+     </div>}
      <div className="composer-devices">
       {layout.equipment.map(d=>{
        const s=scan.devices[d.id];
        return <div key={d.id} className="composer-device">
         <button onClick={()=>selectedInput(d.id)} aria-pressed={selected===d.id}><b>{d.tag}</b> {d.label}</button>
-        {d.kind!=='fence'&&<label><input type="checkbox" checked={commands[d.id]===true} onChange={e=>setCommands(p=>({...p,[d.id]:e.target.checked}))}/> Command ON</label>}
+        {d.kind!=='fence'&&<label><input type="checkbox" checked={commands[d.id]===true} disabled={controlMode==='ladder'&&d.kind!=='photoeye'&&d.kind!=='control-panel'} onChange={e=>setCommands(p=>({...p,[d.id]:e.target.checked}))}/> {controlMode==='ladder'?'Field input':'Command ON'}</label>}
         <span>{s?(s.value*100).toFixed(1)+'%':'0.0%'}</span>
        </div>;
       })}
      </div>
-     <div className="actions"><button className="primary" onClick={()=>step(1)}>Scan 100 ms</button><button onClick={()=>step(10)}>Scan 1 s</button><button onClick={()=>{setScan(initialScan());setCommands({});setNote('Simulated machine state reset.');}}>Reset scan</button></div>
+     <div className="actions"><button className="primary" onClick={()=>step(1)}>Scan 100 ms</button><button onClick={()=>step(10)}>Scan 1 s</button><button onClick={()=>{setScan(initialScan());setPlc(initialWorkcellPlcState());setCommands({});setNote('Simulated machine and PLC state reset.');}}>Reset scan</button></div>
      <h3>Current I/O and feedback snapshot</h3>
      <div className="composer-signals">{Object.entries(signals).map(([key,value])=><div key={key}><code>{key}</code><strong>{typeof value==='boolean'?(value?'TRUE':'FALSE'):String(value)}</strong></div>)}</div>
     </div>
