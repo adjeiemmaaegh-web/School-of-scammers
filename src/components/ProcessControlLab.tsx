@@ -61,15 +61,17 @@ export function ProcessControlLab(){
  const advance=(seconds:number)=>{
   try{
    const compiled=useST?compileStructuredText(logic):null;
-   if(compiled&&!compiled.assignedOutputs.includes('PumpEnable'))throw new Error('Structured Text pump permissive must assign PumpEnable.');
+   const pumpTag=compiled?.assignedOutputs.find(tag=>tag.toUpperCase()==='PUMPENABLE');
+   if(compiled&&!pumpTag)throw new Error('Structured Text pump permissive must assign PumpEnable.');
    let current=tank;let outputs:STSignals={...stMemory};const newRows:TankSample[]=[];
    for(let i=0;i<seconds;i++){
     let permit=settings.permitPump;
     if(compiled){
      const signals:STSignals={TankLevel:current.measuredPercent,TankHigh:current.actualPercent>=95,TankLow:current.actualPercent<=10,EStopOK:!settings.emergencyStop};
      outputs=executeStructuredText(compiled,signals,outputs).outputs;
-     if(typeof outputs.PumpEnable!=='boolean')throw new TypeError('PumpEnable must be BOOL; program outputs are not safe to execute.');
-     permit=permit&&outputs.PumpEnable;
+     const pumpEnable=outputs[pumpTag!];
+     if(typeof pumpEnable!=='boolean')throw new TypeError('PumpEnable must be BOOL; program outputs are not safe to execute.');
+     permit=permit&&pumpEnable;
     }
     current=stepTank(current,{...settings,permitPump:permit,resetTrip:i===0&&settings.resetTrip});newRows.push(tankSample(current,settings));
    }

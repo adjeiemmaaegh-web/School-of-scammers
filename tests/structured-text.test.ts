@@ -48,4 +48,36 @@ describe('bounded Structured Text interpreter',()=>{
   expect(executeStructuredText(p,inputs,prev).outputs.Out).toBe(13);expect(inputs.In).toBe(12);expect(prev.Out).toBe(11);
   expect(p.referencedInputs).toEqual(['In']);expect(p.assignedOutputs).toEqual(['Out']);
  });
+
+ it('resolves mixed-case tag references and retains first output spelling',()=>{
+  const p=compileStructuredText('IF start THEN Run := TRUE; ELSE RUN := FALSE; END_IF; result := run;');
+  expect(p.referencedInputs).toEqual(['start']);
+  expect(p.assignedOutputs).toEqual(['Run','result']);
+  const result=executeStructuredText(p,{START:true},{rUn:false});
+  expect(result.outputs).toEqual({Run:true,result:true});
+  expect(result.signals.Run).toBe(true);
+  expect(result.assignments.map(a=>a.tag)).toEqual(['Run','result']);
+ });
+ it('rejects case-only aliases and sampled-input writes through alternate spelling',()=>{
+  const p=compileStructuredText('Start := FALSE;');
+  expect(()=>executeStructuredText(p,{start:true})).toThrow(/overwrite/);
+  expect(()=>executeStructuredText(p,{Start:true,sTaRt:false})).toThrow(/Ambiguous signal aliases/);
+  expect(()=>executeStructuredText(p,{}, {Run:false,run:true})).toThrow(/Ambiguous signal aliases/);
+ });
+ it('replaces case-variant input names between scan steps without creating aliases',()=>{
+  const p=compileStructuredText('IF start THEN Run := TRUE; ELSE run := FALSE; END_IF;');
+  const result=runStructuredTextScans(p,[{scans:1,inputs:{Start:true}},{scans:1,inputs:{START:false}}]);
+  expect(result.rows.map(row=>row.outputs.Run)).toEqual([true,false]);
+  expect(Object.keys(result.rows[1].inputs)).toEqual(['START']);
+ });
+ it('implements safe integer MOD at multiplication precedence with signed remainder',()=>{
+  const p=compileStructuredText('A := 2 + 7 MOD 4 * 3; B := -7 MOD 4; C := 7 MOD -4;');
+  expect(executeStructuredText(p,{}).outputs).toEqual({A:11,B:-3,C:3});
+  expect(executeStructuredText(compileStructuredText('R := 10 mod 3;'),{}).outputs.R).toBe(1);
+ });
+ it('rejects REAL, BOOL, and division-by-zero MOD operands',()=>{
+  expect(()=>executeStructuredText(compileStructuredText('X := 1.5 MOD 2;'),{})).toThrow(/safe integer/);
+  expect(()=>executeStructuredText(compileStructuredText('X := TRUE MOD 2;'),{})).toThrow(/numeric/);
+  expect(()=>executeStructuredText(compileStructuredText('X := 4 MOD 0;'),{})).toThrow(/Division by zero/);
+ });
 });
