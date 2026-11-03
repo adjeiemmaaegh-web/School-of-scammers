@@ -10,7 +10,7 @@ export type STResult={outputs:Record<string,STValue>;signals:Record<string,STVal
 const keyword=(s:string)=>s.toUpperCase();
 const identifier=/^[A-Za-z][A-Za-z0-9_]*$/;
 const number=/^(?:\d+(?:\.\d+)?|\.\d+)$/;
-const precedence:Readonly<Record<string,number>>={OR:1,XOR:2,AND:3,'=':4,'<>':4,'<':4,'<=':4,'>':4,'>=':4,'+':5,'-':5,'*':6,'/':6};
+const precedence:Readonly<Record<string,number>>={OR:1,XOR:2,AND:3,'=':4,'<>':4,'<':4,'<=':4,'>':4,'>=':4,'+':5,'-':5,'*':6,'/':6,MOD:6};
 const RESERVED=new Set(['IF','THEN','ELSIF','ELSE','END_IF','AND','OR','XOR','NOT','TRUE','FALSE','MOD']);
 function tokenize(source:string):Token[]{
  if(typeof source!=='string'||source.length>12000)throw new RangeError('Structured Text must be at most 12,000 characters');
@@ -28,7 +28,7 @@ function tokenize(source:string):Token[]{
  tokens.push({value:'<EOF>',offset:source.length});return tokens;
 }
 export function compileStructuredText(source:string):STProgram{
- const tokens=tokenize(source);let pos=0;let statementCount=0;const reads=new Set<string>();const writes=new Set<string>();
+ const tokens=tokenize(source);let pos=0;let statementCount=0;const reads=new Map<string,string>();const writes=new Map<string,string>();
  const peek=()=>tokens[pos].value, upper=()=>keyword(peek());
  const next=()=>tokens[pos++].value;
  const fail=(reason:string):never=>{throw new SyntaxError(`${reason} at offset ${tokens[Math.min(pos,tokens.length-1)].offset}`);};
@@ -42,7 +42,7 @@ export function compileStructuredText(source:string):STProgram{
   else if(u==='NOT'||t==='+'||t==='-')left={kind:'unary',op:u,inner:expression(7,depth+1)};
   else if(u==='TRUE'||u==='FALSE')left={kind:'literal',value:u==='TRUE'};
   else if(number.test(t)){const value=Number(t);if(!Number.isFinite(value))fail('Nonfinite numeric literal');left={kind:'literal',value};}
-  else if(identifier.test(t)&&!RESERVED.has(u)){reads.add(t);left={kind:'read',name:t};}
+  else if(identifier.test(t)&&!RESERVED.has(u)){reads.set(u,reads.get(u)??t);left={kind:'read',name:u};}
   else fail(`Expected expression, found ${t}`);
   while(true){const op=upper(),prec=precedence[op];if(prec===undefined||prec<minPrec)break;next();const right=expression(prec+1,depth+1);left={kind:'binary',op,left,right};}
   return left;
@@ -58,7 +58,7 @@ export function compileStructuredText(source:string):STProgram{
     const otherwise=accept('ELSE')?statements(new Set(['END_IF']),depth+1):[];
     requireToken('END_IF');requireToken(';');result.push({kind:'if',branches,otherwise});
    }else{
-    const name=readName();requireToken(':=');const expr=expression();requireToken(';');writes.add(name);result.push({kind:'assign',name,expr});
+    const name=readName();requireToken(':=');const expr=expression();requireToken(';');const key=keyword(name);if(!writes.has(key))writes.set(key,name);result.push({kind:'assign',name:key,expr});
    }
   }
   return result;
@@ -66,9 +66,9 @@ export function compileStructuredText(source:string):STProgram{
  const compiled=statements(new Set());
  if(peek()!=='<EOF>')fail(`Unexpected token ${peek()}`);
  if(!compiled.length)throw new SyntaxError('Structured Text requires at least one assignment or IF');
- const outputs=Array.from(writes);
+ const outputs=Array.from(writes.values());
  if(!outputs.length)throw new SyntaxError('Structured Text requires an output assignment');
- return {source,statements:compiled,referencedInputs:Array.from(reads).filter(x=>!writes.has(x)),assignedOutputs:outputs};
+ return {source,statements:compiled,referencedInputs:Array.from(reads.entries()).filter(([key])=>!writes.has(key)).map(([,name])=>name),assignedOutputs:outputs};
 }
 function numeric(v:STValue):number{if(typeof v!=='number')throw new TypeError('Arithmetic requires numeric operands');return v;}
 function bool(v:STValue):boolean{if(typeof v!=='boolean')throw new TypeError('Boolean logic requires BOOL operands');return v;}
@@ -99,6 +99,12 @@ function evaluate(expr:Expression,signals:STSignals):STValue{
   case '-':output=numeric(left)-numeric(right);break;
   case '*':output=numeric(left)*numeric(right);break;
   case '/':if(numeric(right)===0)throw new RangeError('Division by zero');output=numeric(left)/numeric(right);break;
+  case 'MOD':{
+   const a=numeric(left),b=numeric(right);
+   if(!Number.isSafeInteger(a)||!Number.isSafeInteger(b))throw new TypeError('MOD requires safe integer operands');
+   if(b===0)throw new RangeError('Division by zero');
+   output=a%b;break;
+  }
   default:throw new Error('Unsupported operator');
  }
  if(typeof output==='number'&&!Number.isFinite(output))throw new RangeError('Nonfinite arithmetic result');
@@ -106,13 +112,25 @@ function evaluate(expr:Expression,signals:STSignals):STValue{
 }
 function assertSignals(input:STSignals):void{
  if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).length>128)throw new RangeError('Signals must be a map of at most 128 BOOL/REAL tags');
- for(const [k,v] of Object.entries(input))if(!identifier.test(k)||RESERVED.has(keyword(k))||(typeof v!=='boolean'&&(typeof v!=='number'||!Number.isFinite(v))))throw new TypeError(`Invalid signal: ${k}`);
+ const seen=new Set<string>();
+ for(const [k,v] of Object.entries(input)){
+  const key=keyword(k);
+  if(!identifier.test(k)||RESERVED.has(key)||(typeof v!=='boolean'&&(typeof v!=='number'||!Number.isFinite(v))))throw new TypeError(`Invalid signal: ${k}`);
+  if(seen.has(key))throw new TypeError(`Ambiguous signal aliases for ${k}`);
+  seen.add(key);
+ }
 }
 /** Each scan starts from last outputs, then samples current inputs; input tags cannot be overwritten. */
 export function executeStructuredText(program:STProgram,inputs:STSignals,previousOutputs:STSignals={}):STResult{
  assertSignals(inputs);assertSignals(previousOutputs);
  if(!program||!Array.isArray(program.statements))throw new TypeError('Compile Structured Text before executing');
- const values:Record<string,STValue>={...previousOutputs,...inputs};
+ // IEC-style tag identifiers ignore case; public outputs retain the program's first spelling.
+ const values:Record<string,STValue>=Object.create(null);
+ const displays=new Map<string,string>();
+ for(const [tag,value] of Object.entries(previousOutputs)){const key=keyword(tag);values[key]=value;displays.set(key,tag);}
+ for(const [tag,value] of Object.entries(inputs)){const key=keyword(tag);values[key]=value;displays.set(key,tag);}
+ const inputKeys=new Set(Object.keys(inputs).map(keyword));
+ const outputNames=new Map(program.assignedOutputs.map(tag=>[keyword(tag),tag]));
  const outputs:Record<string,STValue>={};const assignments:{tag:string;value:STValue}[]=[];
  let operations=0;
  const run=(statements:readonly Statement[],depth:number)=>{
@@ -120,8 +138,9 @@ export function executeStructuredText(program:STProgram,inputs:STSignals,previou
   for(const statement of statements){
    if(++operations>400)throw new RangeError('Execution statement budget exceeded');
    if(statement.kind==='assign'){
-    if(Object.prototype.hasOwnProperty.call(inputs,statement.name))throw new Error(`Cannot overwrite sampled input ${statement.name}`);
-    const value=evaluate(statement.expr,values);values[statement.name]=value;outputs[statement.name]=value;assignments.push({tag:statement.name,value});
+    if(inputKeys.has(statement.name))throw new Error(`Cannot overwrite sampled input ${statement.name}`);
+    const value=evaluate(statement.expr,values);values[statement.name]=value;
+    const tag=outputNames.get(statement.name)??statement.name;outputs[tag]=value;assignments.push({tag,value});
    }else{
     let body:readonly Statement[]=statement.otherwise;
     for(const branch of statement.branches)if(bool(evaluate(branch.when,values))){body=branch.body;break;}
@@ -131,16 +150,24 @@ export function executeStructuredText(program:STProgram,inputs:STSignals,previou
  };
  run(program.statements,0);
  // Preserve state of declared outputs between scans, including unassigned IF branches.
- for(const tag of program.assignedOutputs){
-  if(Object.prototype.hasOwnProperty.call(values,tag))outputs[tag]=values[tag];
+ for(const [key,tag] of outputNames){
+  if(Object.prototype.hasOwnProperty.call(values,key)){outputs[tag]=values[key];displays.set(key,tag);}
  }
- return {outputs,signals:values,assignments};
+ const signals=Object.fromEntries(Object.entries(values).map(([key,value])=>[displays.get(key)??key,value]));
+ return {outputs,signals,assignments};
 }
 export function runStructuredTextScans(program:STProgram,steps:readonly {scans:number;inputs:STSignals}[],initialOutputs:STSignals={}):{rows:{scan:number;inputs:STSignals;outputs:STSignals}[];finalOutputs:STSignals}{
  if(!Array.isArray(steps)||steps.length<1||steps.length>100)throw new RangeError('Provide 1..100 scan steps');
  const total=steps.reduce((n,s)=>n+s.scans,0);if(total>5000)throw new RangeError('Sequence exceeds 5,000 scans');
  const rows:{scan:number;inputs:STSignals;outputs:STSignals}[]=[];let memory:STSignals={...initialOutputs};let sampled:Record<string,STValue>={};
- for(const step of steps){if(!Number.isSafeInteger(step.scans)||step.scans<1)throw new RangeError('Invalid scan count');assertSignals(step.inputs);sampled={...sampled,...step.inputs};for(let i=0;i<step.scans;i++){const result=executeStructuredText(program,sampled,memory);memory=result.outputs;rows.push({scan:rows.length+1,inputs:{...sampled},outputs:{...memory}});}}
+ for(const step of steps){if(!Number.isSafeInteger(step.scans)||step.scans<1)throw new RangeError('Invalid scan count');assertSignals(step.inputs);
+  // Later scan steps replace earlier case-variant spellings of the same tag.
+  for(const [tag,value] of Object.entries(step.inputs)){
+   const former=Object.keys(sampled).find(key=>keyword(key)===keyword(tag));
+   if(former!==undefined)delete sampled[former];
+   sampled[tag]=value;
+  }
+  for(let i=0;i<step.scans;i++){const result=executeStructuredText(program,sampled,memory);memory=result.outputs;rows.push({scan:rows.length+1,inputs:{...sampled},outputs:{...memory}});}}
  return {rows,finalOutputs:memory};
 }
 export const ST_DEMO=`(* PLC Skills Lab: teaching subset; not a vendor PLC runtime *)
