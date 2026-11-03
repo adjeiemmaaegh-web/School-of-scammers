@@ -31,7 +31,7 @@ async function run(){
  const exceptions=[];page.on('pageerror',e=>exceptions.push(e.message));
  try{
   await page.setViewport({width:1366,height:768});
-  const routes=['/','/labs','/engineering','/simulation','/assessments','/process-control','/starter-lab','/electrical-bench','/pneumatics','/workcell-composer'];
+  const routes=['/','/labs','/engineering','/simulation','/assessments','/process-control','/starter-lab','/electrical-bench','/pneumatics','/workcell-composer','/dc-circuit'];
   for(const route of routes){await visit(page,route);console.log('ROUTE PASS',route);}
   await visit(page,'/starter-lab');await page.waitForSelector('.starter-control-diagram');
   await click(page,'Press START');for(let i=0;i<4;i++)await click(page,'Advance 1 s');
@@ -44,6 +44,25 @@ async function run(){
   assert.ok((await page.$eval('.patch-light-on',e=>e.textContent||'')).includes('LIT'));
   assert.equal(await page.$eval('.patch-meter',e=>e.textContent?.trim()),'24.0 V DC','Correct loop meter voltage');
   await click(page,'Isolate supply');console.log('PATCH BENCH PASS');
+  await visit(page,'/dc-circuit');
+  await page.waitForSelector('.dc-meter');
+  await click(page,'Series voltage divider');
+  await click(page,'Energize 24 V supply');
+  await page.select('select[aria-label="DC red probe"]','N1');
+  await page.select('select[aria-label="DC black probe"]','GND');
+  await pause(120);
+  assert.equal(await page.$eval('.dc-meter',e=>e.textContent?.trim()),'12.000 V DC','Divider has correct 12 V midpoint');
+  assert.ok((await page.$eval('body',e=>e.textContent||'')).includes('12.000 mA'),'Divider branch shows expected 12 mA');
+  await click(page,'Isolate 24 V supply');
+  await click(page,'Balanced bridge network');
+  await click(page,'Energize 24 V supply');
+  assert.equal(await page.$eval('.dc-meter',e=>e.textContent?.trim()),'12.000 V DC','Balanced bridge has correct midpoint');
+  await click(page,'Isolate 24 V supply');
+  await click(page,'Direct supply short');
+  await click(page,'Energize 24 V supply');
+  assert.ok((await page.$eval('body',e=>e.innerText)).includes('Cannot energize'),'Source short must block virtual energization');
+  await click(page,'Series voltage divider');
+  console.log('DC NODAL LAB PASS');
   await visit(page,'/process-control');await click(page,'Run 10 s');console.log('PID SCAN PASS');
   await visit(page,'/workcell-composer');
   await page.waitForSelector('.composer-grid');
@@ -71,7 +90,7 @@ async function run(){
   assert.ok((await page.$eval('body',e=>e.innerText)).includes('Assessment report'));
   console.log('ASSESSMENT PASS');
   await page.setViewport({width:390,height:780});
-  for(const route of ['/','/labs','/starter-lab','/electrical-bench','/pneumatics','/workcell-composer']){
+  for(const route of ['/','/labs','/starter-lab','/electrical-bench','/pneumatics','/workcell-composer','/dc-circuit']){
    await visit(page,route);
    const size=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:innerWidth}));
    assert.ok(size.scroll<=size.viewport+2,'Horizontal mobile overflow '+route+' '+JSON.stringify(size));

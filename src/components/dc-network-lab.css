@@ -1,0 +1,44 @@
+.dc-lab .page-heading{align-items:start}
+.dc-lab .dc-import{display:inline-flex;align-items:center;justify-content:center;border:1px solid #3a536a;border-radius:7px;padding:11px 15px;background:#17283a;color:#eaf4fa;cursor:pointer;position:relative}
+.dc-lab .dc-import:focus-within{outline:2px solid #6ce4d1}
+.dc-lab .dc-import input{position:absolute;opacity:0;width:1px;height:1px;top:50%;left:50%}
+.dc-lab .dc-schematic{background:#0b1b29;border:1px solid #30485a;border-radius:10px;display:grid;grid-template-columns:100px minmax(0,1fr) 100px;gap:10px;padding:15px;align-items:stretch;min-height:165px}
+.dc-lab .dc-rail{display:flex;flex-direction:column;gap:5px;align-items:center;justify-content:center;background:#1c4e5a;border:1px solid #3d9a99;border-radius:6px;color:#c4fbf3}
+.dc-lab .dc-rail.ground{background:#253846;border-color:#607f92;color:#d3e4f0}
+.dc-lab .dc-rail strong{font-size:16px}
+.dc-lab .dc-rail span{font-size:12px}
+.dc-lab .dc-schematic-branches{display:flex;flex-direction:column;gap:6px;max-height:250px;overflow:auto;min-width:0}
+.dc-lab .dc-schematic-part{display:grid;grid-template-columns:45px 1fr minmax(100px,2fr) 1fr 45px;align-items:center;gap:3px;background:#152b3b;border:1px solid #263d4f;border-radius:4px;min-height:32px;padding:3px}
+.dc-lab .dc-schematic-part strong{font-size:11px;text-align:center;color:#e4f2fc;overflow-wrap:anywhere}
+.dc-lab .dc-schematic-part code{font-size:10px;color:#69d6c1;text-align:center}
+.dc-lab .dc-branch-line{height:2px;background:#799eb4}
+.dc-lab .dc-part-editor{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:14px 0}
+.dc-lab .dc-part-editor label{font-size:12px;display:flex;flex-direction:column;gap:6px}
+.dc-lab select,.dc-lab input[type="number"]{max-width:190px;min-height:40px;border:1px solid #496075;border-radius:5px;background:#122a3e;color:#e4f4ff;font:inherit;padding:8px}
+.dc-lab input[type="checkbox"]{min-width:16px;min-height:16px}
+.dc-lab .dc-part-editor label:has(input[type="checkbox"]){flex-direction:row;align-items:center}
+.dc-lab .dc-table-wrap{overflow-x:auto}
+.dc-lab table{min-width:650px;text-align:left}
+.dc-lab td,.dc-lab th{padding:9px;vertical-align:middle;border-bottom:1px solid #2b4356}
+.dc-lab td{font-size:12px}
+.dc-lab td small{display:block;font-size:11px}
+.dc-lab th{color:#aacbdb;font-size:11px}
+.dc-lab td button{font-size:11px;margin:2px;padding:7px 9px}
+.dc-lab aside label{display:flex;flex-direction:column;gap:8px;margin:12px 0;font-size:13px}
+.dc-lab .dc-meter{font-family:ui-monospace,SFMono-Regular,monospace;text-align:center;background:#0b292b;border:2px solid #408f83;color:#b7ffca;word-break:break-word;font-size:clamp(18px,2vw,28px);font-weight:800;border-radius:8px;padding:20px 12px;min-height:75px}
+.dc-lab .dc-node-list{display:flex;flex-direction:column;gap:5px;max-height:270px;overflow:auto}
+.dc-lab .dc-node-list>div{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:6px 8px;background:#0d1d2d;border-radius:5px}
+.dc-lab .dc-node-list strong{font-variant-numeric:tabular-nums;font-size:12px}
+.dc-lab .dc-node-list button{padding:5px 8px;font-size:11px}
+.dc-lab button:focus-visible,.dc-lab select:focus-visible,.dc-lab input:focus-visible{outline:2px solid #70efce;outline-offset:2px}
+@media(max-width:760px){.dc-lab .dc-schematic{grid-template-columns:68px minmax(0,1fr) 68px;padding:8px;gap:5px}.dc-lab .dc-schematic-part{grid-template-columns:35px minmax(8px,1fr) minmax(55px,2fr) minmax(8px,1fr) 35px}.dc-lab .dc-rail strong{font-size:12px}.dc-lab .dc-rail span{font-size:10px}.dc-lab .dc-schematic-part strong{font-size:9px}}
+
+/* A wide electrical table must scroll inside its own container, not expand the layout grid. */
+.dc-lab,.dc-lab .workspace,.dc-lab .workspace>div,.dc-lab .workspace>aside,.dc-lab .panel,.dc-lab .dc-table-wrap{min-width:0;max-width:100%}
+.dc-lab .dc-table-wrap{display:block;width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.dc-lab .dc-table-wrap table{min-width:650px}
+@media(max-width:850px){
+ .dc-lab .workspace{grid-template-columns:minmax(0,1fr)}
+ .dc-lab .dc-part-editor{max-width:100%}
+ .dc-lab .dc-part-editor label{min-width:0}
+}

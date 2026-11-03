@@ -10,7 +10,7 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,6 +35,19 @@ jobs:
           done
           curl --silent --fail http://127.0.0.1:4173/ > /dev/null
           PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
+      - name: Install Firefox for second-browser acceptance
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.64.1
+          npx playwright install --with-deps firefox
+      - name: Firefox browser smoke - DC, PLC workcell and mobile
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4174 > /tmp/plc-firefox-preview.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl --silent --fail http://127.0.0.1:4174/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:4174/ > /dev/null
+          PLC_BASE_URL=http://127.0.0.1:4174 node scripts/firefox-acceptance.cjs
       - name: Upload production build (if successful)
         if: success()
         uses: actions/upload-artifact@v4
