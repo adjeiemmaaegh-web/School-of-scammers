@@ -8,7 +8,7 @@ const base=(process.env.PLC_BASE_URL||'http://127.0.0.1:4174').replace(/\/+$/,''
 const pause=(ms)=>new Promise(resolve=>setTimeout(resolve,ms));
 async function go(page,path){
  const r=await page.goto(base+path,{waitUntil:'domcontentloaded',timeout:40000});
- assert.equal(r?.status(),200,'HTTP 200 for '+path);
+ assert.ok([200,304].includes(r?.status()),'HTTP 200 or valid cache 304 for '+path+': '+r?.status());
  await page.locator('h1').first().waitFor({timeout:25000});
  console.log('FIREFOX ROUTE PASS',path);
 }
