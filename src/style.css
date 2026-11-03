@@ -81,3 +81,12 @@
  .starter-lab .starter-table-wrap{overflow-x:auto;}
  .starter-lab .metric-grid,.patch-lab .metric-grid{min-width:0;}
 }
+
+
+/* Keyboard navigation: a visible skip link, stable focus target and native scroll areas. */
+.skip-link{position:fixed;top:10px;left:10px;z-index:1000;transform:translateY(-150%);padding:12px 18px;background:#eafffa;color:#08242b;font-weight:800;border-radius:8px;outline:3px solid #3bddbc;outline-offset:2px}
+.skip-link:focus{transform:translateY(0)}
+.app-main:focus{outline:2px solid #74f2d3;outline-offset:-2px}
+:where(a,button,select,input,textarea,[tabindex]):focus-visible{outline:2px solid #80efcf;outline-offset:2px}
+.starter-table-wrap[tabindex]:focus-visible{outline:3px solid #80efcf;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto!important}*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}

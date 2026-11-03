@@ -200,10 +200,10 @@ export function WorkcellComposer(){
     <Workcell3D layout={layout} scan={scan} selected={selected} onSelect={selectedInput}/>
     <div className="panel"><h2>Floor plan — 13 × 13 grid</h2>
      <p className="muted">Drag equipment from the palette or select existing equipment and use the arrow buttons. Grid positions are idealized anchors and do not represent collision-free machine clearance.</p>
-     <div className="composer-grid" role="grid" aria-label="Workcell floor plan">
+     <div className="composer-grid" role="group" aria-label="Workcell floor plan — select a cell to edit equipment">
       {Array.from({length:169},(_,i)=>{
        const x=i%13-6,z=Math.floor(i/13)-6,obj=layout.equipment.find(d=>d.x===x&&d.z===z);
-       return <button key={x+':'+z} type="button" role="gridcell"
+       return <button key={x+':'+z} type="button"
         className={'composer-cell '+(obj?'occupied ':'')+(obj&&selected===obj.id?'selected':'')}
         aria-label={(obj?obj.label+' '+obj.kind:'Empty slot')+' at '+x+', '+z}
         draggable={Boolean(obj)}
