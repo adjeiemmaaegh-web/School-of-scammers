@@ -230,10 +230,10 @@ export function executeStructuredText(program:STProgram,inputs:STSignals,previou
  else Object.assign(memory,outputs);
  return {outputs,signals,assignments,memory};
 }
-export function runStructuredTextScans(program:STProgram,steps:readonly {scans:number;inputs:STSignals}[],initialOutputs:STSignals={}):{rows:{scan:number;inputs:STSignals;outputs:STSignals}[];finalOutputs:STSignals}{
+export function runStructuredTextScans(program:STProgram,steps:readonly {scans:number;inputs:STSignals}[],initialOutputs:STSignals={}):{rows:{scan:number;inputs:STSignals;outputs:STSignals}[];finalOutputs:STSignals;finalMemory:STSignals}{
  if(!Array.isArray(steps)||steps.length<1||steps.length>100)throw new RangeError('Provide 1..100 scan steps');
  const total=steps.reduce((n,s)=>n+s.scans,0);if(total>5000)throw new RangeError('Sequence exceeds 5,000 scans');
- const rows:{scan:number;inputs:STSignals;outputs:STSignals}[]=[];let memory:STSignals={...initialOutputs};let sampled:Record<string,STValue>={};
+ const rows:{scan:number;inputs:STSignals;outputs:STSignals}[]=[];let memory:STSignals={...initialOutputs};let lastOutputs:STSignals={};let sampled:Record<string,STValue>={};
  for(const step of steps){if(!Number.isSafeInteger(step.scans)||step.scans<1)throw new RangeError('Invalid scan count');assertSignals(step.inputs);
   // Later scan steps replace earlier case-variant spellings of the same tag.
   for(const tag of Object.keys(step.inputs)){
@@ -242,8 +242,8 @@ export function runStructuredTextScans(program:STProgram,steps:readonly {scans:n
    if(former!==undefined)delete sampled[former];
    sampled[tag]=value;
   }
-  for(let i=0;i<step.scans;i++){const result=executeStructuredText(program,sampled,memory);memory=result.memory;rows.push({scan:rows.length+1,inputs:{...sampled},outputs:{...result.outputs}});}}
- return {rows,finalOutputs:memory};
+  for(let i=0;i<step.scans;i++){const result=executeStructuredText(program,sampled,memory);memory=result.memory;lastOutputs=result.outputs;rows.push({scan:rows.length+1,inputs:{...sampled},outputs:{...result.outputs}});}}
+ return {rows,finalOutputs:lastOutputs,finalMemory:memory};
 }
 export const ST_DEMO=`(* PLC Skills Lab: teaching subset; not a vendor PLC runtime *)
 IF NOT EStopOK OR NOT GuardClosed THEN

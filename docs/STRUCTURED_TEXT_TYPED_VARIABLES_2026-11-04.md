@@ -16,3 +16,9 @@ The implementation is a **subset**, not IEC 61131-3 compliance: no PROGRAM/FUNCT
 
 ## Verification policy
 Perform GitHub CI: engineering checks, semantic TS, Vitest, Vite, size budgets and browser smoke in Chrome/Firefox/Linux WebKit; do not merge if any required gate fails. These checks do not replace industrial reference validation, real 8 GB Windows benchmarks, Safari/Edge device coverage or accessibility sign-off.
+
+## Editor browser regression
+Chrome smoke verifies the typed sample from the React editor, a sampled Start input, output vs private VAR separation, persistence over two scans, and reset-to-initial-value behavior. This test uses local Vite preview in CI; it does not establish real hardware fidelity.
+
+## Scan runner contract
+`runStructuredTextScans` keeps `finalOutputs` public-output-only and adds `finalMemory` for retained private variables. Existing untyped callers keep the original public-output behavior.

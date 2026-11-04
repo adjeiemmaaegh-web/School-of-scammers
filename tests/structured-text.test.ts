@@ -155,7 +155,8 @@ Previous := Start;`);
   const b=runStructuredTextScans(program,steps);
   expect(a).toEqual(b);
   expect(a.rows.map(row=>row.outputs.Pulse)).toEqual([true,false,false,true]);
-  expect(a.finalOutputs).toEqual({Pulse:true,Previous:true});
+  expect(a.finalOutputs).toEqual({Pulse:true});
+  expect(a.finalMemory).toEqual({Pulse:true,Previous:true});
  });
  it('runs the typed example with persistent counter state',()=>{
   const program=compileStructuredText(ST_TYPED_DEMO);
