@@ -3,7 +3,7 @@ import type { Inputs, Program, Signal } from '../core/plc';
 export type Contact = { type: 'contact'; tag: string; normallyClosed?: boolean };
 export type Branch = { type: 'branch'; alternatives: readonly (readonly Contact[])[] };
 export type RungElement = Contact | Branch;
-export type RungOperation = { kind: 'coil' | 'osr' | 'osf' } | { kind: 'ton' | 'tof' | 'rto'; presetMs: number; resetTag?: string } | { kind: 'ctu'; preset: number; resetTag?: string };
+export type RungOperation = { kind: 'coil' | 'osr' | 'osf' } | { kind: 'ton' | 'tof' | 'rto' | 'tp'; presetMs: number; resetTag?: string } | { kind: 'ctu'; preset: number; resetTag?: string } | { kind: 'ctd'; preset: number; loadTag: string };
 export type Rung = { id: string; elements: readonly RungElement[]; coil: string; operation?: RungOperation };
 export type SymbolDefinition = { description: string; address?: string };
 export type LadderDocument = { id: string; version: string; rungs: readonly Rung[]; symbols?: Readonly<Record<string, SymbolDefinition>> };
@@ -38,17 +38,19 @@ export function validateLadder(doc: LadderDocument): string[] {
       } else errors.push(`Rung ${index}: unknown element`);
     }
     const op = rung.operation;
-    if (op && (typeof op !== 'object' || !['coil','ton','tof','rto','ctu','osr','osf'].includes(op.kind))) errors.push(`Rung ${index}: invalid operation`);
-    if (op?.kind === 'ton' || op?.kind === 'tof' || op?.kind === 'rto') { if (!Number.isSafeInteger(op.presetMs) || op.presetMs < 1 || op.presetMs > 86400000) errors.push(`Rung ${index}: timer preset must be 1..86400000 ms`); }
-    if (op?.kind === 'ctu' && (!Number.isSafeInteger(op.preset) || op.preset < 1 || op.preset > 100000000)) errors.push(`Rung ${index}: counter preset must be 1..100000000`);
+    if (op && (typeof op !== 'object' || !['coil','ton','tof','rto','tp','ctu','ctd','osr','osf'].includes(op.kind))) errors.push(`Rung ${index}: invalid operation`);
+    if (op?.kind === 'ton' || op?.kind === 'tof' || op?.kind === 'rto' || op?.kind === 'tp') { if (!Number.isSafeInteger(op.presetMs) || op.presetMs < 1 || op.presetMs > 86400000) errors.push(`Rung ${index}: timer preset must be 1..86400000 ms`); }
+    if ((op?.kind === 'ctu' || op?.kind === 'ctd') && (!Number.isSafeInteger(op.preset) || op.preset < 1 || op.preset > 100000000)) errors.push(`Rung ${index}: counter preset must be 1..100000000`);
     if (op && 'resetTag' in op && op.resetTag !== undefined && (typeof op.resetTag !== 'string' || !tagOK(op.resetTag))) errors.push(`Rung ${index}: invalid reset tag`);
     if (op && 'resetTag' in op && op.resetTag !== undefined && !['ctu','rto'].includes(op.kind)) errors.push(`Rung ${index}: reset tag unsupported for ${op.kind}`);
+    if (op?.kind === 'ctd' && (typeof op.loadTag !== 'string' || !tagOK(op.loadTag) || op.loadTag === rung.coil)) errors.push(`Rung ${index}: CTD requires a valid external load tag`);
+    if (op && 'loadTag' in op && op.kind !== 'ctd') errors.push(`Rung ${index}: load tag unsupported for ${op.kind}`);
   }
   return errors;
 }
 export type ContactTrace = { tag: string; normallyClosed: boolean; sampled: boolean; conducts: boolean };
 export type ElementTrace = { type: 'contact' | 'branch'; conducts: boolean; paths: readonly (readonly ContactTrace[])[] };
-export type LadderStep = { rungId: string; energized: boolean; coil: string; result: boolean; operation: 'coil'|'ton'|'tof'|'rto'|'ctu'|'osr'|'osf'; elapsedMs?: number; count?: number; elements: readonly ElementTrace[] };
+export type LadderStep = { rungId: string; energized: boolean; coil: string; result: boolean; operation: 'coil'|'ton'|'tof'|'rto'|'tp'|'ctu'|'ctd'|'osr'|'osf'; elapsedMs?: number; count?: number; elements: readonly ElementTrace[] };
 export type LadderResult = { outputs: Record<string, boolean>; steps: readonly LadderStep[]; memory: LadderMemory };
 /** Each scan samples inputs once, then evaluates rungs in document order. Timers use simulation time, never wall time. */
 export function executeLadder(doc: LadderDocument, inputs: Inputs, previousCoils: Readonly<Record<string, boolean>> = {}, previousMemory: LadderMemory = {}, deltaMs = 20): LadderResult {
@@ -77,6 +79,12 @@ export function executeLadder(doc: LadderDocument, inputs: Inputs, previousCoils
     } else if (op.kind === 'tof') {
       elapsedMs = energized ? 0 : old.lastEnable ? deltaMs : Math.min(op.presetMs, old.elapsedMs + deltaMs);
       result = energized || (old.done && elapsedMs < op.presetMs);
+    } else if (op.kind === 'tp') {
+      // Scan-time monostable: a rising enable edge starts the non-retriggerable pulse.
+      const start = energized && !old.lastEnable && !old.done;
+      const ongoing = old.done && old.elapsedMs < op.presetMs;
+      result = start || ongoing;
+      elapsedMs = result ? Math.min(op.presetMs, (start ? 0 : old.elapsedMs) + deltaMs) : 0;
     } else if (op.kind === 'rto') {
       // RTO retains accumulated time while disabled; reset takes priority even if enabled.
       const reset = op.resetTag !== undefined && read(signals, op.resetTag);
@@ -87,6 +95,12 @@ export function executeLadder(doc: LadderDocument, inputs: Inputs, previousCoils
       const reset = op.resetTag !== undefined && read(signals, op.resetTag);
       count = reset ? 0 : energized && !old.lastEnable ? Math.min(op.preset, Math.max(0, old.count) + 1) : Math.max(0, old.count);
       result = count >= op.preset;
+    } else if (op.kind === 'ctd') {
+      // Explicit LD has priority. Fresh CV starts at 0, so Q is TRUE until loaded.
+      const load = read(signals, op.loadTag);
+      const prior = Math.max(0, Math.min(op.preset, old.count));
+      count = load ? op.preset : energized && !old.lastEnable ? Math.max(0, prior - 1) : prior;
+      result = count === 0;
     } else if (op.kind === 'osr') {
       result = energized && !old.lastEnable;
     } else if (op.kind === 'osf') {
@@ -94,7 +108,7 @@ export function executeLadder(doc: LadderDocument, inputs: Inputs, previousCoils
     }
     memory[rung.id] = { elapsedMs, count, done: result, lastEnable: energized };
     outputs[rung.coil] = result; signals[rung.coil] = result;
-    steps.push({ rungId: rung.id, energized, coil: rung.coil, result, operation: op.kind, elements: trace, ...(op.kind === 'ton' || op.kind === 'tof' || op.kind === 'rto' ? {elapsedMs} : {}), ...(op.kind === 'ctu' ? {count} : {}) });
+    steps.push({ rungId: rung.id, energized, coil: rung.coil, result, operation: op.kind, elements: trace, ...(op.kind === 'ton' || op.kind === 'tof' || op.kind === 'rto' || op.kind === 'tp' ? {elapsedMs} : {}), ...(op.kind === 'ctu' || op.kind === 'ctd' ? {count} : {}) });
   }
   return { outputs, steps, memory };
 }
