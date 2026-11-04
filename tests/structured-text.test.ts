@@ -150,7 +150,7 @@ VAR_OUTPUT Pulse:BOOL:=FALSE; END_VAR
 VAR Previous:BOOL:=FALSE; END_VAR
 Pulse := Start AND NOT Previous;
 Previous := Start;`);
-  const steps=[{scans:2,inputs:{Start:true}},{scans:1,inputs:{start:false}},{scans:1,inputs:{START:true}}];
+  const steps:{scans:number;inputs:Readonly<Record<string,boolean>>}[]=[{scans:2,inputs:{Start:true}},{scans:1,inputs:{start:false}},{scans:1,inputs:{START:true}}];
   const a=runStructuredTextScans(program,steps);
   const b=runStructuredTextScans(program,steps);
   expect(a).toEqual(b);

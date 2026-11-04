@@ -111,8 +111,9 @@ export function compileStructuredText(source:string):STProgram{
   const table=new Map(declarations.map(d=>[keyword(d.name),d]));
   for(const [key,name] of reads)if(!table.has(key))fail(`Undeclared variable ${name}`);
   for(const [key,name] of writes){
-   const decl=table.get(key);if(!decl)fail(`Undeclared assignment ${name}`);
-   if(decl.scope==='input')fail(`Cannot assign VAR_INPUT ${name}`);
+   const decl=table.get(key);
+   if(!decl)throw new SyntaxError(`Undeclared assignment ${name}`);
+   if(decl.scope==='input')throw new SyntaxError(`Cannot assign VAR_INPUT ${name}`);
   }
  }
  const outputs=declarations.length?declarations.filter(d=>d.scope==='output').map(d=>d.name):Array.from(writes.values());
