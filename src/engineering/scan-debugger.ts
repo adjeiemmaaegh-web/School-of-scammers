@@ -43,11 +43,11 @@ function checkBreakpoint(bench:LogicBench,b:NewBreakpoint):void {
   if(!bench.program.rungs.some(r=>r.id===b.rungId)||!['rising','falling'].includes(b.edge))throw Error('Rung breakpoint must refer to an existing rung and valid edge');return;
  case 'timer': {
   const rung=bench.program.rungs.find(r=>r.id===b.rungId);
-  if(!rung||!rung.operation||!['ton','tof','rto'].includes(rung.operation.kind)||!Number.isSafeInteger(b.elapsedMs)||b.elapsedMs<1||b.elapsedMs>(rung.operation as {presetMs:number}).presetMs)throw Error('Timer threshold must match a timer rung and its preset');return;
+  if(!rung||!rung.operation||!['ton','tof','rto','tp'].includes(rung.operation.kind)||!Number.isSafeInteger(b.elapsedMs)||b.elapsedMs<1||b.elapsedMs>(rung.operation as {presetMs:number}).presetMs)throw Error('Timer threshold must match a timer rung and its preset');return;
  }
  case 'counter': {
   const rung=bench.program.rungs.find(r=>r.id===b.rungId);
-  if(!rung||rung.operation?.kind!=='ctu'||!Number.isSafeInteger(b.count)||b.count<1||b.count>rung.operation.preset)throw Error('Counter threshold must match a counter rung and its preset');return;
+  if(!rung||!rung.operation||(rung.operation.kind!=='ctu'&&rung.operation.kind!=='ctd')||!Number.isSafeInteger(b.count)||b.count<(rung.operation.kind==='ctd'?0:1)||b.count>rung.operation.preset)throw Error('Counter threshold must match a counter rung and its preset');return;
  }
  default: throw Error('Unknown breakpoint kind');
  }
@@ -98,7 +98,9 @@ function matchBreakpoint(before:LogicBench,after:LogicBench,b:DebugBreakpoint):D
  }
  case 'counter': {
   const old=before.memory[b.rungId]?.count??0;const current=after.memory[b.rungId]?.count??0;
-  matched=old<b.count&&current>=b.count;observed=`${current} edges`;reason=`Counter ${b.rungId} reached ${b.count}`;break;
+  const down=before.program.rungs.find(r=>r.id===b.rungId)?.operation?.kind==='ctd';
+  matched=down?old>b.count&&current<=b.count:old<b.count&&current>=b.count;
+  observed=`${current} count`;reason=`Counter ${b.rungId} crossed ${b.count} ${down?'down':'up'}`;break;
  }
  }
  return matched?{breakpointId:b.id,scan:after.scan,timeMs:after.timeMs,reason,observed}:null;
@@ -140,7 +142,7 @@ export function breakpointLabel(b:DebugBreakpoint):string {
  case 'signal':return `${b.source} ${b.tag} · ${b.edge} edge`;
  case 'rung':return `Rung ${b.rungId} · ${b.edge} edge`;
  case 'timer':return `Timer ${b.rungId} ≥ ${b.elapsedMs} ms`;
- case 'counter':return `Counter ${b.rungId} ≥ ${b.count}`;
+ case 'counter':return `Counter ${b.rungId} threshold ${b.count}`;
  }
 }
 const csv=(field:unknown)=>`"${String(field).replaceAll('"','""').replace(/^[\s]*([=+@-])/,'\u0027$&')}\u0022`;

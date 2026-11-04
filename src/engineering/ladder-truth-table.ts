@@ -9,7 +9,7 @@ export function buildTruthTable(doc: LadderDocument, maxInputs = 10): TruthTable
   if (!Number.isSafeInteger(maxInputs) || maxInputs < 1 || maxInputs > 12) throw new RangeError('Input limit must be 1..12');
   const outputTags = doc.rungs.map(r => r.coil);
   const outputs = new Set(outputTags);
-  const inputTags = [...new Set(doc.rungs.flatMap(r => r.elements.flatMap(e => e.type === 'contact' ? [e.tag] : e.alternatives.flatMap(path => path.map(c => c.tag))).concat(r.operation && 'resetTag' in r.operation && r.operation.resetTag ? [r.operation.resetTag] : [])))].filter(t => !outputs.has(t)).sort();
+  const inputTags = [...new Set(doc.rungs.flatMap(r => r.elements.flatMap(e => e.type === 'contact' ? [e.tag] : e.alternatives.flatMap(path => path.map(c => c.tag))).concat(r.operation?.kind==='ctd'?[r.operation.loadTag]:r.operation && 'resetTag' in r.operation && r.operation.resetTag ? [r.operation.resetTag] : [])))].filter(t => !outputs.has(t)).sort();
   if (inputTags.length > maxInputs) throw new RangeError(`Too many external inputs (${inputTags.length}); maximum ${maxInputs}`);
   const warnings: string[] = [];
   if (doc.rungs.some(r => r.operation && r.operation.kind !== 'coil')) warnings.push('Stateful instructions are evaluated from fresh memory for each row; this is not a multi-scan behavior proof.');

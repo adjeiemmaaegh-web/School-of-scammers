@@ -33,6 +33,35 @@ async function run(){
   await page.setViewport({width:1366,height:768});
   const routes=['/','/labs','/engineering','/simulation','/assessments','/process-control','/starter-lab','/electrical-bench','/pneumatics','/workcell-composer','/dc-circuit'];
   for(const route of routes){await visit(page,route);console.log('ROUTE PASS',route);}
+  await visit(page,'/engineering');await page.waitForSelector('select[aria-label="Logic exercise"]');
+  await page.select('select[aria-label="Logic exercise"]','ctd');
+  await page.click('input[aria-label="Logic input LoadCount"]');
+  await click(page,'Single scan');
+  const lessonOutput=async tag=>page.evaluate(tag=>{
+    const root=document.querySelector('section[aria-label="PLC instruction and scan debugger"]');
+    const row=[...(root?.querySelectorAll('.io > div')??[])].find(el=>el.querySelector('code')?.textContent?.trim()===tag);
+    return {on:row?.querySelector('strong')?.textContent?.trim(),line:row?.textContent?.trim()};
+  },tag);
+  let countSample=await lessonOutput('ZeroReached');
+  assert.equal(countSample.on,'OFF','CTD load must de-energize zero flag');
+  assert.ok(countSample.line?.includes('3/3 count'),'CTD loads preset');
+  await page.click('input[aria-label="Logic input LoadCount"]');
+  await page.click('input[aria-label="Logic input Sensor"]');await click(page,'Single scan');
+  countSample=await lessonOutput('ZeroReached');
+  assert.ok(countSample.line?.includes('2/3 count'),'CTD decrements one per rising edge');
+  await page.click('input[aria-label="Logic input Sensor"]');await click(page,'Single scan');
+  await page.click('input[aria-label="Logic input Sensor"]');await click(page,'Single scan');
+  await page.click('input[aria-label="Logic input Sensor"]');await click(page,'Single scan');
+  await page.click('input[aria-label="Logic input Sensor"]');await click(page,'Single scan');
+  countSample=await lessonOutput('ZeroReached');
+  assert.equal(countSample.on,'ON','CTD reaches zero after three rising edges');
+  await page.select('select[aria-label="Logic exercise"]','tp');
+  await page.click('input[aria-label="Logic input Enable"]');await click(page,'Single scan');
+  await page.click('input[aria-label="Logic input Enable"]');await click(page,'Single scan');
+  let pulse=await lessonOutput('PulseDone');assert.equal(pulse.on,'ON','TP remains active after falling input');
+  await click(page,'Single scan');pulse=await lessonOutput('PulseDone');assert.equal(pulse.on,'ON','TP third scan active');
+  await click(page,'Single scan');pulse=await lessonOutput('PulseDone');assert.equal(pulse.on,'OFF','TP expires');
+  console.log('TP/CTD INSTRUCTION BROWSER PASS');
   await visit(page,'/starter-lab');await page.waitForSelector('.starter-control-diagram');
   await click(page,'Press START');for(let i=0;i<4;i++)await click(page,'Advance 1 s');
   assert.equal(await page.$eval('.metric-grid .metric b',e=>e.textContent?.trim()),'DELTA','Starter must reach DELTA');

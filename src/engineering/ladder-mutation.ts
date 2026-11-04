@@ -21,11 +21,12 @@ export function generateLadderMutants(doc:LadderDocument):MutationCase[]{
    if(el.type==='contact')push(ri,`Invert contact ${el.tag} in element ${ei+1}`,rung=>({...rung,elements:rung.elements.map((e,i)=>i===ei&&e.type==='contact'?{...e,normallyClosed:!e.normallyClosed}:e)}));
    else el.alternatives.forEach((path,pi)=>path.forEach((c,ci)=>push(ri,`Invert branch ${pi+1} contact ${c.tag}`,rung=>({...rung,elements:rung.elements.map((e,i)=>i===ei&&e.type==='branch'?{...e,alternatives:e.alternatives.map((p,j)=>j===pi?p.map((x,k)=>k===ci?{...x,normallyClosed:!x.normallyClosed}:x):p)}:e)}))));
   });
-  if(r.operation?.kind==='ton'||r.operation?.kind==='tof'||r.operation?.kind==='rto'){
+  if(r.operation?.kind==='ton'||r.operation?.kind==='tof'||r.operation?.kind==='rto'||r.operation?.kind==='tp'){
    const preset=r.operation.presetMs;
    for(const factor of [0.5,2])push(ri,`Timer preset ×${factor}`,rung=>({...rung,operation:{...r.operation!,presetMs:Math.max(1,Math.min(86400000,Math.round(preset*factor)))} as Rung['operation']}));
   }
-  if(r.operation?.kind==='ctu')for(const delta of [-1,1])push(ri,`Counter preset ${delta>0?'+1':'-1'}`,rung=>({...rung,operation:{kind:'ctu',preset:Math.max(1,r.operation!.kind==='ctu'?r.operation!.preset+delta:1),...(r.operation!.kind==='ctu'&&r.operation!.resetTag?{resetTag:r.operation!.resetTag}:{})}}));
+  const counterOp=r.operation;
+  if(counterOp?.kind==='ctu'||counterOp?.kind==='ctd')for(const delta of [-1,1])push(ri,`Counter preset ${delta>0?'+1':'-1'}`,rung=>({...rung,operation:{...counterOp,preset:Math.max(1,Math.min(100000000,counterOp.preset+delta))}}));
   if(r.operation?.kind==='osr'||r.operation?.kind==='osf')push(ri,'Swap rising/falling edge',rung=>({...rung,operation:{kind:r.operation?.kind==='osr'?'osf':'osr'}}));
  });
  return result;

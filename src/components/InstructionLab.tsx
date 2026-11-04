@@ -80,8 +80,8 @@ export function InstructionLab({program,onLoadProgram}:{program:LadderDocument;o
  const inputs=logicBenchInputTags(bench.program);
  const outputs=bench.program.rungs.map(r=>r.coil);
  const rungs=bench.program.rungs;
- const timerRungs=rungs.filter(r=>r.operation&&['ton','tof','rto'].includes(r.operation.kind));
- const counterRungs=rungs.filter(r=>r.operation?.kind==='ctu');
+ const timerRungs=rungs.filter(r=>r.operation&&['ton','tof','rto','tp'].includes(r.operation.kind));
+ const counterRungs=rungs.filter(r=>r.operation?.kind==='ctu'||r.operation?.kind==='ctd');
  const options=kind==='input'?inputs:kind==='coil'?outputs:kind==='rung'?rungs.map(r=>r.id):kind==='timer'?timerRungs.map(r=>r.id):kind==='counter'?counterRungs.map(r=>r.id):[];
  const selectedTag=options.includes(tag)?tag:options[0]??'';
  const inspected=selectedScan===null?bench.history.at(-1):bench.history.find(h=>h.scan===selectedScan);
@@ -102,7 +102,7 @@ export function InstructionLab({program,onLoadProgram}:{program:LadderDocument;o
  });
  return <section className="panel" aria-label="PLC instruction and scan debugger">
   <span className="eyebrow">PLC PROGRAMMING · DETERMINISTIC SCAN DEBUGGING</span><h2>PLC instruction lab &amp; scan debugger</h2>
-  <p>Explore TON, TOF, RTO, CTU, OSR/OSF, and your own ladder logic with scan-by-scan breakpoints and watch values. Inputs here are simulated and isolated: they do not force real workcell I/O or bypass electrical interlocks. Instruction behavior is educational, not vendor-certified.</p>
+  <p>Explore TON, TOF, TP, RTO, CTU, CTD, OSR/OSF, and your own ladder logic with scan-by-scan breakpoints and watch values. Inputs here are simulated and isolated: they do not force real workcell I/O or bypass electrical interlocks. Instruction behavior is educational, not vendor-certified.</p>
   <label>Exercise <select aria-label="Logic exercise" value={lessonId} onChange={e=>changeLesson(e.target.value)}><option value="current">Current ladder program</option>{INSTRUCTION_EXERCISES.map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></label>
   {lesson&&<div><p><strong>Objective:</strong> {lesson.goal}</p><p><strong>Try:</strong> {lesson.steps}</p><button onClick={()=>onLoadProgram(structuredClone(lesson.program))}>Replace workcell ladder editor with this lesson</button><p className="muted">This replaces your editable ladder program. Save your existing project first; the isolated debugger cannot energize the motor.</p></div>}
   <div className="panel"><h3>Static ladder audit · scan-order and feedback</h3>
@@ -204,13 +204,13 @@ export function InstructionLab({program,onLoadProgram}:{program:LadderDocument;o
   <div className="actions"><button onClick={()=>step(1)}>Single scan</button><button onClick={()=>step(10)}>Continue up to 10</button><button onClick={()=>step(50)}>Continue up to 50</button><button onClick={()=>step(500)}>Continue up to 500</button><button onClick={()=>{setSession(resetDebugSession(session));setSelectedScan(null);setNotice('Session reset; breakpoint definitions retained and scan evidence cleared.');}}>Reset scans</button></div>
   <p role="status" aria-live="polite">{notice}</p>
   <p>Scan <strong>{bench.scan}</strong> · simulated time <strong>{bench.timeMs} ms</strong> · retained samples <strong>{bench.history.length}/500</strong> · recorded actions <strong>{session.actions.length}/1000</strong></p>
-  <div className="io">{rungs.map(r=><div key={r.id}><code>{r.coil}</code><strong className={bench.outputs[r.coil]?'good':'warn'}>{bench.outputs[r.coil]?'ON':'OFF'}</strong><span> {r.operation?.kind.toUpperCase()??'COIL'} · {r.operation?.kind==='ton'||r.operation?.kind==='tof'||r.operation?.kind==='rto'?`${bench.memory[r.id]?.elapsedMs??0}/${r.operation.presetMs} ms`:r.operation?.kind==='ctu'?`${bench.memory[r.id]?.count??0}/${r.operation.preset} edges`:''}</span></div>)}</div>
+  <div className="io">{rungs.map(r=><div key={r.id}><code>{r.coil}</code><strong className={bench.outputs[r.coil]?'good':'warn'}>{bench.outputs[r.coil]?'ON':'OFF'}</strong><span> {r.operation?.kind.toUpperCase()??'COIL'} · {r.operation?.kind==='ton'||r.operation?.kind==='tof'||r.operation?.kind==='rto'||r.operation?.kind==='tp'?`${bench.memory[r.id]?.elapsedMs??0}/${r.operation.presetMs} ms`:(r.operation?.kind==='ctu'||r.operation?.kind==='ctd')?`${bench.memory[r.id]?.count??0}/${r.operation.preset} count`:''}</span></div>)}</div>
   <div className="panel"><h3>Breakpoint configuration</h3>
    <p>Execution pauses <strong>after</strong> a scan that meets a condition; it never interrupts a partially executed rung. All simultaneous matching conditions are recorded.</p>
    <div className="actions"><label>Condition <select aria-label="Breakpoint condition" value={kind} onChange={e=>{setKind(e.target.value as BreakpointUiKind);setTag('');}}><option value="coil">Coil edge</option><option value="input">Input edge</option><option value="rung">Rung power-flow edge</option><option value="timer">Timer elapsed threshold</option><option value="counter">Counter threshold</option><option value="scan">Scan number</option></select></label>
     {kind!=='scan'&&<label>Target <select aria-label="Breakpoint target" value={selectedTag} onChange={e=>setTag(e.target.value)}>{options.map(opt=><option key={opt} value={opt}>{opt}</option>)}</select></label>}
     {['coil','input','rung'].includes(kind)&&<label>Edge <select aria-label="Breakpoint edge" value={kind==='rung'&&edge==='either'?'rising':edge} onChange={e=>setEdge(e.target.value as EdgeDirection)}><option value="rising">Rising</option><option value="falling">Falling</option>{kind!=='rung'&&<option value="either">Either</option>}</select></label>}
-    {['scan','timer','counter'].includes(kind)&&<label>{kind==='scan'?'Scan #':kind==='timer'?'Elapsed ms':'Edge count'} <input aria-label="Breakpoint threshold" type="number" step="1" min="1" value={value} onChange={e=>setValue(e.target.value)}/></label>}
+    {['scan','timer','counter'].includes(kind)&&<label>{kind==='scan'?'Scan #':kind==='timer'?'Elapsed ms':'Counter value'} <input aria-label="Breakpoint threshold" type="number" step="1" min={kind==='counter'&&rungs.find(r=>r.id===selectedTag)?.operation?.kind==='ctd'?'0':'1'} value={value} onChange={e=>setValue(e.target.value)}/></label>}
     <button disabled={session.breakpoints.length>=24||(kind!=='scan'&&!selectedTag)} onClick={add}>Add breakpoint</button>
    </div>
    <div style={{overflowX:'auto'}}><table><thead><tr><th>Enable</th><th>Breakpoint</th><th>Action</th></tr></thead><tbody>{session.breakpoints.map(b=><tr key={b.id}><td><input type="checkbox" aria-label={`Enable ${b.id}`} checked={b.enabled} onChange={e=>setSession(enableDebugBreakpoint(session,b.id,e.target.checked))}/></td><td><code>{b.id}</code> {breakpointLabel(b)}</td><td><button onClick={()=>setSession(removeDebugBreakpoint(session,b.id))}>Remove</button></td></tr>)}</tbody></table></div>

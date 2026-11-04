@@ -15,6 +15,7 @@ export function auditLadder(doc:LadderDocument):LadderAudit {
   const contacts:Contact[]=rung.elements.flatMap(e=>e.type==='contact'?[e]:e.alternatives.flatMap(a=>a));
   const tags=new Set(contacts.map(c=>c.tag));
   if(rung.operation && 'resetTag' in rung.operation && rung.operation.resetTag)tags.add(rung.operation.resetTag);
+  if(rung.operation?.kind==='ctd')tags.add(rung.operation.loadTag);
   deps[rung.coil]=[...tags].filter(t=>outputs.has(t)).sort();
   for(const tag of tags)if(!outputs.has(tag))external.add(tag);
   if(tags.has(rung.coil))findings.push({code:'SELF_REFERENCE',severity:'info',rungId:rung.id,tag:rung.coil,message:`${rung.coil} feeds its own rung; verify intentional seal-in or feedback behavior.`});
