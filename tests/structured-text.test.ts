@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {compileStructuredText,executeStructuredText,runStructuredTextScans,ST_DEMO} from '../src/engineering/structured-text';
+import {compileStructuredText,executeStructuredText,runStructuredTextScans,ST_DEMO,ST_TYPED_DEMO} from '../src/engineering/structured-text';
 
 describe('bounded Structured Text interpreter',()=>{
  it('preserves BOOL seal-in output across scans and implements stop priority',()=>{
@@ -79,5 +79,90 @@ describe('bounded Structured Text interpreter',()=>{
   expect(()=>executeStructuredText(compileStructuredText('X := 1.5 MOD 2;'),{})).toThrow(/safe integer/);
   expect(()=>executeStructuredText(compileStructuredText('X := TRUE MOD 2;'),{})).toThrow(/numeric/);
   expect(()=>executeStructuredText(compileStructuredText('X := 4 MOD 0;'),{})).toThrow(/Division by zero/);
+ });
+
+ it('compiles typed VAR blocks and preserves private VAR memory across scans',()=>{
+  const program=compileStructuredText(`VAR_INPUT Start : BOOL; END_VAR
+VAR_OUTPUT Run : BOOL := FALSE; Total : INT := 0; END_VAR
+VAR Internal : INT := 0; END_VAR
+Internal := Internal + 1; Total := Internal; Run := Start;`);
+  expect(program.declarations.map(d=>[d.name,d.type,d.scope])).toEqual([
+   ['Start','BOOL','input'],['Run','BOOL','output'],['Total','INT','output'],['Internal','INT','local']
+  ]);
+  const first=executeStructuredText(program,{start:true});
+  expect(first.outputs).toEqual({Run:true,Total:1});
+  expect(first.memory).toEqual({Run:true,Total:1,Internal:1});
+  expect(first.signals.Internal).toBe(1);
+  const second=executeStructuredText(program,{START:false},first.memory);
+  expect(second.outputs).toEqual({Run:false,Total:2});
+  expect(second.memory.Internal).toBe(2);
+  expect(second.outputs).not.toHaveProperty('Internal');
+ });
+ it('enforces BOOL, INT and REAL types on sampled inputs and assignments',()=>{
+  const program=compileStructuredText(`VAR_INPUT Gate:BOOL; Scale:REAL; END_VAR
+VAR_OUTPUT Count:INT:=0; END_VAR
+IF Gate THEN Count:=Scale; END_IF;`);
+  expect(()=>executeStructuredText(program,{Gate:1,Scale:1})).toThrow(/requires BOOL/);
+  expect(()=>executeStructuredText(program,{Gate:true,Scale:true})).toThrow(/requires numeric REAL/);
+  expect(()=>executeStructuredText(program,{Gate:true,Scale:2.5})).toThrow(/INT/);
+  expect(executeStructuredText(program,{Gate:true,Scale:4}).outputs.Count).toBe(4);
+  expect(()=>executeStructuredText(program,{Scale:4})).toThrow(/Missing VAR_INPUT/);
+ });
+ it('detects signed INT overflow and fractional assignments with no state mutation',()=>{
+  const program=compileStructuredText(`VAR_OUTPUT Counter : INT := 32767; END_VAR Counter := Counter + 1;`);
+  const previous={Counter:32767};
+  expect(()=>executeStructuredText(program,{},previous)).toThrow(/-32768..32767/);
+  expect(previous.Counter).toBe(32767);
+  expect(()=>compileStructuredText('VAR_OUTPUT Bad : INT := 32768; END_VAR Bad := 1;')).toThrow(/-32768..32767/);
+  expect(()=>compileStructuredText('VAR_OUTPUT Bad : BOOL := 1; END_VAR Bad := FALSE;')).toThrow(/requires BOOL/);
+ });
+ it('rejects duplicate case-folded declarations, undeclared names and input writes',()=>{
+  const sources=[
+   'VAR_OUTPUT Run : BOOL; run : BOOL; END_VAR Run := TRUE;',
+   'VAR_OUTPUT Run : BOOL; END_VAR Run := Missing;',
+   'VAR_OUTPUT Run : BOOL; END_VAR Unknown := TRUE;',
+   'VAR_INPUT Start : BOOL; END_VAR VAR_OUTPUT Run : BOOL; END_VAR Start := TRUE;',
+   'VAR_OUTPUT Run : BOOL; END_VAR IF Start THEN Run := TRUE; END_IF;'
+  ];
+  for(const s of sources)expect(()=>compileStructuredText(s)).toThrow();
+ });
+ it('rejects unsupported declarations and initializers instead of silently ignoring syntax',()=>{
+  const sources=[
+   'VAR_INPUT Start : BOOL := TRUE; END_VAR VAR_OUTPUT Run : BOOL; END_VAR Run := Start;',
+   'VAR_OUTPUT Run : STRING; END_VAR Run := TRUE;',
+   'VAR_OUTPUT Run : BOOL; Run : REAL; END_VAR Run := TRUE;',
+   'VAR_OUTPUT Run : BOOL; END_VAR VAR Unsupported : DWORD; END_VAR Run := TRUE;',
+   'VAR_OUTPUT Run : BOOL; END_VAR Run := TRUE; VAR Temp:INT; END_VAR'
+  ];
+  for(const s of sources)expect(()=>compileStructuredText(s)).toThrow();
+ });
+ it('initializes typed BOOL, INT and REAL outputs on first scan, then retains them',()=>{
+  const p=compileStructuredText('VAR_OUTPUT B:BOOL; I:INT := -4; R:REAL := 2.25; END_VAR IF B THEN I:=0; END_IF;');
+  const a=executeStructuredText(p,{});
+  expect(a.outputs).toEqual({B:false,I:-4,R:2.25});
+  const b=executeStructuredText(p,{},a.memory);
+  expect(b.outputs).toEqual(a.outputs);
+  expect(executeStructuredText(p,{},{}).outputs).toEqual(a.outputs);
+ });
+ it('replays typed private memory deterministically while reporting public outputs only',()=>{
+  const program=compileStructuredText(`VAR_INPUT Start:BOOL; END_VAR
+VAR_OUTPUT Pulse:BOOL:=FALSE; END_VAR
+VAR Previous:BOOL:=FALSE; END_VAR
+Pulse := Start AND NOT Previous;
+Previous := Start;`);
+  const steps=[{scans:2,inputs:{Start:true}},{scans:1,inputs:{start:false}},{scans:1,inputs:{START:true}}];
+  const a=runStructuredTextScans(program,steps);
+  const b=runStructuredTextScans(program,steps);
+  expect(a).toEqual(b);
+  expect(a.rows.map(row=>row.outputs.Pulse)).toEqual([true,false,false,true]);
+  expect(a.finalOutputs).toEqual({Pulse:true,Previous:true});
+ });
+ it('runs the typed example with persistent counter state',()=>{
+  const program=compileStructuredText(ST_TYPED_DEMO);
+  const first=executeStructuredText(program,{Start:true,Stop:false});
+  const second=executeStructuredText(program,{Start:false,Stop:false},first.memory);
+  expect(first.outputs).toEqual({Run:true,Scans:1});
+  expect(second.outputs).toEqual({Run:true,Scans:2});
+  expect(second.memory.InternalCount).toBe(2);
  });
 });
