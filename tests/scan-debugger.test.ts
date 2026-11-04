@@ -11,6 +11,24 @@ describe('PLC scan debugger: executable-breakpoint semantics',()=>{
  it('matches rung energized transition without polling high forever',()=>{let d=addDebugBreakpoint(createDebugSession(lesson('ton')),{kind:'rung',rungId:'delay',edge:'rising'});d=setDebugInput(d,'Enable',true);d=runDebugScans(d,20);expect(d.bench.scan).toBe(1);d=runDebugScans(d,20);expect(d.bench.scan).toBe(21);expect(d.hits).toHaveLength(1)});
  it('matches a timer threshold as it is crossed, not on all subsequent scans',()=>{let d=createDebugSession(lesson('rto'));d=addDebugBreakpoint(d,{kind:'timer',rungId:'retentive-delay',elapsedMs:60});d=setDebugInput(d,'Enable',true);d=runDebugScans(d,100);expect(d.bench.scan).toBe(3);expect(d.paused).toHaveLength(1);d=runDebugScans(d,20);expect(d.hits).toHaveLength(1);d=setDebugInput(d,'ResetTimer',true);d=runDebugScans(d);d=setDebugInput(d,'ResetTimer',false);d=runDebugScans(d,10);expect(d.hits).toHaveLength(2)});
  it('matches a CTU threshold only on distinct rising edges',()=>{let d=createDebugSession(lesson('ctu'));d=addDebugBreakpoint(d,{kind:'counter',rungId:'batch',count:2});d=setDebugInput(d,'Sensor',true);d=runDebugScans(d,10);expect(d.bench.scan).toBe(10);d=setDebugInput(d,'Sensor',false);d=runDebugScans(d);d=setDebugInput(d,'Sensor',true);d=runDebugScans(d,10);expect(d.bench.scan).toBe(12);expect(d.paused).toHaveLength(1);expect(d.bench.memory.batch.count).toBe(2)});
+ it('CTD breakpoint triggers on downward crossing of zero, never on loading up',()=>{
+  let d=addDebugBreakpoint(createDebugSession(lesson('ctd')),{kind:'counter',rungId:'down-counter',count:0});
+  d=setDebugInput(d,'LoadCount',true);d=runDebugScans(d,10);
+  expect(d.bench.memory['down-counter'].count).toBe(3);expect(d.hits).toHaveLength(0);
+  d=setDebugInput(d,'LoadCount',false);
+  for(let i=0;i<2;i++){d=setDebugInput(d,'Sensor',true);d=runDebugScans(d,2);d=setDebugInput(d,'Sensor',false);d=runDebugScans(d);}
+  d=setDebugInput(d,'Sensor',true);d=runDebugScans(d,10);
+  expect(d.bench.memory['down-counter'].count).toBe(0);
+  expect(d.paused).toHaveLength(1);expect(d.hits[0].reason).toContain('down');
+  expect(verifyDebugReplay(d).passed).toBe(true);
+  expect(()=>addDebugBreakpoint(createDebugSession(lesson('ctu')),{kind:'counter',rungId:'batch',count:0})).toThrow();
+ });
+ it('TP elapsed-time breakpoint pauses at simulated threshold',()=>{
+  let d=addDebugBreakpoint(createDebugSession(lesson('tp')),{kind:'timer',rungId:'pulse',elapsedMs:40});
+  d=setDebugInput(d,'Enable',true);d=runDebugScans(d,10);
+  expect(d.bench.scan).toBe(2);expect(d.paused[0].reason).toContain('40 ms');
+  expect(()=>addDebugBreakpoint(createDebugSession(lesson('tp')),{kind:'timer',rungId:'pulse',elapsedMs:61})).toThrow();
+ });
  it('records multiple simultaneous matches then halts on the same completed scan',()=>{let d=createDebugSession(lesson('edges'));d=addDebugBreakpoint(d,{kind:'scan',scan:1});d=addDebugBreakpoint(d,{kind:'signal',source:'coil',tag:'Rising',edge:'rising'});d=setDebugInput(d,'Enable',true);d=runDebugScans(d,500);expect(d.bench.scan).toBe(1);expect(d.paused).toHaveLength(2);expect(d.hits).toHaveLength(2)});
  it('rejects invalid targets, thresholds, and control requests',()=>{const d=createDebugSession(lesson('ton'));expect(()=>addDebugBreakpoint(d,{kind:'scan',scan:0})).toThrow();expect(()=>addDebugBreakpoint(d,{kind:'signal',source:'coil',tag:'Enable',edge:'rising'})).toThrow();expect(()=>addDebugBreakpoint(d,{kind:'signal',source:'input',tag:'TimerDone',edge:'rising'})).toThrow();expect(()=>addDebugBreakpoint(d,{kind:'timer',rungId:'delay',elapsedMs:61})).toThrow();expect(()=>addDebugBreakpoint(d,{kind:'counter',rungId:'delay',count:2})).toThrow();expect(()=>runDebugScans(d,501)).toThrow();expect(()=>setDebugInput(d,'TimerDone',true)).toThrow()});
  it('removing or disabling a breakpoint prevents future stops',()=>{let d=addDebugBreakpoint(createDebugSession(lesson('ton')),{kind:'scan',scan:3});const id=d.breakpoints[0].id;d=enableDebugBreakpoint(d,id,false);d=runDebugScans(d,10);expect(d.hits).toHaveLength(0);d=resetDebugSession(d);d=enableDebugBreakpoint(d,id,true);d=removeDebugBreakpoint(d,id);d=runDebugScans(d,10);expect(d.hits).toHaveLength(0)});
