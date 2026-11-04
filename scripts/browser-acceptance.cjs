@@ -64,6 +64,40 @@ async function run(){
   await click(page,'Series voltage divider');
   console.log('DC NODAL LAB PASS');
   await visit(page,'/process-control');await click(page,'Run 10 s');console.log('PID SCAN PASS');
+  // Exercise typed ST from the React editor; isolated parser tests cannot prove UI wiring.
+  await click(page,'Structured Text editor');
+  await click(page,'Load typed variables example');
+  const started=await page.evaluate(()=>{
+   const tag=[...document.querySelectorAll('label.process-tag-input')].find(el=>el.textContent?.trim()==='Start');
+   const checkbox=tag?.querySelector('input[type="checkbox"]');
+   if(!checkbox)return false;
+   checkbox.click();
+   return true;
+  });
+  assert.ok(started,'Typed ST Start control missing');
+  const stSnapshot=()=>page.evaluate(()=>{
+   const read=(heading)=>{
+    const panel=[...document.querySelectorAll('.process-lab .panel')].find(el=>el.querySelector('h2')?.textContent?.trim()===heading);
+    if(!panel)throw new Error('Missing ST panel: '+heading);
+    return Object.fromEntries([...panel.querySelectorAll('.io > div')].map(row=>[row.querySelector('code')?.textContent?.trim(),row.querySelector('strong')?.textContent?.trim()]));
+   };
+   return {outputs:read('PLC output memory'),memory:read('Retained scan memory')};
+  });
+  await click(page,'Compile & execute one scan');
+  let sample=await stSnapshot();
+  assert.equal(sample.outputs.Run,'true','Typed ST Start energizes Run');
+  assert.equal(sample.outputs.Scans,'1','Typed ST output counts first scan');
+  assert.equal(sample.memory.InternalCount,'1','Private VAR survives first scan');
+  assert.ok(!Object.hasOwn(sample.outputs,'InternalCount'),'Private VAR is not an output');
+  await click(page,'Compile & execute one scan');
+  sample=await stSnapshot();
+  assert.equal(sample.outputs.Scans,'2','Typed ST retained state increments next scan');
+  assert.equal(sample.memory.InternalCount,'2','Private VAR persists across scans');
+  await click(page,'Reset scan memory');
+  await click(page,'Compile & execute one scan');
+  sample=await stSnapshot();
+  assert.equal(sample.outputs.Scans,'1','Reset re-applies typed initializers');
+  console.log('TYPED ST EDITOR PASS');
   await visit(page,'/workcell-composer');
   await page.waitForSelector('.composer-grid');
   const initialCount=await page.evaluate(()=>document.querySelectorAll('.composer-cell.occupied').length);
