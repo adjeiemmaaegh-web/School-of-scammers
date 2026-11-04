@@ -67,14 +67,13 @@ async function run(){
   // Exercise typed ST from the React editor; isolated parser tests cannot prove UI wiring.
   await click(page,'Structured Text editor');
   await click(page,'Load typed variables example');
-  const startInputs=await page.$('label.process-tag-input');
-  let started=false;
-  for(const tag of startInputs){
-   if((await tag.evaluate(el=>el.textContent?.trim()))==='Start'){
-    const checkbox=await tag.$('input[type="checkbox"]');
-    assert.ok(checkbox,'Typed ST Start input missing');await checkbox.click();started=true;break;
-   }
-  }
+  const started=await page.evaluate(()=>{
+   const tag=[...document.querySelectorAll('label.process-tag-input')].find(el=>el.textContent?.trim()==='Start');
+   const checkbox=tag?.querySelector('input[type="checkbox"]');
+   if(!checkbox)return false;
+   checkbox.click();
+   return true;
+  });
   assert.ok(started,'Typed ST Start control missing');
   const stSnapshot=()=>page.evaluate(()=>{
    const read=(heading)=>{
