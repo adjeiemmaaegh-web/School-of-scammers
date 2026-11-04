@@ -78,7 +78,11 @@ async function run(){
   await click(page,'First scan');
   point=await watched('IN:PowerOK');
   assert.equal(point.value,'FALSE','Historical watch uses selected scan instead of current state');
-  await click(page,'Live');
+  await page.click('button[aria-label="Return to live workcell scan"]');
+  await page.waitForFunction(()=>{
+   const row=document.querySelector('section[aria-label="Workcell PLC watch debugger"] tr[data-watch-id="IN:PowerOK"]');
+   return row?.querySelector('td:nth-child(5) strong')?.textContent?.trim()==='TRUE';
+  },{timeout:5000});
   point=await watched('IN:PowerOK');
   assert.equal(point.value,'TRUE','Live view restores latest scan');
   await page.select('select[aria-label="Workcell watch source"]','plant');
