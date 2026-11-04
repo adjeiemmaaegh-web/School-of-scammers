@@ -36,7 +36,7 @@ export function WorkcellWatch({shown,history,program}:{shown:WorkcellState;histo
    <button disabled={transitions.length===0} onClick={()=>download(watchTimelineCsv({...timeline,changes:transitions}))}>Export filtered watch CSV</button>
   </div>
   <p role="status" aria-live="polite">Showing scan #{frame.scan} at {frame.timeMs} simulated ms · {rows.length} typed signals · {transitions.length} recorded transitions{timeline.truncated?' · older history truncated':''}. {sampled?'Values are simulation evidence, not physical PLC measurements.':'Run a virtual PLC scan to capture input and coil values.'}</p>
-  <div style={{overflowX:'auto',maxHeight:450,overflowY:'auto'}}>
+  <div role="region" aria-label="Scrollable typed workcell watch signals" tabIndex={0} style={{overflowX:'auto',maxHeight:450,overflowY:'auto'}}>
    <table><thead><tr><th>Phase / source</th><th>Educational address</th><th>Tag</th><th>Type</th><th>Value</th><th>When measured</th></tr></thead>
     <tbody>{rows.slice(0,350).map(row=><tr key={row.id} data-watch-id={row.id}>
      <td>{groups.find(g=>g.value===row.group)?.label??row.group}</td>
@@ -53,7 +53,7 @@ export function WorkcellWatch({shown,history,program}:{shown:WorkcellState;histo
   </div>}
   <h4>Recent observed signal changes</h4>
   <p className="muted">Transition comparisons use only retained executed scans up to the inspected scan. The first retained scan has no invented predecessor. A maximum of 240 recent changes is retained in this view.</p>
-  <div className="log" style={{maxHeight:220,overflowY:'auto'}} aria-label="Workcell watch changes">
+  <div className="log" role="region" tabIndex={0} style={{maxHeight:220,overflowY:'auto'}} aria-label="Workcell watch changes">
    {transitions.slice(-24).reverse().map((event,i)=><p key={event.id+'-'+event.scan+'-'+i} data-watch-event={event.id}>
      Scan {event.scan} · {event.timeMs} ms · <code>{event.tag}</code> ({event.group}, {event.type}): {watchValue(event.from,event.type,event.unit)} → {watchValue(event.to,event.type,event.unit)} · {event.direction}
    </p>)}
