@@ -13,8 +13,8 @@ export interface ScenarioAcceptanceReport {
  id:WorkcellPresetId;title:string;passed:boolean;checks:readonly ScenarioAcceptanceCriterion[];
  scanCount:number;simulatedMs:number;trace:readonly {phase:string;timeMs:number;coils:Readonly<Record<string,boolean>>;feedback:Readonly<Record<string,boolean|number>>}[];
 }
-export function runScenarioAcceptance(id:WorkcellPresetId,current?:{layout:WorkcellLayout;program:LadderDocument}):ScenarioAcceptanceReport{
- const preset=loadWorkcellPreset(id),layout=current?validateLayout(current.layout):preset.layout,program=current?.program??preset.program;
+export function runScenarioAcceptance(id:WorkcellPresetId,scene?:{layout:WorkcellLayout;program:LadderDocument}):ScenarioAcceptanceReport{
+ const preset=loadWorkcellPreset(id),layout=scene?validateLayout(scene.layout):preset.layout,program=scene?.program??preset.program;
  const errors=validateLadder(program);if(errors.length)throw new Error('Invalid current PLC program: '+errors.join('; '));
  const sensor=layout.equipment.find(x=>x.kind==='photoeye'||x.kind==='proximity');
  if(!sensor)throw new Error('Commissioning scenario requires a field detection sensor');
@@ -73,5 +73,5 @@ export function runScenarioAcceptance(id:WorkcellPresetId,current?:{layout:Workc
  })();
  add('replay','Exact same deterministic scan inputs reproduce identical final PLC/plant state',
   deterministic,'Deterministic replay '+(deterministic?'matched':'mismatched'));
- return {id:preset.id,title:current?layout.name:preset.title,passed:checks.every(x=>x.passed),checks,scanCount:count,simulatedMs:s.plant.timeMs,trace:rows};
+ return {id:preset.id,title:scene?layout.name:preset.title,passed:checks.every(x=>x.passed),checks,scanCount:count,simulatedMs:s.plant.timeMs,trace:rows};
 }
