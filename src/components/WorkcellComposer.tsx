@@ -11,11 +11,15 @@ import {
 import {stepWorkcellPlc,initialWorkcellPlcState,DEFAULT_OPERATOR_PANEL,DEMO_WORKCELL_PROGRAM,type OperatorPanel} from '../engineering/workcell-plc';
 import {parseProject} from '../engineering/project-file';
 import type {LadderDocument} from '../engineering/ladder';
+import {WORKCELL_PRESETS,loadWorkcellPreset} from '../engineering/workcell-presets';
+import {runScenarioAcceptance,type ScenarioAcceptanceReport} from '../engineering/workcell-scenario-acceptance';
 import './workcell-composer.css';
 
 const names:Readonly<Record<EquipmentKind,string>>={
  'conveyor':'Conveyor','tank':'Process tank','cylinder':'Pneumatic cylinder',
- 'pump':'Pump skid','photoeye':'Photoelectric sensor','control-panel':'PLC panel','fence':'Safety fence'
+ 'pump':'Pump skid','photoeye':'Photoelectric sensor','control-panel':'PLC panel','fence':'Safety fence',
+ 'vfd':'Variable-speed drive','lift':'Vertical transfer lift','pusher':'Linear pusher',
+ 'valve':'Process valve','proximity':'Inductive proximity sensor','indicator':'Signal beacon'
 };
 function EquipmentMesh({item,selected,scan,onSelect}:{item:Equipment;selected:boolean;scan:WorkcellScan;onSelect:()=>void}){
  const state=scan.devices[item.id];
@@ -41,6 +45,37 @@ function EquipmentMesh({item,selected,scan,onSelect}:{item:Equipment;selected:bo
   {item.kind==='pump'&&<group>
    <mesh position={[0,.3,0]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.3,.3,.65,20]}/><meshStandardMaterial color={active?live:frame}/></mesh>
    <mesh position={[.43,.35,0]}><boxGeometry args={[.38,.18,.3]}/><meshStandardMaterial color={metal}/></mesh>
+  </group>}
+  {item.kind==='vfd'&&<group>
+   <mesh position={[0,.48,0]}><boxGeometry args={[.72,.9,.38]}/><meshStandardMaterial color={frame} metalness={.4}/></mesh>
+   <mesh position={[0,.67,.202]}><boxGeometry args={[.52,.3,.035]}/><meshStandardMaterial color="#102c42" emissive={active?'#093b32':'#000000'}/></mesh>
+   <mesh position={[0,.38,.203]}><boxGeometry args={[.42,.09,.03]}/><meshStandardMaterial color={active?live:'#b0c2d1'}/></mesh>
+   <mesh position={[0,.14,0]}><boxGeometry args={[.78,.12,.42]}/><meshStandardMaterial color={idle}/></mesh>
+  </group>}
+  {item.kind==='lift'&&<group>
+   {[-.55,.55].map(x=><mesh key={x} position={[x,.9,0]}><boxGeometry args={[.1,1.8,.13]}/><meshStandardMaterial color={metal}/></mesh>)}
+   <mesh position={[0,.24+level*1.36,0]}><boxGeometry args={[1.25,.12,.95]}/><meshStandardMaterial color={active?live:frame}/></mesh>
+   <mesh position={[0,.08,0]}><boxGeometry args={[1.5,.12,1.1]}/><meshStandardMaterial color={idle}/></mesh>
+  </group>}
+  {item.kind==='pusher'&&<group>
+   <mesh position={[-.55,.3,0]}><boxGeometry args={[.55,.44,.48]}/><meshStandardMaterial color={frame}/></mesh>
+   <mesh position={[-.04+level*.5,.3,0]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[.07,.07,.7,12]}/><meshStandardMaterial color={metal}/></mesh>
+   <mesh position={[.35+level*.8,.3,0]}><boxGeometry args={[.13,.55,.7]}/><meshStandardMaterial color={active?live:'#d6b065'}/></mesh>
+  </group>}
+  {item.kind==='valve'&&<group>
+   <mesh position={[0,.3,0]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[.24,.24,.82,16]}/><meshStandardMaterial color={frame}/></mesh>
+   <mesh position={[0,.63,0]}><cylinderGeometry args={[.2,.2,.22,12]}/><meshStandardMaterial color={active?live:metal}/></mesh>
+   <mesh position={[0,.79,0]} rotation={[0,level*Math.PI/2,0]}><boxGeometry args={[.7,.055,.12]}/><meshStandardMaterial color="#e9b95f"/></mesh>
+  </group>}
+  {item.kind==='proximity'&&<group>
+   <mesh position={[0,.45,0]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[.11,.11,.62,12]}/><meshStandardMaterial color={metal}/></mesh>
+   <mesh position={[.35,.45,0]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[.12,.12,.05,12]}/><meshStandardMaterial color={active?live:'#a55e50'}/></mesh>
+   <mesh position={[0,.17,0]}><boxGeometry args={[.08,.37,.08]}/><meshStandardMaterial color={frame}/></mesh>
+  </group>}
+  {item.kind==='indicator'&&<group>
+   <mesh position={[0,.18,0]}><cylinderGeometry args={[.22,.22,.32,16]}/><meshStandardMaterial color={frame}/></mesh>
+   <mesh position={[0,.48,0]}><cylinderGeometry args={[.18,.18,.38,16]}/><meshStandardMaterial color={active?'#e8bc5d':'#695c47'} emissive={active?'#6b450c':'#000000'} emissiveIntensity={active?.5:0}/></mesh>
+   <mesh position={[0,.71,0]}><cylinderGeometry args={[.2,.2,.06,16]}/><meshStandardMaterial color={metal}/></mesh>
   </group>}
   {item.kind==='photoeye'&&<group>
    <mesh position={[0,.4,0]}><boxGeometry args={[.18,.2,.2]}/><meshStandardMaterial color={frame}/></mesh>
@@ -94,6 +129,8 @@ export function WorkcellComposer(){
  const [plc,setPlc]=useState(initialWorkcellPlcState);
  const [operator,setOperator]=useState<OperatorPanel>(DEFAULT_OPERATOR_PANEL);
  const [programLabel,setProgramLabel]=useState('Sample automatic conveyor / diverter ladder');
+ const [presetId,setPresetId]=useState<string>(WORKCELL_PRESETS[0].id);
+ const [acceptance,setAcceptance]=useState<ScenarioAcceptanceReport|null>(null);
  const [note,setNote]=useState(start.warning??'Place machines on the floor plan, then command and scan each device.');
  const [recoveryAvailable,setRecoveryAvailable]=useState(start.source==='recovery');
  const [saveStatus,setSaveStatus]=useState(start.source==='recovery'?'Recovery loaded — export before replacing damaged primary.':'Stored locally; export JSON for an independent backup.');
@@ -104,6 +141,7 @@ export function WorkcellComposer(){
  const commit=(next:WorkcellLayout,focus?:string|null)=>{
   try{
    const valid=validateLayout(next);
+   setAcceptance(null);
    setPast(p=>[...p.slice(-29),layout]);setFuture([]);setLayout(valid);
    if(focus!==undefined)setSelected(focus);
    setScan(initialScan());setPlc(initialWorkcellPlcState());setCommands({});
@@ -164,7 +202,7 @@ export function WorkcellComposer(){
   const file=event.target.files?.[0];event.target.value='';if(!file)return;
   try{if(file.size>250000)throw RangeError('PLC project exceeds 250 KB');
    const candidate=parseProject(await file.text());
-   setProgram(candidate.program);setProgramLabel(candidate.name);setPlc(initialWorkcellPlcState());setScan(initialScan());
+   setProgram(candidate.program);setProgramLabel(candidate.name);setAcceptance(null);setPlc(initialWorkcellPlcState());setScan(initialScan());
    setControlMode('ladder');setNote('Validated PLC project loaded. Coils named TAG_CMD drive matching virtual equipment.');
   }catch(error){setNote('PLC project import rejected: '+String(error));}
  };
@@ -180,12 +218,21 @@ export function WorkcellComposer(){
  return <section className="portal-page workcell-builder">
   <span className="eyebrow">SCENE AUTHORING / OFFLINE FACTORY WORKCELL</span>
   <div className="page-heading"><div><h1>Factory workcell composer</h1>
-   <p>Arrange conveyors, tanks, pneumatic cylinders, pumps, sensors and control panels on a bounded grid. Preview in 3D, run deterministic teaching scans, inspect I/O and save an editable project offline.</p></div>
+   <p>Arrange conveyors, tanks, pneumatic cylinders, drives, lifts, pushers, valves and sensors on a bounded grid. Load a commissioning scenario, preview it in 3D, run deterministic ladder-controlled scans, inspect device feedback and export an editable project.</p></div>
    <div className="actions"><button onClick={()=>saveFile(layout)}>Export scene JSON</button><label className="composer-import">Import scene JSON<input type="file" accept=".json,application/json" onChange={readFile}/></label></div>
   </div>
   <p className="muted">Educational digital scene authoring only. This editor does not simulate industrial pressure, forces, electrical energy, collisions or certified PLC behavior.</p>
   <div className="composer-toolbar">
    <label>Scene title<input aria-label="Scene title" value={layout.name} maxLength={60} onChange={e=>setLayout(old=>({...old,name:e.target.value}))} onBlur={()=>change(()=>validateLayout({...layout,name:layout.name.trim()||'Untitled workcell'}))}/></label>
+   <label>Commissioning scenario <select aria-label="Commissioning scenario template" value={presetId} onChange={e=>setPresetId(e.target.value)}>{WORKCELL_PRESETS.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></label>
+   <button onClick={()=>{
+    try{
+     const preset=loadWorkcellPreset(presetId);
+     commit(preset.layout,preset.layout.equipment[0]?.id??null);
+     setProgram(preset.program);setProgramLabel(preset.title);setControlMode('ladder');
+     setNote('Loaded '+preset.title+' with a validated ladder program. Toggle the corresponding virtual sensor/panel field input and scan to observe machine motion.');
+    }catch(error){setNote('Scenario rejected: '+String(error));}
+   }}>Load commissioning scenario</button>
    <button disabled={!past.length} onClick={undo}>Undo</button><button disabled={!future.length} onClick={redo}>Redo</button>
    <button onClick={()=>{if(window.confirm('Replace the current workcell? Export it first if you need a copy.'))commit(defaultLayout(),'cv1');}}>Reset scene</button>
   </div>
@@ -195,6 +242,18 @@ export function WorkcellComposer(){
    <div className="metric"><b>{Object.values(commands).filter(Boolean).length}</b><span>Active command switches</span></div>
    <div className="metric"><b>{selectedLabel}</b><span>Selected equipment</span></div>
   </div>
+  <section className="panel" aria-label="Machine commissioning acceptance">
+   <h2>Run scenario commissioning checks</h2>
+   <p className="muted">Run deterministic acceptance checks against the <strong>current editable layout and loaded PLC program</strong>. The inspection covers actual simulated scan outputs, modeled guard/E-stop inhibition, device activity, feedback, clock consistency and replay. It does not establish real-machine or safety certification.</p>
+   <div className="actions"><button onClick={()=>{
+    try{const report=runScenarioAcceptance(presetId as typeof WORKCELL_PRESETS[number]['id'],{layout,program});setAcceptance(report);setNote('Current scene commissioning: '+(report.passed?'all checks passed':'check failures detected'));}
+    catch(error){setAcceptance(null);setNote('Cannot run current-scene FAT: '+String(error));}
+   }}>Run current scene acceptance</button><span>{acceptance?acceptance.checks.filter(c=>c.passed).length+' / '+acceptance.checks.length+' criteria passed':'No current-scene acceptance run'}</span></div>
+   {acceptance&&<div aria-label="Current scene acceptance results">
+    <p role="status"><strong className={acceptance.passed?'good':'warn'}>{acceptance.passed?'PASS':'NOT PASSED'}</strong> · {acceptance.title} · {acceptance.scanCount} test scans · {acceptance.simulatedMs} simulated ms</p>
+    <div className="io">{acceptance.checks.map(check=><div key={check.id}><code>{check.id}</code><strong className={check.passed?'good':'warn'}>{check.passed?'PASS':'FAIL'}</strong><span>{check.description} — {check.observed}</span></div>)}</div>
+   </div>}
+  </section>
   <div className="workspace">
    <div>
     <Workcell3D layout={layout} scan={scan} selected={selected} onSelect={selectedInput}/>
@@ -223,7 +282,7 @@ export function WorkcellComposer(){
       <p><b>Loaded PLC program:</b> {programLabel}</p>
       <p className="muted">Sensor/panel switches become sampled PLC inputs. Each virtual actuator listens for its base tag with _CMD appended, e.g. CV1_CMD or CY1_CMD. Virtual feedback appears as TAG_ACTIVE / TAG_EXTENDED / TAG_RETRACTED. No hardware connectivity.</p>
       <label className="composer-import">Import PLC engineering project<input type="file" accept=".json,application/json" onChange={loadLadder}/></label>
-      <button onClick={()=>{setProgram(DEMO_WORKCELL_PROGRAM);setProgramLabel('Sample automatic conveyor / diverter ladder');setPlc(initialWorkcellPlcState());setScan(initialScan());}}>Load sample ladder</button>
+      <button onClick={()=>{setProgram(DEMO_WORKCELL_PROGRAM);setProgramLabel('Sample automatic conveyor / diverter ladder');setAcceptance(null);setPlc(initialWorkcellPlcState());setScan(initialScan());}}>Load sample ladder</button>
       <div className="composer-controls">
        <label><input type="checkbox" checked={operator.EStopOK} onChange={e=>setOperator(s=>({...s,EStopOK:e.target.checked}))}/> Simulated E-stop OK</label>
        <label><input type="checkbox" checked={operator.GuardClosed} onChange={e=>setOperator(s=>({...s,GuardClosed:e.target.checked}))}/> Simulated guard closed</label>
@@ -238,7 +297,7 @@ export function WorkcellComposer(){
        const s=scan.devices[d.id];
        return <div key={d.id} className="composer-device">
         <button onClick={()=>selectedInput(d.id)} aria-pressed={selected===d.id}><b>{d.tag}</b> {d.label}</button>
-        {d.kind!=='fence'&&<label><input type="checkbox" checked={commands[d.id]===true} disabled={controlMode==='ladder'&&d.kind!=='photoeye'&&d.kind!=='control-panel'} onChange={e=>setCommands(p=>({...p,[d.id]:e.target.checked}))}/> {controlMode==='ladder'?'Field input':'Command ON'}</label>}
+        {d.kind!=='fence'&&<label><input type="checkbox" checked={commands[d.id]===true} disabled={controlMode==='ladder'&&d.kind!=='photoeye'&&d.kind!=='proximity'&&d.kind!=='control-panel'} onChange={e=>setCommands(p=>({...p,[d.id]:e.target.checked}))}/> {controlMode==='ladder'?(d.kind==='photoeye'||d.kind==='proximity'||d.kind==='control-panel'?'Field input':'Ladder output (read-only)'):'Command ON'}</label>}
         <span>{s?(s.value*100).toFixed(1)+'%':'0.0%'}</span>
        </div>;
       })}

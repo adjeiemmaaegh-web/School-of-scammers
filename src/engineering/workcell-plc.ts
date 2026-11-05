@@ -19,7 +19,7 @@ export function stepWorkcellPlc(layout:WorkcellLayout,program:LadderDocument,pre
  if(errors.length)throw Error('Invalid PLC document: '+errors.join('; '));
  const inputValues:Record<string,boolean|number>={...deviceSignals(valid,previous.plant)};
  for(const device of valid.equipment){
-  if(device.kind==='photoeye'||device.kind==='control-panel')inputValues[device.tag+'_ACTIVE']=fieldInputs[device.id]===true;
+  if(device.kind==='photoeye'||device.kind==='proximity'||device.kind==='control-panel')inputValues[device.tag+'_ACTIVE']=fieldInputs[device.id]===true;
  }
  inputValues.EStopOK=operator.EStopOK;
  inputValues.GuardClosed=operator.GuardClosed;
@@ -28,7 +28,7 @@ export function stepWorkcellPlc(layout:WorkcellLayout,program:LadderDocument,pre
  const permit=operator.EStopOK&&operator.GuardClosed&&operator.AutoEnable;
  const commands:Record<string,boolean>={};
  for(const device of valid.equipment){
-  commands[device.id]=device.kind==='photoeye'||device.kind==='control-panel'?
+  commands[device.id]=device.kind==='photoeye'||device.kind==='proximity'||device.kind==='control-panel'?
    fieldInputs[device.id]===true:
    permit&&result.outputs[device.tag+'_CMD']===true;
  }
