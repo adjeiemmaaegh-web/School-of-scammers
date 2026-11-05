@@ -18,6 +18,7 @@ export function runScenarioAcceptance(id:WorkcellPresetId,scene?:{layout:Workcel
  const errors=validateLadder(program);if(errors.length)throw new Error('Invalid current PLC program: '+errors.join('; '));
  const sensor=layout.equipment.find(x=>x.kind==='photoeye'||x.kind==='proximity');
  if(!sensor)throw new Error('Commissioning scenario requires a field detection sensor');
+ const sensorId=sensor.id;
  const outputs=program.rungs.map(r=>r.coil);
  const driven=new Set(outputs.filter(x=>x.endsWith('_CMD')).map(x=>x.slice(0,-4)));
  const actuators=layout.equipment.filter(x=>driven.has(x.tag));
@@ -29,7 +30,7 @@ export function runScenarioAcceptance(id:WorkcellPresetId,scene?:{layout:Workcel
  let current:WorkcellPlcState=initialWorkcellPlcState();
  let count=0;
  function apply(label:string,panel:OperatorPanel,input:boolean){
-  current=stepWorkcellPlc(layout,program,current,panel,{[sensor.id]:input},100);
+  current=stepWorkcellPlc(layout,program,current,panel,{[sensorId]:input},100);
   count++;
   const feedback=deviceSignals(layout,current.plant);
   rows.push({phase:label,timeMs:current.plant.timeMs,coils:{...current.outputs},feedback:{...feedback}});
@@ -68,7 +69,7 @@ export function runScenarioAcceptance(id:WorkcellPresetId,scene?:{layout:Workcel
     {panel:DEFAULT_OPERATOR_PANEL,input:false},
     {panel:{...DEFAULT_OPERATOR_PANEL,EStopOK:false},input:true},
     {panel:DEFAULT_OPERATOR_PANEL,input:false}
-  ])previous=stepWorkcellPlc(layout,program,previous,entry.panel,{[sensor.id]:entry.input},100);
+  ])previous=stepWorkcellPlc(layout,program,previous,entry.panel,{[sensorId]:entry.input},100);
   return JSON.stringify(previous)===JSON.stringify(s);
  })();
  add('replay','Exact same deterministic scan inputs reproduce identical final PLC/plant state',
