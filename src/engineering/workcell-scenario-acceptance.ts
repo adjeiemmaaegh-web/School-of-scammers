@@ -2,7 +2,8 @@
  * Tests are not a field certification and do not validate hardware or vendor control.
  */
 import {loadWorkcellPreset,type WorkcellPresetId} from './workcell-presets';
-import {deviceSignals} from './workcell-layout';
+import {deviceSignals,validateLayout,type WorkcellLayout} from './workcell-layout';
+import {validateLadder,type LadderDocument} from './ladder';
 import {DEFAULT_OPERATOR_PANEL,initialWorkcellPlcState,stepWorkcellPlc,type OperatorPanel,type WorkcellPlcState} from './workcell-plc';
 
 export interface ScenarioAcceptanceCriterion {
@@ -12,8 +13,9 @@ export interface ScenarioAcceptanceReport {
  id:WorkcellPresetId;title:string;passed:boolean;checks:readonly ScenarioAcceptanceCriterion[];
  scanCount:number;simulatedMs:number;trace:readonly {phase:string;timeMs:number;coils:Readonly<Record<string,boolean>>;feedback:Readonly<Record<string,boolean|number>>}[];
 }
-export function runScenarioAcceptance(id:WorkcellPresetId):ScenarioAcceptanceReport{
- const preset=loadWorkcellPreset(id),layout=preset.layout,program=preset.program;
+export function runScenarioAcceptance(id:WorkcellPresetId,current?:{layout:WorkcellLayout;program:LadderDocument}):ScenarioAcceptanceReport{
+ const preset=loadWorkcellPreset(id),layout=current?validateLayout(current.layout):preset.layout,program=current?.program??preset.program;
+ const errors=validateLadder(program);if(errors.length)throw new Error('Invalid current PLC program: '+errors.join('; '));
  const sensor=layout.equipment.find(x=>x.kind==='photoeye'||x.kind==='proximity');
  if(!sensor)throw new Error('Commissioning scenario requires a field detection sensor');
  const outputs=program.rungs.map(r=>r.coil);
@@ -21,6 +23,8 @@ export function runScenarioAcceptance(id:WorkcellPresetId):ScenarioAcceptanceRep
  const actuators=layout.equipment.filter(x=>driven.has(x.tag));
  const checks:ScenarioAcceptanceCriterion[]=[];
  const add=(name:string,description:string,passed:boolean,observed:string)=>checks.push({id:name,description,passed,observed});
+ add('bindings','Current PLC program maps at least one output TAG_CMD to a virtual actuator',
+  actuators.length>0,actuators.length+' mapped actuators');
  const rows:ScenarioAcceptanceReport['trace'][number][]=[];
  let current:WorkcellPlcState=initialWorkcellPlcState();
  let count=0;
@@ -69,5 +73,5 @@ export function runScenarioAcceptance(id:WorkcellPresetId):ScenarioAcceptanceRep
  })();
  add('replay','Exact same deterministic scan inputs reproduce identical final PLC/plant state',
   deterministic,'Deterministic replay '+(deterministic?'matched':'mismatched'));
- return {id:preset.id,title:preset.title,passed:checks.every(x=>x.passed),checks,scanCount:count,simulatedMs:s.plant.timeMs,trace:rows};
+ return {id:preset.id,title:current?layout.name:preset.title,passed:checks.every(x=>x.passed),checks,scanCount:count,simulatedMs:s.plant.timeMs,trace:rows};
 }
