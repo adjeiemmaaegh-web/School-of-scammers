@@ -33,7 +33,9 @@ async function run(){
   await page.setViewport({width:1366,height:768});
   const routes=['/','/labs','/engineering','/simulation','/assessments','/process-control','/starter-lab','/electrical-bench','/pneumatics','/workcell-composer','/dc-circuit'];
   for(const route of routes){await visit(page,route);console.log('ROUTE PASS',route);}
-  await visit(page,'/engineering');await page.waitForSelector('select[aria-label="Logic exercise"]');
+  await visit(page,'/engineering');await page.waitForSelector('section[aria-label="External PLC reference trace comparison"]');
+  assert.ok(await page.$('input[aria-label="Compare external PLC CSV"]'),'External trace comparison workflow must be exposed');
+  await page.waitForSelector('select[aria-label="Logic exercise"]');
   await page.select('select[aria-label="Logic exercise"]','ctd');
   await page.click('input[aria-label="Logic input LoadCount"]');
   await click(page,'Single scan');
@@ -178,6 +180,8 @@ async function run(){
   await click(page,'Compile & execute one scan');
   sample=await stSnapshot();
   assert.equal(sample.outputs.Scans,'1','Reset re-applies typed initializers');
+  assert.ok(await page.$('input[aria-label="Import PLCopen Structured Text XML"]'),'PLCopen ST interchange control is available in the editor');
+  await click(page,'Export PLCopen ST XML');
   console.log('TYPED ST EDITOR PASS');
   await visit(page,'/workcell-composer');
   await page.waitForSelector('.composer-grid');
@@ -221,6 +225,11 @@ async function run(){
   const fat=await page.$eval('[aria-label="Current scene acceptance results"]',el=>el.innerText);
   assert.ok(fat.includes('Tank filling and valve skid'),'Current-scene FAT uses editable process skid layout');
   assert.ok(fat.includes('guard')&&fat.includes('estop')&&fat.includes('replay'),'FAT includes independent simulated guard, E-stop and replay tests');
+  const hasDynamics=await page.evaluate(()=>{
+   const node=[...document.querySelectorAll('.composer-device button')].find(x=>x.textContent?.includes('VL4'));
+   node?.click();return !!document.querySelector('input[aria-label="Equipment rise time"]');
+  });
+  assert.ok(hasDynamics,'Editable process valve timing controls are available in the 3D workcell studio');
   console.log('FOUR SCENE MACHINE CATALOGUE BROWSER PASS');
   console.log('WORKCELL COMPOSER PASS');
   await visit(page,'/pneumatics');
@@ -231,6 +240,9 @@ async function run(){
   await click(page,'EXTEND / 100 ms');
   assert.ok((await page.$eval('body',node=>node.innerText)).includes('8.3%'), 'Pneumatic cylinder must advance under coil command');
   console.log('PNEUMATIC COMMISSIONING PASS');
+  await visit(page,'/assessments');
+  await page.waitForSelector('section[aria-label="Instructor and learner field validation evidence"]');
+  assert.ok(await page.$('input[aria-label="Trial duration"]'),'Human evidence form must render without uploading personal data');
   await visit(page,'/simulation');
   for(const b of ['Record visual inspection','Read PLC I/O','Reconnect sensor circuit','START MOTOR','Verify operation','Submit task'])await click(page,b);
   assert.ok((await page.$eval('body',e=>e.innerText)).includes('Assessment report'));

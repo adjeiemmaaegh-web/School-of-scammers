@@ -7,7 +7,21 @@ export const WORKCELL_RECOVERY_KEY='plc-skills-workcell-layout-recovery-v1';
 export const WORKCELL_DAMAGED_KEY='plc-skills-workcell-layout-damaged-primary-v1';
 export type EquipmentKind='conveyor'|'tank'|'cylinder'|'pump'|'photoeye'|'control-panel'|'fence'|'vfd'|'lift'|'pusher'|'valve'|'proximity'|'indicator';
 export const EQUIPMENT_KINDS:readonly EquipmentKind[]=['conveyor','tank','cylinder','pump','photoeye','control-panel','fence','vfd','lift','pusher','valve','proximity','indicator'];
-export type Equipment={id:string;kind:EquipmentKind;label:string;tag:string;x:number;z:number;rotation:0|1|2|3};
+export type MotionDynamics={riseMs:number;fallMs:number};
+/** Optional simulation tuning, not physical motor nameplate data. */
+export const DYNAMIC_EQUIPMENT_KINDS=['cylinder','lift','pusher','vfd','valve','tank'] as const;
+export function defaultDynamics(kind:EquipmentKind):MotionDynamics{
+ switch(kind){
+  case 'cylinder':return {riseMs:1500,fallMs:1200};
+  case 'lift':return {riseMs:3500,fallMs:2800};
+  case 'pusher':return {riseMs:650,fallMs:500};
+  case 'vfd':return {riseMs:2600,fallMs:3400};
+  case 'valve':return {riseMs:500,fallMs:500};
+  case 'tank':return {riseMs:20000,fallMs:60000};
+  default:throw new Error('This equipment has no tunable rise/fall model');
+ }
+}
+export type Equipment={id:string;kind:EquipmentKind;label:string;tag:string;x:number;z:number;rotation:0|1|2|3;dynamics?:MotionDynamics};
 export type WorkcellLayout={format:typeof WORKCELL_FORMAT;schemaVersion:1;name:string;equipment:Equipment[]};
 export type DeviceScan={value:number;active:boolean};
 export type WorkcellScan={timeMs:number;devices:Readonly<Record<string,DeviceScan>>};
@@ -33,13 +47,18 @@ export function validateLayout(value:unknown):WorkcellLayout{
  const equipment:Equipment[]=[];
  for(const unknownDevice of value.equipment){
   if(!plain(unknownDevice))fail('Invalid equipment record');
-  const {id,kind,label,tag,x,z,rotation}=unknownDevice;
+  const {id,kind,label,tag,x,z,rotation,dynamics}=unknownDevice;
   if(typeof id!=='string'||!idPattern.test(id)||typeof kind!=='string'||!kinds.has(kind)||typeof label!=='string'||label.trim().length<1||label.length>48||typeof tag!=='string'||!tagPattern.test(tag)||!Number.isInteger(x)||!Number.isInteger(z)||Number(x)<-6||Number(x)>6||Number(z)<-6||Number(z)>6||![0,1,2,3].includes(Number(rotation)))fail('Invalid equipment fields');
+  if(dynamics!==undefined){
+   if(!(DYNAMIC_EQUIPMENT_KINDS as readonly string[]).includes(kind as string)||!plain(dynamics)||Object.keys(dynamics).some(key=>!['riseMs','fallMs'].includes(key))||
+    !Number.isSafeInteger(dynamics.riseMs)||!Number.isSafeInteger(dynamics.fallMs)||Number(dynamics.riseMs)<100||Number(dynamics.fallMs)<100||Number(dynamics.riseMs)>120000||Number(dynamics.fallMs)>120000)
+    fail('Invalid educational device dynamics (100..120000 ms rise/fall)');
+  }
   if(ids.has(id)||tags.has(tag))fail('Equipment IDs and I/O tags must be unique');
   const slot=String(x)+':'+String(z);
   if(places.has(slot))fail('Equipment anchor positions must be unique');
   ids.add(id);tags.add(tag);places.add(slot);
-  equipment.push({id,kind:kind as EquipmentKind,label,tag,x:x as number,z:z as number,rotation:rotation as 0|1|2|3});
+  equipment.push({id,kind:kind as EquipmentKind,label,tag,x:x as number,z:z as number,rotation:rotation as 0|1|2|3,...(dynamics!==undefined?{dynamics:{riseMs:Number((dynamics as Record<string,unknown>).riseMs),fallMs:Number((dynamics as Record<string,unknown>).fallMs)}}:{})});
  }
  return {format:WORKCELL_FORMAT,schemaVersion:1,name:value.name as string,equipment};
 }
@@ -62,7 +81,7 @@ export function addEquipment(layout:WorkcellLayout,kind:EquipmentKind):WorkcellL
  const device:Equipment={id:'item'+serial,tag:'IO'+serial,label:kind.replace('-',' ')+' '+serial,kind,x:slot.x,z:slot.z,rotation:0};
  return {...valid,equipment:[...valid.equipment,device]};
 }
-export function updateEquipment(layout:WorkcellLayout,id:string,changes:Partial<Pick<Equipment,'label'|'tag'|'x'|'z'|'rotation'>>):WorkcellLayout{
+export function updateEquipment(layout:WorkcellLayout,id:string,changes:Partial<Pick<Equipment,'label'|'tag'|'x'|'z'|'rotation'|'dynamics'>>):WorkcellLayout{
  const valid=validateLayout(layout);
  if(!valid.equipment.some(item=>item.id===id))throw new Error('Equipment not found');
  const equipment=valid.equipment.map(item=>item.id===id?{...item,...changes}:item);
@@ -88,18 +107,27 @@ export function stepWorkcell(layout:WorkcellLayout,previous:WorkcellScan,command
  if(!previous||!Number.isSafeInteger(previous.timeMs)||previous.timeMs<0||!plain(previous.devices))throw new TypeError('Invalid scan state');
  if(previous.timeMs+deltaMs>Number.MAX_SAFE_INTEGER)throw RangeError('Scan clock overflow');
  const devices:Record<string,DeviceScan>={};
+ const pumps=valid.equipment.filter(x=>x.kind==='pump');
+ const valves=valid.equipment.filter(x=>x.kind==='valve');
  for(const item of valid.equipment){
   const old=previous.devices[item.id];
   const oldValue=old&&Number.isFinite(old.value)?Math.min(1,Math.max(0,old.value)):0;
   const active=commands[item.id]===true;
   let value=oldValue;
+  const dynamics=(DYNAMIC_EQUIPMENT_KINDS as readonly string[]).includes(item.kind)?item.dynamics??defaultDynamics(item.kind):null;
+  const up=dynamics?.riseMs??1000,down=dynamics?.fallMs??1000;
   if(item.kind==='conveyor')value=(value+(active?deltaMs/1800:0))%1; // normalized belt phase
-  else if(item.kind==='tank')value=Math.min(1,Math.max(0,value+(active?deltaMs/20000:-deltaMs/60000))); // bounded teaching level
-  else if(item.kind==='cylinder')value=Math.min(1,Math.max(0,value+(active?deltaMs/1500:-deltaMs/1200))); // end-stop stroke
-  else if(item.kind==='lift')value=Math.min(1,Math.max(0,value+(active?deltaMs/3500:-deltaMs/2800))); // normalized hoist position
-  else if(item.kind==='pusher')value=Math.min(1,Math.max(0,value+(active?deltaMs/650:-deltaMs/500))); // simple linear slide
-  else if(item.kind==='vfd')value=Math.min(1,Math.max(0,value+(active?deltaMs/2600:-deltaMs/3400))); // ramped speed model
-  else if(item.kind==='valve')value=Math.min(1,Math.max(0,value+(active?deltaMs/500:-deltaMs/500))); // opening travel
+  else if(item.kind==='tank'){
+   // Educational mass balance: inlet demand needs pump and open valve if present in this skid.
+   const supplyOK=!pumps.length||pumps.some(p=>commands[p.id]===true);
+   const inletValve=valves.length?Math.max(...valves.map(v=>Math.min(1,Math.max(0,previous.devices[v.id]?.value??0)))):1;
+   const fill=active&&supplyOK&&inletValve>0;
+   value=Math.min(1,Math.max(0,value+(fill?deltaMs/up*inletValve:-deltaMs/down)));
+  }
+  else if(['cylinder','lift','pusher','vfd','valve'].includes(item.kind)){
+   // Configurable travel/speed ramp, deterministic in simulated time and independent of frame rate.
+   value=Math.min(1,Math.max(0,value+(active?deltaMs/up:-deltaMs/down)));
+  }
   else if(item.kind==='pump'||item.kind==='photoeye'||item.kind==='control-panel'||item.kind==='proximity'||item.kind==='indicator')value=active?1:0;
   else value=0;
   devices[item.id]={value:Math.round(value*1000000)/1000000,active:active&&item.kind!=='fence'};

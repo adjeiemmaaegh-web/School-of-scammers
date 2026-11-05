@@ -8,12 +8,12 @@
 
 ## Practical workflows
 - Author NO/NC contacts, branches, output coils, on/off/fixed/retentive timers, up/down counters and edge instructions in the ladder editor.
-- Practice typed BOOL/INT/REAL Structured Text with persistent internal simulated memory.
+- Practice bounded BOOL/INT/DINT/REAL/LREAL Structured Text, CASE, FOR, persistent memory and single-program PLCopen XML 2.01 import/export. Unsupported IEC constructs fail explicitly.
 - Wire idealized 24 V circuits, diagnose shorts/opens, use a virtual multimeter, and complete conveyor, motor starter, pneumatic, PID and DC network labs.
-- Build and commission 3D workcells from **13 equipment kinds** and four editable PLC-driven templates (conveyor sorter, packaging cell, vertical transfer, process skid). Check actual current layout/program behavior with simulated FAT outcomes.
-- Examine real simulated scan snapshots, typed I/O, timers, counters, transitions, CSV evidence and offline replay.
+- Build and commission 3D workcells from **13 equipment kinds** and four PLC-driven templates. Tune normalized actuator rise/fall behavior and observe pump/valve-dependent tank fill; run simulated FAT against the edited scene.
+- Examine actual **simulated** scan snapshots, typed I/O, timers, counters, transitions, CSV evidence and offline replay. Compare externally captured real-PLC BOOL scan CSV against the teaching ladder engine; reference provenance remains unverified until independent review.
 - Use simulation-only PLC input forcing for Start, SensorOK, Photoeye and ExitSensor. Isolate **virtual** power before changing forces. The watch table shows both underlying readings and forced PLC values. Safety power, guard, stop and outputs cannot be forced.
-- Export projects/sessions as JSON; browser-local storage is not a durable backup.
+- Export projects/sessions as JSON; browser-local storage is not a durable backup. Record consent-based anonymous instructor/learner observations in Assessments, without claiming human tests were already performed.
 
 This repository includes **no** backend, authentication, database, employer management or payment features; a separate team owns those systems.
 
@@ -34,9 +34,13 @@ The production build runs semantic TypeScript, Vite, and an offline precache gen
 - [Simulation-first PRD](docs/product/PRD.md)
 - [Approved roadmap](docs/product/ROADMAP.md)
 - [Release completion register](docs/RELEASE_COMPLETION_2026-11-05.md)
+- [Standards, real-device, legal and human-validation gate register](docs/RELEASE_STANDARDS_AND_ACCEPTANCE_2026-11-05.md)
+- [Physical device test protocol](qa/PHYSICAL_DEVICE_ACCEPTANCE_PROTOCOL.md)
+- [Reference PLC measurement protocol](qa/PLC_REFERENCE_MEASUREMENT_PROTOCOL.md)
+- [Independent learner/instructor study protocol](qa/INDEPENDENT_INSTRUCTOR_LEARNER_PROTOCOL.md)
 - [Dependency and license provenance](docs/LICENSE_PROVENANCE_REVIEW_2026-11-05.md)
 - [Input force and offline behavior](docs/FORCE_AND_OFFLINE_COMPLETION_2026-11-05.md)
 
-Remaining release gates include expert PLC reference verification, low-spec 8 GB Windows measurements, actual Edge/Safari/mobile acceptance, complete licensing and dependency review, broader plant/3D scene authoring, and independent instructional assessment.
+Remaining release gates include expert PLC reference verification, low-spec 8 GB Windows measurements, actual low-spec Windows, Safari and real mobile acceptance (Windows-hosted Edge CI is separate), complete licensing and dependency review, broader plant/3D scene authoring, and independent instructional assessment.
 
 - [Virtual machine catalogue and source acceptance](docs/FACTORY_MACHINE_CATALOG_COMPLETION_2026-11-05.md)
