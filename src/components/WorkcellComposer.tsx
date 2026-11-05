@@ -3,7 +3,7 @@ import {Canvas} from '@react-three/fiber';
 import {OrbitControls} from '@react-three/drei';
 import {SceneShell} from './SceneShell';
 import {
- EQUIPMENT_KINDS,WORKCELL_STORAGE_KEY,defaultLayout,validateLayout,addEquipment,
+ EQUIPMENT_KINDS,DYNAMIC_EQUIPMENT_KINDS,defaultDynamics,WORKCELL_STORAGE_KEY,defaultLayout,validateLayout,addEquipment,
  updateEquipment,moveEquipment,removeEquipment,rotateEquipment,parseLayout,
  serializeLayout,initialScan,stepWorkcell,deviceSignals,persistLayout,readLayout,restoreLayoutFromRecovery,
  type Equipment,type EquipmentKind,type WorkcellLayout,type WorkcellCommands,type WorkcellScan
@@ -136,6 +136,8 @@ export function WorkcellComposer(){
  const [saveStatus,setSaveStatus]=useState(start.source==='recovery'?'Recovery loaded — export before replacing damaged primary.':'Stored locally; export JSON for an independent backup.');
  const [labelDraft,setLabelDraft]=useState('');
  const [tagDraft,setTagDraft]=useState('');
+ const [riseDraft,setRiseDraft]=useState('');
+ const [fallDraft,setFallDraft]=useState('');
  const item=layout.equipment.find(x=>x.id===selected)??null;
  const signals=useMemo(()=>deviceSignals(layout,scan),[layout,scan]);
  const commit=(next:WorkcellLayout,focus?:string|null)=>{
@@ -206,7 +208,7 @@ export function WorkcellComposer(){
    setControlMode('ladder');setNote('Validated PLC project loaded. Coils named TAG_CMD drive matching virtual equipment.');
   }catch(error){setNote('PLC project import rejected: '+String(error));}
  };
- const selectedInput=(id:string)=>{setSelected(id);setLabelDraft('');setTagDraft('');};
+ const selectedInput=(id:string)=>{setSelected(id);setLabelDraft('');setTagDraft('');setRiseDraft('');setFallDraft('');};
  const changeProperties=()=>{if(!item)return;change(()=>updateEquipment(layout,item.id,{label:labelDraft.trim()||item.label,tag:(tagDraft.trim()||item.tag).toUpperCase()}),item.id);};
  const readFile=async(event:React.ChangeEvent<HTMLInputElement>)=>{
   const file=event.target.files?.[0];event.target.value='';if(!file)return;
@@ -318,6 +320,15 @@ export function WorkcellComposer(){
       <label>Label<input key={item.id+'label'} value={labelDraft||item.label} onChange={e=>setLabelDraft(e.target.value)} maxLength={48}/></label>
       <label>I/O base tag<input key={item.id+'tag'} value={tagDraft||item.tag} onChange={e=>setTagDraft(e.target.value.toUpperCase())} maxLength={24}/></label>
       <button onClick={changeProperties}>Apply properties</button>
+      {(DYNAMIC_EQUIPMENT_KINDS as readonly string[]).includes(item.kind)&&<fieldset><legend>Simulated actuator / tank dynamics</legend>
+       <p className="muted">Tune normalized commanded rise/fill and return/drain times in simulated milliseconds. The vessel additionally depends on pump and valve command/position when installed in the same skid. These are teaching parameters, not measured industrial performance.</p>
+       <label>Rise / fill time (ms)<input aria-label="Equipment rise time" type="number" min={100} max={120000} step={100} value={riseDraft||String(item.dynamics?.riseMs??defaultDynamics(item.kind).riseMs)} onChange={e=>setRiseDraft(e.target.value)}/></label>
+       <label>Return / drain time (ms)<input aria-label="Equipment return time" type="number" min={100} max={120000} step={100} value={fallDraft||String(item.dynamics?.fallMs??defaultDynamics(item.kind).fallMs)} onChange={e=>setFallDraft(e.target.value)}/></label>
+       <button onClick={()=>change(()=>updateEquipment(layout,item.id,{dynamics:{
+        riseMs:Number(riseDraft||item.dynamics?.riseMs||defaultDynamics(item.kind).riseMs),
+        fallMs:Number(fallDraft||item.dynamics?.fallMs||defaultDynamics(item.kind).fallMs)
+       }}),item.id)}>Apply dynamics</button>
+      </fieldset>}
       <p className="muted">X={item.x}, Z={item.z}, orientation={item.rotation*90}°</p>
       <div className="composer-arrows">
        <button aria-label="Move north" onClick={()=>change(()=>moveEquipment(layout,item.id,0,-1),item.id)}>↑</button>
