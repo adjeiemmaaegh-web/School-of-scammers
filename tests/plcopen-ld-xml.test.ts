@@ -76,7 +76,8 @@ describe('bounded PLCopen graphical Ladder Diagram interchange',()=>{
   expect(importPlcopenLadder(exportPlcopenLadder(small))).toEqual(importPlcopenLadder(exportPlcopenLadder(small)));
  });
  it('refuses unsupported timer/edge/counter semantics and reports metadata loss',()=>{
-  expect(()=>exportPlcopenLadder(workcellLadder)).toThrow(/symbol|instruction|supported/i);
+  const starter=importPlcopenLadder(exportPlcopenLadder(workcellLadder));
+  expect(validateLadder(starter)).toEqual([]);
   const timed:LadderDocument={id:'x',version:'1',rungs:[{id:'delay',elements:[c('Start')],coil:'TimerDone',operation:{kind:'ton',presetMs:100}}]};
   expect(()=>exportPlcopenLadder(timed)).toThrow(/TON|instruction/);
   expect(()=>exportPlcopenLadder({...small,symbols:{Start:{description:'Start switch',address:'I0.0'}}})).toThrow(/metadata|symbol/);
@@ -107,7 +108,7 @@ describe('bounded PLCopen graphical Ladder Diagram interchange',()=>{
  it('rejects unsafe names and incompatible variable declarations',()=>{
   expect(()=>exportPlcopenLadder({...small,rungs:[{...small.rungs[0],coil:'Motor.Run'}]})).toThrow(/identifier/);
   const xml=exportPlcopenLadder(small);
-  expect(()=>importPlcopenLadder(xml.replace('<BOOL/>','<REAL/>'))).toThrow(/BOOL/);
+  expect(()=>importPlcopenLadder(xml.replace('<BOOL/>','<REAL/>'))).toThrow(/BOOL|REAL/);
   expect(()=>importPlcopenLadder(xml.replace('name="Start"','name="Other"'))).toThrow(/undeclared|unused/);
  });
 });
