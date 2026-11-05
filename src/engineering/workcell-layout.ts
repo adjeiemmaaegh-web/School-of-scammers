@@ -5,8 +5,8 @@ export const WORKCELL_FORMAT='plc-skills-workcell' as const;
 export const WORKCELL_STORAGE_KEY='plc-skills-workcell-layout-v1';
 export const WORKCELL_RECOVERY_KEY='plc-skills-workcell-layout-recovery-v1';
 export const WORKCELL_DAMAGED_KEY='plc-skills-workcell-layout-damaged-primary-v1';
-export type EquipmentKind='conveyor'|'tank'|'cylinder'|'pump'|'photoeye'|'control-panel'|'fence';
-export const EQUIPMENT_KINDS:readonly EquipmentKind[]=['conveyor','tank','cylinder','pump','photoeye','control-panel','fence'];
+export type EquipmentKind='conveyor'|'tank'|'cylinder'|'pump'|'photoeye'|'control-panel'|'fence'|'vfd'|'lift'|'pusher'|'valve'|'proximity'|'indicator';
+export const EQUIPMENT_KINDS:readonly EquipmentKind[]=['conveyor','tank','cylinder','pump','photoeye','control-panel','fence','vfd','lift','pusher','valve','proximity','indicator'];
 export type Equipment={id:string;kind:EquipmentKind;label:string;tag:string;x:number;z:number;rotation:0|1|2|3};
 export type WorkcellLayout={format:typeof WORKCELL_FORMAT;schemaVersion:1;name:string;equipment:Equipment[]};
 export type DeviceScan={value:number;active:boolean};
@@ -96,7 +96,11 @@ export function stepWorkcell(layout:WorkcellLayout,previous:WorkcellScan,command
   if(item.kind==='conveyor')value=(value+(active?deltaMs/1800:0))%1; // normalized belt phase
   else if(item.kind==='tank')value=Math.min(1,Math.max(0,value+(active?deltaMs/20000:-deltaMs/60000))); // bounded teaching level
   else if(item.kind==='cylinder')value=Math.min(1,Math.max(0,value+(active?deltaMs/1500:-deltaMs/1200))); // end-stop stroke
-  else if(item.kind==='pump'||item.kind==='photoeye'||item.kind==='control-panel')value=active?1:0;
+  else if(item.kind==='lift')value=Math.min(1,Math.max(0,value+(active?deltaMs/3500:-deltaMs/2800))); // normalized hoist position
+  else if(item.kind==='pusher')value=Math.min(1,Math.max(0,value+(active?deltaMs/650:-deltaMs/500))); // simple linear slide
+  else if(item.kind==='vfd')value=Math.min(1,Math.max(0,value+(active?deltaMs/2600:-deltaMs/3400))); // ramped speed model
+  else if(item.kind==='valve')value=Math.min(1,Math.max(0,value+(active?deltaMs/500:-deltaMs/500))); // opening travel
+  else if(item.kind==='pump'||item.kind==='photoeye'||item.kind==='control-panel'||item.kind==='proximity'||item.kind==='indicator')value=active?1:0;
   else value=0;
   devices[item.id]={value:Math.round(value*1000000)/1000000,active:active&&item.kind!=='fence'};
  }
@@ -110,6 +114,16 @@ export function deviceSignals(layout:WorkcellLayout,scan:WorkcellScan):Readonly<
   if(item.kind==='cylinder'){result[item.tag+'_EXTENDED']=state.value>=0.999;result[item.tag+'_RETRACTED']=state.value<=0.001;}
   if(item.kind==='tank')result[item.tag+'_LEVEL_PERCENT']=Math.round(state.value*1000)/10;
   if(item.kind==='conveyor')result[item.tag+'_BELT_PHASE']=Math.round(state.value*1000)/1000;
+  if(item.kind==='lift'||item.kind==='pusher'){
+   result[item.tag+'_EXTENDED']=state.value>=0.999;
+   result[item.tag+'_RETRACTED']=state.value<=0.001;
+   result[item.tag+'_POSITION_PERCENT']=Math.round(state.value*1000)/10;
+  }
+  if(item.kind==='vfd'){
+   result[item.tag+'_SPEED_PERCENT']=Math.round(state.value*1000)/10;
+   result[item.tag+'_AT_SPEED']=state.value>=0.999;
+  }
+  if(item.kind==='valve')result[item.tag+'_OPEN_PERCENT']=Math.round(state.value*1000)/10;
  }
  return result;
 }
