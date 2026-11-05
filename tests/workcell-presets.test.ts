@@ -25,10 +25,12 @@ describe('production educational factory-machine catalogue',()=>{
  it('never shares mutable layout or PLC objects between scenario loads',()=>{
   const a=loadWorkcellPreset('vertical-transfer');
   a.layout.equipment[0].label='changed';
-  a.program.rungs[0].elements[0].tag='not-real';
+  const first=a.program.rungs[0].elements[0];
+  if(first.type==='contact')first.tag='not-real';
   const b=loadWorkcellPreset('vertical-transfer');
   expect(b.layout.equipment[0].label).not.toBe('changed');
-  expect(b.program.rungs[0].elements[0].tag).not.toBe('not-real');
+  const unchanged=b.program.rungs[0].elements[0];
+  expect(unchanged.type==='contact'&&unchanged.tag).not.toBe('not-real');
  });
  it('rejects unknown scenario identifiers rather than silently selecting the default',()=>{
   expect(()=>loadWorkcellPreset('unknown-scene')).toThrow(/Unknown workcell scenario/);
