@@ -193,8 +193,10 @@ async function run(){
   assert.ok((await page.$eval('body',e=>e.innerText)).includes('100 ms'),'Machine scan advances');
   await page.select('select[aria-label="Commissioning scenario template"]','packaging-cell');
   await click(page,'Load commissioning scenario');
+  await page.waitForFunction(()=>document.querySelector('input[aria-label="Scene title"]')?.value==='Packaging cell',{timeout:5000});
   const packaging=await page.$eval('body',el=>el.innerText);
-  assert.ok(packaging.includes('Packaging cell')&&packaging.includes('PX2'),'Packaging scene and mapped sensor load into real UI');
+  const sceneName=await page.$eval('input[aria-label="Scene title"]',el=>el.value);
+  assert.ok(sceneName==='Packaging cell'&&packaging.includes('PX2'),'Packaging scene and mapped sensor load into real UI');
   const enabled=await page.evaluate(()=>{
    const row=[...document.querySelectorAll('.composer-device')].find(el=>el.querySelector('button b')?.textContent?.trim()==='PX2');
    const input=row?.querySelector('input[type="checkbox"]');
