@@ -36,7 +36,7 @@ export function LadderEditor({ document, onChange }: { document: LadderDocument;
       if(metadata&&!window.confirm('PLCopen LD subset does not preserve rung IDs or symbol descriptions/addresses. Use project JSON for a lossless backup. Export XML anyway?'))return;
       const xml=exportPlcopenLadder(document,'TrainingLadder',{allowSymbolMetadataLoss:metadata});
       const url=URL.createObjectURL(new Blob([xml],{type:'application/xml;charset=utf-8'}));
-      const link=document.createElement('a');link.href=url;link.download='plc-ladder-tc6-0201.xml';link.click();
+      const link=window.document.createElement('a');link.href=url;link.download='plc-ladder-tc6-0201.xml';link.click();
       setTimeout(()=>URL.revokeObjectURL(url),1000);
       setMessage('PLCopen LD XML exported (BOOL contact/coil subset). Keep project JSON for complete program metadata.');
     }catch(error){setMessage('PLCopen LD export rejected: '+String(error));}
