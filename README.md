@@ -9,6 +9,7 @@
 ## Practical workflows
 - Author NO/NC contacts, branches, output coils, on/off/fixed/retentive timers, up/down counters and edge instructions in the ladder editor.
 - Practice bounded BOOL/INT/DINT/REAL/LREAL Structured Text, CASE, FOR, persistent memory and single-program PLCopen XML 2.01 import/export. Unsupported IEC constructs fail explicitly.
+- Exchange simple graphical Ladder Diagram NO/NC contacts, branches and coils as bounded PLCopen LD XML; unsupported instructions are rejected. Add custom PLC tags without editing JSON.
 - Wire idealized 24 V circuits, diagnose shorts/opens, use a virtual multimeter, and complete conveyor, motor starter, pneumatic, PID and DC network labs.
 - Build and commission 3D workcells from **13 equipment kinds** and four PLC-driven templates. Tune normalized actuator rise/fall behavior and observe pump/valve-dependent tank fill; run simulated FAT against the edited scene.
 - Examine actual **simulated** scan snapshots, typed I/O, timers, counters, transitions, CSV evidence and offline replay. Compare externally captured real-PLC BOOL scan CSV against the teaching ladder engine; reference provenance remains unverified until independent review.
@@ -39,6 +40,7 @@ The production build runs semantic TypeScript, Vite, and an offline precache gen
 - [Reference PLC measurement protocol](qa/PLC_REFERENCE_MEASUREMENT_PROTOCOL.md)
 - [Independent learner/instructor study protocol](qa/INDEPENDENT_INSTRUCTOR_LEARNER_PROTOCOL.md)
 - [Dependency and license provenance](docs/LICENSE_PROVENANCE_REVIEW_2026-11-05.md)
+- [Ladder XML interchange limits and evidence](docs/PLCOPEN_LD_INTERCHANGE_2026-11-06.md)
 - [Input force and offline behavior](docs/FORCE_AND_OFFLINE_COMPLETION_2026-11-05.md)
 
 Remaining release gates include expert PLC reference verification, low-spec 8 GB Windows measurements, actual low-spec Windows, Safari and real mobile acceptance (Windows-hosted Edge CI is separate), complete licensing and dependency review, broader plant/3D scene authoring, and independent instructional assessment.
