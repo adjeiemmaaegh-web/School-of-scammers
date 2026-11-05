@@ -2,18 +2,18 @@
  * This is NOT a vendor parser, real PLC runtime, or safety-rated controller. */
 export type STValue=number|boolean;
 export type STSignals=Readonly<Record<string,STValue>>;
-export type STType='BOOL'|'INT'|'REAL';
+export type STType='BOOL'|'INT'|'DINT'|'REAL'|'LREAL';
 export type STDeclaration={name:string;type:STType;scope:'input'|'output'|'local';initial:STValue};
 type Token={value:string;offset:number};
 type Expression={kind:'literal';value:STValue}|{kind:'read';name:string}|{kind:'unary';op:string;inner:Expression}|{kind:'binary';op:string;left:Expression;right:Expression};
-type Statement={kind:'assign';name:string;expr:Expression}|{kind:'if';branches:{when:Expression;body:Statement[]}[];otherwise:Statement[]};
+type Statement={kind:'assign';name:string;expr:Expression}|{kind:'if';branches:{when:Expression;body:Statement[]}[];otherwise:Statement[]}|{kind:'case';selector:Expression;arms:{value:STValue;body:Statement[]}[];otherwise:Statement[]}|{kind:'for';counter:string;from:Expression;to:Expression;step:Expression;body:Statement[]};
 export type STProgram={source:string;statements:readonly Statement[];referencedInputs:string[];assignedOutputs:string[];declarations:readonly STDeclaration[]};
 export type STResult={outputs:Record<string,STValue>;signals:Record<string,STValue>;assignments:{tag:string;value:STValue}[];memory:Record<string,STValue>};
 const keyword=(s:string)=>s.toUpperCase();
 const identifier=/^[A-Za-z][A-Za-z0-9_]*$/;
 const number=/^(?:\d+(?:\.\d+)?|\.\d+)$/;
 const precedence:Readonly<Record<string,number>>={OR:1,XOR:2,AND:3,'=':4,'<>':4,'<':4,'<=':4,'>':4,'>=':4,'+':5,'-':5,'*':6,'/':6,MOD:6};
-const RESERVED=new Set(['IF','THEN','ELSIF','ELSE','END_IF','AND','OR','XOR','NOT','TRUE','FALSE','MOD','VAR','VAR_INPUT','VAR_OUTPUT','END_VAR','BOOL','INT','REAL']);
+const RESERVED=new Set(['IF','THEN','ELSIF','ELSE','END_IF','AND','OR','XOR','NOT','TRUE','FALSE','MOD','VAR','VAR_INPUT','VAR_OUTPUT','END_VAR','BOOL','INT','DINT','REAL','LREAL','CASE','OF','END_CASE','FOR','TO','BY','DO','END_FOR']);
 function tokenize(source:string):Token[]{
  if(typeof source!=='string'||source.length>12000)throw new RangeError('Structured Text must be at most 12,000 characters');
  const tokens:Token[]=[];
@@ -29,11 +29,12 @@ function tokenize(source:string):Token[]{
  }
  tokens.push({value:'<EOF>',offset:source.length});return tokens;
 }
-/** Educational data types; INT is modeled as signed 16-bit, REAL as finite JS number. */
+/** Teaching numeric bounds: INT 16-bit, DINT signed 32-bit, REAL/LREAL finite JS numbers (not IEC float precision). */
 function checkType(type:STType,value:STValue,name:string):void{
  if(type==='BOOL'){if(typeof value!=='boolean')throw new TypeError(`${name} requires BOOL`);return;}
  if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${name} requires numeric ${type}`);
  if(type==='INT'&&(!Number.isInteger(value)||value<-32768||value>32767))throw new RangeError(`${name} requires INT in -32768..32767`);
+ if(type==='DINT'&&(!Number.isInteger(value)||value<-2147483648||value>2147483647))throw new RangeError(`${name} requires DINT in -2147483648..2147483647`);
 }
 export function compileStructuredText(source:string):STProgram{
  const tokens=tokenize(source);let pos=0;let statementCount=0;const reads=new Map<string,string>();const writes=new Map<string,string>();const declarations:STDeclaration[]=[];const namedDeclarations=new Set<string>();
@@ -67,7 +68,7 @@ export function compileStructuredText(source:string):STProgram{
    if(namedDeclarations.has(key))fail(`Duplicate variable declaration ${name}`);
    requireToken(':');
    const typeName=upper();
-   if(typeName!=='BOOL'&&typeName!=='INT'&&typeName!=='REAL')fail(`Unsupported variable type ${peek()}`);
+   if(!['BOOL','INT','DINT','REAL','LREAL'].includes(typeName))fail(`Unsupported variable type ${peek()}`);
    const type=typeName as STType;next();
    let initial:STValue=type==='BOOL'?false:0;
    if(accept(':=')){
@@ -88,9 +89,23 @@ export function compileStructuredText(source:string):STProgram{
   if(!count)fail('Empty variable declaration block');
   requireToken('END_VAR');
  }
- function statements(terminators:ReadonlySet<string>,depth=0):Statement[]{
+ const startsCaseLabel=()=>{
+  const here=peek(),nextOne=tokens[pos+1]?.value,nextTwo=tokens[pos+2]?.value;
+  return (number.test(here)||here.toUpperCase()==='TRUE'||here.toUpperCase()==='FALSE')&&nextOne===':' ||
+    ((here==='-'||here==='+')&&nextOne!==undefined&&number.test(nextOne)&&nextTwo===':');
+ };
+ function caseLiteral():STValue{
+  let sign=1;if(accept('-'))sign=-1;else accept('+');
+  const value=next(),up=keyword(value);
+  if(up==='TRUE'||up==='FALSE'){if(sign!==1)fail('Signed boolean case label');return up==='TRUE';}
+  if(!number.test(value))fail('Expected integer or BOOL case label');
+  const literal=Number(value)*sign;
+  if(!Number.isSafeInteger(literal))fail('CASE requires integer labels');
+  return literal;
+ }
+ function statements(terminators:ReadonlySet<string>,depth=0,caseBody=false):Statement[]{
   if(depth>16)throw new RangeError('IF nesting limit (16) exceeded');const result:Statement[]=[];
-  while(peek()!=='<EOF>'&&!terminators.has(upper())){
+  while(peek()!=='<EOF>'&&!terminators.has(upper())&&!(caseBody&&startsCaseLabel())){
    if(++statementCount>200)throw new RangeError('Statement limit (200) exceeded');
    if(accept('IF')){
     const branches:{when:Expression;body:Statement[]}[]=[];
@@ -98,6 +113,23 @@ export function compileStructuredText(source:string):STProgram{
     while(accept('ELSIF')){const when=expression();requireToken('THEN');branches.push({when,body:statements(new Set(['ELSIF','ELSE','END_IF']),depth+1)});}
     const otherwise=accept('ELSE')?statements(new Set(['END_IF']),depth+1):[];
     requireToken('END_IF');requireToken(';');result.push({kind:'if',branches,otherwise});
+   }else if(accept('CASE')){
+    const selector=expression();requireToken('OF');const arms:{value:STValue;body:Statement[]}[]=[];const seen=new Set<string>();
+    while(upper()!=='ELSE'&&upper()!=='END_CASE'&&peek()!=='<EOF>'){
+     if(arms.length>=64)throw new RangeError('CASE arm limit (64) exceeded');
+     const value=caseLiteral(),key=typeof value+':'+String(value);
+     if(seen.has(key))fail('Duplicate CASE label');seen.add(key);requireToken(':');
+     arms.push({value,body:statements(new Set(['ELSE','END_CASE']),depth+1,true)});
+    }
+    if(!arms.length)fail('CASE requires at least one arm');
+    const otherwise=accept('ELSE')?statements(new Set(['END_CASE']),depth+1):[];
+    requireToken('END_CASE');requireToken(';');result.push({kind:'case',selector,arms,otherwise});
+   }else if(accept('FOR')){
+    const counterName=readName(),counter=keyword(counterName);if(!writes.has(counter))writes.set(counter,counterName);
+    requireToken(':=');const from=expression();requireToken('TO');const to=expression();
+    const step=accept('BY')?expression():{kind:'literal' as const,value:1};
+    requireToken('DO');const body=statements(new Set(['END_FOR']),depth+1);
+    requireToken('END_FOR');requireToken(';');result.push({kind:'for',counter,from,to,step,body});
    }else{
     const name=readName();requireToken(':=');const expr=expression();requireToken(';');const key=keyword(name);if(!writes.has(key))writes.set(key,name);result.push({kind:'assign',name:key,expr});
    }
@@ -115,6 +147,15 @@ export function compileStructuredText(source:string):STProgram{
    if(!decl)throw new SyntaxError(`Undeclared assignment ${name}`);
    if(decl.scope==='input')throw new SyntaxError(`Cannot assign VAR_INPUT ${name}`);
   }
+  const validateFor=(body:readonly Statement[]):void=>{for(const stmt of body){
+   if(stmt.kind==='for'){
+    const type=table.get(stmt.counter)?.type;
+    if(type!=='INT'&&type!=='DINT')throw new SyntaxError('FOR counter must be declared INT or DINT');
+    validateFor(stmt.body);
+   }else if(stmt.kind==='if'){for(const arm of stmt.branches)validateFor(arm.body);validateFor(stmt.otherwise);}
+   else if(stmt.kind==='case'){for(const arm of stmt.arms)validateFor(arm.body);validateFor(stmt.otherwise);}
+  }};
+  validateFor(compiled);
  }
  const outputs=declarations.length?declarations.filter(d=>d.scope==='output').map(d=>d.name):Array.from(writes.values());
  if(!outputs.length)throw new SyntaxError('Structured Text requires a declared or assigned output');
@@ -212,10 +253,28 @@ export function executeStructuredText(program:STProgram,inputs:STSignals,previou
     const tag=declaration?.name??outputNames.get(statement.name)??statement.name;
     if(!typed||declaration?.scope==='output')outputs[tag]=value;
     assignments.push({tag,value});
-   }else{
+   }else if(statement.kind==='if'){
     let body:readonly Statement[]=statement.otherwise;
     for(const branch of statement.branches)if(bool(evaluate(branch.when,values))){body=branch.body;break;}
     run(body,depth+1);
+   }else if(statement.kind==='case'){
+    const selected=evaluate(statement.selector,values);
+    const arm=statement.arms.find(entry=>typeof entry.value===typeof selected&&entry.value===selected);
+    run(arm?.body??statement.otherwise,depth+1);
+   }else if(statement.kind==='for'){
+    if(inputKeys.has(statement.counter))throw new Error('Cannot use input as FOR counter');
+    const from=numeric(evaluate(statement.from,values)),to=numeric(evaluate(statement.to,values)),step=numeric(evaluate(statement.step,values));
+    if(!Number.isSafeInteger(from)||!Number.isSafeInteger(to)||!Number.isSafeInteger(step)||step===0)throw new RangeError('FOR bounds and BY must be nonzero safe integers');
+    const size=step>0?(to-from)/step:(from-to)/(-step);
+    if(size>=400||!Number.isFinite(size))throw new RangeError('FOR exceeds bounded execution budget');
+    let iterations=0;
+    for(let n=from;step>0?n<=to:n>=to;n+=step){
+     if(++iterations>400)throw new RangeError('FOR iteration budget exceeded');
+     const declaration=declarationTypes.get(statement.counter);
+     if(declaration)checkType(declaration.type,n,declaration.name);
+     values[statement.counter]=n;
+     run(statement.body,depth+1);
+    }
    }
   }
  };
