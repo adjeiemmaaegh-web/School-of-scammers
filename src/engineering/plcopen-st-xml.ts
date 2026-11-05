@@ -10,16 +10,15 @@ type Node={name:string;attrs:Record<string,string>;children:Node[];text:string};
 const nameOK=/^[A-Za-z][A-Za-z0-9_]{0,79}$/;
 const xmlEscape=(s:string)=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
 function xmlDecode(s:string):string {
- const decoded=s.replace(/&(?:amp|lt|gt|quot|apos|#(?:x[0-9a-fA-F]+|[0-9]+));/g,v=>{
+ const pattern=/&(?:amp|lt|gt|quot|apos|#(?:x[0-9a-fA-F]+|[0-9]+));/g;
+ if(s.replace(pattern,'').includes('&'))throw Error('Malformed or unsupported XML entity');
+ const decoded=s.replace(pattern,v=>{
   if(v==='&amp;')return '&';if(v==='&lt;')return '<';if(v==='&gt;')return '>';
   if(v==='&quot;')return '"';if(v==='&apos;')return "'";
   const hex=v.startsWith('&#x'),n=parseInt(v.slice(hex?3:2,-1),hex?16:10);
   if(n===0||n>0x10ffff||(n>=0xd800&&n<=0xdfff)||n<32&&n!==9&&n!==10&&n!==13)throw Error('Invalid numeric XML entity');
   return String.fromCodePoint(n);
  });
- if(decoded.includes('&')&&/&(?!(?:[^;]*;))/.test(decoded))throw Error('Malformed XML entity');
- // Reject source entities not decoded; this is a strict subset rather than a lenient XML reader.
- if(/&(?:[a-zA-Z_][a-zA-Z0-9_.:-]*|#[^;]+);/.test(decoded))throw Error('Unsupported or nested XML entity');
  return decoded;
 }
 function parseSmallXml(input:string):Node{
