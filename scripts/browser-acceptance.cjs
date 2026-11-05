@@ -33,6 +33,31 @@ async function run(){
   await page.setViewport({width:1366,height:768});
   const routes=['/','/labs','/engineering','/simulation','/assessments','/process-control','/starter-lab','/electrical-bench','/pneumatics','/workcell-composer','/dc-circuit'];
   for(const route of routes){await visit(page,route);console.log('ROUTE PASS',route);}
+  await visit(page,'/engineering');
+  await page.waitForSelector('input[aria-label="Import PLCopen LD XML"]');
+  await page.evaluate(()=>{
+   const xml='<?xml version="1.0" encoding="UTF-8"?>'+
+    '<project xmlns="http://www.plcopen.org/xml/tc6_0201"><fileHeader/><contentHeader name="External"/>'+
+    '<types><dataTypes/><pous><pou name="ImportedTest" pouType="program">'+
+    '<interface><inputVars><variable name="Start"><type><BOOL/></type></variable></inputVars>'+
+    '<outputVars><variable name="Aux1"><type><BOOL/></type></variable></outputVars></interface>'+
+    '<body><LD><leftPowerRail localId="0"><connectionPointOut/></leftPowerRail>'+
+    '<contact localId="1"><connectionPointIn><connection refLocalId="0"/></connectionPointIn><connectionPointOut/><variable>Start</variable></contact>'+
+    '<coil localId="2"><connectionPointIn><connection refLocalId="1"/></connectionPointIn><connectionPointOut/><variable>Aux1</variable></coil>'+
+    '</LD></body></pou></pous></types></project>';
+   const input=document.querySelector('input[aria-label="Import PLCopen LD XML"]');
+   const files=new DataTransfer();files.items.add(new File([xml],'sample.xml',{type:'application/xml'}));
+   input.files=files.files;input.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  await page.waitForFunction(()=>document.body.innerText.includes('Validated PLCopen LD XML imported'),{timeout:8000});
+  assert.ok((await page.$eval('body',e=>e.innerText)).includes('ImportedTest')||(await page.$eval('body',e=>e.innerText)).includes('Aux1'),'PLCopen imported rung rendered');
+  await click(page,'Export PLCopen LD XML');
+  await page.waitForFunction(()=>document.body.innerText.includes('PLCopen LD XML exported'),{timeout:8000});
+  await page.type('input[aria-label="New custom PLC tag"]','ExtraSensor');
+  await click(page,'Add custom tag');
+  const customTags=await page.$eval('select[aria-label="Symbol tag"]',el=>[...el.options].map(x=>x.value));
+  assert.ok(customTags.includes('ExtraSensor'),'Custom symbol becomes available in editor');
+  console.log('PLCOPEN LADDER XML EDITOR BROWSER PASS');
   await visit(page,'/engineering');await page.waitForSelector('section[aria-label="External PLC reference trace comparison"]');
   assert.ok(await page.$('input[aria-label="Compare external PLC CSV"]'),'External trace comparison workflow must be exposed');
   await page.waitForSelector('select[aria-label="Logic exercise"]');
