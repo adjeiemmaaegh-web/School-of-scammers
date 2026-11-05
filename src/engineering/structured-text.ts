@@ -7,7 +7,7 @@ export type STDeclaration={name:string;type:STType;scope:'input'|'output'|'local
 type Token={value:string;offset:number};
 type Expression={kind:'literal';value:STValue}|{kind:'read';name:string}|{kind:'unary';op:string;inner:Expression}|{kind:'binary';op:string;left:Expression;right:Expression};
 type Statement={kind:'assign';name:string;expr:Expression}|{kind:'if';branches:{when:Expression;body:Statement[]}[];otherwise:Statement[]}|{kind:'case';selector:Expression;arms:{value:STValue;body:Statement[]}[];otherwise:Statement[]}|{kind:'for';counter:string;from:Expression;to:Expression;step:Expression;body:Statement[]};
-export type STProgram={source:string;statements:readonly Statement[];referencedInputs:string[];assignedOutputs:string[];declarations:readonly STDeclaration[]};
+export type STProgram={source:string;bodySource:string;statements:readonly Statement[];referencedInputs:string[];assignedOutputs:string[];declarations:readonly STDeclaration[]};
 export type STResult={outputs:Record<string,STValue>;signals:Record<string,STValue>;assignments:{tag:string;value:STValue}[];memory:Record<string,STValue>};
 const keyword=(s:string)=>s.toUpperCase();
 const identifier=/^[A-Za-z][A-Za-z0-9_]*$/;
@@ -103,6 +103,7 @@ export function compileStructuredText(source:string):STProgram{
   if(!Number.isSafeInteger(literal))fail('CASE requires integer labels');
   return literal;
  }
+ const bodyStart=tokens[pos].offset;
  function statements(terminators:ReadonlySet<string>,depth=0,caseBody=false):Statement[]{
   if(depth>16)throw new RangeError('IF nesting limit (16) exceeded');const result:Statement[]=[];
   while(peek()!=='<EOF>'&&!terminators.has(upper())&&!(caseBody&&startsCaseLabel())){
@@ -159,7 +160,7 @@ export function compileStructuredText(source:string):STProgram{
  }
  const outputs=declarations.length?declarations.filter(d=>d.scope==='output').map(d=>d.name):Array.from(writes.values());
  if(!outputs.length)throw new SyntaxError('Structured Text requires a declared or assigned output');
- return {source,statements:compiled,referencedInputs:Array.from(reads.entries()).filter(([key])=>!writes.has(key)).map(([,name])=>name),assignedOutputs:outputs,declarations};
+ return {source,bodySource:source.slice(bodyStart),statements:compiled,referencedInputs:Array.from(reads.entries()).filter(([key])=>!writes.has(key)).map(([,name])=>name),assignedOutputs:outputs,declarations};
 }
 function numeric(v:STValue):number{if(typeof v!=='number')throw new TypeError('Arithmetic requires numeric operands');return v;}
 function bool(v:STValue):boolean{if(typeof v!=='boolean')throw new TypeError('Boolean logic requires BOOL operands');return v;}
