@@ -31,7 +31,8 @@ export function injectMaterial(layout:WorkcellLayout,state:MaterialFlowState,con
  if(state.units.some(e=>e.conveyorId===conveyorId&&e.progress<0.22))throw new Error('Virtual infeed occupied; advance conveyor before adding another item');
  if(state.nextId>=Number.MAX_SAFE_INTEGER)throw new RangeError('Material serial number exhausted');
  const id='part-'+state.nextId;
- return {nextId:state.nextId+1,units:[...state.units,{id,kind,conveyorId,progress:0.05}],completed:state.completed,diverted:state.diverted,events:[...state.events,{kind:'injected',unitId:id,timeMs,conveyorId}].slice(-MAX_MATERIAL_EVENTS)};
+ const event:MaterialEvent={kind:'injected',unitId:id,timeMs,conveyorId};
+ return {nextId:state.nextId+1,units:[...state.units,{id,kind,conveyorId,progress:0.05}],completed:state.completed,diverted:state.diverted,events:[...state.events,event].slice(-MAX_MATERIAL_EVENTS)};
 }
 /** Sample the geometric sensor image *before* the PLC scan, from the prior
  * material state. All sensors on a belt use world coordinates, not device IDs.
