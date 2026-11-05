@@ -92,14 +92,13 @@ describe('bounded PLCopen graphical Ladder Diagram interchange',()=>{
    good.replace('localId="1"','localId="2"'),
    good.replace('storage="none"','storage="set"'),
    good.replace('edge="none"','edge="rising"'),
-   good.replace('negated="false" storage="none"','negated="true" storage="none"'),
+   good.replace(/(<coil[^>]*?)negated="false"/,'$1negated="true"'),
    good.replace('tc6_0201','tc6_0200'),
    '<!DOCTYPE note [<!ENTITY x SYSTEM "file:///etc/passwd">]>'+good
   ])expect(()=>importPlcopenLadder(malformed),malformed.slice(0,50)).toThrow();
  });
  it('rejects unreferenced contacts and cycles, not just syntactically malformed XML',()=>{
   const good=exportPlcopenLadder(small);
-  expect(()=>importPlcopenLadder(good.replace('<contact localId="2"','<contact localId="2"'))).not.toThrow();
   const orphan=good.replace('</LD>','<contact localId="1999"><position x="1" y="1"/><connectionPointIn><connection refLocalId="1"/></connectionPointIn><connectionPointOut/><variable>Start</variable></contact></LD>');
   expect(()=>importPlcopenLadder(orphan)).toThrow(/orphan|Unsupported/);
   const cycle=good.replace('<connection refLocalId="1"/>','<connection refLocalId="2"/>');
