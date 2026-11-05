@@ -12,6 +12,7 @@ import {stepWorkcellPlc,initialWorkcellPlcState,DEFAULT_OPERATOR_PANEL,DEMO_WORK
 import {parseProject} from '../engineering/project-file';
 import type {LadderDocument} from '../engineering/ladder';
 import {WORKCELL_PRESETS,loadWorkcellPreset} from '../engineering/workcell-presets';
+import {runScenarioAcceptance,type ScenarioAcceptanceReport} from '../engineering/workcell-scenario-acceptance';
 import './workcell-composer.css';
 
 const names:Readonly<Record<EquipmentKind,string>>={
@@ -128,7 +129,8 @@ export function WorkcellComposer(){
  const [plc,setPlc]=useState(initialWorkcellPlcState);
  const [operator,setOperator]=useState<OperatorPanel>(DEFAULT_OPERATOR_PANEL);
  const [programLabel,setProgramLabel]=useState('Sample automatic conveyor / diverter ladder');
- const [presetId,setPresetId]=useState(WORKCELL_PRESETS[0].id);
+ const [presetId,setPresetId]=useState<string>(WORKCELL_PRESETS[0].id);
+ const [acceptance,setAcceptance]=useState<ScenarioAcceptanceReport|null>(null);
  const [note,setNote]=useState(start.warning??'Place machines on the floor plan, then command and scan each device.');
  const [recoveryAvailable,setRecoveryAvailable]=useState(start.source==='recovery');
  const [saveStatus,setSaveStatus]=useState(start.source==='recovery'?'Recovery loaded — export before replacing damaged primary.':'Stored locally; export JSON for an independent backup.');
@@ -139,6 +141,7 @@ export function WorkcellComposer(){
  const commit=(next:WorkcellLayout,focus?:string|null)=>{
   try{
    const valid=validateLayout(next);
+   setAcceptance(null);
    setPast(p=>[...p.slice(-29),layout]);setFuture([]);setLayout(valid);
    if(focus!==undefined)setSelected(focus);
    setScan(initialScan());setPlc(initialWorkcellPlcState());setCommands({});
@@ -199,7 +202,7 @@ export function WorkcellComposer(){
   const file=event.target.files?.[0];event.target.value='';if(!file)return;
   try{if(file.size>250000)throw RangeError('PLC project exceeds 250 KB');
    const candidate=parseProject(await file.text());
-   setProgram(candidate.program);setProgramLabel(candidate.name);setPlc(initialWorkcellPlcState());setScan(initialScan());
+   setProgram(candidate.program);setProgramLabel(candidate.name);setAcceptance(null);setPlc(initialWorkcellPlcState());setScan(initialScan());
    setControlMode('ladder');setNote('Validated PLC project loaded. Coils named TAG_CMD drive matching virtual equipment.');
   }catch(error){setNote('PLC project import rejected: '+String(error));}
  };
@@ -239,6 +242,18 @@ export function WorkcellComposer(){
    <div className="metric"><b>{Object.values(commands).filter(Boolean).length}</b><span>Active command switches</span></div>
    <div className="metric"><b>{selectedLabel}</b><span>Selected equipment</span></div>
   </div>
+  <section className="panel" aria-label="Machine commissioning acceptance">
+   <h2>Run scenario commissioning checks</h2>
+   <p className="muted">Run deterministic acceptance checks against the <strong>current editable layout and loaded PLC program</strong>. The inspection covers actual simulated scan outputs, modeled guard/E-stop inhibition, device activity, feedback, clock consistency and replay. It does not establish real-machine or safety certification.</p>
+   <div className="actions"><button onClick={()=>{
+    try{const report=runScenarioAcceptance(presetId as typeof WORKCELL_PRESETS[number]['id'],{layout,program});setAcceptance(report);setNote('Current scene commissioning: '+(report.passed?'all checks passed':'check failures detected'));}
+    catch(error){setAcceptance(null);setNote('Cannot run current-scene FAT: '+String(error));}
+   }}>Run current scene acceptance</button><span>{acceptance?acceptance.checks.filter(c=>c.passed).length+' / '+acceptance.checks.length+' criteria passed':'No current-scene acceptance run'}</span></div>
+   {acceptance&&<div aria-label="Current scene acceptance results">
+    <p role="status"><strong className={acceptance.passed?'good':'warn'}>{acceptance.passed?'PASS':'NOT PASSED'}</strong> · {acceptance.title} · {acceptance.scanCount} test scans · {acceptance.simulatedMs} simulated ms</p>
+    <div className="io">{acceptance.checks.map(check=><div key={check.id}><code>{check.id}</code><strong className={check.passed?'good':'warn'}>{check.passed?'PASS':'FAIL'}</strong><span>{check.description} — {check.observed}</span></div>)}</div>
+   </div>}
+  </section>
   <div className="workspace">
    <div>
     <Workcell3D layout={layout} scan={scan} selected={selected} onSelect={selectedInput}/>
@@ -267,7 +282,7 @@ export function WorkcellComposer(){
       <p><b>Loaded PLC program:</b> {programLabel}</p>
       <p className="muted">Sensor/panel switches become sampled PLC inputs. Each virtual actuator listens for its base tag with _CMD appended, e.g. CV1_CMD or CY1_CMD. Virtual feedback appears as TAG_ACTIVE / TAG_EXTENDED / TAG_RETRACTED. No hardware connectivity.</p>
       <label className="composer-import">Import PLC engineering project<input type="file" accept=".json,application/json" onChange={loadLadder}/></label>
-      <button onClick={()=>{setProgram(DEMO_WORKCELL_PROGRAM);setProgramLabel('Sample automatic conveyor / diverter ladder');setPlc(initialWorkcellPlcState());setScan(initialScan());}}>Load sample ladder</button>
+      <button onClick={()=>{setProgram(DEMO_WORKCELL_PROGRAM);setProgramLabel('Sample automatic conveyor / diverter ladder');setAcceptance(null);setPlc(initialWorkcellPlcState());setScan(initialScan());}}>Load sample ladder</button>
       <div className="composer-controls">
        <label><input type="checkbox" checked={operator.EStopOK} onChange={e=>setOperator(s=>({...s,EStopOK:e.target.checked}))}/> Simulated E-stop OK</label>
        <label><input type="checkbox" checked={operator.GuardClosed} onChange={e=>setOperator(s=>({...s,GuardClosed:e.target.checked}))}/> Simulated guard closed</label>
