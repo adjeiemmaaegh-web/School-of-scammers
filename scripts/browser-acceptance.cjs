@@ -211,6 +211,14 @@ async function run(){
   await click(page,'Load commissioning scenario');
   const vertical=await page.$eval('body',el=>el.innerText);
   assert.ok(vertical.includes('VF3_SPEED_PERCENT')&&vertical.includes('LF3_POSITION_PERCENT'),'VFD/lift feedback integrated into 3D scene studio');
+  await click(page,'Run current scene acceptance');
+  assert.ok((await page.$eval('[aria-label="Current scene acceptance results"]',el=>el.textContent)).includes('PASS'),'Current vertical scene passes commissioning FAT');
+  await page.select('select[aria-label="Commissioning scenario template"]','process-skid');
+  await click(page,'Load commissioning scenario');
+  await click(page,'Run current scene acceptance');
+  const fat=await page.$eval('[aria-label="Current scene acceptance results"]',el=>el.innerText);
+  assert.ok(fat.includes('Tank filling and valve skid'),'Current-scene FAT uses editable process skid layout');
+  assert.ok(fat.includes('guard')&&fat.includes('estop')&&fat.includes('replay'),'FAT includes independent simulated guard, E-stop and replay tests');
   console.log('FOUR SCENE MACHINE CATALOGUE BROWSER PASS');
   console.log('WORKCELL COMPOSER PASS');
   await visit(page,'/pneumatics');
