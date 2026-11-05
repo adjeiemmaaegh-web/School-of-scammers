@@ -31,6 +31,10 @@ describe('user-tuned motion and coupled virtual fluid dynamics',()=>{
   scan=stepWorkcell(scene,scan,{tk4:true,pm4:false,vl4:true},100);
   expect(scan.devices.tk4.value).toBe(0);
   scan=stepWorkcell(scene,scan,{tk4:true,pm4:true,vl4:false},100);
+  // Flow uses the beginning-of-scan physical valve position; a valve commanded
+  // closed still carries residual flow until its travel completes.
+  expect(scan.devices.tk4.value).toBeGreaterThan(0);
+  scan=stepWorkcell(scene,scan,{tk4:true,pm4:true,vl4:false},100);
   expect(scan.devices.tk4.value).toBe(0);
   scan=stepWorkcell(scene,scan,{tk4:true,pm4:true,vl4:true},100);
   expect(scan.devices.tk4.value).toBe(0);

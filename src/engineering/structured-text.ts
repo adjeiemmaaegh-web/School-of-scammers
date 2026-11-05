@@ -103,7 +103,7 @@ export function compileStructuredText(source:string):STProgram{
   if(!Number.isSafeInteger(literal))fail('CASE requires integer labels');
   return literal;
  }
- const bodyStart=tokens[pos].offset;
+ const bodyStart=declarations.length?tokens[pos].offset:0; // Preserve leading comments in untyped programs
  function statements(terminators:ReadonlySet<string>,depth=0,caseBody=false):Statement[]{
   if(depth>16)throw new RangeError('IF nesting limit (16) exceeded');const result:Statement[]=[];
   while(peek()!=='<EOF>'&&!terminators.has(upper())&&!(caseBody&&startsCaseLabel())){
