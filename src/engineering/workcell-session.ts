@@ -1,5 +1,5 @@
 /** Portable, deterministic workcell session. Simulation evidence, not physical-machine evidence. */
-import {initialWorkcell,stepWorkcell,type WorkcellAction,type WorkcellState} from './workcell';
+import {initialWorkcell,stepWorkcell,FORCEABLE_WORKCELL_INPUTS,type WorkcellAction,type WorkcellState} from './workcell';
 import {type LadderDocument} from './ladder';
 import {validateProject} from './project-file';
 import {type Board} from './wiring-board';
@@ -10,7 +10,7 @@ export interface SessionCheckpoint {scan:number;fingerprint:string;}
 export const SESSION_CHECKPOINT_INTERVAL=50;
 function fingerprint(state:WorkcellState):string {
  // Stable, noncryptographic integrity marker for accidental corruption detection only.
- const evidence=JSON.stringify({scan:state.scan,timeMs:state.timeMs,motor:state.motor,runLatch:state.runLatch,inputs:state.plcInputs,outputs:state.plcOutputs,memory:state.ladderMemory,terminal:state.terminalWiring,starter:state.starter,process:state.process});
+ const evidence=JSON.stringify({scan:state.scan,timeMs:state.timeMs,motor:state.motor,runLatch:state.runLatch,inputs:state.plcInputs,outputs:state.plcOutputs,memory:state.ladderMemory,terminal:state.terminalWiring,starter:state.starter,process:state.process,...(Object.keys(state.inputForces).length?{simulationForces:state.inputForces,unforcedInputs:state.rawPlcInputs}:{})});
  let hash=2166136261;for(let i=0;i<evidence.length;i++){hash^=evidence.charCodeAt(i);hash=Math.imul(hash,16777619);}return (hash>>>0).toString(16).padStart(8,'0');
 }
 export function replaySession(program:LadderDocument,board:Board,boardMode:boolean,actions:readonly WorkcellAction[]):WorkcellState {
@@ -47,6 +47,7 @@ export function parseSession(text:string):{session:WorkcellSession;final:Workcel
  if(a.kind==='starter-fault'&&starter.has(String(a.fault))&&typeof a.active==='boolean')continue;
  if(a.kind==='process-fault'&&process.has(String(a.fault))&&typeof a.active==='boolean')continue;
  if(a.kind==='spawn-product'&&typeof a.reject==='boolean')continue;
+ if(a.kind==='force-input'&&Object.keys(a).length===3&&typeof a.tag==='string'&&(FORCEABLE_WORKCELL_INPUTS as readonly string[]).includes(a.tag)&&(a.value===null||typeof a.value==='boolean'))continue;
  throw Error('Unknown or malformed recorded action');}
  const session=makeSession(s.name,s.program,s.board,s.boardMode,s.actions);
  if(s.checkpoints!==undefined){

@@ -5,13 +5,17 @@ import {evaluateStarter,initialStarterFaults,changeStarterFault,type StarterStat
 import { executeLadder, type LadderStep, type LadderDocument, type LadderMemory } from './ladder';
 import { solveDiscrete24V, type CircuitResult } from './electrical';
 import {initialTerminalWiring,sampleTerminals,changeTerminalWiring,type TerminalWiring,type WireTarget,type TerminalSample} from './terminal-wiring';
-export type WorkcellAction = 'press-start' | 'release-start' | 'press-stop' | 'release-stop' | 'open-guard' | 'close-guard' | 'disconnect-sensor' | 'connect-sensor' | 'isolate-power' | 'restore-power' | 'press-reset-count' | 'release-reset-count' | 'press-reset-timer' | 'release-reset-timer' | 'tick' | {kind:'wire-sensor';target:WireTarget} | {kind:'wire-return';connected:boolean} | {kind:'starter-fault';fault:keyof StarterFaults;active:boolean} | {kind:'process-fault';fault:keyof ProcessFaults;active:boolean} | {kind:'spawn-product';reject:boolean};
-export interface WorkcellState { scan: number; timeMs: number; powerOn: boolean; guardClosed: boolean; sensorConnected: boolean; startPressed: boolean; stopPressed: boolean; resetCountPressed:boolean; resetTimerPressed:boolean; motor: boolean; runLatch: boolean; plcInputs: Readonly<Record<string, boolean>>; plcOutputs: Readonly<Record<string, boolean>>; rungTrace: readonly LadderStep[]; ladderMemory: LadderMemory; electrical: CircuitResult; terminalWiring: TerminalWiring; terminalSample: TerminalSample; starter:StarterState; process:ProcessState; events: readonly string[]; }
+/** Only external, non-safety simulated input-image values may be forced. */
+export const FORCEABLE_WORKCELL_INPUTS=['Start','SensorOK','Photoeye','ExitSensor'] as const;
+export type ForceableWorkcellInput=typeof FORCEABLE_WORKCELL_INPUTS[number];
+export type WorkcellInputForces=Readonly<Partial<Record<ForceableWorkcellInput,boolean>>>;
+export type WorkcellAction = 'press-start' | 'release-start' | 'press-stop' | 'release-stop' | 'open-guard' | 'close-guard' | 'disconnect-sensor' | 'connect-sensor' | 'isolate-power' | 'restore-power' | 'press-reset-count' | 'release-reset-count' | 'press-reset-timer' | 'release-reset-timer' | 'tick' | {kind:'wire-sensor';target:WireTarget} | {kind:'wire-return';connected:boolean} | {kind:'starter-fault';fault:keyof StarterFaults;active:boolean} | {kind:'process-fault';fault:keyof ProcessFaults;active:boolean} | {kind:'spawn-product';reject:boolean} | {kind:'force-input';tag:ForceableWorkcellInput;value:boolean|null};
+export interface WorkcellState { scan: number; timeMs: number; powerOn: boolean; guardClosed: boolean; sensorConnected: boolean; startPressed: boolean; stopPressed: boolean; resetCountPressed:boolean; resetTimerPressed:boolean; motor: boolean; runLatch: boolean; plcInputs: Readonly<Record<string, boolean>>; rawPlcInputs: Readonly<Record<string,boolean>>; inputForces: WorkcellInputForces; plcOutputs: Readonly<Record<string, boolean>>; rungTrace: readonly LadderStep[]; ladderMemory: LadderMemory; electrical: CircuitResult; terminalWiring: TerminalWiring; terminalSample: TerminalSample; starter:StarterState; process:ProcessState; events: readonly string[]; }
 export const workcellLadder: LadderDocument = { id:'workcell-v1',version:'1.0',rungs:[{id:'motor-run',elements:[{type:'contact',tag:'PowerOK'},{type:'contact',tag:'GuardClosed'},{type:'contact',tag:'SensorOK'},{type:'contact',tag:'Stop',normallyClosed:true},{type:'branch',alternatives:[[{type:'contact',tag:'Start'}],[{type:'contact',tag:'RunLatch'}]]}],coil:'RunLatch'}]};
 function circuit(powerOn: boolean, sensorConnected: boolean, motorRequest: boolean): CircuitResult {
   return solveDiscrete24V({devices:[{id:'psu',kind:'supply',positive:'P24',negative:'M0',volts:24},{id:'sensor',kind:'load',positive:'S+',negative:'S-',nominalVolts:24},{id:'motor-contactor',kind:'load',positive:'K+',negative:'K-',nominalVolts:24},{id:'power',kind:'switch',a:'P24',b:'BUS',closed:powerOn},{id:'sensor-cable',kind:'switch',a:'BUS',b:'S+',closed:sensorConnected},{id:'coil-command',kind:'switch',a:'BUS',b:'K+',closed:motorRequest}],wires:[['M0','S-'],['M0','K-']]});
 }
-export function initialWorkcell(): WorkcellState {return {scan:0,timeMs:0,powerOn:true,guardClosed:true,sensorConnected:false,startPressed:false,stopPressed:false,resetCountPressed:false,resetTimerPressed:false,motor:false,runLatch:false,plcInputs:{},plcOutputs:{},rungTrace:[],ladderMemory:{},electrical:circuit(true,false,false),terminalWiring:initialTerminalWiring(),terminalSample:sampleTerminals(initialTerminalWiring(),true,true),starter:evaluateStarter(true,false,true,initialStarterFaults()),process:initialProcess(),events:[]};}
+export function initialWorkcell(): WorkcellState {return {scan:0,timeMs:0,powerOn:true,guardClosed:true,sensorConnected:false,startPressed:false,stopPressed:false,resetCountPressed:false,resetTimerPressed:false,motor:false,runLatch:false,plcInputs:{},rawPlcInputs:{},inputForces:{},plcOutputs:{},rungTrace:[],ladderMemory:{},electrical:circuit(true,false,false),terminalWiring:initialTerminalWiring(),terminalSample:sampleTerminals(initialTerminalWiring(),true,true),starter:evaluateStarter(true,false,true,initialStarterFaults()),process:initialProcess(),events:[]};}
 /** A PLC scan samples electrical inputs, executes ladder, then applies the output to the contactor. */
 export function stepWorkcell(previous: WorkcellState, action: WorkcellAction, deltaMs=20, program: LadderDocument = workcellLadder, board?: Board): WorkcellState {
  if (!Number.isSafeInteger(deltaMs) || deltaMs<1 || deltaMs>1000) throw new RangeError('Scan interval must be 1..1000 ms');
@@ -19,8 +23,19 @@ export function stepWorkcell(previous: WorkcellState, action: WorkcellAction, de
  if(typeof action==='object'){
   if(action.kind==='process-fault'){next.process=setProcessFault(next.process,action.fault,action.active,!next.powerOn);}
   else if(action.kind==='spawn-product'){next.process=advanceProcess(next.process,{motor:false,diverter:false,spawn:true,rejectNext:action.reject},1);}
+  else if(action.kind==='force-input'){
+   if(!(FORCEABLE_WORKCELL_INPUTS as readonly string[]).includes(action.tag) || !(action.value===null || typeof action.value==='boolean'))throw new TypeError('Unsupported simulated input force');
+   if(next.powerOn||next.motor)next.events.push('REJECTED input force: isolate simulated supply and stop motor before changing a force');
+   else {
+    const forces={...next.inputForces};
+    if(action.value===null)delete forces[action.tag];else forces[action.tag]=action.value;
+    next.inputForces=forces;
+    next.events.push(`SIMULATION INPUT FORCE ${action.tag} ${action.value===null?'CLEARED':action.value?'TRUE':'FALSE'}; physical sensor/guard/power states unchanged`);
+   }
+  }
   else if(action.kind==='starter-fault'){const change=changeStarterFault(next.starter.faults,action.fault,action.active,next.powerOn,next.motor);if(change.error)next.events.push(`REJECTED fault change: ${change.error}`);else next.starter={...next.starter,faults:change.faults};}
-  else {const change=changeTerminalWiring(next.terminalWiring,action.kind==='wire-sensor'?{sensorPositive:action.target}:{sensorReturnConnected:action.connected},next.powerOn,next.motor);next.terminalWiring=change.wiring;if(change.error)next.events.push(`REJECTED wiring: ${change.error}`);}
+  else if(action.kind==='wire-sensor'||action.kind==='wire-return'){const change=changeTerminalWiring(next.terminalWiring,action.kind==='wire-sensor'?{sensorPositive:action.target}:{sensorReturnConnected:action.connected},next.powerOn,next.motor);next.terminalWiring=change.wiring;if(change.error)next.events.push(`REJECTED wiring: ${change.error}`);}
+  else throw new TypeError('Unknown workcell action');
  } else switch(action){
  case 'press-start': next.startPressed=true; break;
  case 'release-start': next.startPressed=false; break;
@@ -46,7 +61,10 @@ export function stepWorkcell(previous: WorkcellState, action: WorkcellAction, de
  const boardReading=board ? evaluateBoard(board,next.powerOn) : undefined;
  const sensorValue=boardReading ? (boardReading.plcInputs['I0.2']===true) : terminalSample.inputs['I0.2'];
  // Inputs represent the beginning-of-scan plant snapshot. Outputs update the process afterward.
- const sampled={PowerOK:next.powerOn,GuardClosed:next.guardClosed,SensorOK:sensorValue,Start:next.startPressed,Stop:next.stopPressed,ResetCount:next.resetCountPressed,ResetTimer:next.resetTimerPressed,Photoeye:previous.process.photoeye,ExitSensor:previous.process.exitSensor,MotorFeedback:previous.process.motorFeedback,K1Feedback:previous.starter.feedback,...(boardReading?.plcInputs ?? {})};
+ const rawSampled={PowerOK:next.powerOn,GuardClosed:next.guardClosed,SensorOK:sensorValue,Start:next.startPressed,Stop:next.stopPressed,ResetCount:next.resetCountPressed,ResetTimer:next.resetTimerPressed,Photoeye:previous.process.photoeye,ExitSensor:previous.process.exitSensor,MotorFeedback:previous.process.motorFeedback,K1Feedback:previous.starter.feedback,...(boardReading?.plcInputs ?? {})};
+ const sampled={...rawSampled};
+ for(const tag of FORCEABLE_WORKCELL_INPUTS){const forced=next.inputForces[tag];if(forced!==undefined)sampled[tag]=forced;}
+ next.rawPlcInputs={...rawSampled};
  if(boardReading?.result.diagnostics.some(d=>d.includes('short circuit')))next.events.push('WIRING BOARD: supply short detected; check connections');
  const ladder=executeLadder(program,sampled,previous.plcOutputs.RunLatch !== undefined ? previous.plcOutputs : {RunLatch:previous.runLatch},previous.ladderMemory,deltaMs);
  next.runLatch=ladder.outputs.RunLatch === true; next.ladderMemory=ladder.memory;

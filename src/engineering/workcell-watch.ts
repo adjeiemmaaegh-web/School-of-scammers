@@ -1,17 +1,17 @@
 /** Read-only typed evidence from the integrated virtual workcell's executed scans.
- * No PLC writes, field forcing, live hardware access, or safety certification.
+ * Does not write PLC values or access live hardware; teaching forces are labeled as such.
  */
 import {WORKCELL_INPUTS,WORKCELL_OUTPUTS} from './io-mapping';
 import {initialWorkcell,type WorkcellState} from './workcell';
 import type {LadderDocument} from './ladder';
 
-export type WatchGroup='sampled-input'|'plc-coil'|'post-scan-feedback'|'plant'|'instruction-memory';
+export type WatchGroup='sampled-input'|'unforced-input'|'plc-coil'|'post-scan-feedback'|'plant'|'instruction-memory';
 export type WatchType='BOOL'|'DINT'|'REAL'|'TIME';
 export type WatchValue=boolean|number;
 export interface WatchRow {
  readonly id:string;readonly tag:string;readonly group:WatchGroup;
  readonly type:WatchType;readonly value:WatchValue;readonly unit:string;
- readonly address:string;readonly description:string;readonly phase:string;
+ readonly address:string;readonly description:string;readonly phase:string;readonly forced?:boolean;
 }
 export interface WorkcellWatchFrame {
  readonly scan:number;readonly timeMs:number;readonly rows:readonly WatchRow[];
@@ -37,7 +37,16 @@ export function captureWorkcellWatch(state:WorkcellState,program:LadderDocument)
  const address=(tag:string,group:'input'|'output')=>descriptions[tag]?.address??(group==='input'?(WORKCELL_INPUTS as Record<string,string>)[tag]:(WORKCELL_OUTPUTS as Record<string,string>)[tag])??'';
  const describe=(tag:string)=>descriptions[tag]?.description??'';
  if(state.scan>0){
-  for(const [tag,value] of ordered(state.plcInputs))rows.push(asRow('IN:'+tag,tag,'sampled-input','BOOL',value,'',address(tag,'input'),describe(tag),'Beginning-of-scan sampled input'));
+  for(const [tag,value] of ordered(state.plcInputs)){
+   const isForced=Object.prototype.hasOwnProperty.call(state.inputForces,tag);
+   const row=asRow('IN:'+tag,tag,'sampled-input','BOOL',value,'',address(tag,'input'),describe(tag),isForced?'Beginning-of-scan PLC image (SIMULATION FORCE)':'Beginning-of-scan sampled input');
+   rows.push(isForced?{...row,forced:true}:row);
+   if(isForced){
+    const physicalValue=state.rawPlcInputs[tag];
+    if(typeof physicalValue!=='boolean')throw new Error('Missing unforced input evidence for '+tag);
+    rows.push(asRow('RAW:'+tag,tag,'unforced-input','BOOL',physicalValue,'',address(tag,'input'),describe(tag),'Unforced electrical/plant sample before PLC image force'));
+   }
+  }
   for(const [tag,value] of ordered(state.plcOutputs)){
    const written=coils.has(tag);
    rows.push(asRow('OUT:'+tag,tag,written?'plc-coil':'post-scan-feedback','BOOL',value,'',address(tag,'output'),describe(tag),written?'Ladder result after PLC scan':'Derived post-scan feedback (not a ladder coil)'));
@@ -70,6 +79,9 @@ export function captureWorkcellWatch(state:WorkcellState,program:LadderDocument)
  ];
  for(const [tag,type,value,unit,description] of physical)rows.push(asRow('PLANT:'+tag,tag,'plant',type,value,unit,'',description,'Plant state after output actuation'));
  const diagnostics:{kind:'warning'|'info';message:string}[]=[];
+ for(const [tag,forced] of Object.entries(state.inputForces)){
+  if(state.scan>0)diagnostics.push({kind:'warning',message:`Active teaching force on ${tag}: PLC image is ${forced?'TRUE':'FALSE'}; unforced sample is ${state.rawPlcInputs[tag]?'TRUE':'FALSE'}. This does not change the physical device.`});
+ }
  if(state.scan>0 && state.motor&&!state.runLatch)diagnostics.push({kind:'warning',message:'Motor running without PLC RunLatch request: inspect the virtual starter (including welded-contact fault). This is a modeled hazard indication.'});
  else if(state.scan>0 && state.runLatch&&!state.motor)diagnostics.push({kind:'info',message:'PLC RunLatch is TRUE but the motor is stopped: inspect supply, guard, starter and wiring conditions.'});
  if(state.scan>0&&state.plcInputs.K1Feedback!==undefined&&state.plcInputs.K1Feedback!==state.starter.feedback)diagnostics.push({kind:'info',message:'K1 feedback changed after the input sample. The sampled value belongs to the beginning of this scan, not its end.'});
