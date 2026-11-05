@@ -78,16 +78,12 @@ function validateDeclarations(pou:X):Map<string,'input'|'output'|'local'> {
  }
  return declarations;
 }
-function wire(n:X):string{
- const id=localId(n);
- return '<connection refLocalId="'+id+'"/>';
-}
-function common(id:number,x:number,y:number):string{return ' localId="'+id+'" height="20" width="40"><position x="'+x+'" y="'+y+'"/>'; }
+function common(id:number,x:number,y:number,extra=''):string{return ' localId="'+id+'" height="20" width="40"'+extra+'><position x="'+x+'" y="'+y+'"/>'; }
 function connector(source:readonly number[]):string{
  return '<connectionPointIn>'+source.map(id=>'<connection refLocalId="'+id+'"/>').join('')+'</connectionPointIn>';
 }
 function contactNode(id:number,tag:string,negated:boolean,x:number,y:number,from:readonly number[]):string{
- return '<contact'+common(id,x,y)+' '+(negated?'negated="true"':'negated="false"')+' storage="none" edge="none">'+
+ return '<contact'+common(id,x,y,(negated?' negated="true"':' negated="false"')+' storage="none" edge="none"')+
  connector(from)+'<connectionPointOut/><variable>'+esc(tag)+'</variable></contact>';
 }
 /** Export preserves execution topology/boolean semantics, not editor rung IDs,
@@ -100,7 +96,6 @@ export function exportPlcopenLadder(doc:LadderDocument,pouName='TrainingLadder',
  if(doc.rungs.length>200)fail('more than 200 rungs');
  if(doc.symbols&&Object.keys(doc.symbols).length&&!options?.allowSymbolMetadataLoss)fail('symbol descriptions/addresses are not preserved; use project JSON or explicitly confirm metadata loss');
  const outputTags=new Set(doc.rungs.map(r=>r.coil));
- const allTags=new Set<string>(outputTags);
  const inputTags=new Set<string>();
  const machine:string[]=[];
  let counter=1,depth=0;
@@ -111,7 +106,7 @@ export function exportPlcopenLadder(doc:LadderDocument,pouName='TrainingLadder',
   const rail=counter++;machine.push('<leftPowerRail'+common(rail,0,y)+'<connectionPointOut/></leftPowerRail>');
   let sources=[rail],column=1;
   function insert(c:Contact,previous:readonly number[],extraY=0):number{
-   allTags.add(c.tag);if(!outputTags.has(c.tag))inputTags.add(c.tag);
+   if(!outputTags.has(c.tag))inputTags.add(c.tag);
    const id=counter++;
    machine.push(contactNode(id,c.tag,c.normallyClosed===true,35*column,y+extraY,previous));
    return id;
@@ -130,7 +125,7 @@ export function exportPlcopenLadder(doc:LadderDocument,pouName='TrainingLadder',
    column++;
   }
   const coil=counter++;
-  machine.push('<coil'+common(coil,35*column+60,y)+' negated="false" storage="none">'+
+  machine.push('<coil'+common(coil,35*column+60,y,' negated="false" storage="none"')+
    connector(sources)+'<connectionPointOut/><variable>'+esc(rung.coil)+'</variable></coil>');
   const end=counter++;
   machine.push('<rightPowerRail'+common(end,35*column+100,y)+connector([coil])+'</rightPowerRail>');
