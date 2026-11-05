@@ -1,0 +1,17 @@
+# PLC Skills Lab — Dependency and asset provenance review (5 November 2026)
+
+**Disposition: source/legal clearance NOT yet established for full commercial distribution.** This register does not assert any known infringement; it records unresolved verification requirements.
+
+## Direct source dependencies to review
+Runtime: react, react-dom, react-router-dom, three, @react-three/fiber, @react-three/drei.
+Build/test: typescript, vite, @vitejs/plugin-react, vitest.
+CI-only checks use puppeteer, axe-core and playwright/browser binaries.
+
+## Closure evidence needed
+1. Generate and commit a vetted npm lockfile. Pin and test exact dependency resolutions, and use npm ci in CI/production instead of unconstrained installs.
+2. Generate a complete transitive SBOM with package names, versions, source URLs, license expressions and notices; review security advisories.
+3. Inventory every 3D asset, model, texture, font and borrowed code module with authorship/license proof and required attribution.
+4. Review any restricted/copyleft terms or missing notices; document approval by responsible reviewer before monetization.
+5. Review browser storage privacy and security threats, credential handling by any future separately owned backend, and branding/origin of historical imports.
+
+No full-release licensing signoff has occurred. Do not confuse the presence of open-source components with blanket redistribution permission.
