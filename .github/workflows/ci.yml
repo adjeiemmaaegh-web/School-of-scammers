@@ -59,6 +59,30 @@ jobs:
       - name: Linux WebKit browser smoke - DC, workcell and mobile
         run: |
           PLC_BASE_URL=http://127.0.0.1:4174 node scripts/webkit-acceptance.cjs
+      - name: Collect dependency, security and asset evidence (not legal clearance)
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p qa-artifacts
+          node scripts/asset-provenance.cjs > qa-artifacts/source-assets.json
+          if test -f package-lock.json; then cp package-lock.json qa-artifacts/resolved-package-lock.json; fi
+          if npm sbom --sbom-format cyclonedx > qa-artifacts/dependencies.cdx.json; then
+            echo "SBOM produced from actual CI installed dependency tree" > qa-artifacts/sbom-status.txt
+          else
+            echo "SBOM generation failed - unresolved release blocker" > qa-artifacts/sbom-status.txt
+          fi
+          if npm audit --json > qa-artifacts/npm-audit.json; then
+            echo "npm audit returned zero" > qa-artifacts/audit-status.txt
+          else
+            echo "npm audit returned nonzero - review findings, not legal signoff" > qa-artifacts/audit-status.txt
+          fi
+      - name: Upload dependency and source provenance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plc-release-provenance
+          path: qa-artifacts/
+          if-no-files-found: warn
       - name: Upload production build (if successful)
         if: success()
         uses: actions/upload-artifact@v4
