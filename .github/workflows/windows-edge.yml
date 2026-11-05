@@ -1,0 +1,35 @@
+name: PLC Skills Lab - Windows Edge Hosted Runner
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-edge:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Compile production app on genuine Windows runner
+        run: npm run build
+      - name: Install browser runner and native Microsoft Edge
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.64.1
+          npx playwright install msedge
+      - name: Native Windows Edge browser and workcell smoke
+        run: node scripts/windows-edge-acceptance.cjs
+      - name: Publish Windows hosted-runner evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plc-windows-edge-hosted-evidence
+          path: qa-artifacts/windows-edge-smoke.json
+          if-no-files-found: warn
