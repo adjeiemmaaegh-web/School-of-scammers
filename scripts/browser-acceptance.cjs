@@ -191,6 +191,27 @@ async function run(){
   assert.equal(await page.evaluate(()=>document.querySelectorAll('.composer-cell.occupied').length),initialCount+1,'Redo must restore added device');
   await click(page,'Scan 100 ms');
   assert.ok((await page.$eval('body',e=>e.innerText)).includes('100 ms'),'Machine scan advances');
+  await page.select('select[aria-label="Commissioning scenario template"]','packaging-cell');
+  await click(page,'Load commissioning scenario');
+  const packaging=await page.$eval('body',el=>el.innerText);
+  assert.ok(packaging.includes('Packaging cell')&&packaging.includes('PX2'),'Packaging scene and mapped sensor load into real UI');
+  const enabled=await page.evaluate(()=>{
+   const row=[...document.querySelectorAll('.composer-device')].find(el=>el.querySelector('button b')?.textContent?.trim()==='PX2');
+   const input=row?.querySelector('input[type="checkbox"]');
+   if(!input)return false;
+   input.click();
+   return true;
+  });
+  assert.ok(enabled,'Proximity field input is editable in ladder-controlled scenario');
+  await click(page,'Scan 100 ms');
+  const machineText=await page.$eval('body',el=>el.innerText);
+  assert.ok(machineText.includes('PS2_POSITION_PERCENT'),'Pusher scan feedback visible to learner');
+  assert.ok(machineText.includes('CV2_CMD'),'PLC command available from loaded packaging program');
+  await page.select('select[aria-label="Commissioning scenario template"]','vertical-transfer');
+  await click(page,'Load commissioning scenario');
+  const vertical=await page.$eval('body',el=>el.innerText);
+  assert.ok(vertical.includes('VF3_SPEED_PERCENT')&&vertical.includes('LF3_POSITION_PERCENT'),'VFD/lift feedback integrated into 3D scene studio');
+  console.log('FOUR SCENE MACHINE CATALOGUE BROWSER PASS');
   console.log('WORKCELL COMPOSER PASS');
   await visit(page,'/pneumatics');
   await click(page,'Reference commissioning sequence');
