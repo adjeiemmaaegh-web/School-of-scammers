@@ -9,7 +9,8 @@
 ## Practical workflows
 - Author NO/NC contacts, branches, output coils, on/off/fixed/retentive timers, up/down counters and edge instructions in the ladder editor.
 - Practice typed BOOL/INT/REAL Structured Text with persistent internal simulated memory.
-- Wire idealized 24 V circuits, diagnose shorts/opens, use a virtual multimeter, and complete conveyor, motor starter, pneumatic, PID, DC network and 3D workcell exercises.
+- Wire idealized 24 V circuits, diagnose shorts/opens, use a virtual multimeter, and complete conveyor, motor starter, pneumatic, PID and DC network labs.
+- Build and commission 3D workcells from **13 equipment kinds** and four editable PLC-driven templates (conveyor sorter, packaging cell, vertical transfer, process skid). Check actual current layout/program behavior with simulated FAT outcomes.
 - Examine real simulated scan snapshots, typed I/O, timers, counters, transitions, CSV evidence and offline replay.
 - Use simulation-only PLC input forcing for Start, SensorOK, Photoeye and ExitSensor. Isolate **virtual** power before changing forces. The watch table shows both underlying readings and forced PLC values. Safety power, guard, stop and outputs cannot be forced.
 - Export projects/sessions as JSON; browser-local storage is not a durable backup.
@@ -37,3 +38,5 @@ The production build runs semantic TypeScript, Vite, and an offline precache gen
 - [Input force and offline behavior](docs/FORCE_AND_OFFLINE_COMPLETION_2026-11-05.md)
 
 Remaining release gates include expert PLC reference verification, low-spec 8 GB Windows measurements, actual Edge/Safari/mobile acceptance, complete licensing and dependency review, broader plant/3D scene authoring, and independent instructional assessment.
+
+- [Virtual machine catalogue and source acceptance](docs/FACTORY_MACHINE_CATALOG_COMPLETION_2026-11-05.md)
