@@ -21,7 +21,7 @@ function xmlDecode(s:string):string {
  });
  return decoded;
 }
-function parseSmallXml(input:string):Node{
+export function parseSmallXml(input:string):Node{
  if(typeof input!=='string'||input.length>150000)throw RangeError('PLCopen interchange XML must be at most 150 KB');
  let xml=input.trim().replace(/^<\?xml\s+version="1\.0"\s+encoding="UTF-8"\s*\?>\s*/i,'');
  if(/<!|<\?/.test(xml))throw Error('DTD, entities, CDATA, comments and processing instructions are not supported');
