@@ -24,7 +24,7 @@ Visit the hosted app once online in a service-worker-capable browser. The produc
 ## Local development and verification
 Requires Node.js 22 and npm with registry access.
 
-    npm install
+    npm ci
     npm run dev
     npm run verify:engineering:offline
     npm run verify:full
@@ -40,6 +40,8 @@ The production build runs semantic TypeScript, Vite, and an offline precache gen
 - [Reference PLC measurement protocol](qa/PLC_REFERENCE_MEASUREMENT_PROTOCOL.md)
 - [Independent learner/instructor study protocol](qa/INDEPENDENT_INSTRUCTOR_LEARNER_PROTOCOL.md)
 - [Dependency and license provenance](docs/LICENSE_PROVENANCE_REVIEW_2026-11-05.md)
+- [Transitive dependency license evidence](docs/DEPENDENCY_LICENSE_TRIAGE_2026-11-06.md)
+- [Committed lockfile and reproducible CI](docs/REPRODUCIBLE_DEPENDENCIES_2026-11-06.md)
 - [Ladder XML interchange limits and evidence](docs/PLCOPEN_LD_INTERCHANGE_2026-11-06.md)
 - [Input force and offline behavior](docs/FORCE_AND_OFFLINE_COMPLETION_2026-11-05.md)
 
