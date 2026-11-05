@@ -20,3 +20,6 @@ Date: 5 November 2026
 - Full roadmap scope, including unrestricted scene authoring and comprehensive IEC programming behavior, or explicit product scope reduction approved by the owner.
 
 **Full industrial/commercial release remains NO-GO** even if all automated tests pass. A frontend-only educational beta can remain available with prominent limits. No backend, authentication, payments or real PLC connection is authorized.
+
+## Geometric material-flow development — 6 November 2026
+A separate opt-in deterministic parcel-flow engine now transports individual simulated cartons/metal items on commanded conveyors; position-derived sensor input images feed the PLC program on the following scan and controlled pushers can divert parcels. Test evidence and model constraints are tracked in docs/MATERIAL_FLOW_INTEGRATION_2026-11-06.md. This closes a meaningful **development** material-flow integration gap but not calibrated industrial physics, field sensors or physical PLC verification.

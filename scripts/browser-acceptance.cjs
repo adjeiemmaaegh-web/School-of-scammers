@@ -256,6 +256,30 @@ async function run(){
   });
   assert.ok(hasDynamics,'Editable process valve timing controls are available in the 3D workcell studio');
   console.log('FOUR SCENE MACHINE CATALOGUE BROWSER PASS');
+  await click(page,'Load parcel flow cell');
+  await page.waitForSelector('section[aria-label="Virtual material flow controls"]');
+  assert.ok((await page.$eval('input[aria-label="Scene title"]',node=>node.value)).includes('Parcel conveyor'),'Material sorting cell loads actual scene');
+  const panelEnabled=await page.evaluate(()=>{
+   const row=[...document.querySelectorAll('.composer-device')].find(node=>node.querySelector('button b')?.textContent?.trim()==='CONTROL1');
+   const cb=row?.querySelector('input[type="checkbox"]');if(!cb||cb.disabled)return false;cb.click();return true;
+  });
+  assert.equal(panelEnabled,true,'Virtual run panel remains operator-controllable');
+  const sensorLocked=await page.evaluate(()=>{
+   const row=[...document.querySelectorAll('.composer-device')].find(node=>node.querySelector('button b')?.textContent?.trim()==='BEAM1');
+   return row?.querySelector('input[type="checkbox"]')?.disabled===true;
+  });
+  assert.equal(sensorLocked,true,'Automatic photoeye cannot be manually overridden while material mode is active');
+  await click(page,'Inject carton');
+  const beforeMove=await page.$eval('[aria-label="Material tracking results"]',node=>node.innerText);
+  assert.ok(beforeMove.includes('part-1')&&beforeMove.includes('5.0%'),'Infeed injection records visible material state');
+  await click(page,'Scan 1 s');await click(page,'Scan 1 s');await click(page,'Scan 1 s');
+  const evidence=await page.$eval('section[aria-label="Virtual material flow controls"]',node=>node.innerText);
+  assert.ok(evidence.includes('Diverted: 1'),'PLC beam-driven pusher diverts the real simulated parcel');
+  assert.ok(evidence.includes('diverted'),'Part evidence records completed diversion and simulated time');
+  await click(page,'Clear material evidence');
+  const clear=await page.$eval('section[aria-label="Virtual material flow controls"]',node=>node.innerText);
+  assert.ok(clear.includes('Diverted: 0'),'Reset clears material events and counters');
+  console.log('PLC-GEOMETRIC MATERIAL FLOW BROWSER PASS');
   console.log('WORKCELL COMPOSER PASS');
   await visit(page,'/pneumatics');
   await click(page,'Reference commissioning sequence');

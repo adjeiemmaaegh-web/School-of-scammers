@@ -13,6 +13,8 @@ import {parseProject} from '../engineering/project-file';
 import type {LadderDocument} from '../engineering/ladder';
 import {WORKCELL_PRESETS,loadWorkcellPreset} from '../engineering/workcell-presets';
 import {runScenarioAcceptance,type ScenarioAcceptanceReport} from '../engineering/workcell-scenario-acceptance';
+import {injectMaterial,initialMaterialFlow,materialWorldPosition,sampleMaterialSensors,materialSignals,type MaterialFlowState,type MaterialKind} from '../engineering/workcell-material';
+import {loadMaterialLineExercise} from '../engineering/workcell-material-exercise';
 import './workcell-composer.css';
 
 const names:Readonly<Record<EquipmentKind,string>>={
@@ -94,14 +96,23 @@ function EquipmentMesh({item,selected,scan,onSelect}:{item:Equipment;selected:bo
   {selected&&<mesh position={[0,.012,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[.84,.94,32]}/><meshBasicMaterial color="#8afbe8" side={2}/></mesh>}
  </group>;
 }
-function Workcell3D({layout,scan,selected,onSelect}:{layout:WorkcellLayout;scan:WorkcellScan;selected:string|null;onSelect:(id:string)=>void}){
- return <SceneShell title="3D factory layout preview" summary={layout.equipment.length+' placed devices, simulated scan time '+scan.timeMs+' ms. All equipment can also be edited from the accessible plan view.'}>
+function Workcell3D({layout,scan,material,selected,onSelect}:{layout:WorkcellLayout;scan:WorkcellScan;material:MaterialFlowState;selected:string|null;onSelect:(id:string)=>void}){
+ return <SceneShell title="3D factory layout preview" summary={layout.equipment.length+' placed devices and '+material.units.length+' tracked parcels, simulated scan time '+scan.timeMs+' ms. All equipment can also be edited from the accessible plan view.'}>
   <Canvas camera={{position:[9,10,11],fov:51}} gl={{antialias:false,powerPreference:'low-power'}}>
    <color attach="background" args={['#0b1623']}/>
    <ambientLight intensity={1}/><directionalLight position={[7,13,6]} intensity={2}/>
    <gridHelper args={[13,13,'#607f9b','#344b60']}/>
    <mesh position={[0,-.06,0]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[14,14]}/><meshStandardMaterial color="#172838"/></mesh>
    {layout.equipment.map(item=><EquipmentMesh key={item.id} item={item} selected={selected===item.id} scan={scan} onSelect={()=>onSelect(item.id)}/>)}
+   {material.units.map(part=>{
+    const conveyor=layout.equipment.find(e=>e.id===part.conveyorId&&e.kind==='conveyor');
+    if(!conveyor)return null;
+    const where=materialWorldPosition(conveyor,part.progress);
+    return <mesh key={part.id} position={[where.x,.68,where.z]} rotation={[0,conveyor.rotation*Math.PI/2,0]}>
+      <boxGeometry args={[.4,.32,.4]}/>
+      <meshStandardMaterial color={part.kind==='metal'?'#a9d9f5':'#e5b77c'} metalness={part.kind==='metal'?.75:0}/>
+    </mesh>;
+   })}
    <OrbitControls makeDefault minDistance={4} maxDistance={25} maxPolarAngle={Math.PI/2.05}/>
   </Canvas>
  </SceneShell>;
@@ -125,6 +136,8 @@ export function WorkcellComposer(){
  const [scan,setScan]=useState<WorkcellScan>(initialScan);
  const [commands,setCommands]=useState<Record<string,boolean>>({});
  const [controlMode,setControlMode]=useState<'manual'|'ladder'>('manual');
+ const [materialMode,setMaterialMode]=useState(false);
+ const [materialConveyorId,setMaterialConveyorId]=useState(start.layout.equipment.find(e=>e.kind==='conveyor')?.id??'');
  const [program,setProgram]=useState<LadderDocument>(DEMO_WORKCELL_PROGRAM);
  const [plc,setPlc]=useState(initialWorkcellPlcState);
  const [operator,setOperator]=useState<OperatorPanel>(DEFAULT_OPERATOR_PANEL);
@@ -139,12 +152,14 @@ export function WorkcellComposer(){
  const [riseDraft,setRiseDraft]=useState('');
  const [fallDraft,setFallDraft]=useState('');
  const item=layout.equipment.find(x=>x.id===selected)??null;
- const signals=useMemo(()=>deviceSignals(layout,scan),[layout,scan]);
+ const signals=useMemo(()=>({...deviceSignals(layout,scan),...(materialMode?materialSignals(plc.material):{})}),[layout,scan,materialMode,plc.material]);
+ const materialSensorImage=useMemo(()=>materialMode?sampleMaterialSensors(layout,plc.material):{},[layout,plc.material,materialMode]);
  const commit=(next:WorkcellLayout,focus?:string|null)=>{
   try{
    const valid=validateLayout(next);
    setAcceptance(null);
    setPast(p=>[...p.slice(-29),layout]);setFuture([]);setLayout(valid);
+   setMaterialMode(false);setMaterialConveyorId(valid.equipment.find(e=>e.kind==='conveyor')?.id??'');
    if(focus!==undefined)setSelected(focus);
    setScan(initialScan());setPlc(initialWorkcellPlcState());setCommands({});
    try{persistLayout(window.localStorage,valid);setSaveStatus('Changes saved to this browser. Export a JSON copy for backup.');}
@@ -158,6 +173,7 @@ export function WorkcellComposer(){
   try{
    const next=restoreLayoutFromRecovery(window.localStorage);
    setLayout(next);setPast([]);setFuture([]);setSelected(next.equipment[0]?.id??null);
+   setMaterialMode(false);setMaterialConveyorId(next.equipment.find(e=>e.kind==='conveyor')?.id??'');
    setScan(initialScan());setPlc(initialWorkcellPlcState());setCommands({});
    setRecoveryAvailable(false);setSaveStatus('Recovered scene restored; original damaged bytes preserved separately.');
    setNote('Scene recovery completed. Export a JSON backup now.');
@@ -165,6 +181,7 @@ export function WorkcellComposer(){
  };
  const useSnapshot=(next:WorkcellLayout,other:'undo'|'redo')=>{
   setLayout(next);setScan(initialScan());setPlc(initialWorkcellPlcState());setCommands({});setSelected(next.equipment[0]?.id??null);
+  setMaterialMode(false);setMaterialConveyorId(next.equipment.find(e=>e.kind==='conveyor')?.id??'');
   try{persistLayout(window.localStorage,next);setSaveStatus('Restored layout saved locally.');}
   catch(e){setSaveStatus('Restore NOT SAVED: '+String(e));}
   setNote(other==='undo'?'Reverted the last placement change.':'Reapplied placement change.');
@@ -190,7 +207,7 @@ export function WorkcellComposer(){
   try{
    if(controlMode==='ladder'){
     let current=plc;
-    for(let i=0;i<count;i++)current=stepWorkcellPlc(layout,program,current,operator,commands,100);
+    for(let i=0;i<count;i++)current=stepWorkcellPlc(layout,program,current,operator,commands,100,{materialFlow:materialMode});
     setPlc(current);setScan(current.plant);
     setNote('Executed '+count+' ladder-controlled scan(s). Field inputs are sampled then coils update the virtual plant.');
    }else{
@@ -205,6 +222,7 @@ export function WorkcellComposer(){
   try{if(file.size>250000)throw RangeError('PLC project exceeds 250 KB');
    const candidate=parseProject(await file.text());
    setProgram(candidate.program);setProgramLabel(candidate.name);setAcceptance(null);setPlc(initialWorkcellPlcState());setScan(initialScan());
+   setMaterialMode(false);
    setControlMode('ladder');setNote('Validated PLC project loaded. Coils named TAG_CMD drive matching virtual equipment.');
   }catch(error){setNote('PLC project import rejected: '+String(error));}
  };
@@ -235,6 +253,13 @@ export function WorkcellComposer(){
      setNote('Loaded '+preset.title+' with a validated ladder program. Toggle the corresponding virtual sensor/panel field input and scan to observe machine motion.');
     }catch(error){setNote('Scenario rejected: '+String(error));}
    }}>Load commissioning scenario</button>
+   <button onClick={()=>{
+    try{
+     const cell=loadMaterialLineExercise();commit(cell.layout,cell.layout.equipment[0]?.id??null);
+     setProgram(cell.program);setProgramLabel(cell.title);setControlMode('ladder');setMaterialMode(true);setMaterialConveyorId('belt1');
+     setNote('Parcel flow cell ready. Enable the operator panel, inject a part, and scan. Photoeye sensors are sampled from actual virtual part positions.');
+    }catch(error){setNote('Parcel exercise cannot load: '+String(error));}
+   }}>Load parcel flow cell</button>
    <button disabled={!past.length} onClick={undo}>Undo</button><button disabled={!future.length} onClick={redo}>Redo</button>
    <button onClick={()=>{if(window.confirm('Replace the current workcell? Export it first if you need a copy.'))commit(defaultLayout(),'cv1');}}>Reset scene</button>
   </div>
@@ -258,7 +283,7 @@ export function WorkcellComposer(){
   </section>
   <div className="workspace">
    <div>
-    <Workcell3D layout={layout} scan={scan} selected={selected} onSelect={selectedInput}/>
+    <Workcell3D layout={layout} scan={scan} material={materialMode&&controlMode==='ladder'?plc.material:initialMaterialFlow()} selected={selected} onSelect={selectedInput}/>
     <div className="panel"><h2>Floor plan — 13 × 13 grid</h2>
      <p className="muted">Drag equipment from the palette or select existing equipment and use the arrow buttons. Grid positions are idealized anchors and do not represent collision-free machine clearance.</p>
      <div className="composer-grid" role="group" aria-label="Workcell floor plan — select a cell to edit equipment">
@@ -278,8 +303,32 @@ export function WorkcellComposer(){
     </div>
     <div className="panel"><h2>Teaching device scan</h2>
      <p className="muted">Toggle commands and advance in 100 ms simulated steps. Motion curves are normalized demonstrations, not calibrated physical models.</p>
-     <div className="composer-controls"><label><input type="radio" name="composer-control" checked={controlMode==='manual'} onChange={()=>{setControlMode('manual');setScan(initialScan());setPlc(initialWorkcellPlcState());}}/> Manual device commands</label>
+     <div className="composer-controls"><label><input type="radio" name="composer-control" checked={controlMode==='manual'} onChange={()=>{setControlMode('manual');setScan(initialScan());setPlc(initialWorkcellPlcState());setMaterialMode(false);}}/> Manual device commands</label>
      <label><input type="radio" name="composer-control" checked={controlMode==='ladder'} onChange={()=>{setControlMode('ladder');setScan(initialScan());setPlc(initialWorkcellPlcState());}}/> PLC ladder controlled</label></div>
+     {controlMode==='ladder'&&<section className="composer-plc" aria-label="Virtual material flow controls">
+      <h3>Simulated material handling</h3>
+      <p className="muted">Opt-in parcel tracking derives optical/inductive sensor states from each part's geometric position at the start of a PLC scan. The safety permit independently inhibits actuator commands. Models are normalized, without collision forces or guaranteed conveyor throughput.</p>
+      <label><input type="checkbox" aria-label="Enable geometric material sensors" checked={materialMode} onChange={event=>{
+       setMaterialMode(event.target.checked);setPlc(initialWorkcellPlcState());setScan(initialScan());setCommands({});
+       setNote(event.target.checked?'Geometric material sensing enabled. Reset and inject parts before scanning.':'Returned to manually toggled virtual sensor inputs.');
+      }}/> Enable geometric sensor / parcel simulation</label>
+      {materialMode&&<>
+       <div className="actions">
+        <label>Conveyor <select aria-label="Material infeed conveyor" value={materialConveyorId} onChange={event=>setMaterialConveyorId(event.target.value)}>
+         {layout.equipment.filter(e=>e.kind==='conveyor').map(e=><option key={e.id} value={e.id}>{e.tag} — {e.label}</option>)}
+        </select></label>
+        {(['carton','metal'] as const).map(kind=><button key={kind} disabled={!layout.equipment.some(e=>e.kind==='conveyor')} onClick={()=>{
+         try{setPlc(prev=>({...prev,material:injectMaterial(layout,prev.material,materialConveyorId,kind,prev.plant.timeMs)}));setNote('Inserted simulated '+kind+' at the infeed. Enable conveyor and scan to move it.');}
+         catch(error){setNote('Infeed blocked: '+String(error));}
+        }}>Inject {kind==='carton'?'carton':'metal part'}</button>)}
+        <button onClick={()=>setPlc(prev=>({...prev,material:initialMaterialFlow()}))}>Clear material evidence</button>
+       </div>
+       <p role="status">Tracked: <b>{plc.material.units.length}</b> · Exited: <b>{plc.material.completed}</b> · Diverted: <b>{plc.material.diverted}</b> · Last {plc.material.events.length} events</p>
+       <div className="io" aria-label="Material tracking results">{plc.material.units.map(part=><div key={part.id}><code>{part.id}</code><span>{part.kind} · {part.conveyorId} · {(part.progress*100).toFixed(1)}% belt travel</span></div>)}</div>
+       <h4>Position-derived sensor image</h4><div className="composer-signals">{layout.equipment.filter(e=>e.kind==='photoeye'||e.kind==='proximity').map(e=><div key={e.id}><code>{e.tag}_ACTIVE</code><strong>{materialSensorImage[e.id]?'TRUE':'FALSE'}</strong></div>)}</div>
+       <div className="io" aria-label="Material event log">{plc.material.events.slice(-10).map((event,index)=><div key={event.unitId+event.timeMs+event.kind+index}><code>{event.unitId}</code><span>{event.kind} · {event.timeMs} ms</span></div>)}</div>
+      </>}
+     </section>}
      {controlMode==='ladder'&&<div className="composer-plc">
       <p><b>Loaded PLC program:</b> {programLabel}</p>
       <p className="muted">Sensor/panel switches become sampled PLC inputs. Each virtual actuator listens for its base tag with _CMD appended, e.g. CV1_CMD or CY1_CMD. Virtual feedback appears as TAG_ACTIVE / TAG_EXTENDED / TAG_RETRACTED. No hardware connectivity.</p>
@@ -299,7 +348,7 @@ export function WorkcellComposer(){
        const s=scan.devices[d.id];
        return <div key={d.id} className="composer-device">
         <button onClick={()=>selectedInput(d.id)} aria-pressed={selected===d.id}><b>{d.tag}</b> {d.label}</button>
-        {d.kind!=='fence'&&<label><input type="checkbox" checked={commands[d.id]===true} disabled={controlMode==='ladder'&&d.kind!=='photoeye'&&d.kind!=='proximity'&&d.kind!=='control-panel'} onChange={e=>setCommands(p=>({...p,[d.id]:e.target.checked}))}/> {controlMode==='ladder'?(d.kind==='photoeye'||d.kind==='proximity'||d.kind==='control-panel'?'Field input':'Ladder output (read-only)'):'Command ON'}</label>}
+        {d.kind!=='fence'&&<label><input type="checkbox" checked={materialMode&&controlMode==='ladder'&&(d.kind==='photoeye'||d.kind==='proximity')?materialSensorImage[d.id]===true:commands[d.id]===true} disabled={controlMode==='ladder'&&(materialMode&&(d.kind==='photoeye'||d.kind==='proximity')||d.kind!=='photoeye'&&d.kind!=='proximity'&&d.kind!=='control-panel')} onChange={e=>setCommands(p=>({...p,[d.id]:e.target.checked}))}/> {controlMode==='ladder'?(d.kind==='photoeye'||d.kind==='proximity'||d.kind==='control-panel'?'Field input':'Ladder output (read-only)'):'Command ON'}</label>}
         <span>{s?(s.value*100).toFixed(1)+'%':'0.0%'}</span>
        </div>;
       })}

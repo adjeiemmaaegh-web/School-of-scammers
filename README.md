@@ -12,6 +12,7 @@
 - Exchange simple graphical Ladder Diagram NO/NC contacts, branches and coils as bounded PLCopen LD XML; unsupported instructions are rejected. Add custom PLC tags without editing JSON.
 - Wire idealized 24 V circuits, diagnose shorts/opens, use a virtual multimeter, and complete conveyor, motor starter, pneumatic, PID and DC network labs.
 - Build and commission 3D workcells from **13 equipment kinds** and four PLC-driven templates. Tune normalized actuator rise/fall behavior and observe pump/valve-dependent tank fill; run simulated FAT against the edited scene.
+- Run an opt-in PLC-driven parcel conveyor: inject cartons or metal parts, watch actual simulated position-triggered sensor inputs, divert parts with a pusher, and inspect timed material event evidence.
 - Examine actual **simulated** scan snapshots, typed I/O, timers, counters, transitions, CSV evidence and offline replay. Compare externally captured real-PLC BOOL scan CSV against the teaching ladder engine; reference provenance remains unverified until independent review.
 - Use simulation-only PLC input forcing for Start, SensorOK, Photoeye and ExitSensor. Isolate **virtual** power before changing forces. The watch table shows both underlying readings and forced PLC values. Safety power, guard, stop and outputs cannot be forced.
 - Export projects/sessions as JSON; browser-local storage is not a durable backup. Record consent-based anonymous instructor/learner observations in Assessments, without claiming human tests were already performed.
@@ -48,3 +49,4 @@ The production build runs semantic TypeScript, Vite, and an offline precache gen
 Remaining release gates include expert PLC reference verification, low-spec 8 GB Windows measurements, actual low-spec Windows, Safari and real mobile acceptance (Windows-hosted Edge CI is separate), complete licensing and dependency review, broader plant/3D scene authoring, and independent instructional assessment.
 
 - [Virtual machine catalogue and source acceptance](docs/FACTORY_MACHINE_CATALOG_COMPLETION_2026-11-05.md)
+- [Geometric parcel-flow training model](docs/MATERIAL_FLOW_INTEGRATION_2026-11-06.md)
