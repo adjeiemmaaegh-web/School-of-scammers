@@ -61,8 +61,9 @@ async function clickText(page, text) {
     await page.waitForFunction(()=>[...document.querySelectorAll(
       '[data-rung-id="inlet-pump"] select[aria-label="Contact tag"]')].some(x=>x.value==='Unused'));
     await clickText(page,'▶ Run');
-    await page.waitForFunction(()=>document.querySelector('.sandbox-scan')?.textContent.trim()==='Scan 12',
-      {timeout:12000}).catch(()=>{});
+    await page.waitForFunction(() =>
+      Number(document.querySelector('.sandbox-scan')?.textContent.replace(/\D/g,'')) >= 12,
+      {timeout:10000});
     await page.waitForFunction(()=>document.querySelector('[data-tank-pump]')?.textContent==='OFF',{timeout:7000});
     const initial=await page.$eval('[data-tank-level]',e=>Number.parseInt(e.textContent,10));
     await new Promise(done=>setTimeout(done,450));
