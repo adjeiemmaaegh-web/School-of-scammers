@@ -37,7 +37,7 @@ Revised owner-approved decisions: **interactive 3D-first from P1**, Ladder-first
 
 ## P2 programming continuation — bounded, not complete
 
-The owner authorized proceeding from the UX-first prototype into a P2 programming increment. Read `docs/product/P2_PROGRAMMING_PROGRESS.md`. One Web Worker executes either a saved LadderDocument or bounded compiled ST source; do not simulate ST in UI, invent timers driven by browser wall time, or duplicate scan ordering. Backwards-compatible `formatVersion:1` projects may omit language/source. Live tag values, timer/counter memory and the scan breakpoint originate in worker snapshots. Do not describe this as full IEC 61131-3 support, completed P2 or production acceptance; compiler, safety, device and cross-browser gates remain.
+The owner authorized proceeding from the UX-first prototype into a P2 programming increment. Read `docs/product/P2_PROGRAMMING_PROGRESS.md`. One Web Worker executes either a saved LadderDocument or bounded compiled ST source; do not simulate ST in UI, invent timers driven by browser wall time, or duplicate scan ordering. Backwards-compatible `formatVersion:1` projects may omit language/source. Live tag values, timer/counter memory, exact-scan and Boolean edge breakpoints, and a bounded worker-originated CSV scan trace originate in worker snapshots. Do not derive diagnostic results from UI animations. Treat the trace as recent observation, **not** full program replay. Do not describe this as full IEC 61131-3 support, completed P2 or production acceptance; compiler, safety, device and cross-browser gates remain.
 
 ## Mental model (the layers)
 
