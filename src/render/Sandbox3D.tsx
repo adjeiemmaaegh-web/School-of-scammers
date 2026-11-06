@@ -142,7 +142,7 @@ function Device3D({ c, active, motorAngleRad, parcel, editable, selectedTerminal
           c.kind === 'conveyor' ? (active ? 'BELT MOVING' : 'BELT STOPPED') :
           c.kind === 'photoeye' ? (active ? 'MARK DETECTED' : 'NO MARK') :
           c.kind === 'diverter' ? (active ? 'REJECT ACTIVE' : 'PASS') :
-          c.kind === 'supply' ? '24 V DC' : c.pressed ? 'PRESSED' : 'RELEASED'</small>
+          c.kind === 'supply' ? '24 V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</small>
         {(c.kind === 'start' || c.kind === 'stop') && <button type="button"
           disabled={false} onPointerDown={e => e.stopPropagation()}
           onClick={e => { e.stopPropagation(); onOperate(c.id, !c.pressed); }}>{c.pressed ? 'Release' : 'Press'}</button>}
