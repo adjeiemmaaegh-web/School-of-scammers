@@ -35,6 +35,10 @@ operating guide.
 
 Revised owner-approved decisions: **interactive 3D-first from P1**, Ladder-first, and a start/stop contactor/motor vertical slice. Implemented files: `src/components/registry.ts`, `src/sim/{signals,orchestrator,worker}.ts`, `src/program/LadderEditor.tsx`, `src/app/SandboxPage.tsx`, and `tests/sandbox-integration.test.ts`. The P1 supported subset is one PLC, one supply, one Ladder rung, a bounded 24V ideal circuit, real original low-poly WebGL geometry but no advanced mechanical physics yet. It directly uses `engineering/ladder.ts` and `engineering/electrical.ts`; do not claim it already reaches commercial PLC/electrical fidelity. Keep current assessment routes working. Do not claim P0/P1 complete until full automated and browser evidence exists.
 
+## P2 programming continuation — bounded, not complete
+
+The owner authorized proceeding from the UX-first prototype into a P2 programming increment. Read `docs/product/P2_PROGRAMMING_PROGRESS.md`. One Web Worker executes either a saved LadderDocument or bounded compiled ST source; do not simulate ST in UI, invent timers driven by browser wall time, or duplicate scan ordering. Backwards-compatible `formatVersion:1` projects may omit language/source. Live tag values, timer/counter memory and the scan breakpoint originate in worker snapshots. Do not describe this as full IEC 61131-3 support, completed P2 or production acceptance; compiler, safety, device and cross-browser gates remain.
+
 ## Mental model (the layers)
 
 - **Project / WorldState** — the document: components, wires, programs, tags, plant layout, faults, clock + seed. Runtime truth lives in a Web Worker.
