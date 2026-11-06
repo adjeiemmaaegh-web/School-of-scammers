@@ -10,12 +10,14 @@
 
 **Golden rules (full list in the skill):** the engine is authoritative and the renderer only draws the published snapshot; the tick order lives only in the orchestrator; simulation code is pure, DOM-free and deterministic (seeded RNG); run the user's real PLC logic (never a canned animation); build on the salvaged engine (`src/core`, `src/engine`, `src/engineering`) rather than rewriting it; original assets only; everything is an educational simulation, never safety-rated.
 
+**Current owner decision:** frontend-only for these versions. Do **not** introduce backend services, Supabase, authentication, account databases, cloud sync, server APIs, SaaS or payments. Keep browser-local projects and the local assignment/result-code workflow. The P0/P1 initial slice uses 2.5D, Ladder first, and a start/stop motor; full 3D is planned for P3. This is educational 24V simplification, not general electrical/PLC fidelity.
+
 **Two products, one repo:** the open **sandbox simulator** (the current direction, being built per PRD v4) and the **guided-exercise / employer-assessment** app (shipped, in `src/app`/`src/platform`/`src/trades`; becomes a *mode* on the sandbox in roadmap phase P6). Don't delete the latter — it's retained.
 
 **Verify before committing:**
 ```bash
 npx tsc --noEmit && npm test && npm run build && npm run verify:full
 ```
-`npm run verify:full` is the deploy gate that Vercel and GitHub CI run. Keep `main` deployable; keep the 536 engine tests green. Node 22.
+`npm run verify:full` is the core automated build gate. GitHub CI additionally runs `scripts/sandbox-browser-acceptance.cjs` to prove the new visual workflow; don't mark P0/P1 accepted without this and existing browser-suite evidence. Keep `main` deployable; keep the 536 engine tests green. Node 22.
 
 **Working style:** small, working commits; few, high-signal docs (no per-task "report" files); honest claims.
