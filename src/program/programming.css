@@ -77,3 +77,24 @@
 .sandbox-scan-history-list [role="row"]:first-child { background:var(--surface-2); }
 .sandbox-scan-history-list [role="row"]:last-child { border-bottom:0; }
 @media(max-width:440px) { .sandbox-breakpoint-fields { grid-template-columns:1fr; } }
+
+/* P2 typed numeric PLC instructions: consistent with the approved workbench. */
+.sandbox-ux .sandbox-numeric-instruction {
+  display:flex; flex-wrap:wrap; align-items:flex-end; gap:9px; flex-basis:100%;
+  padding:10px; margin:4px 0; background:var(--surface); border:1px solid var(--line); border-radius:9px;
+}
+.sandbox-ux .sandbox-numeric-operand, .sandbox-ux .sandbox-numeric-target {
+  display:grid; gap:5px; flex:1 1 130px; min-width:112px; color:var(--muted); font:11px var(--body);
+}
+.sandbox-ux .sandbox-numeric-instruction select,
+.sandbox-ux .sandbox-numeric-instruction input,
+.sandbox-ux .sandbox-add-tag select {
+  width:100%; min-width:0; color:var(--ink); background:var(--surface-2); border:1px solid var(--line);
+  padding:8px; border-radius:7px; font:12px var(--mono);
+}
+.sandbox-ux .sandbox-numeric-instruction p { flex:1 0 100%; line-height:1.5; }
+.sandbox-ux .sandbox-add-tag > label:not([for]) { display:grid; gap:5px; flex:1 1 90px; min-width:90px; width:auto; }
+.sandbox-ux .sandbox-add-tag > label:not([for]) input { width:100%; }
+@media(max-width:550px) {
+  .sandbox-ux .sandbox-numeric-operand,.sandbox-ux .sandbox-numeric-target { flex-basis:100%; }
+}
