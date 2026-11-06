@@ -75,7 +75,7 @@ export function SandboxPage() {
     const x = ev.clientX - rect.left - BOX_W / 2, y = ev.clientY - rect.top - 65;
     if (value.startsWith('add:')) {
       const kind = value.slice(4) as ComponentKind;
-      if (kind in COMPONENTS) place(kind, x, y);
+      if (Object.hasOwn(COMPONENTS, kind)) place(kind, x, y);
     } else if (value.startsWith('move:')) {
       const id = value.slice(5);
       send([{ k: 'move', id, to: { x: Math.max(5, Math.min(CANVAS_W - BOX_W - 5, x)),
