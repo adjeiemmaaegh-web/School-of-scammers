@@ -42,6 +42,14 @@ Program and UI evidence: `tests/sandbox-p2-programming.test.ts` covers wired mot
 
 The developer has not merged PR #14, #15 or #16 or promoted an external deployment. Owner review, real WebGL/low-spec physical Windows and complete P2 feature gates remain open.
 
+### Next P2 implementation — typed numeric PLC (7 November 2026)
+
+Owner requested continued engineering on the same **draft PR #16**, with PR #14 (3D) and #15 (UX) still unmerged. The authoritative `engineering/ladder.ts` runtime now holds bounded local `INT`, `DINT`, and `REAL` numeric registers alongside BOOL tags, applying MOV, ADD, SUB, MUL, DIV and six comparisons in actual top-to-bottom scan order. The numeric instruction editor in `src/program/NumericInstructionControls.tsx` and `src/program/LadderEditor.tsx` uses the approved workbench. Values persist in the worker between scans and are visible in online monitoring and scan trace. Numeric tags cannot be used as Boolean contacts/coils; missing operands, invalid initial values and arithmetic faults are rejected. Overflow and division by zero pause and deenergize simulated outputs.
+
+Evidence added: `tests/sandbox-p2-numeric.test.ts` exercises typed registers through the *real* wired motor and validates overflow, invalid tags and legacy compatibility. `scripts/sandbox-p2-numeric-browser.cjs` creates the 11-wire circuit in headless Chrome, programs INT + ADD + numeric comparator from the UI, observes the motor follow the threshold, and verifies that an unreachable threshold leaves it stopped. The original 3D, UX and P2 browser flows are unchanged; `.github/workflows/ci.yml` now gates numeric browser acceptance separately. **Current verification:** Linux run [42298005285](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/42298005285) passed TypeScript, all unit tests, production build, bundle budgets, Chrome P1/UX/P2 and numeric E2E, accessibility, offline smoke and no-WebGL functionality. Firefox/WebKit installer/tests were still executing at this writing. Windows run [42298005243](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/42298005243) passed compilation; hosted Edge smoke was not yet complete when recorded. Final full-CI status must be reviewed before any acceptance claim.
+
+**Open:** physical analog mapping, more advanced PLC function blocks/typed addressing, physical low-spec Windows 3D/WebGL acceptance, owner product review and draft-PR dependency review. No backend, cloud, account service, payment, merge, or commercial release approval.
+
 ## Earlier progress — v3 product (shipped, retained as the assessment layer)
 
 > **Status:** v3 is complete and live: two trades with full 1–10 ladders (PLC + CCTV = 20 playable exercises), two-audience shell, local employer→candidate assessment with evidence trail, device-art visuals, mobile-ready, branded "EFO Skill Lab". This is the assessment layer referenced above.
