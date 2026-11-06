@@ -32,7 +32,7 @@ operating guide.
 
 ## Current P0/P1 implementation (not yet accepted)
 
-Owner-approved decisions: 2.5D-first, Ladder-first, and a start/stop contactor/motor vertical slice. Implemented files: `src/components/registry.ts`, `src/sim/{signals,orchestrator,worker}.ts`, `src/program/LadderEditor.tsx`, `src/app/SandboxPage.tsx`, and `tests/sandbox-integration.test.ts`. The P1 supported subset is one PLC, one supply, one Ladder rung, a bounded 24V ideal circuit, no real 3D/physics yet. It directly uses `engineering/ladder.ts` and `engineering/electrical.ts`; do not claim it already reaches commercial PLC/electrical fidelity. Keep current assessment routes working. Do not claim P0/P1 complete until full automated and browser evidence exists.
+Revised owner-approved decisions: **interactive 3D-first from P1**, Ladder-first, and a start/stop contactor/motor vertical slice. Implemented files: `src/components/registry.ts`, `src/sim/{signals,orchestrator,worker}.ts`, `src/program/LadderEditor.tsx`, `src/app/SandboxPage.tsx`, and `tests/sandbox-integration.test.ts`. The P1 supported subset is one PLC, one supply, one Ladder rung, a bounded 24V ideal circuit, real original low-poly WebGL geometry but no advanced mechanical physics yet. It directly uses `engineering/ladder.ts` and `engineering/electrical.ts`; do not claim it already reaches commercial PLC/electrical fidelity. Keep current assessment routes working. Do not claim P0/P1 complete until full automated and browser evidence exists.
 
 ## Mental model (the layers)
 
@@ -42,7 +42,7 @@ Owner-approved decisions: 2.5D-first, Ladder-first, and a start/stop contactor/m
 - **Program** (`src/program/`) — LD/FBD/ST editors compile to a shared `ProgramIR` executed by the engine (wraps `core/plc.ts`, `engineering/ladder*`, `structured-text`).
 - **Plant** (`src/plant/`) — device kinematics + sensor geometry (wraps `engineering/workcell*`, `conveyor-process`, `pneumatic-cylinder`, `analog-tank`).
 - **Orchestrator** (`src/sim/`) — the tick clock + the typed signal/event interface (`signals.ts`). Authoritative. Runs in `worker.ts`.
-- **Render** (`src/render/`) — 2.5D (`canvas2d`, reusing `src/ui/device-art.tsx`) first; real 3D (`three`) later. Draws the snapshot only.
+- **Render** (`src/render/Sandbox3D.tsx`) — real Three.js/React Three Fiber workbench from P1, with original 3D equipment/cables, a camera, terminal interactions, and low-resource settings. Draws snapshot values only. No-WebGL users retain a functional accessible wiring/controls panel.
 - **Diagnostics** (`src/diagnostics/`) — multimeter, watch, trace, alarms from the snapshot/events (wraps `engineering/scan-debugger`).
 - **Exercises/assessment** (`src/exercises/`, currently `src/app`+`src/platform`+`src/trades`) — guided + employer modes layered on a saved project (re-hosted onto the sandbox in P6).
 
@@ -51,7 +51,7 @@ Owner-approved decisions: 2.5D-first, Ladder-first, and a start/stop contactor/m
 **Add a component (device):**
 1. Create `src/components/defs/<kind>.ts` exporting a `ComponentDefinition`: `kind`, `category`, `label`, `terminals`, `defaults`, pure `behavior(ctx)` (read wired signals → write outputs/kinematics), `visual(ctx)` (→ `VisualState`).
 2. Register it in `src/components/registry.ts`.
-3. Add a 2.5D glyph to `src/ui/device-art.tsx` if needed.
+3. Add original 3D geometry in `src/render/Sandbox3D.tsx`; preserve accessible terminal/operating controls and avoid costly meshes on low-spec devices.
 4. Add a behaviour test under `tests/`. No orchestrator change.
 
 **Add a PLC instruction/block:** extend `src/program/ir.ts` and the interpreter (lean on `core/plc.ts`), wire it into the relevant editor(s), round-trip test it. Keep the supported set documented; unsupported → explicit error.
