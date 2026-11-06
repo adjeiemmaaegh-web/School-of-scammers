@@ -14,6 +14,7 @@ const CANVAS_W = 1080, CANVAS_H = 580, BOX_W = 170;
 const wireGuide = 'Supply P24 → PLC L+, START A, STOP A, contactor 13. Supply M0 → PLC M, contactor A2, motor M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → contactor A1; contactor 14 → motor L+.';
 const sortingWireGuide = 'For 3D sorting: supply P24 → PLC L+, START A, STOP A, contactor 13, photoeye L+. Supply M0 → PLC M, contactor A2, conveyor M-, photoeye M, diverter A2. START B → I0.0; STOP B → I0.1; PLC Q0.0 → contactor A1; contactor 14 → conveyor L+. Photoeye OUT → PLC I0.2; PLC Q0.1 → diverter A1. Load the sorting Ladder example, Run, press START, and feed marked or plain parcels. Photoeye and diverter must be positioned alongside the conveyor in sensor→diverter order.';
 const tankWireGuide = 'For tank process: P24 to PLC L+, STOP A and level probe L+. M0 to PLC M, pump M-, level probe M and drain valve A2. STOP B to PLC I0.1; level probe OUT to PLC I0.3; PLC Q0.2 to pump L+; PLC Q0.3 to drain valve A1. Mount the pump, probe and valve near the tank. Load the tank control Ladder example, Run and observe filling to 750 ml, switching and drainage until 600 ml. Wrong PLC logic, miswiring or moving equipment alters the real result.';
+const protectedDOLGuide = 'P4 protected direct-on-line (24V educational model): supply P24 → breaker IN; breaker OUT → PLC L+, START A, STOP A, contactor 13; supply M0 → PLC M, contactor A2, motor M-, lamp M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → overload 95; overload 96 → contactor A1; contactor 14 → motor L+ and lamp L+. Load the editable latch example. To test protection, trip the overload (95-96 opens) or connect breaker OUT directly to supply M0 (downstream short); the branch breaker should isolate the short on the next scan. Remove the short wire before resetting. Measure across pins with the two-probe virtual DC meter.';
 export function SandboxPage() {
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
   const [project, setProject] = useState<ProjectFile | null>(null);
@@ -117,6 +118,21 @@ export function SandboxPage() {
       k: 'place', id: `${d.kind}-${i + 1}`, kind: d.kind, at: { x: d.x, y: d.y },
     })));
   };
+  const layoutProtectedDOL = () => {
+    if (project?.components.length) return;
+    setMoveTarget(null);
+    const devices: { kind: ComponentKind; x: number; y: number }[] = [
+      {kind:'supply',x:25,y:25}, {kind:'breaker',x:175,y:25},
+      {kind:'plc',x:340,y:25}, {kind:'start',x:40,y:245},
+      {kind:'stop',x:240,y:245}, {kind:'overload',x:450,y:245},
+      {kind:'contactor',x:600,y:25}, {kind:'motor',x:830,y:25},
+      {kind:'lamp',x:810,y:245},
+    ];
+    send(devices.map((d,i):Command=>({k:'place',id:`${d.kind}-${i+1}`,kind:d.kind,
+      at:{x:d.x,y:d.y}})));
+  };
+  const meterTerminals = project?.components.flatMap(c =>
+    COMPONENTS[c.kind].terminals.map(t => `${c.id}.${t.name}`)) ?? [];
   const exportProject = () => {
     if (!project) return;
     const file = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
@@ -162,7 +178,8 @@ export function SandboxPage() {
           <span className={`sandbox-work-status ${snapshot?.running ? 'is-running' : ''}`}>
             <i aria-hidden="true" />{snapshot?.running ? 'SIMULATION RUNNING' : 'EDIT MODE'}
           </span>
-          <strong>{project?.components.some(c => c.kind === 'tank') ? 'Untitled tank process project' :
+          <strong>{project?.components.some(c => c.kind === 'breaker') ? 'Untitled protected 24V DOL panel' :
+            project?.components.some(c => c.kind === 'tank') ? 'Untitled tank process project' :
             project?.components.some(c => c.kind === 'conveyor') ?
             'Untitled conveyor sorting project' : 'Untitled motor-control project'}</strong>
           <small>{localSave === 'saved' ? 'Saved in this browser' :
@@ -185,6 +202,8 @@ export function SandboxPage() {
           disabled={!editable || !!project?.components.length}>Place 3D sorting layout</button>
         <button className="btn ghost small" onClick={layoutTank}
           disabled={!editable || !!project?.components.length}>Place 3D tank layout</button>
+        <button className="btn ghost small" onClick={layoutProtectedDOL}
+          disabled={!editable || !!project?.components.length}>Place protected DOL layout</button>
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
@@ -216,7 +235,8 @@ export function SandboxPage() {
                   kind === 'conveyor' ? 'BELT' : kind === 'photoeye' ? 'EYE' :
                   kind === 'diverter' ? 'DIV' : kind === 'tank' ? 'TANK' :
                   kind === 'pump' ? 'PUMP' : kind === 'levelprobe' ? 'LVL' :
-                  kind === 'drainvalve' ? 'VAL' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
+                  kind === 'drainvalve' ? 'VAL' : kind === 'breaker' ? 'CB' :
+                  kind === 'overload' ? 'OL' : kind === 'lamp' ? 'LED' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
               </span>
               <span><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
               <span className="sandbox-add-device" aria-hidden="true">+</span>
@@ -250,7 +270,10 @@ export function SandboxPage() {
             <div className="sandbox-device-list">
               {project?.components.map(c => {
                 const def = COMPONENTS[c.kind];
-                const live = c.kind === 'pump' ? snapshot?.pumpOn :
+                const live = c.kind === 'breaker' ? !snapshot?.breakerTripped :
+                  c.kind === 'overload' ? !snapshot?.overloadTripped :
+                  c.kind === 'lamp' ? snapshot?.lampOn :
+                  c.kind === 'pump' ? snapshot?.pumpOn :
                   c.kind === 'levelprobe' ? snapshot?.io.TankHigh :
                   c.kind === 'drainvalve' ? snapshot?.drainOn :
                   c.kind === 'conveyor' ? snapshot?.conveyorOn :
@@ -272,6 +295,9 @@ export function SandboxPage() {
                       c.kind === 'pump' ? (live ? 'PUMPING' : 'STOPPED') :
                       c.kind === 'levelprobe' ? (live ? 'HIGH LEVEL' : 'LOW LEVEL') :
                       c.kind === 'drainvalve' ? (live ? 'DRAIN OPEN' : 'CLOSED') :
+                      c.kind === 'breaker' ? (live ? 'CLOSED' : 'TRIPPED') :
+                      c.kind === 'overload' ? (live ? '95-96 CLOSED' : 'TRIPPED') :
+                      c.kind === 'lamp' ? (live ? 'ILLUMINATED' : 'OFF') :
                       c.kind === 'supply' ? '24V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</span>
                   </div>
                   <div className="sandbox-patch-actions">
@@ -279,7 +305,12 @@ export function SandboxPage() {
                       className={`sandbox-operate ${c.pressed ? 'pressed' : ''}`}
                       onClick={() => send([{ k: 'operate', id: c.id, pressed: !c.pressed }])}>
                         {c.pressed ? 'Release' : 'Press'}</button>}
-                    <button type="button" className="sandbox-position" disabled={!editable}
+                    {(c.kind === 'breaker' || c.kind === 'overload') && <button
+                      type="button" className="sandbox-operate"
+                      onClick={() => send([{k:'operateProtection',id:c.id,
+                        action:live ? 'trip' : 'reset'}])}>
+                      {live ? 'Trip (training)' : 'Reset protection'}</button>}
+                    <button type="button" className="sandbox-position" disabled={!editable>
                       aria-label={`Move ${def.label} in 3D`}
                       onClick={() => { setMoveTarget(c.id); setSelectedDeviceId(c.id); }}>Move in 3D</button>
                   </div>
@@ -311,7 +342,11 @@ export function SandboxPage() {
               {project?.components.some(c => c.kind === 'tank') && <p>
                 Tank: <strong data-tank-brief>{Math.round(snapshot?.tank.levelMl ?? 0)} ml</strong> ·
                 Pump: <strong>{snapshot?.pumpOn ? 'on' : 'off'}</strong> ·
-                Drain: <strong>{snapshot?.drainOn ? 'open' : 'closed'}</strong></p>}</div>
+                Drain: <strong>{snapshot?.drainOn ? 'open' : 'closed'}</strong></p>}
+              {project?.components.some(c => c.kind === 'breaker') && <p>
+                Breaker: <strong data-breaker-status>{snapshot?.breakerTripped ? 'TRIPPED' : 'CLOSED'}</strong> ·
+                Overload: <strong data-overload-status>{snapshot?.overloadTripped ? 'TRIPPED' : 'CLOSED'}</strong> ·
+                Pilot: <strong data-lamp-status>{snapshot?.lampOn ? 'ON' : 'OFF'}</strong></p>}</div>
           </div>
           {project?.components.some(c => c.kind === 'conveyor') && snapshot && <section
             className="sandbox-sorting-panel panel" aria-label="Conveyor sorting controls">
@@ -359,6 +394,19 @@ export function SandboxPage() {
             <details><summary>Tank wiring and editable PLC example</summary>
               <p className="sandbox-help">{tankWireGuide}</p></details>
           </section>}
+          {project?.components.some(c => c.kind === 'breaker') && <section
+            className="sandbox-protection-panel panel" aria-label="Protected motor control panel">
+            <div className="sandbox-section-head"><div>
+              <span className="eyebrow">P4 · electrical panel</span>
+              <h2>Protected 24V motor control</h2></div>
+              <span className="status-pill is-idle">Training circuit · not safety-rated</span></div>
+            <p className="sandbox-help">Protection and the pilot lamp are driven by the actual 24V netlist.
+              A downstream direct short trips the latched breaker; a manual overload trip
+              opens contact 95–96 and drops the contactor. These are bounded educational
+              behaviors, not thermal ratings or certified fault clearing.</p>
+            <details><summary>15-wire protected DOL circuit</summary>
+              <p className="sandbox-help">{protectedDOLGuide}</p></details>
+          </section>}
         </div>
         <WorkbenchInspector project={project ?? { formatVersion: 1, components: [], wires: [], program: { id: 'pending', version: '1', rungs: [] } }}
           snapshot={snapshot ?? { tick: 0, running: false, components: [], wires: [],
@@ -370,6 +418,8 @@ export function SandboxPage() {
             plant: { parcel: null, lastParcelId: 0, photoeyeActive: false, accepted: 0, rejected: 0 },
             tank: { levelMl: 0, highLevel: false, filledMl: 0, drainedMl: 0, spills: 0 },
             pumpOn: false, drainOn: false,
+            breakerTripped: false, overloadTripped: false, lampOn: false,
+            meter: { positive:null, negative:null, volts:null, status:'select' },
             diagnostics: [], lastError: null, language: 'ladder',
             tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false,
               Run: false, Sort: false, Fill: false, Drain: false },
@@ -396,12 +446,37 @@ export function SandboxPage() {
           <p className="sandbox-help">Click a wire's remove button to break a connection and observe what changes. All values come from the simulator.</p>
           <details><summary>Example wiring map</summary><p>{wireGuide}</p>
             {project?.components.some(c => c.kind === 'conveyor') && <p>{sortingWireGuide}</p>}
-            {project?.components.some(c => c.kind === 'tank') && <p>{tankWireGuide}</p>}</details>
+            {project?.components.some(c => c.kind === 'tank') && <p>{tankWireGuide}</p>}
+            {project?.components.some(c => c.kind === 'breaker') && <p>{protectedDOLGuide}</p>}</details>
           <h3>Wires ({project?.wires.length ?? 0})</h3>
           <div className="sandbox-wire-list">{project?.wires.map(w =>
             <div key={w.id}><code>{w.from} → {w.to}</code>
               <button disabled={!editable} aria-label={`Remove wire ${w.id}`} onClick={() => send([{ k: 'unwire', id: w.id }])}>×</button></div>)}</div>
           {selectedTerminal && <button className="btn ghost small" onClick={() => setSelectedTerminal(null)}>Cancel wire from {selectedTerminal}</button>}
+          <section className="sandbox-meter" aria-label="Virtual DC multimeter">
+            <span className="eyebrow">P4 · virtual instrument</span>
+            <h3>Two-probe DC multimeter</h3>
+            <p className="sandbox-help">Select two real terminals to read their differential
+              potential from the 24V solver. Floating nodes and direct supply shorts
+              report an unavailable reading. This is not calibrated test equipment.</p>
+            <div className="sandbox-meter-leads">
+              {(['positive','negative'] as const).map(lead=><label key={lead}>
+                {lead === 'positive' ? 'Red (+) probe' : 'Black (−) probe'}
+                <select aria-label={lead === 'positive' ? 'Red meter probe' : 'Black meter probe'}
+                  value={snapshot?.meter[lead] ?? ''}
+                  onChange={e=>send([{k:'setMeterProbe',lead,terminal:e.target.value||null}])}>
+                  <option value="">Disconnected</option>
+                  {meterTerminals.map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>)}
+            </div>
+            <output className="sandbox-meter-reading" aria-live="polite" data-meter-status={snapshot?.meter.status}>
+              {snapshot?.meter.status === 'measured' ? `${snapshot.meter.volts} V DC` :
+                snapshot?.meter.status === 'short' ? 'Supply short · measurement unavailable' :
+                snapshot?.meter.status === 'floating' ? 'Floating or unconnected terminal' :
+                'Select both probes'}
+            </output>
+          </section>
           <h3>Voltage probes (V)</h3>
           <div className="sandbox-volts">{Object.entries(snapshot?.voltages ?? {}).filter(([name]) =>
             name.includes('I0.') || name.includes('Q0.') || name.endsWith('A1')).map(([name, value]) =>
