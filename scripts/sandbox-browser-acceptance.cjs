@@ -1,4 +1,4 @@
-/** Headless end-to-end proof: open canvas → wire real netlist → edit ladder → drive contactor/motor.
+/** Headless end-to-end proof: open interactive 3D workbench → wire real netlist → edit ladder → drive contactor/motor.
  * Run after npm install --no-save puppeteer@24.31.0 and a local vite preview.
  */
 const puppeteer = require('puppeteer');
@@ -12,7 +12,7 @@ const pairs = [
   ['supply-1.P24','contactor-3.13'], ['contactor-3.14','motor-4.L+'], ['supply-1.M0','motor-4.M-'],
 ];
 (async () => {
-  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const errors = [];
   const page = await browser.newPage();
   page.on('pageerror', error => errors.push(String(error)));
@@ -33,10 +33,33 @@ const pairs = [
     { timeout: 5000 }, running ? 'RUNNING' : 'STOPPED');
   try {
     await page.goto(baseUrl + '/sandbox', { waitUntil: 'networkidle0', timeout: 15000 });
-    await page.waitForSelector('.sandbox-canvas');
+    await page.waitForSelector('.sandbox-3d-shell');
+    await page.waitForSelector('canvas.sandbox-three-canvas', { timeout: 15000 });
+    const webgl = await page.evaluate(() => {
+      const canvas = document.querySelector('canvas.sandbox-three-canvas');
+      return !!canvas && canvas.width > 0 && canvas.height > 0 && !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+    });
+    assert.ok(webgl, 'P1 must mount an actual WebGL-backed Three.js scene when software WebGL is available');
+    // Drag a palette component onto the 3D floor; a projected ray must place a real project component.
+    await page.evaluate(() => {
+      const root = document.querySelector('.sandbox-3d-shell');
+      const rect = root.getBoundingClientRect();
+      const dataTransfer = new DataTransfer();
+      dataTransfer.setData('text/plain', 'add:motor');
+      root.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer,
+        clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }));
+    });
+    await page.waitForSelector('[data-device-id="motor-1"]', { timeout: 5000 });
+    await clickText('New blank project');
+    await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 0);
     await clickText('Place starter layout');
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 6);
-    for (const [from, to] of pairs) {
+    // Connect the first wire from the real 3D terminal UI to the keyboard patch panel.
+    await page.waitForSelector('[data-scene-terminal-id="supply-1.P24"]');
+    await page.$eval('[data-scene-terminal-id="supply-1.P24"]', el => el.click());
+    await page.waitForFunction(() => document.querySelector('[data-terminal-id="supply-1.P24"]')?.classList.contains('selected'));
+    await page.click('[data-terminal-id="plc-2.L+"]');
+    for (const [from, to] of pairs.slice(1)) {
       await page.click(`[data-terminal-id="${from}"]`);
       await page.waitForFunction(id => document.querySelector(`[data-terminal-id="${id}"]`)?.classList.contains('selected'), {}, from);
       await page.click(`[data-terminal-id="${to}"]`);
@@ -87,7 +110,7 @@ const pairs = [
     const motorStatus = await page.$eval('[data-device-id="motor-4"] .sandbox-device-status', e => e.textContent.trim());
     assert.equal(motorStatus, 'STOPPED', 'The motor must not run with disconnected PLC output wiring');
     assert.deepEqual(errors, [], 'Browser console/page errors');
-    console.log('PASS: sandbox P1 build → wire → editable latch → run → stop → wrong logic → broken output wire');
+    console.log('PASS: sandbox P1 true 3D → palette drop → 3D terminal wiring → editable latch → run → stop → wrong logic → broken output wire');
   } finally {
     await browser.close();
   }
