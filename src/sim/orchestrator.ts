@@ -1,7 +1,10 @@
 /** P0/P1 authoritative deterministic sandbox. Pure simulation: no DOM, timers or wall clock. */
 import { COMPONENTS, terminalExists, type ComponentKind } from '../components/registry';
 import { solveDiscrete24V, type Device } from '../engineering/electrical';
-import { executeLadder, validateLadder, type LadderDocument } from '../engineering/ladder';
+import { executeLadder, type LadderDocument, type LadderResult } from '../engineering/ladder';
+import { executeStructuredText, type STResult, type STValue } from '../engineering/structured-text';
+import { compileSandboxST, DEFAULT_ST_SOURCE, validateSandboxProgram } from '../program/p2-contract';
+export { validateSandboxProgram } from '../program/p2-contract';
 import type { Command, PlacedComponent, ProjectFile, RenderSnapshot, SimEvent, WorldState } from './signals';
 
 export const SCAN_MS = 50;
@@ -21,28 +24,19 @@ export const latchProgram = (): LadderDocument => ({
     ], coil: 'Run' },
   ],
 });
-/** The P1 editor intentionally supports one rung and one-contact parallel legs. */
-export function validateSandboxProgram(program: LadderDocument): string[] {
-  const errors = validateLadder(program);
-  if (errors.length) return errors;
-  if (program.rungs.length !== 1) return ['P1 supports exactly one editable rung'];
-  const rung = program.rungs[0];
-  if (rung.elements.length > 8 || rung.elements.length < 1) return ['P1 rung needs 1–8 elements'];
-  const validContact = (c: { tag: string }) => ['Start', 'StopOK', 'Run', 'Unused'].includes(c.tag);
-  if (!['Run', 'Unused'].includes(rung.coil)) return ['P1 output coil must be Run or Unused'];
-  for (const element of rung.elements) {
-    if (element.type === 'contact' && !validContact(element)) return ['Unsupported P1 contact tag'];
-    if (element.type === 'branch' &&
-      (element.alternatives.length !== 2 ||
-       element.alternatives.some(path => path.length !== 1 || !validContact(path[0]))))
-      return ['P1 supports two one-contact parallel paths'];
-  }
-  return [];
-}
-export const newProject = (): ProjectFile => ({ formatVersion: 1, components: [], wires: [], program: blankProgram() });
+export const newProject = (): ProjectFile => ({
+  formatVersion: 1, components: [], wires: [], program: blankProgram(),
+  language: 'ladder', stSource: DEFAULT_ST_SOURCE,
+});
 export function createWorld(project: ProjectFile = newProject()): WorldState {
-  return { project, running: false, tick: 0, coils: {}, ladderMemory: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
-    powered: false, inputs: { Start: false, StopOK: false }, voltages: {}, diagnostics: [], lastError: null };
+  return {
+    project, running: false, tick: 0, coils: {}, ladderMemory: {}, stMemory: {},
+    tagValues: { Start: false, StopOK: false, Run: false }, ladderSteps: [],
+    breakpointScan: null, breakpointHit: null,
+    contactorOn: false, motorOn: false, motorAngleRad: 0,
+    powered: false, inputs: { Start: false, StopOK: false },
+    voltages: {}, diagnostics: [], lastError: null,
+  };
 }
 const terminal = (id: string, pin: string) => `${id}.${pin}`;
 const validId = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9_-]{1,45}$/.test(value);
@@ -74,7 +68,20 @@ export function validateProject(raw: unknown): ProjectFile {
   }
   const programErrors = validateSandboxProgram(p.program);
   if (programErrors.length) throw new Error(programErrors.join('; '));
-  return { formatVersion: 1, components, wires: p.wires.map(w => ({ id: w.id, from: w.from, to: w.to })), program: p.program };
+  if (p.language !== undefined && p.language !== 'ladder' && p.language !== 'st')
+    throw new Error('Unknown PLC programming language');
+  if (p.stSource !== undefined && typeof p.stSource !== 'string')
+    throw new Error('Invalid Structured Text source');
+  if (p.language === 'st' || p.stSource !== undefined) {
+    if (p.language === 'st' && !p.stSource) throw new Error('ST mode requires a compiled source');
+    if (p.stSource) compileSandboxST(p.stSource);
+  }
+  return {
+    formatVersion: 1, components,
+    wires: p.wires.map(w => ({ id: w.id, from: w.from, to: w.to })), program: p.program,
+    ...(p.language !== undefined ? { language: p.language } : {}),
+    ...(p.stSource !== undefined ? { stSource: p.stSource } : {}),
+  };
 }
 const setError = (world: WorldState, message: string): WorldState => ({ ...world, lastError: message });
 const canEdit = (world: WorldState) => !world.running;
@@ -84,11 +91,17 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): { wor
   for (const cmd of commands) {
     world = { ...world, lastError: null };
     if (cmd.k === 'run') {
-      const issues = validateSandboxProgram(world.project.program);
-      world = issues.length ? setError(world, issues.join('; ')) : { ...world, running: true };
+      try {
+        if (world.project.language === 'st') compileSandboxST(world.project.stSource ?? '');
+        else {
+          const issues = validateSandboxProgram(world.project.program);
+          if (issues.length) throw new Error(issues.join('; '));
+        }
+        world = { ...world, running: true, breakpointHit: null };
+      } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Program validation failed'); }
     } else if (cmd.k === 'pause') world = { ...world, running: false };
     else if (cmd.k === 'step') { world = { ...world, running: false }; forceStep = true; }
-    else if (cmd.k === 'reset') world = { ...createWorld(world.project) };
+    else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan };
     else if (cmd.k === 'clear') world = createWorld();
     else if (cmd.k === 'operate') {
       if (!world.project.components.some(c => c.id === cmd.id && (c.kind === 'start' || c.kind === 'stop'))) world = setError(world, 'Only pushbuttons can be operated');
@@ -113,7 +126,26 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): { wor
     } else if (cmd.k === 'loadProgram') {
       const errors = validateSandboxProgram(cmd.program);
       if (errors.length) world = setError(world, errors.join('; '));
-      else world = { ...createWorld({ ...world.project, program: cmd.program }) };
+      else world = { ...createWorld({ ...world.project, program: cmd.program, language: 'ladder' }) };
+    } else if (cmd.k === 'loadST') {
+      try {
+        compileSandboxST(cmd.source);
+        world = createWorld({ ...world.project, language: 'st', stSource: cmd.source });
+      } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Invalid Structured Text'); }
+    } else if (cmd.k === 'activateLanguage') {
+      try {
+        if (cmd.language === 'st') compileSandboxST(world.project.stSource ?? DEFAULT_ST_SOURCE);
+        if (cmd.language === 'ladder') {
+          const errors = validateSandboxProgram(world.project.program);
+          if (errors.length) throw new Error(errors.join('; '));
+        }
+        world = createWorld({ ...world.project, language: cmd.language,
+          stSource: world.project.stSource ?? DEFAULT_ST_SOURCE });
+      } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Cannot activate language'); }
+    } else if (cmd.k === 'breakAtScan') {
+      if (cmd.scan !== null && (!Number.isSafeInteger(cmd.scan) || cmd.scan < 1 || cmd.scan > 1000000 || cmd.scan <= world.tick))
+        world = setError(world, 'Choose a future scan from 1 to 1000000');
+      else world = { ...world, breakpointScan: cmd.scan, breakpointHit: null };
     } else if (cmd.k === 'loadProject') {
       try { world = createWorld(validateProject(cmd.project)); } catch (e) { world = setError(world, e instanceof Error ? e.message : 'Invalid project'); }
     }
@@ -144,7 +176,11 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     io: { Start: world.inputs.Start, StopOK: world.inputs.StopOK, Run: world.coils.Run === true,
       'Q0.0': world.coils.Run === true, PlcPowered: world.powered },
     voltages: { ...world.voltages }, contactorOn: world.contactorOn, motorOn: world.motorOn, motorAngleRad: world.motorAngleRad,
-    diagnostics: [...world.diagnostics], lastError: world.lastError };
+    diagnostics: [...world.diagnostics], lastError: world.lastError,
+    language: world.project.language ?? 'ladder',
+    tagValues: { ...world.tagValues }, ladderSteps: [...world.ladderSteps],
+    ladderMemory: { ...world.ladderMemory },
+    breakpointScan: world.breakpointScan, breakpointHit: world.breakpointHit };
 }
 /** Only this function owns the ten phases. Sensor state is sampled for the NEXT tick. */
 export function tick(initial: WorldState, commands: readonly Command[] = [], dtMs = SCAN_MS):
@@ -166,9 +202,30 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     Start: powered && circuit.voltage[terminal(plc!.id, 'I0.0')] === 24,
     StopOK: powered && circuit.voltage[terminal(plc!.id, 'I0.1')] === 24,
   };
-  // 4. Execute the learner's actual LadderDocument with the salvaged instruction runtime.
-  const result = powered ? executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs) : null;
-  const coils = result?.outputs ?? {};
+  // 4. Execute the learner's exact document in the salvaged bounded LD or ST engine.
+  let ladderResult: LadderResult | null = null;
+  let stResult: STResult | null = null;
+  try {
+    if (powered) {
+      if (w.project.language === 'st') {
+        const compiled = compileSandboxST(w.project.stSource ?? '');
+        stResult = executeStructuredText(compiled, inputs, w.stMemory);
+        const run = Object.entries(stResult.outputs).find(([key]) => key.toLowerCase() === 'run')?.[1];
+        if (typeof run !== 'boolean') throw new TypeError('ST Run output must be BOOL');
+      } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'PLC runtime failed';
+    const paused = { ...w, running: false, lastError: `PLC runtime error: ${message}` };
+    return { world: paused, snapshot: renderSnapshot(paused),
+      events: [{ tick: w.tick, kind: 'error', detail: message }] };
+  }
+  const coils = stResult
+    ? Object.fromEntries(Object.entries(stResult.outputs).filter(([, value]) => typeof value === 'boolean')) as Record<string, boolean>
+    : ladderResult?.outputs ?? {};
+  const tagValues: Record<string, STValue> = {
+    ...inputs, ...coils, ...(stResult?.signals ?? {}),
+  };
   // 5. Publish output image (Q0.0 follows coil Run, only when PLC is powered).
   // 6. Apply outputs to actuators via circuit on the NEXT tick; contactor coil is sampled here.
   const contactor = w.project.components.find(c => c.kind === 'contactor');
@@ -183,10 +240,20 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
   if (motorOn !== w.motorOn) events.push({ tick: w.tick + 1, kind: 'motor', detail: motorOn ? 'Motor running' : 'Motor stopped' });
-  w = { ...w, tick: w.tick + 1, coils, ladderMemory: result?.memory ?? {}, powered, inputs, contactorOn, motorOn, motorAngleRad,
+  const nextTick = w.tick + 1;
+  const breakpointHit = w.breakpointScan === nextTick ? `Paused at scan ${nextTick}` : null;
+  if (breakpointHit) events.push({ tick: nextTick, kind: 'breakpoint', detail: breakpointHit });
+  w = {
+    ...w, tick: nextTick, coils,
+    ladderMemory: ladderResult?.memory ?? {},
+    ladderSteps: [...(ladderResult?.steps ?? [])],
+    stMemory: stResult?.memory ?? {},
+    tagValues, powered, inputs, contactorOn, motorOn, motorAngleRad,
     voltages: circuit.voltage,
     diagnostics: [...circuit.diagnostics, ...(!powered && plc ? ['PLC is not powered (wire L+ and M to the 24V supply)'] : [])],
-    running: change.forceStep ? false : w.running };
+    breakpointHit,
+    running: change.forceStep || !!breakpointHit ? false : w.running,
+  };
   // 10. Immutable render data: visuals never drive the simulation.
   return { world: w, snapshot: renderSnapshot(w), events };
 }
