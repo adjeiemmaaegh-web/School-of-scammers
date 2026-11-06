@@ -73,10 +73,10 @@ describe('P3 live 3D material flow through wired PLC and physical I/O',()=>{
     expect(w.plant).toMatchObject({accepted:1,rejected:0,parcel:null});
   });
   it('exposes incorrect learner logic: no Sort coil means marked parcel goes to pass lane',()=>{
-    const wrong=sortingProgram();
-    wrong.rungs=[wrong.rungs[0],{
-      id:'wrong',elements:[{type:'contact',tag:'Unused'}],coil:'Sort',
-    }];
+    const sample=sortingProgram();
+    const wrong = { ...sample, rungs: [sample.rungs[0], {
+      id:'wrong',elements:[{type:'contact' as const,tag:'Unused'}],coil:'Sort',
+    }] };
     let w=feed(release(start(make([],wrong))),'marked');
     w=scans(w,45);
     expect(w.plant).toMatchObject({accepted:1,rejected:0,parcel:null});
