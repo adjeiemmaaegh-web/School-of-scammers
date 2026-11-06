@@ -1,6 +1,7 @@
 import type { LadderDocument, LadderMemory, LadderStep } from '../engineering/ladder';
 import type { STProgram, STValue } from '../engineering/structured-text';
 import type { ComponentKind } from '../components/registry';
+import type { ScanTrace, TagBreakpoint } from '../program/scan-trace';
 
 export type XY = { x: number; y: number };
 export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean };
@@ -27,6 +28,8 @@ export type WorldState = {
   ladderSteps: LadderStep[];
   breakpointScan: number | null;
   breakpointHit: string | null;
+  breakpointTag: TagBreakpoint | null;
+  scanTrace: ScanTrace[];
   contactorOn: boolean;
   motorOn: boolean;
   motorAngleRad: number;
@@ -46,6 +49,7 @@ export type Command =
   | { k: 'loadST'; source: string }
   | { k: 'activateLanguage'; language: 'ladder' | 'st' }
   | { k: 'breakAtScan'; scan: number | null }
+  | { k: 'breakOnTag'; breakpoint: TagBreakpoint | null }
   | { k: 'loadProject'; project: unknown }
   | { k: 'run' | 'pause' | 'step' | 'reset' | 'clear' };
 export type SimEvent = { tick: number; kind: string; detail: string };
@@ -67,6 +71,8 @@ export type RenderSnapshot = {
   ladderMemory: LadderMemory;
   breakpointScan: number | null;
   breakpointHit: string | null;
+  breakpointTag: TagBreakpoint | null;
+  scanTrace: ScanTrace[];
 };
 export type WorkerRequest = { kind: 'commands'; commands: Command[] };
 export type WorkerResponse = { kind: 'snapshot'; snapshot: RenderSnapshot; events: SimEvent[]; project?: ProjectFile };
