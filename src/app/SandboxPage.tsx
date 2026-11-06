@@ -260,7 +260,8 @@ export function SandboxPage() {
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
             diagnostics: [], lastError: null, language: 'ladder',
             tagValues: { Start: false, StopOK: false, Run: false },
-            ladderSteps: [], ladderMemory: {}, breakpointScan: null, breakpointHit: null }}
+            ladderSteps: [], ladderMemory: {}, breakpointScan: null, breakpointHit: null,
+            breakpointTag: null, scanTrace: [] }}
           selectedDevice={selectedDevice} selectedTerminal={selectedTerminal} editable={editable}
           onTerminal={connect} onCancelWire={() => setSelectedTerminal(null)}
           onMove={id => setMoveTarget(id)}
