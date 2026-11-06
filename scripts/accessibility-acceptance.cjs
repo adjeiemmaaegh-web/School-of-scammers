@@ -8,7 +8,7 @@ const assert=require('node:assert/strict');
 const puppeteer=require('puppeteer');
 const axePath=require.resolve('axe-core/axe.min.js');
 const base=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173').replace(/\/+$/,'');
-const routes=['/','/labs','/pathway','/workspaces','/engineering','/simulation','/process-control','/starter-lab','/pneumatics','/workcell-composer','/electrical-bench','/dc-circuit','/assessments','/reference','/settings','/about'];
+const routes=['/','/sandbox','/labs','/pathway','/workspaces','/engineering','/simulation','/process-control','/starter-lab','/pneumatics','/workcell-composer','/electrical-bench','/dc-circuit','/assessments','/reference','/settings','/about'];
 const tags=['wcag2a','wcag2aa','wcag21a','wcag21aa'];
 async function run(){
  const browser=await puppeteer.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']});
@@ -33,8 +33,8 @@ async function run(){
   const skip=await page.evaluate(()=>({text:document.activeElement?.textContent?.trim(),tag:document.activeElement?.tagName}));
   assert.equal(skip.text,'Skip to main content','Skip link should receive first Tab focus');
   await page.keyboard.press('Enter');
-  const mainFocused=await page.evaluate(()=>document.activeElement?.id==='main-content');
-  assert.ok(mainFocused,'Skip link should target keyboard-focusable main region');
+  const mainFocused=await page.evaluate(()=>document.activeElement?.id==='main');
+  assert.ok(mainFocused,'Skip link should focus the main landmark in the current app');
   console.log('KEYBOARD SKIP PASS');
   assert.equal(errors.length,0,'No page errors during accessibility sweep');
   assert.equal(failures.length,0,'Serious/critical accessibility violations: '+JSON.stringify(failures));
