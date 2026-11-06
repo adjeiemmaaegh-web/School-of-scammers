@@ -46,7 +46,7 @@ export function LiveMonitor({ snapshot, onBreakpoint, onTagBreakpoint }: {
     <label className="sandbox-monitor-search">Watch/filter tags
       <input type="search" value={watch} onChange={event => setWatch(event.target.value)}
         placeholder="Start, Run, Aux…" aria-label="Filter watched PLC tags" /></label>
-    <div className="sandbox-monitor-table" role="table" aria-label="Live PLC tag values">
+    <div className="sandbox-monitor-table" role="table" tabIndex={0} aria-label="Live PLC tag values">
       <div role="row" className="sandbox-monitor-header"><span role="columnheader">Tag</span><span role="columnheader">Live value</span></div>
       {visible.map(([name,value]) =>
         <div role="row" key={name}><code role="cell">{name}</code>
