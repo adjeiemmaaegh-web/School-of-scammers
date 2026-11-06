@@ -10,6 +10,7 @@ const operationFor = (kind: string): RungOperation | undefined => {
   if (kind === 'coil') return undefined;
   if (kind === 'ton' || kind === 'tof' || kind === 'rto' || kind === 'tp') return { kind, presetMs: 250 };
   if (kind === 'ctu') return { kind: 'ctu', preset: 2 };
+  if (kind === 'ctd') return { kind: 'ctd', preset: 2, loadTag: 'Unused' };
   if (kind === 'osr' || kind === 'osf') return { kind };
   return undefined;
 };
@@ -54,8 +55,11 @@ export function LadderEditor({ document, snapshot, disabled, onChange }: Props) 
     setNewTag(''); setTagError(null);
   };
   const removeTag = (tag: string) => {
-    if (document.rungs.some(rung => rung.coil === tag || rung.elements.some(element =>
-      element.type === 'contact' ? element.tag === tag : element.alternatives.some(path => path.some(c => c.tag === tag))))) {
+    if (document.rungs.some(rung => rung.coil === tag ||
+      (rung.operation && 'resetTag' in rung.operation && rung.operation.resetTag === tag) ||
+      (rung.operation?.kind === 'ctd' && rung.operation.loadTag === tag) ||
+      rung.elements.some(element => element.type === 'contact' ?
+        element.tag === tag : element.alternatives.some(path => path.some(c => c.tag === tag))))) {
       setTagError(`Tag ${tag} is in use. Remove those contacts/coils first.`); return;
     }
     const remaining = { ...document.symbols };
@@ -79,6 +83,21 @@ export function LadderEditor({ document, snapshot, disabled, onChange }: Props) 
     });
   };
   const reset = () => onChange(blankProgram());
+  const updateTimerPreset = (rung: Rung, presetMs: number) => {
+    const operation = rung.operation;
+    if (operation && 'presetMs' in operation)
+      patchRung(rung.id, { ...rung, operation: { ...operation, presetMs } });
+  };
+  const updateCounterPreset = (rung: Rung, preset: number) => {
+    const operation = rung.operation;
+    if (operation && 'preset' in operation)
+      patchRung(rung.id, { ...rung, operation: { ...operation, preset } });
+  };
+  const updateResetTag = (rung: Rung, resetTag: string) => {
+    const operation = rung.operation;
+    if (operation?.kind === 'ctu' || operation?.kind === 'rto')
+      patchRung(rung.id, { ...rung, operation: { ...operation, resetTag: resetTag || undefined } });
+  };
 
   return <section className="sandbox-editor panel" aria-label="Ladder programming editor">
     <div className="sandbox-section-head">
@@ -135,19 +154,35 @@ export function LadderEditor({ document, snapshot, disabled, onChange }: Props) 
                 <option value="rto">RTO · retentive timer</option>
                 <option value="tp">TP · pulse timer</option>
                 <option value="ctu">CTU · count up</option>
+                <option value="ctd">CTD · count down</option>
                 <option value="osr">OSR · rising pulse</option><option value="osf">OSF · falling pulse</option>
               </select>
             </label>
             {rung.operation && 'presetMs' in rung.operation && <label>Preset (ms)
               <input type="number" min="1" max="86400000" value={rung.operation.presetMs}
                 aria-label={`Timer preset for ${rung.id}`}
-                onChange={e => patchRung(rung.id, { ...rung,
-                  operation: { kind: rung.operation!.kind as 'ton', presetMs: Number(e.target.value) } })} />
+                onChange={e => updateTimerPreset(rung, Number(e.target.value))} />
             </label>}
-            {rung.operation?.kind === 'ctu' && <label>Count preset
+            {(rung.operation?.kind === 'ctu' || rung.operation?.kind === 'ctd') && <label>Count preset
               <input type="number" min="1" max="100000000" value={rung.operation.preset}
                 aria-label={`Counter preset for ${rung.id}`}
-                onChange={e => patchRung(rung.id, { ...rung, operation: { ...rung.operation!, preset: Number(e.target.value) } as RungOperation })} />
+                onChange={e => updateCounterPreset(rung, Number(e.target.value))} />
+            </label>}
+            {(rung.operation?.kind === 'ctu' || rung.operation?.kind === 'rto') && <label>Reset condition
+              <select aria-label={`Reset condition for ${rung.id}`}
+                value={rung.operation.resetTag ?? ''}
+                onChange={e => updateResetTag(rung, e.target.value)}>
+                <option value="">No reset</option>
+                {tags.filter(tag => tag !== rung.coil).map(tag => <option key={tag} value={tag}>{tag}</option>)}
+              </select>
+            </label>}
+            {rung.operation?.kind === 'ctd' && <label>Load preset when
+              <select aria-label={`Load condition for ${rung.id}`}
+                value={rung.operation.loadTag}
+                onChange={e => patchRung(rung.id, { ...rung,
+                  operation: { ...rung.operation!, loadTag: e.target.value } as RungOperation })}>
+                {tags.filter(tag => tag !== rung.coil).map(tag => <option key={tag} value={tag}>{tag}</option>)}
+              </select>
             </label>}
             <button type="button" className="btn ghost small" disabled={rung.elements.length >= 8}
               onClick={() => patchRung(rung.id, { ...rung, elements: [...rung.elements, { type: 'contact', tag: 'StopOK' }] })}>+ Series contact</button>
