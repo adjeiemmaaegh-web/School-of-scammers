@@ -1,5 +1,5 @@
 import type { LadderDocument, LadderMemory, LadderStep } from '../engineering/ladder';
-import type { STValue } from '../engineering/structured-text';
+import type { STProgram, STValue } from '../engineering/structured-text';
 import type { ComponentKind } from '../components/registry';
 
 export type XY = { x: number; y: number };
@@ -20,6 +20,8 @@ export type WorldState = {
   tick: number;
   coils: Record<string, boolean>;
   ladderMemory: LadderMemory;
+  /** Validated AST cached in authoritative worker state, never persisted in ProjectFile. */
+  stCompiled: STProgram | null;
   stMemory: Record<string, STValue>;
   tagValues: Record<string, STValue>;
   ladderSteps: LadderStep[];
