@@ -4,6 +4,12 @@
 
 **Current state:** PRD v4.2 direction approved; P0/P1 3D and UX review branches retain their own draft PRs; the subsequent P2 Ladder/ST programming continuation is in a separate draft branch, not merged or production-approved. The previously shipped guided exercises (PLC + CCTV) and local employer/candidate assessments remain intact. The new primary entry is `/sandbox`; existing exercises are under `/trades`.
 
+## P3 3D sorting development preview (draft PR #17)
+
+The open 3D workbench now includes a **conveyor load, powered mark-sensitive optical sensor and wired reject diverter**. From an empty project, select **Place 3D sorting layout** (equipment only, not prewired), patch the 16 terminals using the keyboard-accessible panel or 3D pins, select **Load sorting program example** in the Ladder editor, Run, press START, and feed **marked** or **plain** parcels from the new station panel. With correct wiring and logic, marked parcels are rejected by Q0.1 and plain parcels pass; moving the sensor, editing Sort or disconnecting the conveyor or sensor changes the actual worker-computed outcome. All 3D moving cartons are driven by immutable Worker snapshots. The same simulator supports optional bounded Structured Text Sort output. Exact wiring and QA limits: [P3 plant progress](docs/product/P3_PLANT_PROGRESS.md).
+
+This is a limited **single-parcel, idealized 24V educational model**, not a physically realistic Factory I/O equivalent. P2's unfinished requirements and P3 device breadth remain open. No backend, user accounts, cloud or production deployment is authorized.
+
 ## P0/P1 3D sandbox and P2 programming development preview
 
 - **Real 3D workbench:** place a 24V source, virtual PLC, START/STOP pushbuttons, contactor and simplified DC motor onto an orbitable, zoomable Three.js scene. Drag from the palette or click to place. Connect terminals in 3D or through the accessible patch panel.
