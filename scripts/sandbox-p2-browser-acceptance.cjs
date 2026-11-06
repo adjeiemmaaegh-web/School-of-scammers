@@ -105,7 +105,8 @@ const clickText = async (page, label) => {
     await page.select('select[aria-label="Breakpoint PLC tag"]','Start');
     await page.select('select[aria-label="Breakpoint signal edge"]','rising');
     await clickText(page,'Arm edge');
-    await page.waitForFunction(() => document.querySelector('.sandbox-breakpoint-panel')?.textContent.includes('Watching Start'));
+    await page.waitForFunction(() => [...document.querySelectorAll('.sandbox-breakpoint-panel')]
+      .some(panel => panel.textContent.includes('Watching Start')));
     await clickText(page,'▶ Run');
     await page.click('[data-device-id="start-5"] .sandbox-operate');
     await page.waitForFunction(() => document.querySelector('.sandbox-breakpoint-hit')?.textContent.includes('Start rising edge'),
