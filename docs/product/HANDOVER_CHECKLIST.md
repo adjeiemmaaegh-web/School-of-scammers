@@ -1,7 +1,32 @@
 # Handover & Checklist — Developer Takeover
 
-> **Purpose:** Capture the state of the project at takeover from the previous developer, and track the work to realign it with the product vision in `docs/product/PRD.md` (v3).
-> **Date started:** 6 November 2026 · **Status:** Phases 0, 1 and 3 delivered; Phase 2 (full 1–10 ladder) in progress.
+> **Purpose:** Capture project state and track the work. **Current direction is PRD v4** — see the pivot note below.
+> **Date started:** 6 November 2026.
+
+---
+
+## ⭐ DIRECTION CHANGE — 6 Nov 2026 (read this first)
+
+After reviewing the shipped product against **Cisco Packet Tracer / GNS3** (the owner's inspiration) and working in **Siemens TIA Portal + Factory I/O**, the owner redefined the product. The build so far is a strong **guided-exercise / employer-assessment** app, but for *students* it behaves like a **quiz**, not a **simulation environment**.
+
+**New direction (PRD v4 — `docs/product/PRD.md`):** a comprehensive, open, browser-based **virtual industrial-automation simulator** — build a control system from a component library, wire it, program the PLC (Ladder/FBD/ST), press Run, and a deterministic scan engine drives a live plant you can observe and troubleshoot. "Packet Tracer for industrial automation," with TIA-Portal programming depth and Factory-I/O plant interaction.
+
+**Status of the two products:**
+- **Shipped v3 (exercise ladders + employer assessment)** — *retained and live* at `plc-skills-lab.vercel.app`. Kept for the employer audience; becomes an **assessment *mode* on the sandbox** in roadmap phase **P6**. Its PRD is archived at `docs/product/archive/PRD_v3_exercise-assessment.md`. **Do not delete it.**
+- **New sandbox simulator (PRD v4)** — the primary direction; **not built yet** (this entry documents the plan). The salvaged engine (`src/core`, `src/engine`, `src/engineering`, 536 tests) is the foundation — see the PRD §11 salvage map.
+
+**New docs for co-developers (this session):**
+- `docs/product/PRD.md` (v4) · `docs/product/ARCHITECTURE.md` (v4) · `.claude/skills/automation-platform/SKILL.md` · root `CLAUDE.md`.
+
+**v4 roadmap (runnable each phase):** P0 foundations & contracts → **P1 first vertical slice (start/stop motor: place→wire→program→Run through the full tick loop)** → P2 programming depth → P3 plant & devices → P4 electrical & panel → P5 faults & diagnostics → P6 learning/assessment on the sandbox (re-host v3) → P7+ realism (FBD, PLCopen, Modbus/external runtime, HIL).
+
+**Next action:** owner to review PRD/ARCHITECTURE/SKILL and confirm the open decisions in PRD §12 (2.5D-first, Ladder-first, the P1 slice), then P0/P1 build begins.
+
+---
+
+## Earlier progress — v3 product (shipped, retained as the assessment layer)
+
+> **Status:** v3 is complete and live: two trades with full 1–10 ladders (PLC + CCTV = 20 playable exercises), two-audience shell, local employer→candidate assessment with evidence trail, device-art visuals, mobile-ready, branded "EFO Skill Lab". This is the assessment layer referenced above.
 
 ## Progress snapshot (6 Nov 2026)
 - ✅ **Phase 0** — repo cleaned, engine audited, contracts defined (`src/platform/types.ts`), ARCHITECTURE + README updated to v3.

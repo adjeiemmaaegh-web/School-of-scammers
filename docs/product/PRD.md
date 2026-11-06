@@ -1,280 +1,237 @@
-# EFO Skill Lab — Product Requirements Document (v3)
+# EFO Skill Lab — Product Requirements Document (v4)
 
-> **Brand:** EFO Skill Lab (chosen 6 November 2026).
-> **Version:** 3.0 · **Date:** 6 November 2026 · **Status:** Active product direction. Supersedes the legacy "simulation-first" PRD v2, which is archived at `docs/product/archive/PRD_v2_simulation-first_LEGACY.md`.
-> **Owners:** Product owner (you) + engineering (Claude, taking over from the previous developer).
+> **Product:** a comprehensive, browser-based **virtual industrial-automation laboratory** — the industrial-automation equivalent of Cisco Packet Tracer, with the programming depth of Siemens TIA Portal and the interactive 3D plant simulation of Factory I/O.
+> **Version:** 4.0 · **Date:** 6 November 2026 · **Status:** Active product direction. Supersedes PRD v3 (exercise/assessment), archived at `docs/product/archive/PRD_v3_exercise-assessment.md` and **retained** as the spec for the assessment layer.
+> **Owner:** product owner. **Builders:** Claude + co-developers (read this, then `ARCHITECTURE.md`, then the `automation-platform` skill).
 
 ---
 
-## 0. Why this document exists (the reset)
+## 0. Why this document exists (the reset to a real simulator)
 
-The previous developer built a technically real but **mis-framed** product. They produced a deep, well-tested PLC *simulation engine* — but wrapped it in a dense "engineer's debug console" UI, scoped the product as PLC-only, and **explicitly excluded the employer/candidate hiring flow** that is central to the actual vision. The result looks and feels like a developer tool, not a learning-and-assessment platform.
+The product owner reviewed the v3 build against Cisco Packet Tracer and GNS3 and found the student experience fundamentally different: v3 is a **guided-exercise / assessment** tool (pick an exercise → fixed scene → scripted steps → graded result). That is genuinely useful for **employers assessing candidates**, and it is kept and will be developed further for that audience.
 
-This PRD resets the product around the real vision while **salvaging the one genuinely valuable asset — the simulation engine.**
+But it is **not a simulation environment** for students. Packet Tracer and GNS3 give a learner an *empty workspace* where they choose devices, wire them, configure/program them, press Run, and watch real behaviour emerge — including the consequences of their own mistakes. After working in **Siemens TIA Portal** and **Factory I/O**, the owner's target is clear:
 
-**Decisions already made (with the product owner), which this PRD is built on:**
+> An open, build-it-yourself virtual automation lab: drag PLCs, sensors, motors, conveyors, pneumatics from a library into a workspace; wire them to PLC I/O; program the PLC in Ladder / FBD / Structured Text; press **Run**; and a genuine PLC scan engine drives a live 3D plant that the learner can observe, fault, and troubleshoot — all in one browser app, with no hardware, no licensed IDE, no accounts.
 
-| # | Decision | Choice |
-|---|----------|--------|
-| 1 | Codebase strategy | **Keep the simulation engine, rebuild the shell/product around it.** |
-| 2 | v1 trade scope | **PLC first (flagship), but architected for multiple trades from day one.** |
-| 3 | Backend & accounts | **Design for the full employer→candidate flow now, but ship v1 local-only; real accounts/backend is a later phase.** |
-| 4 | Visual fidelity | **Hybrid 2.5D (clean guided 2D/isometric canvas + targeted 3D where it earns its place), in the spirit of Cisco Packet Tracer.** |
+This PRD specifies that platform. The v3 exercise/assessment product becomes a **mode layered on top** of this sandbox (a saved scenario + objectives + rubric), not a separate app.
+
+**Crucial, money-saving fact:** the hardest part of this vision — a deterministic PLC **scan engine**, ladder & Structured Text execution, an electrical netlist solver, fault models, deterministic replay — **already exists** in this repo's salvaged engine (`src/engine`, `src/core`, `src/engineering`). The problem was never the engine; it was the absence of the open, integrated, visual sandbox around it. This PRD builds that sandbox on the existing engine. See §11 for the salvage map.
 
 ---
 
 ## 1. Vision
 
-**"Cisco Packet Tracer for the skilled trades."**
+**"Cisco Packet Tracer for industrial automation."** One browser application where students, technicians, engineers and automation professionals can **learn, design, program, simulate, test and troubleshoot** industrial control systems without physical PLCs, sensors, motors or factory equipment.
 
-A browser-based platform where people **practice real, hands-on technical skills in simulation** — and where **employers can practically test candidates** on realistic, job-like tasks instead of relying on book knowledge and interviews.
+It unifies three proven experiences into one original product:
+- **Packet Tracer / GNS3** → the practical, drag-wire-configure-run-troubleshoot learning loop on an open canvas.
+- **Siemens TIA Portal** → the PLC programming depth (LD / FBD / ST, IEC 61131-3 elements, a real scan cycle, online monitoring).
+- **Factory I/O** → the interactive 3D industrial plant that the program actually drives.
 
-It launches with **PLC / industrial automation**, and is designed to expand to other hands-on trades: **CCTV installation, BMS (Building Management Systems), phone & PC repair, and electronics.**
-
-Two things make it different from a course or a quiz:
-
-1. **You *do* the work, not read about it.** Every exercise is a simulated environment with real cause and effect — wire it wrong and it doesn't work; diagnose the fault and it does.
-2. **It bridges learning and hiring.** The same realistic tasks that teach a student can be used by an employer to see whether a candidate can actually do the job.
+These are **functional references, not things to clone**: original interface, original component models, independent PLC-simulation architecture, legally clean implementations of supported standards/protocols. No proprietary assets, branding, or claimed compatibility without verification.
 
 ---
 
-## 2. The problem
+## 2. What "a simulation environment" means here (the bar)
 
-- **Hands-on trades are expensive and risky to practice.** PLC hardware, licensed IDEs, wiring benches, CCTV kits, and lab machines cost money and space most learners don't have.
-- **Hiring in these trades is broken.** Interviews and certificates don't reveal whether someone can actually wire a panel, find a fault, or commission a machine. Employers hire "book-knowledge" candidates and find out too late.
-- **Existing tools are either too shallow (quizzes) or too intimidating (full engineering simulators with terrible onboarding).** Nothing sits in the sweet spot of *realistic, guided, and usable by a normal learner or an interviewer.*
+The platform is a simulator, not an animation or a quiz, when **all** of these hold:
 
----
+1. **Open authoring.** The learner starts from an empty (or template) workspace and *builds* the system from a component library — it is not a fixed, pre-wired scene.
+2. **Real wiring.** Components are connected terminal-to-terminal (sensor → PLC input, PLC output → actuator; power, commons). Connections are validated; signals propagate through them.
+3. **The learner's own program runs.** There is a PLC programming environment; the engine executes **the user's actual LD/FBD/ST logic** through a scan cycle — it does not play a canned animation.
+4. **One integrated loop.** Sensor state in the plant → PLC input image → program scan → PLC output image → actuator in the plant → physics advances → sensors re-sample. Continuously. (See §7.)
+5. **Mistakes have consequences.** Wrong logic or wrong wiring produces wrong behaviour, visibly — the sim never "auto-corrects."
+6. **Observable & debuggable.** Live I/O, variable monitoring, scan tracing, virtual multimeter, alarms — the learner diagnoses as on real equipment.
 
-## 3. Target users & jobs-to-be-done
-
-The platform serves **two audiences through two distinct experiences** that share one simulation core.
-
-### 3.1 Learner / Student (the "lab")
-*Analogous to a student opening Cisco Packet Tracer / GNS3.*
-
-- **Novice learner** — "I want to learn PLC/CCTV/etc. from zero, safely, without buying hardware."
-- **Student / trainee** — "I'm in a course and need to practice the practical side."
-- **Career switcher / self-taught** — "I want to build and prove real skills."
-
-**JTBD:** open a guided simulation, follow clear objectives, make mistakes and see consequences, get feedback, progress through increasing difficulty, and build demonstrable competence.
-
-### 3.2 Employer ↔ Candidate (the "assessment")
-*The hiring pillar — the part the previous product omitted entirely.*
-
-- **Employer / interviewer / hiring manager** — "I want to give a candidate a realistic practical task and see, objectively, whether they can do the job."
-- **Job applicant / candidate** — "I want to prove I can actually do the work, not just pass a quiz."
-
-**JTBD (employer):** pick (or configure) a situation-based exercise at an appropriate difficulty, send it to a candidate, and receive an objective, evidence-backed result (what they did, what they got right/wrong, how they diagnosed, whether they respected safety).
-
-**JTBD (candidate):** receive a task, complete it in the simulator under realistic conditions, and have the work speak for itself.
-
-### 3.3 Secondary users
-- **Instructor / trainer / assessor** — authors or curates exercises, reviews learner evidence, runs cohorts.
-- **Platform admin** — manages trades, exercises, and (later) organizations.
+v3 satisfies none of 1–3 for the student (each exercise is a bespoke state machine). v4 must satisfy all six.
 
 ---
 
-## 4. Product principles
+## 3. Users & jobs-to-be-done
 
-1. **Doing over reading.** Every control changes real simulated state; the visuals render the engine's truth. No fake buttons, no scripted "right answer" animations.
-2. **Two audiences, one engine.** The Student lab and the Employer assessment are different *framings and flows* over the **same simulation and the same exercise definitions.** An exercise authored once can be used to teach and to test.
-3. **Guided, not intimidating.** A learner should understand what to do within seconds. Packet-Tracer-level approachability is a hard requirement — this is the #1 fix versus the old product.
-4. **Realistic, honestly bounded.** Simulations model the *category of work* faithfully (programming, wiring, diagnosis, commissioning) but never claim to be a safety-rated controller or hardware-equivalent. Limits are stated, not hidden.
-5. **Difficulty is a first-class ladder (1–10).** Every trade has a clear progression of ten ranked exercises so both learners and interviewers have a shared, legible scale.
-6. **Trades are pluggable.** Adding CCTV or BMS is adding a *trade module* (its devices, exercises, and assessment rubric), not forking the app.
-7. **Evidence, not just a score.** Results explain *why* — the actions taken, faults found, safety respected — so they're meaningful to an employer and fair to a candidate.
-8. **Works in a browser, offline-friendly, low-spec-tolerant.** No install. Degrades gracefully when 3D/WebGL isn't available.
+- **Student / trainee** — "Build and operate a complete virtual control system from scratch, and learn by experimenting and failing safely."
+- **Technician** — "Wire control circuits, trace signals, measure, inject and find faults, verify operation."
+- **PLC programmer / engineer** — "Write, run, debug and monitor LD/FBD/ST against a realistic scan cycle and I/O, driving a plant."
+- **Instructor / vocational trainer** — "Author scenarios and faults, set exercises with measurable outcomes (allowing multiple valid solutions), observe and assess."
+- **Employer / interviewer** — "Assess a candidate on a realistic task." *(Served by the assessment mode layered on the sandbox — the retained v3 experience, upgraded to run on the real simulator.)*
 
 ---
 
-## 5. The exercise model (the heart of the platform)
+## 4. Product pillars
 
-The exercise is the atomic unit shared by both audiences.
-
-### 5.1 The 1–10 ranked ladder
-Each trade exposes **10 ranked exercises**, difficulty **1 (entry) → 10 (expert)**. The rank is a real, defensible scale used by:
-- **Learners** to progress.
-- **Interviewers** to choose "give me a level-4 wiring task" or "a level-8 commissioning scenario" for a candidate.
-
-A rank encodes expected competence, time, and complexity (number of subsystems, faults, ambiguity, safety stakes).
-
-### 5.2 An exercise definition includes
-- **Identity:** trade, rank (1–10), title, estimated time.
-- **Scenario / situation:** a realistic, work-order-style brief ("The conveyor won't start — diagnose and restore it").
-- **Environment:** the simulated scene/devices and their initial (possibly faulted) state, with a fixed seed for reproducibility.
-- **Objectives / success conditions:** machine-checkable ("motor runs," "fault cleared," "wiring continuity correct," "E-stop dominates run").
-- **Rubric:** weighted criteria (correct logic, correct wiring, correct diagnosis, verification, safety discipline, change discipline).
-- **Hints / teaching layer:** shown in Student mode, withheld in Assessment mode.
-- **Evidence capture:** the actions, edits, measurements, and safety-relevant events to record.
-
-### 5.3 Two modes over the same definition
-- **Student mode:** hints on, unlimited resets/replay, solution reveal allowed, no stakes.
-- **Assessment mode:** frozen version + seed, hints/solution withheld, full audit trail, deterministic replay, exportable evidence + rubric result.
-
-This is the key architectural idea the old product missed: **learning and hiring are two modes of one exercise, not two separate products.**
+1. **The Workspace** — an open visual canvas: a component library, drag-and-drop placement, terminal-level wiring, properties, and Run/Pause/Step controls. The Packet-Tracer-style home base.
+2. **The PLC Programming Environment** — LD, FBD and ST editors with IEC 61131-3 elements, a tag/variable table, compile/validate, and online monitoring. The TIA-Portal-style depth.
+3. **The PLC Engine** — a deterministic scan-cycle runtime that executes the user's compiled program (read inputs → solve logic → timers/counters/memory → write outputs), with run/pause/single-scan/breakpoints.
+4. **The Plant** — a 2.5D/3D industrial environment of original device models (conveyors, sensors, motors, contactors, cylinders, valves, tanks, pumps, diverters, robotic mechanisms) whose state is driven by the engine, never scripted.
+5. **The Integration Loop** — the single simulation clock and signal/event bus that ties plant ⇄ wiring ⇄ PLC together every tick. **This is the core of the product.**
+6. **Electrical & Wiring** — a control-panel/wiring layer (supplies, contactors, overloads, relays, push buttons, PLC terminals) with validated connections and propagated signals; DOL, forward/reverse, star-delta, interlocks, E-stop logic.
+7. **Faults & Diagnostics** — injectable faults (disconnected sensor, miswire, failed motor, stuck contactor, broken mechanism, stuck input, logic error) plus diagnostic tools (live variable monitor, I/O indicators, execution trace, virtual multimeter, signal inspection, alarm history).
+8. **Learning & Assessment** — structured, progressive exercises with clear problem/components/conditions/expected-results, measurable outcomes, and support for multiple valid solutions; plus the employer assessment mode. Built *on* the sandbox, not instead of it.
+9. **Projects** — create/save/reopen projects locally; open versioned project files; no account or server required for the core.
 
 ---
 
-## 6. Scope
+## 5. Core concepts (the vocabulary the whole team shares)
 
-### 6.1 In scope for the product (across phases)
-- **Student lab** experience: trade selection → exercise ladder (1–10) → guided simulation → feedback/progress.
-- **Employer/assessment** experience: choose exercise + difficulty → assign to candidate → candidate completes → employer receives evidence-backed result.
-- **PLC trade module** as the flagship, built on the salvaged engine.
-- **Multi-trade architecture**: a trade-module contract so CCTV, BMS, phone/PC, electronics can be added.
-- **Exercise + rubric + evidence formats** (versioned, open).
-- **Hybrid 2.5D UI** with targeted 3D.
-- **Offline-friendly, low-spec-tolerant** browser delivery.
-
-### 6.2 In scope for v1 specifically
-- Rebuilt **shell + navigation + two-audience entry** (Student / Employer).
-- **PLC exercise ladder: a real 1–10 progression** mapped onto the existing engine's capabilities (ladder editing, wiring, fault diagnosis, commissioning, scan debugging).
-- **Redesigned, approachable UI/UX** (the core fix).
-- **Local-only assessment flow:** employer configures/selects an exercise and shares it via an exported link/file; candidate completes it and the result/evidence is exported back. (No accounts yet.)
-- **Trade-module contract** defined and PLC implemented against it (even if PLC is the only trade in v1).
-
-### 6.3 Deferred (later phases, designed-for-now)
-- **Accounts, organizations, and a backend** (employer/candidate logins, assignment, stored results) — likely Supabase. The data model and flows are designed in this PRD so v1 doesn't paint us into a corner.
-- Additional trade modules (CCTV, BMS, phone/PC, electronics).
-- Cohort/classroom management, analytics dashboards.
-- Payments/billing.
-- Anti-cheat hardening for high-stakes remote assessment.
-
-### 6.4 Explicitly out of scope
-- Controlling real hardware; being a safety-rated controller; certification claims.
-- Cloning a specific vendor's IDE.
-- Photorealistic physics for every machine.
-- Claiming full IEC 61131-3 / electrical-standards conformance without independent verification.
+- **Project / Workspace** — the document: a set of placed **Components**, their **Wiring**, one or more **PLC Programs**, the **Tag table**, plant layout, and (optional) exercise metadata. Serializable to a versioned JSON **project file**.
+- **Component** — a library item instance (PLC, sensor, motor, contactor, button, conveyor, cylinder, valve, tank, …). Declares **terminals** (electrical) and a **device behaviour** (how it reacts to signals / advances physics) and a **visual** (2.5D/3D model).
+- **Terminal / Wire** — components expose typed terminals (24V, 0V, DI, DO, signal). A **Wire** connects two terminals. The **netlist** resolves wires into propagated signal values each tick.
+- **PLC Program** — user logic in LD/FBD/ST, compiled to a common **program IR** the engine executes. Bound to **Tags** mapped to PLC I/O addresses, which are in turn wired to component terminals.
+- **Scan** — one PLC cycle: sample inputs → execute IR → update timers/counters/memory → commit outputs.
+- **Tick** — one step of the global simulation clock, which orchestrates electrical solve, PLC scan, actuator application, plant physics, sensor sampling, event logging, and render snapshot (see §7).
+- **Fault** — a modifier injected into a component/wire/program that changes behaviour deterministically (seeded).
+- **Exercise / Assessment** — a saved project + objectives + rubric + (optional) seeded faults; "learning mode" shows hints and allows free edits, "assessment mode" freezes the scenario and records evidence.
 
 ---
 
-## 7. Experience requirements (fixing the "0/10" UI/UX)
+## 6. In-scope feature areas (what v4 delivers, by depth)
 
-The previous UI failed because it exposed the engine's internals (sidebars of 16 tools, I/O tables, forms) instead of guiding a human through a task. Requirements:
+### 6.1 Workspace & component library
+- A searchable, categorized component palette (PLC & I/O, field devices/sensors, actuators/motors, electrical/control-gear, mechanical/conveyance, process, HMI/indicators).
+- Drag-and-drop placement on a grid canvas; select/move/rotate/duplicate/delete; snap; pan/zoom; multi-select; undo/redo.
+- Per-component **properties** panel (ratings, addresses, parameters, initial state).
+- Clear separation of **simplified training models** vs **more realistic** behaviour, labelled.
 
-### 7.1 First-run & navigation
-- **A clear front door that forks by audience:** "I'm learning" (Student) vs "I'm hiring / testing someone" (Employer). This split must be obvious within 5 seconds.
-- **Trade picker** that visibly shows PLC available now and the other trades as "coming soon" (sets the multi-trade expectation).
-- **The 1–10 ladder as the primary learner surface** — a visual progression, not a flat list of 16 menu items.
+### 6.2 Wiring editor
+- Click-terminal-to-terminal wiring with type/compatibility validation (e.g. DI expects a switched 24V signal), visible errors (short, open, wrong polarity, unconnected common).
+- Voltage/continuity propagation through the netlist; overcurrent/short approximations where modelled.
+- Maps component terminals ↔ PLC I/O addresses ↔ program tags.
 
-### 7.2 In-exercise experience
-- **Guided task framing:** work-order brief, clear objectives checklist, and current-step guidance always visible.
-- **A simulation canvas as the star**, not a side panel. Devices are visual and manipulable; the canvas uses the hybrid 2.5D approach with targeted 3D (e.g. a running conveyor, a filling tank).
-- **Progressive disclosure:** advanced instrumentation (scan debugger, watch tables, raw I/O) is available but tucked behind clear affordances — never the first thing a learner sees.
-- **Immediate, legible feedback:** when something is wired/programmed correctly or not, the user sees it in the simulation, not only in a table.
-- **Safety and consequence are visible** (isolation before wiring, E-stop behavior) — modeled and explained.
+### 6.3 PLC programming environment (TIA-Portal-like, original UI)
+- **Ladder Diagram (LD):** NO/NC contacts, coils (incl. set/reset/latch), branches, timers (TON/TOF/TP), counters (CTU/CTD), comparators, math, move, and documented supported instructions; rung power-flow overlay.
+- **Function Block Diagram (FBD):** blocks and connections for the same semantic set; reusable function blocks.
+- **Structured Text (ST):** a bounded IEC 61131-3 subset (BOOL/INT/DINT/REAL/LREAL, IF/CASE/FOR/WHILE, functions, persistent memory) with syntax diagnostics; unsupported constructs fail explicitly.
+- **Tag table / variable editor:** typed tags, I/O addressing, memory, timers/counters structures; add tags without editing JSON.
+- Compile/validate with clear errors; **online monitoring** (live values overlaid on the program); run/pause/single-scan/breakpoints/watch/force (with visible force flags); forcing respects safety rules.
+- Open interchange where feasible (e.g. PLCopen XML for the LD/ST subset) with round-trip checks. Never execute arbitrary user JavaScript; sandbox program execution.
 
-### 7.3 Assessment experience
-- **Candidate view:** calm, focused, "exam-like" — brief, canvas, submit. No hints, no clutter.
-- **Employer result view:** a human-readable report — pass/fail, rubric breakdown, timeline of what the candidate did, safety flags, and replay.
+### 6.4 PLC execution engine
+- A genuine deterministic scan cycle executing the compiled IR: read input image → execute instructions in defined order → update timers/counters/memory → write output image. Deterministic task scheduling, numeric precision, and replay contracts.
+- Run / pause / single-scan / step; breakpoints on scan, rung/block, timer/counter, I/O change; execution trace export.
+- Runs in a **Web Worker** so heavy execution never blocks the UI; message protocol carries tick, version, commands, and state deltas.
 
-### 7.4 Quality bar
-- Approachable, modern, consistent visual design; fast; responsive down to a tablet; accessible (keyboard, reduced-motion, no-WebGL fallback). Mobile phone is "viewable," not the primary authoring surface.
+### 6.5 Plant simulation (Factory-I/O-like, original models)
+- Reusable typed device models: conveyor, roller, motor/VFD abstraction, photoeye, inductive/proximity sensor, cylinder, solenoid valve, pneumatic supply, tank, pump, diverter, pusher, lift, robotic mechanism, indicators.
+- Device state, kinematics, simple collisions, material flow, and sensor geometry driven by the simulation clock. Physics is per-scene and **never** defines PLC state except through explicitly modelled sensors.
+- 2.5D first (clean isometric/plan canvas, performant, approachable), with targeted real 3D (Three.js/Babylon.js) where it adds value; graphics tiers, LOD, WebGL capability check and a usable no-WebGL fallback.
+
+### 6.6 The integration loop — see §7. (The product's heart.)
+
+### 6.7 Electrical control panel & wiring
+- Supplies, fuses, terminals, switches, relays, contactors, overloads, lamps, sensors, motors; DOL, forward/reverse, star-delta, interlocking, E-stop. Teach safety behaviour and its limits; never present as certified safety engineering.
+
+### 6.8 Faults & diagnostics
+- Instructor/learner fault injection (seeded, reproducible): disconnected/stuck sensor, miswire, failed motor, stuck contactor, broken mechanism, open fuse, unexpected input, logic error.
+- Diagnostic toolset: live variable monitor, I/O status, execution trace, virtual multimeter, signal inspection, alarm/event history. (The automation analogue of ping/traceroute/packet-inspect.)
+
+### 6.9 Learning, exercises & assessment
+- Progressive catalogue: start-stop motor → traffic lights → conveyor automation → tank level → sequential machines → full production line. Each: clear problem, required components, operating conditions, expected results; measurable outcome checks; **multiple valid solutions** allowed for advanced tasks.
+- Two modes over one scenario: **learning** (hints, free edits, replay) and **assessment** (frozen scenario + seed, evidence trail, rubric) — the retained v3 experience, re-hosted on the real simulator.
+
+### 6.10 Projects & persistence
+- Create/save/reopen projects locally (IndexedDB + import/export of versioned project files). No account/server for the core. Schema validation and versioned migrations.
+
+### 6.11 Extensibility toward realism (GNS3-inspired, later)
+- Architect so the internal PLC simulator can later interoperate with external **software PLC runtimes** and industrial protocols (e.g. **Modbus TCP**), and eventually compatible hardware-in-the-loop — without the core ever depending on them.
 
 ---
 
-## 8. Architecture direction
+## 7. The integration contract (the heart — read twice)
 
-> Detailed technical design lives in `docs/product/ARCHITECTURE.md` (to be updated to match this PRD). This section sets direction.
+A single **simulation clock** advances the system in deterministic, explicitly ordered phases each tick:
 
-### 8.1 Layers
-1. **Simulation engine (keep & refactor):** the existing deterministic PLC/electrical/machine engine under `src/engineering/*`, `src/core/`, `src/engine/`. This is salvaged. It may be reorganized and have a cleaner public API, but its logic and tests are assets.
-2. **Trade-module layer (new contract):** each trade implements a defined interface — its device catalog, its scene model, its exercise definitions, and its rubric evaluators. PLC is the first implementation and the reference.
-3. **Exercise runtime (new):** loads an exercise definition, instantiates the environment + seed, runs it in Student or Assessment mode, captures evidence, evaluates the rubric.
-4. **Experience layer / shell (rebuild):** the two-audience app — front door, trade picker, 1–10 ladder, in-exercise UI, assessment flows. This is where most of the rebuild effort goes.
-5. **Persistence boundary (designed now, local in v1):** a clean interface for "store/retrieve exercises, assignments, results." v1 implements it with local storage + import/export; a later phase implements it with a real backend (Supabase candidate) **behind the same interface.**
+```
+1. apply user commands            (button press, force, fault toggle, edit)
+2. solve electrical / netlist     (propagate supplies & switched signals through wiring)
+3. sample PLC input image         (from wired input terminals)
+4. execute PLC program scan       (user's compiled IR → outputs, timers, counters, memory)
+5. publish PLC output image
+6. apply outputs to actuators     (motors, valves, diverters, …)
+7. advance plant physics          (kinematics, material flow, collisions)
+8. sample sensor geometry         (positions → sensor terminal states for next tick)
+9. append ordered events          (for trace, alarms, evidence, replay)
+10. publish immutable render snapshot   (3D/2.5D renders THIS, never its own truth)
+```
 
-### 8.2 Why this shape
-- It makes the salvage decision real: the engine sits under a stable contract while we rebuild everything above it.
-- It makes "PLC first, multi-trade later" true by construction: a new trade is a new module, not a new app.
-- It makes "backend later" safe: the experience layer never talks to storage directly, so adding accounts/server later doesn't require rewriting flows.
-
-### 8.3 Likely stack
-- Keep: TypeScript, React, Vite, React Three Fiber/Three.js (for the targeted 3D), Vitest.
-- Rebuild the shell with a clear design system.
-- Later backend: Supabase (auth, Postgres, storage) is the leading candidate — confirmed when we reach that phase.
+Rules that are non-negotiable:
+- **The engine is authoritative; the renderer only draws the published snapshot.** No visual element may be a source of truth.
+- **Deterministic & replayable:** a fixed scenario + program + seed + command log reproduces identically.
+- **One typed signal/event interface** connects plant ⇄ wiring ⇄ PLC so a change in one module is reflected everywhere. (Defined concretely in `ARCHITECTURE.md`.)
+- **Safety dominates:** modelled E-stop/guard logic overrides run; forcing cannot override safety inputs.
 
 ---
 
-## 9. Phased roadmap
+## 8. Non-goals / honest limits (initial release)
 
-Each phase ends with something demonstrable and usable.
+- Not a safety-rated controller; not certified instruction; not a substitute for live-work training. Always stated.
+- No cloud, accounts, or server dependency for the core (assessment accounts are a later, optional layer).
+- Not a clone of TIA Portal / Factory I/O / Packet Tracer UI or assets; no claimed vendor compatibility without verification.
+- No full IEC 61131-3 coverage at first — a **documented supported subset**; unsupported constructs fail explicitly, never silently.
+- No photoreal physics for every machine; fidelity is "faithful category of behaviour," tiered and labelled.
+- External PLC runtimes / Modbus / hardware-in-the-loop are **architected-for, not in, v1**.
 
-| Phase | Goal | Key deliverables | Done when |
-|---|---|---|---|
-| **0 — Reset & foundations** *(current)* | Shared direction + clean base | This PRD, handover/checklist, repo cleanup, engine audit, trade-module + exercise-definition contracts drafted | Owner signs off on PRD; engine's usable surface is documented |
-| **1 — New shell & first great exercise** | Prove the new UX on one exercise end-to-end | Two-audience front door, trade picker, redesigned in-exercise UI, **one polished PLC exercise** (the "conveyor won't start" reference) in both Student and Assessment mode | A stranger can learn *and* be tested on one task with no instructions |
-| **2 — The PLC 1–10 ladder** | A complete flagship trade | All 10 ranked PLC exercises authored on the engine, with rubrics, hints, and evidence | Learner can climb 1→10; interviewer can pick any rank |
-| **3 — Local assessment flow** | Hiring pillar, local-only | Employer selects/configures an exercise, exports an assignment link/file; candidate completes; evidence/result exports back; employer report view | An employer can test a candidate without accounts |
-| **4 — Second trade** | Prove multi-trade | A second trade module (CCTV *or* electronics — TBD) with a starter ladder, validating the contract | A non-PLC trade ships with no engine/shell forks |
-| **5 — Backend & accounts** | Real hiring platform | Supabase auth, employer/candidate accounts, assignment + stored results behind the existing persistence interface | Employer assigns online and sees results in-app |
-| **6+ — Scale** | More trades, cohorts, analytics, billing | BMS, phone/PC, remaining trades; instructor cohorts; dashboards | — |
+---
+
+## 9. Phased roadmap (this is a large, multi-phase build)
+
+Each phase ends with something runnable end-to-end. The **vertical slice first** principle (one complete sandbox scenario working through the whole loop) beats building modules in isolation.
+
+| Phase | Theme | Exit (runnable) |
+|---|---|---|
+| **P0 — Foundations & contracts** | Project model, signal/event interface, tick orchestrator skeleton, component & program IR contracts, engine-salvage audit, worker harness | Contracts documented; an empty workspace loads; the orchestrator ticks a trivial component wired to the salvaged scan engine |
+| **P1 — First vertical slice** | Workspace canvas + a handful of components (PLC, start/stop, contactor, motor) + terminal wiring + LD editor + scan engine + 2.5D render, all through the §7 loop | A user places a start/stop motor circuit, wires it, writes the latch rung, presses Run, and the motor responds to their logic; wrong logic → wrong behaviour |
+| **P2 — Programming depth** | Full LD instruction set, ST editor + engine, tag table, online monitoring, run/pause/step/breakpoints/watch/force | A learner programs timers/counters/comparators and monitors live values |
+| **P3 — Plant & devices** | Device library breadth (conveyor, photoeye, cylinder, valve, tank, pump, diverter…), kinematics, sensor geometry, material flow; targeted 3D | The classic conveyor-sorting scene runs from the user's program |
+| **P4 — Electrical & panel** | Control-panel wiring depth, multimeter, DOL/forward-reverse/star-delta/interlock/E-stop, overcurrent/short approximations | Wiring faults propagate to measurements and PLC inputs |
+| **P5 — Faults & diagnostics** | Seeded fault injection + full diagnostic toolset + alarm/event history + execution trace export | Instructor injects a fault; learner diagnoses with the tools and restores operation |
+| **P6 — Learning & assessment on the sandbox** | Exercise framework (problem/components/conditions/expected-results, multi-solution outcome checks) + re-host the v3 assessment mode on the real simulator | Progressive catalogue; employer assessment runs on real scenarios |
+| **P7+ — Realism & scale** | FBD editor, PLCopen interchange, external runtime / Modbus TCP groundwork, collaboration, HIL | Advanced/opt-in capabilities |
 
 ---
 
 ## 10. Success measures
 
-**Learner (lab):**
-- A first-time user completes a level-1 PLC exercise with no external help.
-- Measurable progression through the 1–10 ladder.
-
-**Employer (assessment):**
-- An interviewer can assign and interpret a practical test in under 10 minutes without training.
-- The result report is specific enough to inform a hiring decision (not just a number).
-
-**Platform:**
-- Adding a new trade requires only a new trade module (no shell rewrite).
-- Backend can be introduced without rewriting experience-layer flows.
-
-**Quality:**
-- "Usability" is the headline metric this time — the old product's failure mode. Target: new users understand what to do without a manual.
+Measured by **how accurately and consistently the integrated system behaves**, not by graphics alone:
+- A learner can build, wire, program, run and troubleshoot a complete control scenario from an empty workspace, unaided.
+- The simulated plant demonstrably follows the user's own program (including their mistakes), reproducibly.
+- Fidelity holds against documented reference traces for the supported subset; determinism/replay verified.
+- A migrating Packet Tracer / GNS3 user recognizes the *workflow* (build → wire → configure → run → troubleshoot) immediately.
 
 ---
 
-## 11. Risks & mitigations
+## 11. Relationship to the existing codebase (salvage map)
 
-| Risk | Mitigation |
-|---|---|
-| Rebuilding the shell drifts into rebuilding the engine too | Freeze the engine behind a documented contract early (Phase 0); only refactor its public surface, not its logic. |
-| "Multi-trade" ambition dilutes PLC quality | Phase gate: PLC ladder (Phase 2) must be excellent before Phase 4's second trade. |
-| 2.5D/3D scope creep | Hybrid-fidelity principle: 3D only where it demonstrably helps; 2D/isometric is the default. |
-| Backend deferral creates rework | Persistence interface defined in Phase 0; v1 local impl and later server impl both sit behind it. |
-| Assessment integrity (cheating) for remote hiring | Deterministic seeds + full evidence/replay now; harder anti-cheat is an explicit later phase, not a v1 promise. |
-| Over-claiming realism/safety | Keep the honest "educational simulation, not safety-rated/certified" framing from the start. |
-| Repo churn returns (70+ report files) | New working style: fewer, meaningful docs; cleanup in Phase 0 (see handover/checklist). |
+**Keep & build on (the engine layer):**
+- `src/core/plc.ts` — deterministic scan kernel (contacts, coils, TON, CTU) → the seed of the **PLC engine**.
+- `src/engineering/ladder*.ts`, `structured-text.ts`, `scan-debugger.ts`, `ladder-truth-table.ts`, `mcdc-*` → **program compilation/validation, execution, debugging**.
+- `src/engineering/electrical.ts`, `dc-network.ts`, `terminal-wiring.ts`, `wiring-board.ts`, `io-mapping.ts`, `contact-coverage.ts` → **electrical/netlist** layer.
+- `src/engineering/workcell*.ts`, `conveyor-process.ts`, `pneumatic-cylinder.ts`, `analog-tank.ts`, `fault-matrix.ts`, `safety-invariants.ts`, `plc-reference-trace.ts` → **plant devices, faults, reference traces**.
+- The full `tests/` suite (536 tests) — keep green; it protects the engine during the rebuild.
 
----
+**Keep as a layer, re-host later (the assessment product):**
+- The v3 shell (`src/app`, `src/ui`, `src/trades`, `src/platform`) and its PLC/CCTV exercise ladders — the **guided-exercise / employer-assessment mode**. It stays live and is upgraded in **P6** to run on the real sandbox instead of bespoke per-exercise state machines.
 
-## 12. Assets / images needed (for you to source)
+**Rebuild (the new core):** the Workspace canvas, component library, wiring editor, PLC programming UIs, the tick orchestrator + signal/event bus, and the plant renderer — i.e. everything in §4 pillars 1–7 that turns the engine into an open simulator.
 
-You offered to get images — here's what will be needed, described. (Nothing blocks the PRD; these are for the rebuild.)
-
-1. **Trade icons** (set of 5, consistent style): PLC/industrial automation, CCTV camera, BMS/building controls, phone & PC repair, electronics/circuit board. Flat, modern line-or-solid icons on transparent background, ~512×512.
-2. **PLC device sprites/models** (for the 2.5D canvas): conveyor belt, electric motor, contactor, push-buttons (start/stop/E-stop), sensor/photoeye, PLC rack, terminal block, lamp/indicator, multimeter. Clean isometric illustrations or simple 3D-ready glTF — top/front consistent angle.
-3. **Front-door hero imagery:** one image/illustration conveying "hands-on practice + hiring" (e.g. a person at a virtual bench). Optional; can be abstract.
-4. **Reference photos (not for shipping, for accuracy):** real photos of a PLC panel, a wired 24V control circuit, a conveyor sorter — so device visuals look credible to practitioners.
-5. **Brand:** if you have a name/logo direction (see §13), any logo files.
-
-> For each, tell me the real-world device and I can also specify exact dimensions/format when we build the canvas. Where licensing matters, we'll track provenance (the repo already has a license-provenance discipline worth keeping).
+> Net: we are not starting over. We are building the open sandbox the engine always deserved, and folding the current app into it as the assessment mode.
 
 ---
 
-## 13. Open decisions (need your input, not blocking the PRD)
+## 12. Open decisions (owner input, non-blocking)
 
-1. **Product/brand name.** ✅ Decided: **EFO Skill Lab** (6 November 2026). The GitHub repo is still named `School-of-scammers` (a jab at the prior dev) — rename it in GitHub settings when convenient; it doesn't affect the product.
-2. **Second trade (Phase 4):** ✅ Decided — **CCTV install** (starter ladder ranks 1–5 shipped; ranks 6–10 planned). Electronics/BMS/phone-PC remain future trades.
-3. **Backend choice confirmation (Phase 5):** Supabase assumed — confirm when we get there.
-4. **Monetization model** (later): free lab + paid employer assessments? Per-seat? Not needed now, but it influences account design in Phase 5.
-
----
-
-## 14. Relationship to existing repo docs
-
-- **Superseded:** legacy PRD v2 and roadmap v2 → moved to `docs/product/archive/` (kept, not deleted).
-- **Still useful:** `docs/product/COMPETITOR_AND_MIT_REVIEW.md` (competitor benchmarks — Factory I/O, Controls Trainer, etc.), `docs/product/ARCHITECTURE.md` (to be updated to match this PRD), the QA protocols in `qa/`, and the license-provenance docs.
-- **To be archived/cleaned:** ~70 `*_INCREMENT_REPORT.md` files in the repo root — kept per your instruction, but moved into an archive folder so the repo root is legible. See the handover checklist.
+1. **2.5D-first vs full-3D-first for the plant.** Recommendation: 2.5D-first for the vertical slice (fast, approachable, Packet-Tracer-like), add targeted 3D in P3. (Factory I/O is full 3D; matching that from day one is far heavier.)
+2. **3D engine when we get there:** Three.js (already a dependency) vs Babylon.js. Recommendation: Three.js unless a Babylon feature is needed.
+3. **First editor:** Ladder first (most used in training), FBD later. Agree?
+4. **Scope of the P1 slice:** confirm "start/stop motor latch" as the first end-to-end scenario (smallest thing that exercises the whole §7 loop).
+5. **Relationship of the two products in the UI:** one app with a "Sandbox" home and an "Exercises/Assessment" section, or kept as separate entries? (Recommend one app, two entry modes.)
 
 ---
 
-*This PRD is a living document. It reflects the product owner's vision as of the reset and the four foundational decisions above. Changes go through the owner.*
+## 13. Assets
+
+Original component artwork is code-drawn SVG for 2.5D (a device-art library already exists at `src/ui/device-art.tsx`) and original glTF/low-poly models for 3D (to be produced). No proprietary vendor models, icons, or branding. Reference *photos* (for accuracy only, not shipping) of a PLC rack, wired 24V panel, conveyor sorter, and a control cabinet are welcome from the owner. Where any third-party asset or standard is used, provenance and licence are recorded (continue the repo's provenance discipline).
+
+---
+
+*This PRD is the current product direction. It reframes the platform as an open simulator with the exercise/assessment product as a mode on top. Changes go through the owner. Companion docs: `ARCHITECTURE.md` (how it's built) and the `automation-platform` skill (how to work in the repo).*
