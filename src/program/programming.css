@@ -65,3 +65,15 @@
   :root:not([data-theme="light"]) .sandbox-ux .sandbox-rung-execution { color:#a4f0c9; }
 }
 :root[data-theme="dark"] .sandbox-ux .sandbox-rung-execution { color:#a4f0c9; }
+
+/* P2 extended PLC debugger: explicit edge controls and read-only scan evidence. */
+.sandbox-breakpoint-fields { display:grid !important; grid-template-columns:1fr 1fr; gap:8px !important; }
+.sandbox-breakpoint-fields label { display:grid; gap:5px; min-width:0; font-size:11px; color:var(--muted); }
+.sandbox-breakpoint-fields select { width:100%; min-width:0; border:1px solid var(--line); border-radius:7px; background:var(--surface); color:var(--ink); padding:7px 6px; font:11px var(--body); }
+.sandbox-scan-history { display:grid; gap:9px; padding:12px 0 6px; border-top:1px solid var(--line); }
+.sandbox-scan-history h3 { font-size:14px; margin-top:4px; }
+.sandbox-scan-history-list { border:1px solid var(--line); border-radius:8px; overflow:auto; max-height:240px; }
+.sandbox-scan-history-list [role="row"] { display:grid; grid-template-columns:1fr 1fr 1.5fr; gap:8px; padding:6px 9px; border-bottom:1px solid var(--line); font:11px var(--mono); }
+.sandbox-scan-history-list [role="row"]:first-child { background:var(--surface-2); }
+.sandbox-scan-history-list [role="row"]:last-child { border-bottom:0; }
+@media(max-width:440px) { .sandbox-breakpoint-fields { grid-template-columns:1fr; } }
