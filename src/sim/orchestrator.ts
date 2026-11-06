@@ -5,6 +5,7 @@ import { executeLadder, type LadderDocument, type LadderResult } from '../engine
 import { executeStructuredText, type STResult, type STValue } from '../engineering/structured-text';
 import { compileSandboxST, DEFAULT_ST_SOURCE, validateSandboxProgram } from '../program/p2-contract';
 import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from '../program/scan-trace';
+import { feedPlant, freshPlant, stepPlant } from '../plant/sorting-conveyor';
 export { validateSandboxProgram } from '../program/p2-contract';
 import type { Command, PlacedComponent, ProjectFile, RenderSnapshot, SimEvent, WorldState } from './signals';
 
@@ -25,6 +26,19 @@ export const latchProgram = (): LadderDocument => ({
     ], coil: 'Run' },
   ],
 });
+/** P3 teachable sorting example: Run controls Q0.0, mark detector gates Q0.1. */
+export const sortingProgram = (): LadderDocument => ({
+  id: 'conveyor-sorting', version: '1.0', rungs: [
+    { id: 'belt-enable', elements: [
+      { type: 'contact', tag: 'StopOK' },
+      { type: 'branch', alternatives: [[{ type: 'contact', tag: 'Start' }],
+        [{ type: 'contact', tag: 'Run' }]] },
+    ], coil: 'Run' },
+    { id: 'sort-at-eye', elements: [
+      { type: 'contact', tag: 'Run' }, { type: 'contact', tag: 'Photoeye' },
+    ], coil: 'Sort' },
+  ],
+});
 export const newProject = (): ProjectFile => ({
   formatVersion: 1, components: [], wires: [], program: blankProgram(),
   language: 'ladder', stSource: DEFAULT_ST_SOURCE,
@@ -34,10 +48,11 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     project, running: false, tick: 0, coils: {}, ladderMemory: {}, ladderNumeric: {},
     stCompiled: project.language === 'st' ? compileSandboxST(project.stSource ?? '') : null,
     stMemory: {},
-    tagValues: { Start: false, StopOK: false, Run: false }, ladderSteps: [],
+    tagValues: { Start: false, StopOK: false, Photoeye: false, Run: false, Sort: false }, ladderSteps: [],
     breakpointScan: null, breakpointHit: null, breakpointTag: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
-    powered: false, inputs: { Start: false, StopOK: false },
+    plant: freshPlant(), conveyorOn: false, diverterOn: false,
+    powered: false, inputs: { Start: false, StopOK: false, Photoeye: false },
     voltages: {}, diagnostics: [], lastError: null,
   };
 }
@@ -106,14 +121,27 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): { wor
     else if (cmd.k === 'step') { world = { ...world, running: false }; forceStep = true; }
     else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
     else if (cmd.k === 'clear') world = createWorld();
-    else if (cmd.k === 'operate') {
+    else if (cmd.k === 'feedParcel') {
+      if (!world.project.components.some(c => c.kind === 'conveyor'))
+        world = setError(world, 'Place a conveyor before feeding a parcel');
+      else if (cmd.kind !== 'plain' && cmd.kind !== 'marked')
+        world = setError(world, 'Unknown parcel type');
+      else {
+        const fed = feedPlant(world.plant, cmd.kind);
+        world = { ...world, plant: fed.plant };
+        if (fed.events[0]?.includes('already') || fed.events[0]?.includes('limit'))
+          world = setError(world, fed.events[0]);
+      }
+    } else if (cmd.k === 'operate') {
       if (!world.project.components.some(c => c.id === cmd.id && (c.kind === 'start' || c.kind === 'stop'))) world = setError(world, 'Only pushbuttons can be operated');
       else world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, pressed: cmd.pressed } : c) } };
     } else if (!canEdit(world)) world = setError(world, 'Pause simulation before modifying the project');
     else if (cmd.k === 'place') {
       if (!validId(cmd.id) || !Object.hasOwn(COMPONENTS, cmd.kind) || !validPos(cmd.at) ||
           world.project.components.some(c => c.id === cmd.id) || world.project.components.length >= 40) world = setError(world, 'Invalid component placement');
-      else if ((cmd.kind === 'plc' || cmd.kind === 'supply') && world.project.components.some(c => c.kind === cmd.kind)) world = setError(world, 'P1 supports one PLC and one supply');
+      else if (['plc', 'supply', 'conveyor', 'photoeye', 'diverter'].includes(cmd.kind) &&
+        world.project.components.some(c => c.kind === cmd.kind))
+        world = setError(world, 'This educational workbench supports one of each station component');
       else world = { ...world, project: { ...world.project, components: [...world.project.components, { id: cmd.id, kind: cmd.kind, x: cmd.at.x, y: cmd.at.y, pressed: false }] } };
     } else if (cmd.k === 'move') {
       if (!validPos(cmd.to) || !world.project.components.some(c => c.id === cmd.id)) world = setError(world, 'Invalid movement');
@@ -172,22 +200,34 @@ function buildCircuit(world: WorldState): Device[] {
       id: c.id, kind: 'switch', a: terminal(c.id, 'A'), b: terminal(c.id, 'B'),
       closed: c.kind === 'start' ? c.pressed : !c.pressed,
     });
-    if (c.kind === 'plc') devices.push({ id: `${c.id}-Q`, kind: 'switch',
-      a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.0'), closed: world.coils.Run === true });
+    if (c.kind === 'plc') {
+      devices.push({ id: `${c.id}-Q`, kind: 'switch',
+        a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.0'), closed: world.coils.Run === true });
+      devices.push({ id: `${c.id}-Q1`, kind: 'switch',
+        a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.1'), closed: world.coils.Sort === true });
+    }
+    if (c.kind === 'photoeye') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
+      a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'), closed: world.plant.photoeyeActive });
     if (c.kind === 'contactor') {
       devices.push({ id: c.id, kind: 'load', positive: terminal(c.id, 'A1'), negative: terminal(c.id, 'A2'), nominalVolts: 24 });
       devices.push({ id: `${c.id}-NO`, kind: 'switch', a: terminal(c.id, '13'), b: terminal(c.id, '14'), closed: world.contactorOn });
     }
-    if (c.kind === 'motor') devices.push({ id: c.id, kind: 'load', positive: terminal(c.id, 'L+'), negative: terminal(c.id, 'M-'), nominalVolts: 24 });
+    if (c.kind === 'motor' || c.kind === 'conveyor') devices.push({ id: c.id, kind: 'load',
+      positive: terminal(c.id, 'L+'), negative: terminal(c.id, 'M-'), nominalVolts: 24 });
+    if (c.kind === 'diverter') devices.push({ id: c.id, kind: 'load',
+      positive: terminal(c.id, 'A1'), negative: terminal(c.id, 'A2'), nominalVolts: 24 });
   }
   return devices;
 }
 export function renderSnapshot(world: WorldState): RenderSnapshot {
   return { tick: world.tick, running: world.running, components: world.project.components.map(c => ({ ...c })),
     wires: world.project.wires.map(w => ({ ...w })),
-    io: { Start: world.inputs.Start, StopOK: world.inputs.StopOK, Run: world.coils.Run === true,
-      'Q0.0': world.coils.Run === true, PlcPowered: world.powered },
+    io: { Start: world.inputs.Start, StopOK: world.inputs.StopOK,
+      Photoeye: world.inputs.Photoeye, Run: world.coils.Run === true, Sort: world.coils.Sort === true,
+      'Q0.0': world.coils.Run === true, 'Q0.1': world.coils.Sort === true, PlcPowered: world.powered },
     voltages: { ...world.voltages }, contactorOn: world.contactorOn, motorOn: world.motorOn, motorAngleRad: world.motorAngleRad,
+    conveyorOn: world.conveyorOn, diverterOn: world.diverterOn,
+    plant: { ...world.plant, parcel: world.plant.parcel ? { ...world.plant.parcel } : null },
     diagnostics: [...world.diagnostics], lastError: world.lastError,
     language: world.project.language ?? 'ladder',
     tagValues: { ...world.tagValues }, ladderSteps: [...world.ladderSteps],
@@ -212,10 +252,15 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const plc = w.project.components.find(c => c.kind === 'plc');
   const powered = !!plc && !shorted && circuit.voltage[terminal(plc.id, 'L+')] === 24 &&
     circuit.voltage[terminal(plc.id, 'M')] === 0;
-  // 3. Snapshot the PLC inputs from actually wired terminals (not buttons directly).
+  // 3. Sample actual wired 24V input image, including powered mark photoeye.
+  // The photoeye's optical state was determined by the PRIOR plant scan.
+  const eye = w.project.components.find(c => c.kind === 'photoeye');
+  const eyePowered = !!eye && !shorted && circuit.voltage[terminal(eye.id, 'L+')] === 24 &&
+    circuit.voltage[terminal(eye.id, 'M')] === 0;
   const inputs = {
     Start: powered && circuit.voltage[terminal(plc!.id, 'I0.0')] === 24,
     StopOK: powered && circuit.voltage[terminal(plc!.id, 'I0.1')] === 24,
+    Photoeye: powered && eyePowered && circuit.voltage[terminal(plc!.id, 'I0.2')] === 24,
   };
   // 4. Execute the learner's exact document in the salvaged bounded LD or ST engine.
   let ladderResult: LadderResult | null = null;
@@ -234,9 +279,10 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     // Fail closed in the *simulated* plant. Do not publish stale energized outputs
     // after an arithmetic fault (overflow, division by zero, invalid typed write).
     const paused: WorldState = {
-      ...w, running: false, coils: { ...w.coils, Run: false },
-      tagValues: { ...w.tagValues, Run: false },
-      contactorOn: false, motorOn: false, voltages: {},
+      ...w, running: false, coils: { ...w.coils, Run: false, Sort: false },
+      tagValues: { ...w.tagValues, Run: false, Sort: false },
+      contactorOn: false, motorOn: false, conveyorOn: false, diverterOn: false,
+      plant: { ...w.plant, photoeyeActive: false }, voltages: {},
       diagnostics: [...w.diagnostics, 'PLC scan interrupted; simulated outputs deenergized'],
       lastError: `PLC runtime error: ${message}`,
     };
@@ -246,26 +292,36 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const stRun = stResult
     ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'run')?.[1]
     : undefined;
+  const stSort = stResult
+    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'sort')?.[1]
+    : undefined;
   // Structured Text is case-insensitive; the physical Q0.0 binding is always canonical "Run".
   const coils: Record<string, boolean> = stResult
     ? { ...Object.fromEntries(Object.entries(stResult.outputs).filter(([, value]) => typeof value === 'boolean')),
-        Run: stRun === true }
+        Run: stRun === true, Sort: stSort === true }
     : ladderResult?.outputs ?? {};
   const tagValues: Record<string, STValue> = {
     ...inputs, ...(stResult?.signals ?? {}), ...(ladderResult?.numericValues ?? {}), ...coils,
-    Run: coils.Run === true, Unused: false,
+    Run: coils.Run === true, Sort: coils.Sort === true, Unused: false,
   };
   // 5. Publish output image (Q0.0 follows coil Run, only when PLC is powered).
   // 6. Apply outputs to actuators via circuit on the NEXT tick; contactor coil is sampled here.
   const contactor = w.project.components.find(c => c.kind === 'contactor');
   const motor = w.project.components.find(c => c.kind === 'motor');
+  const conveyor = w.project.components.find(c => c.kind === 'conveyor');
+  const diverter = w.project.components.find(c => c.kind === 'diverter');
   const contactorOn = !!contactor && circuit.energizedLoads.includes(contactor.id);
   // 7. Advance P1 plant: ideal DC motor load, no fake animation or invented motion physics.
   const motorOn = !!motor && circuit.energizedLoads.includes(motor.id);
   // Idealized shaft indicator rotation comes from the authoritative simulation clock,
   // not requestAnimationFrame or visual-only animation. Speed is illustrative, not calibrated.
   const motorAngleRad = motorOn ? (w.motorAngleRad + dtMs * 0.02) % (2 * Math.PI) : w.motorAngleRad;
-  // 8. P1 has manually operated pushbuttons; their states are sampled in phase 2 next tick.
+  // P3 plant movement derives from the actual powered conveyor, never Run/3D animation.
+  const conveyorOn = !!conveyor && circuit.energizedLoads.includes(conveyor.id);
+  const diverterOn = !!diverter && circuit.energizedLoads.includes(diverter.id);
+  const nextPlant = stepPlant(w.plant, w.project.components, conveyorOn, diverterOn, dtMs);
+  for (const detail of nextPlant.events) events.push({ tick: w.tick + 1, kind: 'plant', detail });
+  // 8. Photoeye state from geometry is sampled by the circuit on NEXT scan.
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
   if (motorOn !== w.motorOn) events.push({ tick: w.tick + 1, kind: 'motor', detail: motorOn ? 'Motor running' : 'Motor stopped' });
@@ -289,6 +345,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     ladderSteps: [...(ladderResult?.steps ?? [])],
     stMemory: stResult?.memory ?? {},
     tagValues, powered, inputs, contactorOn, motorOn, motorAngleRad,
+    conveyorOn, diverterOn, plant: nextPlant.plant,
     voltages: circuit.voltage,
     diagnostics: [...circuit.diagnostics, ...(!powered && plc ? ['PLC is not powered (wire L+ and M to the 24V supply)'] : [])],
     breakpointHit,
