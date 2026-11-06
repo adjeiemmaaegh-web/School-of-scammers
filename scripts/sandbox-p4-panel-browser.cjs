@@ -77,8 +77,11 @@ const deviceStatus=(page,id,value)=>page.waitForFunction((id,value)=>
     await deviceStatus(page,'motor-8','STOPPED');
     assert.equal(await page.$eval('[data-lamp-status]',el=>el.textContent),'OFF');
 
-    // Remove short and reset the protection; prove full motor/lamp recovery.
+    // Wait for the authoritative Worker to publish PAUSED before editing wires.
+    // Running projects correctly disable the patch-panel remove button.
     await button(page,'Pause');
+    await page.waitForFunction(()=>[...document.querySelectorAll('.sandbox-toolbar button')]
+      .some(b=>b.textContent.trim()==='▶ Run'),{timeout:7000});
     const unwired=await page.evaluate(()=>{
       const row=[...document.querySelectorAll('.sandbox-wire-list > div')].find(el=>
         el.textContent.includes('breaker-2.OUT') && el.textContent.includes('supply-1.M0'));
