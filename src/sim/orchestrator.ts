@@ -41,7 +41,7 @@ export function validateSandboxProgram(program: LadderDocument): string[] {
 }
 export const newProject = (): ProjectFile => ({ formatVersion: 1, components: [], wires: [], program: blankProgram() });
 export function createWorld(project: ProjectFile = newProject()): WorldState {
-  return { project, running: false, tick: 0, coils: {}, ladderMemory: {}, contactorOn: false, motorOn: false,
+  return { project, running: false, tick: 0, coils: {}, ladderMemory: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
     powered: false, inputs: { Start: false, StopOK: false }, voltages: {}, diagnostics: [], lastError: null };
 }
 const terminal = (id: string, pin: string) => `${id}.${pin}`;
@@ -143,7 +143,7 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     wires: world.project.wires.map(w => ({ ...w })),
     io: { Start: world.inputs.Start, StopOK: world.inputs.StopOK, Run: world.coils.Run === true,
       'Q0.0': world.coils.Run === true, PlcPowered: world.powered },
-    voltages: { ...world.voltages }, contactorOn: world.contactorOn, motorOn: world.motorOn,
+    voltages: { ...world.voltages }, contactorOn: world.contactorOn, motorOn: world.motorOn, motorAngleRad: world.motorAngleRad,
     diagnostics: [...world.diagnostics], lastError: world.lastError };
 }
 /** Only this function owns the ten phases. Sensor state is sampled for the NEXT tick. */
@@ -176,11 +176,14 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const contactorOn = !!contactor && circuit.energizedLoads.includes(contactor.id);
   // 7. Advance P1 plant: ideal DC motor load, no fake animation or invented motion physics.
   const motorOn = !!motor && circuit.energizedLoads.includes(motor.id);
+  // Idealized shaft indicator rotation comes from the authoritative simulation clock,
+  // not requestAnimationFrame or visual-only animation. Speed is illustrative, not calibrated.
+  const motorAngleRad = motorOn ? (w.motorAngleRad + dtMs * 0.02) % (2 * Math.PI) : w.motorAngleRad;
   // 8. P1 has manually operated pushbuttons; their states are sampled in phase 2 next tick.
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
   if (motorOn !== w.motorOn) events.push({ tick: w.tick + 1, kind: 'motor', detail: motorOn ? 'Motor running' : 'Motor stopped' });
-  w = { ...w, tick: w.tick + 1, coils, ladderMemory: result?.memory ?? {}, powered, inputs, contactorOn, motorOn,
+  w = { ...w, tick: w.tick + 1, coils, ladderMemory: result?.memory ?? {}, powered, inputs, contactorOn, motorOn, motorAngleRad,
     voltages: circuit.voltage,
     diagnostics: [...circuit.diagnostics, ...(!powered && plc ? ['PLC is not powered (wire L+ and M to the 24V supply)'] : [])],
     running: change.forceStep ? false : w.running };
