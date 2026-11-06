@@ -35,7 +35,7 @@ const pairs = [
     await page.goto(baseUrl + '/sandbox', { waitUntil: 'networkidle0', timeout: 15000 });
     await page.waitForSelector('.sandbox-3d-shell');
     try {
-      await page.waitForFunction(() => !!document.querySelector('canvas.sandbox-three-canvas') ||
+      await page.waitForFunction(() => !!document.querySelector('.sandbox-three-canvas canvas') ||
         !!document.querySelector('.sandbox-3d-fallback'), { timeout: 15000 });
     } catch (error) {
       const state = await page.evaluate(() => {
@@ -49,7 +49,7 @@ const pairs = [
       throw error;
     }
     const renderer = await page.evaluate(() => {
-      const canvas = document.querySelector('canvas.sandbox-three-canvas');
+      const canvas = document.querySelector('.sandbox-three-canvas canvas');
       return { hasCanvas: !!canvas, width: canvas?.width ?? 0, height: canvas?.height ?? 0,
         fallback: document.querySelector('.sandbox-3d-fallback')?.textContent?.trim() ?? null };
     });
