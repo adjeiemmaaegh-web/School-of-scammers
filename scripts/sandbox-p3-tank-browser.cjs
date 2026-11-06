@@ -49,7 +49,7 @@ async function clickText(page, text) {
     await page.waitForFunction(()=>document.querySelector('[data-tank-high]')?.textContent==='HIGH',{timeout:16000});
     await page.waitForFunction(()=>document.querySelector('[data-tank-drain]')?.textContent==='OPEN',{timeout:10000});
     await page.waitForFunction(()=>document.querySelector('[data-tank-high]')?.textContent==='CLEAR',{timeout:10000});
-    const observedLevel=Number((await page.$eval('[data-tank-level]',e=>e.textContent)).replace(/\\D/g,''));
+    const observedLevel=Number((await page.$eval('[data-tank-level]',e=>e.textContent)).replace(/\D/g,''));
     assert.ok(observedLevel>0 && observedLevel<=1000,`Expected bounded water level, got ${observedLevel}`);
     await clickText(page,'Pause');
     await page.waitForFunction(()=>[...document.querySelectorAll('.sandbox-toolbar button')]
