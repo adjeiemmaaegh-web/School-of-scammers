@@ -28,7 +28,7 @@ jobs:
         run: |
           npm install --no-save --no-audit --no-fund puppeteer@24.31.0 axe-core@4.10.3
           npx puppeteer browsers install chrome
-      - name: Browser smoke - routes, machine control, meter, assessment and mobile
+      - name: Start local Vite preview for browser acceptance
         run: |
           npx vite preview --host 127.0.0.1 --port 4173 > /tmp/plc-vite-preview.log 2>&1 &
           for i in $(seq 1 40); do
@@ -36,9 +36,10 @@ jobs:
             sleep 1
           done
           curl --silent --fail http://127.0.0.1:4173/ > /dev/null
-          PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
       - name: Open sandbox P1 - place, wire, program, run and test failures
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-browser-acceptance.cjs
+      - name: Browser smoke - routes, machine control, meter, assessment and mobile
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
       - name: Offline deep-link and lazy-lab cache acceptance
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/offline-acceptance.cjs
       - name: Automated WCAG accessibility and keyboard skip-navigation audit
