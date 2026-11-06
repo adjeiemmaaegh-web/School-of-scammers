@@ -50,6 +50,14 @@ Evidence added: `tests/sandbox-p2-numeric.test.ts` exercises typed registers thr
 
 **Open:** physical analog mapping, more advanced PLC function blocks/typed addressing, physical low-spec Windows 3D/WebGL acceptance, owner product review and draft-PR dependency review. No backend, cloud, account service, payment, merge, or commercial release approval.
 
+## P3 3D plant and sorting continuation — November 2026 (REVIEW / NO-GO)
+
+The owner authorized moving from ongoing P2 development into P3 engineering without merging earlier drafts or claiming full P2 acceptance. New branch `engineering/p3-3d-conveyor-sorting`, draft PR **#17**, is based on P2 branch/PR #16 (itself stacked on UX PR #15 and P0/P1 PR #14). All remain **unmerged**, existing v3 exercises/employer assessment preserved, and **no backend**.
+
+Working P3 vertical slice: original low-poly Three.js 24V conveyor, powered mark photoeye and solenoid diverter with actual terminal wiring, 3D carton movement from worker state, manually fed marked/plain parcels, one station, geometry-aware sensor and downstream gate, I0.2 Photoeye and Q0.1 Sort PLC tags, editable Ladder sorting example and optional ST output. Sorted accepted/rejected counts and input/output states are worker-published; stop/power removal freezes parcels, wrong logic and wiring alter routing. `src/plant/sorting-conveyor.ts` owns pure fixed-step material handling and `src/sim/orchestrator.ts` remains the only ten-phase scan authority. No change to project `formatVersion:1`.
+
+QA: `tests/sandbox-p3-sorting.test.ts` includes marked/normal routes, wrong program, missing sensor and diverter wiring, misaligned geometry, broken conveyor supply, reset, snapshot isolation, legacy compatibility, ST path and determinism; `scripts/sandbox-p3-sorting-browser.cjs` actually wires 16 nets in Chrome, runs both parcel classes and alters user Ladder. See `docs/product/P3_PLANT_PROGRESS.md`. A source-code CI run passed the 574-unit suite, TypeScript and bundle build, retained P1/P2/UX integration, and the new P3 Chrome sorting E2E; **record final full GitHub Actions run IDs and any remaining Firefox/WebKit/Windows scopes before claiming all CI green**. Physical 8 GB/low-spec Windows 3D, real WebGL Edge, owner visual review, and full P3 equipment breadth (cylinders/valves/tank/pump, multi-parcel flow, realistic physics) remain **open**. Do not merge, deploy, monetize or describe this as Factory I/O parity without separate authorization.
+
 ## Earlier progress — v3 product (shipped, retained as the assessment layer)
 
 > **Status:** v3 is complete and live: two trades with full 1–10 ladders (PLC + CCTV = 20 playable exercises), two-audience shell, local employer→candidate assessment with evidence trail, device-art visuals, mobile-ready, branded "EFO Skill Lab". This is the assessment layer referenced above.
