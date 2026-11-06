@@ -220,11 +220,16 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     return { world: paused, snapshot: renderSnapshot(paused),
       events: [{ tick: w.tick, kind: 'error', detail: message }] };
   }
-  const coils = stResult
-    ? Object.fromEntries(Object.entries(stResult.outputs).filter(([, value]) => typeof value === 'boolean')) as Record<string, boolean>
+  const stRun = stResult
+    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'run')?.[1]
+    : undefined;
+  // Structured Text is case-insensitive; the physical Q0.0 binding is always canonical "Run".
+  const coils: Record<string, boolean> = stResult
+    ? { ...Object.fromEntries(Object.entries(stResult.outputs).filter(([, value]) => typeof value === 'boolean')),
+        Run: stRun === true }
     : ladderResult?.outputs ?? {};
   const tagValues: Record<string, STValue> = {
-    ...inputs, ...coils, ...(stResult?.signals ?? {}),
+    ...inputs, ...(stResult?.signals ?? {}), ...coils,
   };
   // 5. Publish output image (Q0.0 follows coil Run, only when PLC is powered).
   // 6. Apply outputs to actuators via circuit on the NEXT tick; contactor coil is sampled here.
