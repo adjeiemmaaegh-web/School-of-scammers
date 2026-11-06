@@ -3,6 +3,7 @@ import type { ProjectFile, RenderSnapshot } from '../sim/signals';
 import { LadderEditor } from './LadderEditor';
 import { StructuredTextEditor } from './StructuredTextEditor';
 import { DEFAULT_ST_SOURCE } from './p2-contract';
+import './programming.css';
 
 export function ProgrammingDock({ project, snapshot, disabled, onLadder, onST, onLanguage }: {
   project: ProjectFile; snapshot: RenderSnapshot; disabled: boolean;
