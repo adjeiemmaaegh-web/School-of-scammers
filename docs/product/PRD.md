@@ -263,7 +263,7 @@ You offered to get images — here's what will be needed, described. (Nothing bl
 ## 13. Open decisions (need your input, not blocking the PRD)
 
 1. **Product/brand name.** ✅ Decided: **EFO Skill Lab** (6 November 2026). The GitHub repo is still named `School-of-scammers` (a jab at the prior dev) — rename it in GitHub settings when convenient; it doesn't affect the product.
-2. **Second trade (Phase 4):** CCTV vs electronics first? (CCTV is visually compelling; electronics may reuse more of the existing electrical engine.)
+2. **Second trade (Phase 4):** ✅ Decided — **CCTV install** (starter ladder ranks 1–5 shipped; ranks 6–10 planned). Electronics/BMS/phone-PC remain future trades.
 3. **Backend choice confirmation (Phase 5):** Supabase assumed — confirm when we get there.
 4. **Monetization model** (later): free lab + paid employer assessments? Per-seat? Not needed now, but it influences account design in Phase 5.
 

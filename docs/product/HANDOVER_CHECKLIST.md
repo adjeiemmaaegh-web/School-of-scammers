@@ -98,10 +98,12 @@ The previous developer was let go. They delivered a real, well-tested **PLC simu
 - [x] Employer review of returned result (rubric + evidence)
 - [ ] Nice-to-have later: visual replay of the evidence timeline
 
-### Phase 4 — Second trade
-- [ ] Pick second trade (CCTV vs electronics — owner decision)
-- [ ] Implement as a trade module against the contract (no shell/engine forks)
-- [ ] Starter exercise ladder for it
+### Phase 4 — Second trade 🚧 (CCTV)
+- [x] Second trade chosen: **CCTV install** (owner decision)
+- [x] Implemented as a trade module against the contract — **no shell/engine forks** (`src/trades/cctv/`, registered in `registry.ts`)
+- [x] Starter ladder (ranks 1–5): camera coverage & aiming, cable & termination, IP addressing & NVR, PoE power budget, offline-fault diagnosis (seeded)
+- [x] Each verified headless (correct path → 100%); CCTV flipped from "coming soon" to available
+- [ ] Author CCTV ranks 6–10 (designed as planned rungs)
 
 ### Phase 5 — Backend & accounts
 - [ ] Confirm Supabase (or alternative)

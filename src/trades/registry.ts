@@ -11,10 +11,10 @@ import type {
   TradeModule,
 } from '../platform/types';
 import { plcModule } from './plc';
+import { cctvModule } from './cctv';
 
 /** Every trade shown in the picker — available first, then coming-soon. */
 const COMING_SOON: TradeMeta[] = [
-  { id: 'cctv', name: 'CCTV install', blurb: 'Plan coverage, run cable, terminate and commission IP cameras and recorders.', status: 'coming-soon' },
   { id: 'bms', name: 'BMS controls', blurb: 'Building management: controllers, sensors, actuators and control strategies.', status: 'coming-soon' },
   { id: 'phone-pc', name: 'Phone & PC repair', blurb: 'Diagnose and repair hardware and software faults on phones and computers.', status: 'coming-soon' },
   { id: 'electronics', name: 'Electronics', blurb: 'Build, measure and fault-find analog and digital electronic circuits.', status: 'coming-soon' },
@@ -22,6 +22,7 @@ const COMING_SOON: TradeMeta[] = [
 
 const MODULES: Record<string, TradeModule> = {
   [plcModule.meta.id]: plcModule,
+  [cctvModule.meta.id]: cctvModule,
 };
 
 export function allTrades(): TradeMeta[] {
