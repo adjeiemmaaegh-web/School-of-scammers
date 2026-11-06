@@ -26,6 +26,8 @@ const pairs = [
     }, text);
     assert.ok(found, `Expected control: ${text}`);
   };
+  const paused = () => page.waitForFunction(() =>
+    [...document.querySelectorAll('.sandbox-toolbar button')].some(b => b.textContent.trim() === '▶ Run' && !b.disabled));
   const motorIs = running => page.waitForFunction(expected =>
     document.querySelector('[data-device-id="motor-4"] .sandbox-device-status')?.textContent.trim() === expected,
     { timeout: 5000 }, running ? 'RUNNING' : 'STOPPED');
@@ -57,6 +59,7 @@ const pairs = [
     await motorIs(false);
 
     await clickText('Pause');
+    await paused();
     await clickText('Reset to one contact');
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-contact').length === 1);
     await page.click('[data-device-id="stop-6"] .sandbox-operate'); // Release stop.
@@ -67,6 +70,7 @@ const pairs = [
     await motorIs(false);
 
     await clickText('Pause');
+    await paused();
     await clickText('Load editable latch example');
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-contact').length === 3);
     const removed = await page.evaluate(() => {
