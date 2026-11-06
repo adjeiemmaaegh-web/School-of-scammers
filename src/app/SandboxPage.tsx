@@ -12,6 +12,7 @@ const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ def
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
 const CANVAS_W = 1080, CANVAS_H = 580, BOX_W = 170;
 const wireGuide = 'Supply P24 → PLC L+, START A, STOP A, contactor 13. Supply M0 → PLC M, contactor A2, motor M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → contactor A1; contactor 14 → motor L+.';
+const sortingWireGuide = 'For 3D sorting: supply P24 → PLC L+, START A, STOP A, contactor 13, photoeye L+. Supply M0 → PLC M, contactor A2, conveyor M-, photoeye M, diverter A2. START B → I0.0; STOP B → I0.1; PLC Q0.0 → contactor A1; contactor 14 → conveyor L+. Photoeye OUT → PLC I0.2; PLC Q0.1 → diverter A1. Load the sorting Ladder example, Run, press START, and feed marked or plain parcels. Photoeye and diverter must be positioned alongside the conveyor in sensor→diverter order.';
 export function SandboxPage() {
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
   const [project, setProject] = useState<ProjectFile | null>(null);
@@ -89,6 +90,19 @@ export function SandboxPage() {
     ];
     send(devices.map((d, i): Command => ({ k: 'place', id: `${d.kind}-${i + 1}`, kind: d.kind, at: { x: d.x, y: d.y } })));
   };
+  const layoutSorting = () => {
+    if (project?.components.length) return;
+    setMoveTarget(null);
+    const devices: { kind: ComponentKind; x: number; y: number }[] = [
+      { kind: 'supply', x: 25, y: 25 }, { kind: 'plc', x: 315, y: 25 },
+      { kind: 'contactor', x: 555, y: 25 }, { kind: 'conveyor', x: 610, y: 280 },
+      { kind: 'start', x: 60, y: 245 }, { kind: 'stop', x: 325, y: 245 },
+      { kind: 'photoeye', x: 690, y: 380 }, { kind: 'diverter', x: 750, y: 170 },
+    ];
+    send(devices.map((d, i): Command => ({
+      k: 'place', id: `${d.kind}-${i + 1}`, kind: d.kind, at: { x: d.x, y: d.y },
+    })));
+  };
   const exportProject = () => {
     if (!project) return;
     const file = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
@@ -134,7 +148,8 @@ export function SandboxPage() {
           <span className={`sandbox-work-status ${snapshot?.running ? 'is-running' : ''}`}>
             <i aria-hidden="true" />{snapshot?.running ? 'SIMULATION RUNNING' : 'EDIT MODE'}
           </span>
-          <strong>Untitled motor-control project</strong>
+          <strong>{project?.components.some(c => c.kind === 'conveyor') ?
+            'Untitled conveyor sorting project' : 'Untitled motor-control project'}</strong>
           <small>{localSave === 'saved' ? 'Saved in this browser' :
             localSave === 'failed' ? 'Not saved — export your JSON' : 'Loading local project'}</small>
         </div>
@@ -151,6 +166,8 @@ export function SandboxPage() {
       <div className="sandbox-toolbar">
         <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setActiveStage('build'); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
         <button className="btn ghost small" onClick={layout} disabled={!editable || !!project?.components.length}>Place starter layout</button>
+        <button className="btn ghost small" onClick={layoutSorting}
+          disabled={!editable || !!project?.components.length}>Place 3D sorting layout</button>
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
@@ -178,7 +195,9 @@ export function SandboxPage() {
               onClick={() => place(kind)} disabled={!editable}
               className="sandbox-palette-item">
               <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
-                {kind === 'plc' ? 'PLC' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
+                {kind === 'plc' ? 'PLC' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
+                  kind === 'conveyor' ? 'BELT' : kind === 'photoeye' ? 'EYE' :
+                  kind === 'diverter' ? 'DIV' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
               </span>
               <span><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
               <span className="sandbox-add-device" aria-hidden="true">+</span>
@@ -212,7 +231,10 @@ export function SandboxPage() {
             <div className="sandbox-device-list">
               {project?.components.map(c => {
                 const def = COMPONENTS[c.kind];
-                const live = c.kind === 'motor' ? snapshot?.motorOn : c.kind === 'contactor' ? snapshot?.contactorOn :
+                const live = c.kind === 'conveyor' ? snapshot?.conveyorOn :
+                  c.kind === 'photoeye' ? snapshot?.io.Photoeye :
+                  c.kind === 'diverter' ? snapshot?.diverterOn :
+                  c.kind === 'motor' ? snapshot?.motorOn : c.kind === 'contactor' ? snapshot?.contactorOn :
                   c.kind === 'plc' ? snapshot?.io.PlcPowered : c.kind === 'start' || c.kind === 'stop' ? c.pressed : false;
                 return <section className={`sandbox-device ${live ? 'active' : ''}`} key={c.id} data-device-id={c.id}>
                   <div className="sandbox-patch-head">
@@ -221,7 +243,10 @@ export function SandboxPage() {
                     <span className="sandbox-device-status">{c.kind === 'motor' ? (live ? 'RUNNING' : 'STOPPED') :
                       c.kind === 'contactor' ? (live ? 'COIL ON' : 'COIL OFF') :
                       c.kind === 'plc' ? (live ? 'POWER OK' : 'NO POWER') :
-                      c.kind === 'supply' ? '24V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</span>
+                      c.kind === 'conveyor' ? (live ? 'BELT MOVING' : 'BELT STOPPED') :
+                      c.kind === 'photoeye' ? (live ? 'MARK DETECTED' : 'NO MARK') :
+                      c.kind === 'diverter' ? (live ? 'REJECT ACTIVE' : 'PASS') :
+                      c.kind === 'supply' ? '24V DC' : c.pressed ? 'PRESSED' : 'RELEASED'</span>
                   </div>
                   <div className="sandbox-patch-actions">
                     {(c.kind === 'start' || c.kind === 'stop') && <button
@@ -247,19 +272,50 @@ export function SandboxPage() {
           </details>
           <div className="sandbox-status panel">
             <div><span className="eyebrow">Live I/O</span><div className="sandbox-lamps">
-              {(['Start', 'StopOK', 'Run', 'Q0.0', 'PlcPowered'] as const).map(k =>
+              {(['Start', 'StopOK', 'Photoeye', 'Run', 'Sort', 'Q0.0', 'Q0.1', 'PlcPowered'] as const).map(k =>
                 <span className={snapshot?.io[k] ? 'lit' : ''} key={k}><i />{k}</span>)}
               </div></div>
             <div><span className="eyebrow">Plant</span>
-              <p>Contactor: <strong>{snapshot?.contactorOn ? 'energised' : 'off'}</strong> · Motor: <strong>{snapshot?.motorOn ? 'running' : 'stopped'}</strong></p></div>
+              <p>Contactor: <strong>{snapshot?.contactorOn ? 'energised' : 'off'}</strong> · Motor: <strong>{snapshot?.motorOn ? 'running' : 'stopped'}</strong></p>
+              {project?.components.some(c => c.kind === 'conveyor') && <p>
+                Conveyor: <strong>{snapshot?.conveyorOn ? 'moving' : 'stopped'}</strong> ·
+                Mark eye: <strong>{snapshot?.io.Photoeye ? 'detected' : 'clear'}</strong> ·
+                Diverter: <strong>{snapshot?.diverterOn ? 'reject' : 'pass'}</strong></p>}</div>
           </div>
+          {project?.components.some(c => c.kind === 'conveyor') && snapshot && <section
+            className="sandbox-sorting-panel panel" aria-label="Conveyor sorting controls">
+            <div className="sandbox-section-head"><div>
+              <span className="eyebrow">P3 · material handling</span>
+              <h2>Conveyor sorting station</h2></div>
+              <span className="status-pill is-idle">Single lane · bounded teaching model</span></div>
+            <p className="sandbox-help">Feed one parcel at a time. Marked parcels activate the positioned optical detector;
+              plain parcels do not. Your wired Q0.1 diverter determines the actual route.</p>
+            <div className="sandbox-actions">
+              <button type="button" className="btn ghost small" disabled={!!snapshot.plant.parcel}
+                onClick={() => send([{ k:'feedParcel', kind:'marked' }])}>Feed marked parcel</button>
+              <button type="button" className="btn ghost small" disabled={!!snapshot.plant.parcel}
+                onClick={() => send([{ k:'feedParcel', kind:'plain' }])}>Feed plain parcel</button>
+            </div>
+            <div className="sandbox-sort-metrics" aria-live="off">
+              <span>Current: <strong>{snapshot.plant.parcel ?
+                `${snapshot.plant.parcel.kind} · ${Math.round(snapshot.plant.parcel.position * 100)}% · ${snapshot.plant.parcel.route}` :
+                'empty'}</strong></span>
+              <span>Accepted: <strong data-sort-accepted>{snapshot.plant.accepted}</strong></span>
+              <span>Rejected: <strong data-sort-rejected>{snapshot.plant.rejected}</strong></span>
+            </div>
+            <details><summary>Wiring and logic for the sorting exercise</summary>
+              <p className="sandbox-help">{sortingWireGuide}</p></details>
+          </section>}
         </div>
         <WorkbenchInspector project={project ?? { formatVersion: 1, components: [], wires: [], program: { id: 'pending', version: '1', rungs: [] } }}
           snapshot={snapshot ?? { tick: 0, running: false, components: [], wires: [],
-            io: { Start: false, StopOK: false, Run: false, 'Q0.0': false, PlcPowered: false },
+            io: { Start: false, StopOK: false, Photoeye: false, Run: false, Sort: false,
+              'Q0.0': false, 'Q0.1': false, PlcPowered: false },
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
+            conveyorOn: false, diverterOn: false,
+            plant: { parcel: null, lastParcelId: 0, photoeyeActive: false, accepted: 0, rejected: 0 },
             diagnostics: [], lastError: null, language: 'ladder',
-            tagValues: { Start: false, StopOK: false, Run: false },
+            tagValues: { Start: false, StopOK: false, Photoeye: false, Run: false, Sort: false },
             ladderSteps: [], ladderMemory: {}, breakpointScan: null, breakpointHit: null,
             breakpointTag: null, scanTrace: [] }}
           selectedDevice={selectedDevice} selectedTerminal={selectedTerminal} editable={editable}
@@ -281,7 +337,8 @@ export function SandboxPage() {
             onTagBreakpoint={breakpoint => send([{ k: 'breakOnTag', breakpoint }])} />}
           <span className="eyebrow">Diagnostics</span><h2>Electrical &amp; event trace</h2>
           <p className="sandbox-help">Click a wire's remove button to break a connection and observe what changes. All values come from the simulator.</p>
-          <details><summary>Example wiring map</summary><p>{wireGuide}</p></details>
+          <details><summary>Example wiring map</summary><p>{wireGuide}</p>
+            {project?.components.some(c => c.kind === 'conveyor') && <p>{sortingWireGuide}</p>}</details>
           <h3>Wires ({project?.wires.length ?? 0})</h3>
           <div className="sandbox-wire-list">{project?.wires.map(w =>
             <div key={w.id}><code>{w.from} → {w.to}</code>
@@ -297,7 +354,7 @@ export function SandboxPage() {
             <p className="sandbox-help">No changes recorded yet.</p>}</div>
         </aside>
       </div>
-      <p className="sandbox-disclaimer">Educational, simplified 24V DC simulation only. Not safety-rated or a substitute for commissioning. This P2 development preview uses real 3D equipment and wiring with bounded Ladder/ST PLC programming, up to eight rungs, real timer/counter scan memory and online monitoring. It does not model certified PLC hardware, industrial motor physics, full IEC languages or live machinery.</p>
+      <p className="sandbox-disclaimer">Educational, simplified 24V DC simulation only. Not safety-rated or a substitute for commissioning. This P3 preview adds a genuine worker-driven 3D conveyor, marked-parcel optical detector and wired diverter with deterministic material routing. The underlying Ladder/ST and 24V circuit models remain educational and bounded; no factory-grade mechanics, automatic object recognition, hardware PLC, certified safety, full IEC coverage or real machinery are claimed.</p>
     </main>
   </>;
 }
