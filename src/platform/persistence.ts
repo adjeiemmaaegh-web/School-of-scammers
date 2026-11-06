@@ -35,7 +35,7 @@ export function encodeAssignment(a: Assignment): string {
 
 export function decodeAssignment(s: string): Assignment {
   const a = decode<Assignment>(s.trim());
-  if (a?.kind !== 'skills-lab-assignment') throw new Error('Not a valid Skills Lab assignment.');
+  if (a?.kind !== 'skills-lab-assignment') throw new Error('Not a valid EFO Skill Lab assignment.');
   return a;
 }
 
@@ -45,7 +45,7 @@ export function encodeResult(r: AttemptResult): string {
 
 export function decodeResult(s: string): AttemptResult {
   const r = decode<AttemptResult>(s.trim());
-  if (r?.kind !== 'skills-lab-result') throw new Error('Not a valid Skills Lab result.');
+  if (r?.kind !== 'skills-lab-result') throw new Error('Not a valid EFO Skill Lab result.');
   return r;
 }
 

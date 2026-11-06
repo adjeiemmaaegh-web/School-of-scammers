@@ -1,4 +1,4 @@
-# Skills Lab — Architecture (v3)
+# EFO Skill Lab — Architecture (v3)
 
 > Matches PRD v3 (`docs/product/PRD.md`). Supersedes the v2 "frontend simulation" architecture, which was written for the previous PLC-only, simulation-first product. The v2 doc's layer diagram is preserved in git history.
 

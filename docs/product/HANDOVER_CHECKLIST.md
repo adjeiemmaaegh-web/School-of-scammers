@@ -115,7 +115,7 @@ The previous developer was let go. They delivered a real, well-tested **PLC simu
 ---
 
 ## 5. Open decisions awaiting owner (also in PRD §13)
-- [ ] **Product/brand name** (repo is `School-of-scammers`; app is "PLC Skills Lab" — needs a trade-agnostic name before Phase 1 UI ships)
+- [x] **Product/brand name** — **EFO Skill Lab** (decided 6 Nov 2026; threaded through the app via `src/platform/config.ts`)
 - [ ] Second trade for Phase 4 (CCTV vs electronics)
 - [ ] Backend choice confirmation (Supabase assumed)
 - [ ] Monetization model (later; affects Phase 5 account design)

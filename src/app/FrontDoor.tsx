@@ -245,7 +245,7 @@ export function FrontDoor() {
 
       <footer className="site-foot">
         <div className="wrap wrap-wide foot-inner">
-          <span>{BRAND.name} <span className="placeholder">working name — brand TBD</span></span>
+          <span>{BRAND.name}</span>
           <span>Virtual trade simulator &amp; practical assessment · Educational use</span>
         </div>
       </footer>

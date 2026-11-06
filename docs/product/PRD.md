@@ -1,6 +1,6 @@
-# Skills Lab — Product Requirements Document (v3)
+# EFO Skill Lab — Product Requirements Document (v3)
 
-> **Working title:** "Skills Lab" (final brand name is an open decision — see §13).
+> **Brand:** EFO Skill Lab (chosen 6 November 2026).
 > **Version:** 3.0 · **Date:** 6 November 2026 · **Status:** Active product direction. Supersedes the legacy "simulation-first" PRD v2, which is archived at `docs/product/archive/PRD_v2_simulation-first_LEGACY.md`.
 > **Owners:** Product owner (you) + engineering (Claude, taking over from the previous developer).
 
@@ -262,7 +262,7 @@ You offered to get images — here's what will be needed, described. (Nothing bl
 
 ## 13. Open decisions (need your input, not blocking the PRD)
 
-1. **Product/brand name.** The repo is `School-of-scammers` (a jab at the prior dev) and the app is "PLC Skills Lab." A multi-trade platform wants a broader name. *Proposal: pick a trade-agnostic name before Phase 1 ships UI.* Options can be brainstormed together.
+1. **Product/brand name.** ✅ Decided: **EFO Skill Lab** (6 November 2026). The GitHub repo is still named `School-of-scammers` (a jab at the prior dev) — rename it in GitHub settings when convenient; it doesn't affect the product.
 2. **Second trade (Phase 4):** CCTV vs electronics first? (CCTV is visually compelling; electronics may reuse more of the existing electrical engine.)
 3. **Backend choice confirmation (Phase 5):** Supabase assumed — confirm when we get there.
 4. **Monetization model** (later): free lab + paid employer assessments? Per-seat? Not needed now, but it influences account design in Phase 5.

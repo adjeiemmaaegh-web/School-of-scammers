@@ -1,8 +1,8 @@
-# Skills Lab
+# EFO Skill Lab
 
 **A browser-based virtual simulator and practical-assessment platform for the skilled trades — "Cisco Packet Tracer for the trades."** Learners build real hands-on skills in simulation; employers test candidates on realistic, job-like tasks instead of book knowledge. It launches with **PLC & industrial automation** and is architected to expand to CCTV, BMS, phone & PC repair, and electronics.
 
-> **Status:** active rebuild. The product was reset from the previous developer's PLC-only "simulation-first" codebase to the two-audience vision in [`docs/product/PRD.md`](docs/product/PRD.md). The deterministic simulation **engine was kept**; the product shell around it was rebuilt. `Skills Lab` is a working name — the brand is still an open decision.
+> **Status:** active rebuild. The product was reset from the previous developer's PLC-only "simulation-first" codebase to the two-audience vision in [`docs/product/PRD.md`](docs/product/PRD.md). The deterministic simulation **engine was kept**; the product shell around it was rebuilt.
 >
 > **This is an educational simulation.** It models the *categories* of trade work (programming, wiring, diagnosis, commissioning). It is **not** a safety-rated controller, not certified instruction, and not a substitute for live-work training. Limits are stated, not hidden.
 

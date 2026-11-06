@@ -1,10 +1,10 @@
 {
-  "name": "PLC Skills Lab — Virtual Industrial Automation",
-  "short_name": "PLC Skills Lab",
-  "description": "Offline-capable browser engineering simulations; educational and not safety rated.",
+  "name": "EFO Skill Lab — Virtual Trade Simulator & Assessment",
+  "short_name": "EFO Skill Lab",
+  "description": "Browser-based virtual simulator and practical assessment for the skilled trades; educational and not safety rated.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0b1220",
-  "theme_color": "#0b1220"
+  "background_color": "#16202e",
+  "theme_color": "#16202e"
 }
