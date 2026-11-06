@@ -13,7 +13,7 @@ After reviewing the shipped product against **Cisco Packet Tracer / GNS3** (the 
 
 **Status of the two products:**
 - **Shipped v3 (exercise ladders + employer assessment)** — *retained and live* at `plc-skills-lab.vercel.app`. Kept for the employer audience; becomes an **assessment *mode* on the sandbox** in roadmap phase **P6**. Its PRD is archived at `docs/product/archive/PRD_v3_exercise-assessment.md`. **Do not delete it.**
-- **New sandbox simulator (PRD v4)** — the primary direction; **P0/P1 first 3D slice is implemented on feature branch and awaits complete 3D-specific browser acceptance**. The salvaged engine (`src/core`, `src/engine`, `src/engineering`, 536 tests) is the foundation — see the PRD §11 salvage map.
+- **New sandbox simulator (PRD v4)** — the primary direction; **P0/P1 first 3D vertical slice implemented on feature branch, automated CI green; review and real hardware/browser-specific 3D acceptance remain open**. The salvaged engine (`src/core`, `src/engine`, `src/engineering`, 536 tests) is the foundation — see the PRD §11 salvage map.
 
 **New docs for co-developers (this session):**
 - `docs/product/PRD.md` (v4) · `docs/product/ARCHITECTURE.md` (v4) · `.claude/skills/automation-platform/SKILL.md` · root `CLAUDE.md`.
@@ -24,9 +24,13 @@ After reviewing the shipped product against **Cisco Packet Tracer / GNS3** (the 
 
 ---
 
-## Current P0/P1 implementation note (6 Nov 2026)
+## Current P0/P1 implementation and verification (6 November 2026)
 
-On the development branch only: `/sandbox` route and home CTA; drag/place real low-poly 3D components, terminal-to-terminal wiring, editable one-rung Ladder, worker tick orchestrator bridging the existing Ladder and bounded 24V electrical solvers, contactor/motor state feedback, local JSON import/export, and initial deterministic regression tests plus an automated browser end-to-end check in GitHub CI. Existing v3 exercises and local assessments are unchanged. **Prior P1 2.5D CI ran 541/541 tests and the end-to-end browser check successfully. New 3D changes require fresh typecheck, Vitest, 3D WebGL-capable browser acceptance, fallback and cross-browser checks.** No backend is planned or authorized.
+Development branch `feat/p0-p1-sandbox-foundation`; draft review PR #14. **Owner revised 2.5D-first to genuine interactive 3D from P1**. The public-facing sandbox is a real Three.js/React Three Fiber workbench with original low-poly 3D devices (supply, PLC, START/STOP, contactor, ideal DC motor), projected drag-to-place, 3D terminal hit targets, actual 3D cable geometry, camera orbit/pan/zoom, motor fan rotation derived from the authoritative scan clock, and an accessible browser-local patch panel/fallback. The saved project coordinate format remains compatible with the earlier JSON format. The deterministic PLC and 24V circuit computations still execute only in `src/sim/orchestrator.ts` (Web Worker); nothing about the renderer proves certified PLC or real machinery physics. Existing v3 guided exercises and employer assessments remain unchanged. No backend, account or cloud features were introduced.
+
+**Evidence for application code commit `07f10396b1b37e97c2804ed44f185ac4dea774b2`:** GitHub Actions Linux run `42275581892` passed all gates, including **544/544 Vitest tests**, semantic TypeScript, Vite production build, compressed bundle budget, real WebGL-backed Chrome sandbox test (3D palette drop, 3D terminal connection, user-editable Ladder latch, motor behavior, wrong logic, broken wire), retained engineering/assessment Chrome smoke, offline routes, WCAG-selected automated accessibility, no-WebGL/4× CPU-throttle fallback, Firefox legacy smoke and WebKit legacy smoke. Windows run `42275581656` passed compilation and Edge legacy smoke. **The Windows hosted Edge runner could not provide WebGL; a genuine 3D Edge test was NOT verified.** Firefox and WebKit tests covered the existing application, not full 3D workspace hardware acceptance. Real 8GB Windows devices, physically observed 3D interactions/low-end performance, and owner review are still unverified. A Vercel review preview is auto-generated for the feature branch; this is not production acceptance or merge authorization.
+
+**Release status:** REVIEW / NO-GO for merging to `main` until owner review and any required remaining real-device / graphics browser gates are resolved. Do not imply feature/accuracy parity with Factory I/O. Next practical task after P1 review is expanding the device library and PLC programming depth under the 3D-first roadmap, keeping all functionality frontend-only.
 
 ## Earlier progress — v3 product (shipped, retained as the assessment layer)
 
