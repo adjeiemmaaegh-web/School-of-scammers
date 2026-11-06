@@ -10,7 +10,7 @@ The Ladder editor supports up to eight sequential rungs, user-declared local BOO
 
 The Structured Text editor is an actual code editor with compilation feedback and a bounded ST parser/interpreter. A typed `Run : BOOL` output (or untyped case-insensitive `run`) controls the real, wired motor. The P1 Ladder program remains saved when ST mode is active; switching back requires deliberate user selection and resets runtime state. Saved `formatVersion:1` JSON is backward compatible with pre-P2 projects missing the optional `language` and `stSource` fields.
 
-Live monitoring displays worker-published PLC tags, timer/counter memory, and a one-shot future-scan breakpoint. The breakpoint pauses after the target simulated scan. No manual I/O overrides, PLC forces, certified electrical safety logic, or real PLC hardware communications are implemented.
+Live monitoring displays worker-published PLC tags, timer/counter memory, an exact future-scan breakpoint, and rising/falling/either-edge breakpoints on known Boolean PLC signals. Breakpoints pause after the relevant simulated scan. A bounded 300-scan worker-generated trace records sampled inputs, Run output, contactor/motor state and per-network instruction results; CSV export is local-only, escapes spreadsheet formulas, and does not claim full replay. No manual I/O overrides, PLC forces, certified electrical safety logic, or real PLC hardware communications are implemented.
 
 ## Key traceability files
 
@@ -18,13 +18,15 @@ Live monitoring displays worker-published PLC tags, timer/counter memory, and a 
 - `src/sim/orchestrator.ts`, `src/sim/signals.ts` — one authoritative Ladder/ST execution path, monitored memory, breakpoint.
 - `src/program/LadderEditor.tsx`, `StructuredTextEditor.tsx`, `ProgrammingDock.tsx`, `LiveMonitor.tsx`, `programming.css` — approved UX framework extensions.
 - `tests/sandbox-p2-programming.test.ts` — TON/CTU/real motor, ST latch and invalid program, breakpoints, legacy files, case-insensitive output.
-- `scripts/sandbox-p2-browser-acceptance.cjs` — actual browser place/wire/program/timer/ST/Run/breakpoint end-to-end, added to CI.
+- `scripts/sandbox-p2-browser-acceptance.cjs` — actual browser place/wire/program/timer/ST/Run/scan-and-edge-breakpoints/CTD configuration end-to-end, added to CI.
+- `src/program/scan-trace.ts` — pure bounded scan trace, edge validation, and safe CSV serialization.
+- `tests/sandbox-p2-debugger.test.ts` — wired CTD count-down, rising/falling edge debug, 300-record bound, snapshot isolation, CSV injection defenses and malformed tag rejection.
 
 ## Still open in the full P2 roadmap
 
 - Typed non-BOOL Ladder tag table; general analog/digital I/O allocation beyond current 24V two-input/one-output demonstration.
-- Full graphical instructions for comparators, MOVE, arithmetic, full counters, function blocks and all Ladder operations in the PRD; comprehensive IEC syntax coverage is **not** claimed.
-- More advanced breakpoints (rung/edge/tag/threshold), safe manual forces with explicit indicators, multi-task PLC scheduling and instruction trace export.
+- Full graphical instructions for comparators, MOVE, arithmetic, extended functions/blocks and all Ladder operations in the PRD; CTD is now editable, but comprehensive IEC syntax coverage is **not** claimed.
+- More advanced rung/timer/counter threshold breakpoints, safe manual input forces with explicit indicators, multi-task PLC scheduling and full replayable instruction-level trace export. Boolean tag-edge and bounded scan CSV are **implemented but not full replay**.
 - Broad verified ST debugging for complex typed programs, language syntax highlighting/autocomplete and unsupported construct guidance.
 - Full cross-browser 3D interactive acceptance and low-spec physical Windows/Edge WebGL testing.
 - Owner design/engineering approval, upstream PR dependency review, and explicit merge decision.
