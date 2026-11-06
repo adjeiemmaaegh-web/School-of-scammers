@@ -46,6 +46,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-numeric-browser.cjs
       - name: P3 3D sorting - powered conveyor, photoeye, diverter and wrong PLC logic
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-sorting-browser.cjs
+      - name: P3 3D tank - wired pump, high-level switch and drain valve browser E2E
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-tank-browser.cjs
       - name: Browser smoke - routes, machine control, meter, assessment and mobile
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
       - name: Offline deep-link and lazy-lab cache acceptance
