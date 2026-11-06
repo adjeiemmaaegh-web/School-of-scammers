@@ -86,7 +86,10 @@ describe('P2 real worker programming modes and scan-state contract', () => {
     let w = tick(build(), [{ k: 'loadST', source: DEFAULT_ST_SOURCE }]).world;
     expect(w.project.language).toBe('st');
     expect(w.project.stSource).toBe(DEFAULT_ST_SOURCE);
+    const compiledOnce = w.stCompiled;
+    expect(compiledOnce).toBeTruthy();
     w = tick(w, [{ k: 'operate', id: 'start', pressed: true }, { k: 'run' }]).world;
+    expect(w.stCompiled).toBe(compiledOnce);
     w = scan(w, 4);
     expect(w.coils.Run).toBe(true);
     expect(w.motorOn).toBe(true);
