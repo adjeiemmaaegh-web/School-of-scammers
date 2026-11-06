@@ -109,7 +109,7 @@ export function App() {
 
         {/* redirects from old top-level engine paths */}
         <Route path="/engineering" element={<Navigate to="/labs/engineering" replace />} />
-        <Route path="/simulation" element={<Navigate to="/labs/engineering" replace />} />
+        <Route path="/simulation" element={<Navigate to="/exercise/plc-conveyor-start" replace />} />
         <Route path="/assessments" element={<Navigate to="/labs/assessments" replace />} />
         <Route path="/process-control" element={<Navigate to="/labs/process-control" replace />} />
         <Route path="/starter-lab" element={<Navigate to="/labs/starter" replace />} />
