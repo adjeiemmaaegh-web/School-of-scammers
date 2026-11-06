@@ -27,7 +27,7 @@ const base = process.env.PLC_BASE_URL || 'http://127.0.0.1:4173';
     await search.focus();
     await search.evaluate(el => el.select());
     await page.keyboard.press('Backspace');
-    await page.waitForFunction(() => document.querySelectorAll('.sandbox-palette-item').length === 6);
+    await page.waitForFunction(() => document.querySelectorAll('.sandbox-palette-item').length === 9);
 
     const placed = await page.evaluate(() => {
       const button = [...document.querySelectorAll('.sandbox-toolbar button')].find(
