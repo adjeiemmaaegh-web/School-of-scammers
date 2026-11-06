@@ -83,7 +83,11 @@ function NotFound() {
 export function App() {
   return (
     <BrowserRouter>
-      <a className="skip-link" href="#main">Skip to main content</a>
+      <a className="skip-link" href="#main" onClick={() => {
+        // Main landmarks are not natively focusable; support keyboard skip navigation.
+        const main = document.getElementById('main');
+        if (main) { main.setAttribute('tabindex', '-1'); main.focus(); }
+      }}>Skip to main content</a>
       <Routes>
         <Route path="/" element={<FrontDoor />} />
         <Route path="/sandbox" element={<SandboxPage />} />
