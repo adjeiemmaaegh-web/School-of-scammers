@@ -310,7 +310,7 @@ export function SandboxPage() {
                       onClick={() => send([{k:'operateProtection',id:c.id,
                         action:live ? 'trip' : 'reset'}])}>
                       {live ? 'Trip (training)' : 'Reset protection'}</button>}
-                    <button type="button" className="sandbox-position" disabled={!editable>
+                    <button type="button" className="sandbox-position" disabled={!editable}
                       aria-label={`Move ${def.label} in 3D`}
                       onClick={() => { setMoveTarget(c.id); setSelectedDeviceId(c.id); }}>Move in 3D</button>
                   </div>
