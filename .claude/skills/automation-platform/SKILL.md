@@ -27,7 +27,12 @@ operating guide.
 4. **Run the user's real logic.** The PLC engine executes the user's compiled `ProgramIR` through a scan cycle. Never animate a canned result; never auto-correct a wrong program. Wrong logic/wiring → wrong behaviour, visibly.
 5. **Build on the salvaged engine, don't rewrite it.** `src/core/plc.ts`, `src/engineering/*`, `src/engine/*` are the execution/electrical/plant foundation (and 536 passing tests protect them). Extend them behind the new module seams.
 6. **Originality & honesty.** Original UI and component models; TIA Portal / Factory I/O / Packet Tracer are references, not sources — no proprietary assets/branding/claimed compatibility. Everything is an educational simulation, never safety-rated or certified; say so.
-7. **No doc churn.** The previous developer generated ~70 "increment report" files. Don't. Update the PRD/ARCHITECTURE/handover when direction changes; otherwise let code and tests speak.
+7. **No backend in current versions.** Do not add authentication, Supabase, APIs, cloud storage, SaaS infrastructure, accounts, payments or server dependencies. Browser-local projects and existing local assessment codes are sufficient unless the owner explicitly changes scope.
+8. **No doc churn.** The previous developer generated ~70 "increment report" files. Don't. Update the PRD/ARCHITECTURE/handover when direction changes; otherwise let code and tests speak.
+
+## Current P0/P1 implementation (not yet accepted)
+
+Owner-approved decisions: 2.5D-first, Ladder-first, and a start/stop contactor/motor vertical slice. Implemented files: `src/components/registry.ts`, `src/sim/{signals,orchestrator,worker}.ts`, `src/program/LadderEditor.tsx`, `src/app/SandboxPage.tsx`, and `tests/sandbox-integration.test.ts`. The P1 supported subset is one PLC, one supply, one Ladder rung, a bounded 24V ideal circuit, no real 3D/physics yet. It directly uses `engineering/ladder.ts` and `engineering/electrical.ts`; do not claim it already reaches commercial PLC/electrical fidelity. Keep current assessment routes working. Do not claim P0/P1 complete until full automated and browser evidence exists.
 
 ## Mental model (the layers)
 
