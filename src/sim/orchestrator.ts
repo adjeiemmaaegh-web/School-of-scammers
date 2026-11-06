@@ -4,6 +4,7 @@ import { solveDiscrete24V, type Device } from '../engineering/electrical';
 import { executeLadder, type LadderDocument, type LadderResult } from '../engineering/ladder';
 import { executeStructuredText, type STResult, type STValue } from '../engineering/structured-text';
 import { compileSandboxST, DEFAULT_ST_SOURCE, validateSandboxProgram } from '../program/p2-contract';
+import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from '../program/scan-trace';
 export { validateSandboxProgram } from '../program/p2-contract';
 import type { Command, PlacedComponent, ProjectFile, RenderSnapshot, SimEvent, WorldState } from './signals';
 
@@ -34,7 +35,7 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     stCompiled: project.language === 'st' ? compileSandboxST(project.stSource ?? '') : null,
     stMemory: {},
     tagValues: { Start: false, StopOK: false, Run: false }, ladderSteps: [],
-    breakpointScan: null, breakpointHit: null,
+    breakpointScan: null, breakpointHit: null, breakpointTag: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     powered: false, inputs: { Start: false, StopOK: false },
     voltages: {}, diagnostics: [], lastError: null,
@@ -103,7 +104,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): { wor
       } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Program validation failed'); }
     } else if (cmd.k === 'pause') world = { ...world, running: false };
     else if (cmd.k === 'step') { world = { ...world, running: false }; forceStep = true; }
-    else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan };
+    else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
     else if (cmd.k === 'clear') world = createWorld();
     else if (cmd.k === 'operate') {
       if (!world.project.components.some(c => c.id === cmd.id && (c.kind === 'start' || c.kind === 'stop'))) world = setError(world, 'Only pushbuttons can be operated');
@@ -148,6 +149,15 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): { wor
       if (cmd.scan !== null && (!Number.isSafeInteger(cmd.scan) || cmd.scan < 1 || cmd.scan > 1000000 || cmd.scan <= world.tick))
         world = setError(world, 'Choose a future scan from 1 to 1000000');
       else world = { ...world, breakpointScan: cmd.scan, breakpointHit: null };
+    } else if (cmd.k === 'breakOnTag') {
+      const tags = new Set([
+        'Start', 'StopOK', 'Run', ...Object.keys(world.project.program.symbols ?? {}),
+        ...world.project.program.rungs.map(rung => rung.coil),
+        ...Object.entries(world.tagValues).filter(([, value]) => typeof value === 'boolean').map(([tag]) => tag),
+      ]);
+      if (cmd.breakpoint !== null && !validateTagBreakpoint(cmd.breakpoint, tags))
+        world = setError(world, 'Tag breakpoint requires a known Boolean PLC tag and valid edge');
+      else world = { ...world, breakpointTag: cmd.breakpoint, breakpointHit: null };
     } else if (cmd.k === 'loadProject') {
       try { world = createWorld(validateProject(cmd.project)); } catch (e) { world = setError(world, e instanceof Error ? e.message : 'Invalid project'); }
     }
@@ -182,7 +192,10 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     language: world.project.language ?? 'ladder',
     tagValues: { ...world.tagValues }, ladderSteps: [...world.ladderSteps],
     ladderMemory: { ...world.ladderMemory },
-    breakpointScan: world.breakpointScan, breakpointHit: world.breakpointHit };
+    breakpointScan: world.breakpointScan, breakpointHit: world.breakpointHit,
+    breakpointTag: world.breakpointTag, scanTrace: world.scanTrace.map(entry => ({
+      ...entry, networks: entry.networks.map(network => ({ ...network })),
+    })) };
 }
 /** Only this function owns the ten phases. Sensor state is sampled for the NEXT tick. */
 export function tick(initial: WorldState, commands: readonly Command[] = [], dtMs = SCAN_MS):
@@ -232,6 +245,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     : ladderResult?.outputs ?? {};
   const tagValues: Record<string, STValue> = {
     ...inputs, ...(stResult?.signals ?? {}), ...coils,
+    Run: coils.Run === true, Unused: false,
   };
   // 5. Publish output image (Q0.0 follows coil Run, only when PLC is powered).
   // 6. Apply outputs to actuators via circuit on the NEXT tick; contactor coil is sampled here.
@@ -248,10 +262,20 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
   if (motorOn !== w.motorOn) events.push({ tick: w.tick + 1, kind: 'motor', detail: motorOn ? 'Motor running' : 'Motor stopped' });
   const nextTick = w.tick + 1;
-  const breakpointHit = w.breakpointScan === nextTick ? `Paused at scan ${nextTick}` : null;
+  const scanHit = w.breakpointScan === nextTick ? `Paused at scan ${nextTick}` : null;
+  const edgeHit = w.breakpointTag && tagEdge(w.tagValues[w.breakpointTag.tag],
+    tagValues[w.breakpointTag.tag], w.breakpointTag.edge)
+    ? `Paused at scan ${nextTick}: ${w.breakpointTag.tag} ${w.breakpointTag.edge} edge` : null;
+  const breakpointHit = scanHit ?? edgeHit;
   if (breakpointHit) events.push({ tick: nextTick, kind: 'breakpoint', detail: breakpointHit });
+  const trace = buildScanTrace({
+    scan: nextTick, simulatedMs: nextTick * dtMs, language: w.project.language ?? 'ladder',
+    start: inputs.Start, stopOK: inputs.StopOK, run: coils.Run === true,
+    plcPowered: powered, contactorOn, motorOn, ladderSteps: ladderResult?.steps ?? [],
+    breakpoint: breakpointHit,
+  });
   w = {
-    ...w, tick: nextTick, coils,
+    ...w, tick: nextTick, coils, scanTrace: appendScanTrace(w.scanTrace, trace),
     ladderMemory: ladderResult?.memory ?? {},
     ladderSteps: [...(ladderResult?.steps ?? [])],
     stMemory: stResult?.memory ?? {},
