@@ -136,6 +136,9 @@ describe('P4 electrical/panel: real 24V safety-isolation teaching model',()=>{
     expect(w.lastError).toMatch(/Invalid breaker/);
     w=tick(w,[{k:'setMeterProbe',lead:'positive',terminal:'missing.BAD'}]).world;
     expect(w.lastError).toMatch(/existing terminal/);
+    const malformed=tick(w,[{k:'setMeterProbe',lead:'positive',terminal:42} as unknown as Command]).world;
+    expect(malformed.lastError).toMatch(/existing terminal/);
+    expect(malformed.meter).toEqual(emptyMeter());
     expect(w.meter).toEqual(emptyMeter());
     const bad={...w.project,components:[...w.project.components,{
       id:'breaker-two',kind:'breaker',x:400,y:400,pressed:false,
