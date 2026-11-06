@@ -43,7 +43,7 @@ npm run build
 npm run verify:full
 ```
 
-The P1 regression tests are in `tests/sandbox-integration.test.ts`. The project must pass the full repository verification suite before merge or any production rollout. A real browser play-through of place → wire → edit → run → wrong wiring/logic must also be recorded. **Do not assume code presence equals acceptance.**
+The P1 unit regressions are in `tests/sandbox-integration.test.ts`. GitHub CI also runs `scripts/sandbox-browser-acceptance.cjs` to exercise the visual end-to-end path. The project must pass the full repository verification suite before merge or any production rollout. A real browser play-through of place → wire → edit → run → wrong wiring/logic must also be recorded. **Do not assume code presence equals acceptance.**
 
 ## Product documents
 
