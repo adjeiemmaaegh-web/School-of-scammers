@@ -176,8 +176,8 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       }
     } else if (cmd.k === 'setMeterProbe') {
       if ((cmd.lead !== 'positive' && cmd.lead !== 'negative') ||
-          (cmd.terminal !== null && (!terminalExists(cmd.terminal, world.project.components) ||
-            typeof cmd.terminal !== 'string')))
+          (cmd.terminal !== null && (typeof cmd.terminal !== 'string' ||
+            !terminalExists(cmd.terminal, world.project.components))))
         world = setError(world, 'Meter probe must attach to an existing terminal or be disconnected');
       else world = { ...world, meter: {
         ...world.meter, [cmd.lead]: cmd.terminal, volts: null, status: 'select',
