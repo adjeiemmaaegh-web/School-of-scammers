@@ -177,6 +177,8 @@ Rules that are non-negotiable:
 
 Each phase ends with something runnable end-to-end. The **vertical slice first** principle (one complete sandbox scenario working through the whole loop) beats building modules in isolation.
 
+**Owner-approved UX-first gate:** after the first P1 3D vertical slice, complete a dedicated UX/UI workbench design review **before starting P2 programming depth or P3 plant expansion**. The design blueprint lives at [UX_WORKBENCH_V1.md](UX_WORKBENCH_V1.md): project navigation, device library, 3D canvas, contextual inspector, wiring panel, programming dock, diagnostics, mobile and keyboard/no-WebGL states. The reviewable prototype does not imply owner acceptance or production readiness; existing engine and employer assessments are preserved.
+
 | Phase | Theme | Exit (runnable) |
 |---|---|---|
 | **P0 — Foundations & contracts** | Project model, signal/event interface, tick orchestrator skeleton, component & program IR contracts, engine-salvage audit, worker harness | Contracts documented; an empty workspace loads; the orchestrator ticks a trivial component wired to the salvaged scan engine |
