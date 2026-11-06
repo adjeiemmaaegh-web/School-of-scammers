@@ -72,3 +72,38 @@
 .sandbox-alert { margin-bottom:15px; color:var(--ink); }
 .sandbox-disclaimer { color:var(--muted); font-size:12px; line-height:1.55; margin-top:22px; }
 @media(max-width:850px){.sandbox-layout,.sandbox-bottom{grid-template-columns:1fr}.sandbox-palette{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.sandbox-palette h2,.sandbox-palette>.eyebrow,.sandbox-palette>.sandbox-help{flex-basis:100%}.sandbox-palette-item{max-width:170px;margin-top:0}.sandbox-title{align-items:start}.sandbox-header-links{gap:8px}}
+
+
+/* P1 3D-first workbench. Existing flat-canvas selectors above are dormant, retained for
+   comparison during review; the application no longer mounts the 2.5D canvas. */
+.sandbox-3d-shell { position:relative; width:100%; height:clamp(390px,57vw,620px); min-height:390px; overflow:hidden; border:1px solid var(--line); border-radius:var(--radius-lg); background:#0c1927; }
+.sandbox-three-canvas { width:100% !important; height:100% !important; display:block; touch-action:none; }
+.sandbox-3d-loading,.sandbox-3d-fallback { min-height:400px; padding:54px 24px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:#0c1927; color:#e6f0fa; text-align:center; }
+.sandbox-3d-fallback p { color:#c4d2df; max-width:46ch; font-size:13px; }
+.sandbox-3d-hud { position:absolute; bottom:12px; left:12px; right:12px; display:flex; justify-content:space-between; gap:14px; align-items:center; color:#dcecf9; font:11px var(--mono); pointer-events:none; text-shadow:0 1px 4px #000; }
+.sandbox-3d-hud span { background:#102538dc; border:1px solid #3b5670; padding:7px 10px; border-radius:6px; }
+.sandbox-3d-empty { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:14px 16px; margin-top:10px; background:var(--surface-2); border:1px dashed var(--line); border-radius:12px; font-size:13px; }
+.sandbox-3d-empty span { color:var(--muted); flex:1; min-width:220px; }
+.sandbox-3d-label { display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 9px; border-radius:8px; background:#071c2fee; border:1px solid #62819a; color:#f1f7fb; white-space:nowrap; font:12px var(--body); user-select:none; pointer-events:auto; box-shadow:0 4px 14px #0007; }
+.sandbox-3d-label strong { font-weight:700; }
+.sandbox-3d-label small { font:10px var(--mono); color:#a8ecda; }
+.sandbox-3d-label button { border:1px solid #b5cbdb; border-radius:5px; padding:3px 12px; cursor:pointer; background:#d8edf7; color:#0b2337; font-size:11px; font-weight:700; }
+.sandbox-3d-terminal { white-space:nowrap; background:#dbeefc; color:#112b3d; border:1px solid #537992; border-radius:4px; padding:2px 5px; cursor:crosshair; font:10px var(--mono); min-width:30px; }
+.sandbox-3d-terminal.selected { background:#ffb347; color:#201300; border-color:#ffdf9c; outline:2px solid #fff; }
+.sandbox-3d-terminal:disabled { opacity:.45; cursor:not-allowed; }
+.sandbox-patch { margin-top:12px; padding:14px; }
+.sandbox-patch > summary { cursor:pointer; font-weight:700; font-size:13px; }
+.sandbox-patch > .sandbox-help { margin-top:8px; }
+.sandbox-device-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(175px,1fr)); gap:9px; margin-top:12px; }
+.sandbox-patch .sandbox-device { position:static; width:100%; height:auto; min-height:unset; transform:none; padding:11px; border:1px solid var(--line); border-radius:9px; box-shadow:none; background:var(--surface-2); display:flex; flex-direction:column; align-items:stretch; justify-content:space-between; gap:8px; cursor:default; text-align:left; }
+.sandbox-patch .sandbox-device.active { border-color:var(--ok); box-shadow:inset 0 0 0 1px var(--ok); }
+.sandbox-patch-head { display:flex; align-items:start; flex-wrap:wrap; justify-content:space-between; gap:6px; }
+.sandbox-patch-head strong { font-size:12px; }
+.sandbox-patch-head .sandbox-device-status { font-size:10px; }
+.sandbox-patch-actions { display:flex; align-items:center; gap:6px; }
+.sandbox-position { border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--ink); padding:5px 7px; font-size:10px; cursor:pointer; }
+.sandbox-position:disabled { opacity:.5; cursor:not-allowed; }
+.sandbox-patch-terminals { display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
+.sandbox-patch .sandbox-terminal { position:static; inset:auto; transform:none; width:auto; height:auto; min-width:34px; display:inline-flex; justify-content:center; align-items:center; border-radius:5px; padding:5px 7px; font:10px var(--mono); }
+.sandbox-patch .sandbox-terminal.selected { outline:2px solid var(--accent); }
+@media(max-width:600px) { .sandbox-3d-shell { height:420px; } .sandbox-3d-hud { flex-direction:column; align-items:start; right:auto; } .sandbox-3d-empty span { min-width:0; } .sandbox-device-list { grid-template-columns:repeat(2,minmax(0,1fr)); } }
