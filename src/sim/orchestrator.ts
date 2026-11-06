@@ -251,11 +251,16 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
   return { tick: world.tick, running: world.running, components: world.project.components.map(c => ({ ...c })),
     wires: world.project.wires.map(w => ({ ...w })),
     io: { Start: world.inputs.Start, StopOK: world.inputs.StopOK,
-      Photoeye: world.inputs.Photoeye, Run: world.coils.Run === true, Sort: world.coils.Sort === true,
-      'Q0.0': world.coils.Run === true, 'Q0.1': world.coils.Sort === true, PlcPowered: world.powered },
+      Photoeye: world.inputs.Photoeye, TankHigh: world.inputs.TankHigh,
+      Run: world.coils.Run === true, Sort: world.coils.Sort === true,
+      Fill: world.coils.Fill === true, Drain: world.coils.Drain === true,
+      'Q0.0': world.coils.Run === true, 'Q0.1': world.coils.Sort === true,
+      'Q0.2': world.coils.Fill === true, 'Q0.3': world.coils.Drain === true,
+      PlcPowered: world.powered },
     voltages: { ...world.voltages }, contactorOn: world.contactorOn, motorOn: world.motorOn, motorAngleRad: world.motorAngleRad,
     conveyorOn: world.conveyorOn, diverterOn: world.diverterOn,
     plant: { ...world.plant, parcel: world.plant.parcel ? { ...world.plant.parcel } : null },
+    tank: { ...world.tank }, pumpOn: world.pumpOn, drainOn: world.drainOn,
     diagnostics: [...world.diagnostics], lastError: world.lastError,
     language: world.project.language ?? 'ladder',
     tagValues: { ...world.tagValues }, ladderSteps: [...world.ladderSteps],
@@ -285,10 +290,14 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const eye = w.project.components.find(c => c.kind === 'photoeye');
   const eyePowered = !!eye && !shorted && circuit.voltage[terminal(eye.id, 'L+')] === 24 &&
     circuit.voltage[terminal(eye.id, 'M')] === 0;
+  const probe = w.project.components.find(c => c.kind === 'levelprobe');
+  const probePowered = !!probe && !shorted && circuit.voltage[terminal(probe.id, 'L+')] === 24 &&
+    circuit.voltage[terminal(probe.id, 'M')] === 0;
   const inputs = {
     Start: powered && circuit.voltage[terminal(plc!.id, 'I0.0')] === 24,
     StopOK: powered && circuit.voltage[terminal(plc!.id, 'I0.1')] === 24,
     Photoeye: powered && eyePowered && circuit.voltage[terminal(plc!.id, 'I0.2')] === 24,
+    TankHigh: powered && probePowered && circuit.voltage[terminal(plc!.id, 'I0.3')] === 24,
   };
   // 4. Execute the learner's exact document in the salvaged bounded LD or ST engine.
   let ladderResult: LadderResult | null = null;
@@ -307,9 +316,10 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     // Fail closed in the *simulated* plant. Do not publish stale energized outputs
     // after an arithmetic fault (overflow, division by zero, invalid typed write).
     const paused: WorldState = {
-      ...w, running: false, coils: { ...w.coils, Run: false, Sort: false },
-      tagValues: { ...w.tagValues, Run: false, Sort: false },
+      ...w, running: false, coils: { ...w.coils, Run: false, Sort: false, Fill: false, Drain: false },
+      tagValues: { ...w.tagValues, Run: false, Sort: false, Fill: false, Drain: false },
       contactorOn: false, motorOn: false, conveyorOn: false, diverterOn: false,
+      pumpOn: false, drainOn: false,
       plant: { ...w.plant, photoeyeActive: false }, voltages: {},
       diagnostics: [...w.diagnostics, 'PLC scan interrupted; simulated outputs deenergized'],
       lastError: `PLC runtime error: ${message}`,
@@ -323,24 +333,34 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const stSort = stResult
     ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'sort')?.[1]
     : undefined;
-  if (stSort !== undefined && typeof stSort !== 'boolean') {
+  const stFill = stResult
+    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'fill')?.[1]
+    : undefined;
+  const stDrain = stResult
+    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'drain')?.[1]
+    : undefined;
+  if ((stSort !== undefined && typeof stSort !== 'boolean') ||
+      (stFill !== undefined && typeof stFill !== 'boolean') ||
+      (stDrain !== undefined && typeof stDrain !== 'boolean')) {
     const paused: WorldState = {
       ...w, running: false, coils: { ...w.coils, Run: false, Sort: false },
       tagValues: { ...w.tagValues, Run: false, Sort: false },
       motorOn: false, conveyorOn: false, diverterOn: false, contactorOn: false,
-      lastError: 'PLC Sort output must be BOOL',
+      pumpOn: false, drainOn: false,
+      lastError: 'PLC Sort/Fill/Drain outputs must be BOOL',
     };
     return { world: paused, snapshot: renderSnapshot(paused),
-      events: [{ tick: w.tick, kind: 'error', detail: 'PLC Sort output must be BOOL' }] };
+      events: [{ tick: w.tick, kind: 'error', detail: 'PLC Sort/Fill/Drain outputs must be BOOL' }] };
   }
   // Structured Text is case-insensitive; the physical Q0.0 binding is always canonical "Run".
   const coils: Record<string, boolean> = stResult
     ? { ...Object.fromEntries(Object.entries(stResult.outputs).filter(([, value]) => typeof value === 'boolean')),
-        Run: stRun === true, Sort: stSort === true }
+        Run: stRun === true, Sort: stSort === true, Fill: stFill === true, Drain: stDrain === true }
     : ladderResult?.outputs ?? {};
   const tagValues: Record<string, STValue> = {
     ...inputs, ...(stResult?.signals ?? {}), ...(ladderResult?.numericValues ?? {}), ...coils,
-    Run: coils.Run === true, Sort: coils.Sort === true, Unused: false,
+    Run: coils.Run === true, Sort: coils.Sort === true,
+    Fill: coils.Fill === true, Drain: coils.Drain === true, Unused: false,
   };
   // 5. Publish output image (Q0.0 follows coil Run, only when PLC is powered).
   // 6. Apply outputs to actuators via circuit on the NEXT tick; contactor coil is sampled here.
@@ -348,6 +368,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const motor = w.project.components.find(c => c.kind === 'motor');
   const conveyor = w.project.components.find(c => c.kind === 'conveyor');
   const diverter = w.project.components.find(c => c.kind === 'diverter');
+  const pump = w.project.components.find(c => c.kind === 'pump');
+  const drain = w.project.components.find(c => c.kind === 'drainvalve');
   const contactorOn = !!contactor && circuit.energizedLoads.includes(contactor.id);
   // 7. Advance P1 plant: ideal DC motor load, no fake animation or invented motion physics.
   const motorOn = !!motor && circuit.energizedLoads.includes(motor.id);
@@ -359,6 +381,10 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const diverterOn = !!diverter && circuit.energizedLoads.includes(diverter.id);
   const nextPlant = stepPlant(w.plant, w.project.components, conveyorOn, diverterOn, dtMs);
   for (const detail of nextPlant.events) events.push({ tick: w.tick + 1, kind: 'plant', detail });
+  const pumpOn = !!pump && circuit.energizedLoads.includes(pump.id);
+  const drainOn = !!drain && circuit.energizedLoads.includes(drain.id);
+  const nextTank = stepTank(w.tank, w.project.components, pumpOn, drainOn, dtMs);
+  for (const detail of nextTank.events) events.push({ tick: w.tick + 1, kind: 'tank', detail });
   // 8. Photoeye state from geometry is sampled by the circuit on NEXT scan.
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
@@ -384,6 +410,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     stMemory: stResult?.memory ?? {},
     tagValues, powered, inputs, contactorOn, motorOn, motorAngleRad,
     conveyorOn, diverterOn, plant: nextPlant.plant,
+    pumpOn, drainOn, tank: nextTank.tank,
     voltages: circuit.voltage,
     diagnostics: [...circuit.diagnostics, ...(!powered && plc ? ['PLC is not powered (wire L+ and M to the 24V supply)'] : [])],
     breakpointHit,
