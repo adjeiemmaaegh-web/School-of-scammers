@@ -85,11 +85,11 @@ The previous developer was let go. They delivered a real, well-tested **PLC simu
 - [x] Same exercise in **assessment** mode (hints off, evidence + rubric)
 - [x] Headless usability/interaction check passes (plays through to 100%)
 
-### Phase 2 — PLC 1–10 ladder 🚧
+### Phase 2 — PLC 1–10 ladder ✅
 - [x] Ladder progression UI as the main learner surface (`src/app/TradeLadder.tsx`)
-- [x] Rank 1 authored and playable
-- [x] Ranks 2–10 designed as planned rungs (titles/summaries in `src/trades/plc/index.ts`)
-- [ ] Author ranks 2–10 as fully playable exercises (follow the `conveyor-start.tsx` pattern)
+- [x] **All 10 ranks authored and playable** — conveyor start, motor seal-in, sensor wiring, timed run-on, batch counting, starter diagnosis (seeded), star–delta, tank level, sorter commissioning, factory acceptance (seeded capstone)
+- [x] Each exercise verified headless (correct path → 100% pass, no console errors)
+- [x] Covers distinct archetypes: operate/repair, ladder-build, wire/measure, timers, counters, diagnosis, sequencing/interlocks, process protection, commissioning, FAT
 
 ### Phase 3 — Local assessment flow ✅
 - [x] Employer: select exercise + label, generate assignment (`src/app/EmployerPage.tsx`)
