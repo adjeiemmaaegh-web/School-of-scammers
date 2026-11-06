@@ -4,7 +4,7 @@ import { compileStructuredText, type STProgram } from '../engineering/structured
 
 export const MAX_SANDBOX_RUNGS = 8;
 export const MAX_SANDBOX_SYMBOLS = 16;
-export const SANDBOX_INPUTS = ['Start', 'StopOK', 'Photoeye'] as const;
+export const SANDBOX_INPUTS = ['Start', 'StopOK', 'Photoeye', 'TankHigh'] as const;
 export const DEFAULT_ST_SOURCE = [
   'VAR_INPUT',
   '  Start : BOOL;',
@@ -16,7 +16,7 @@ export const DEFAULT_ST_SOURCE = [
   'Run := StopOK AND (Start OR Run);',
 ].join('\n');
 
-const builtIns = new Set(['Start', 'StopOK', 'Photoeye', 'Run', 'Sort', 'Unused']);
+const builtIns = new Set(['Start', 'StopOK', 'Photoeye', 'TankHigh', 'Run', 'Sort', 'Fill', 'Drain', 'Unused']);
 const safeTag = (tag: string) => /^[A-Za-z][A-Za-z0-9_.]{0,39}$/.test(tag) &&
   !['__proto__', 'constructor', 'prototype'].includes(tag.toLowerCase());
 
@@ -36,7 +36,7 @@ export function validateSandboxProgram(program: LadderDocument): string[] {
   const known = new Set([...builtIns, ...symbols, ...coils]);
   for (const [index, rung] of program.rungs.entries()) {
     if (rung.elements.length > 8 || rung.elements.length < 1) errors.push(`Rung ${index + 1} needs 1–8 series elements`);
-    if (!safeTag(rung.coil) || (rung.coil !== 'Run' && rung.coil !== 'Sort' && rung.coil !== 'Unused' && !symbols.includes(rung.coil)))
+    if (!safeTag(rung.coil) || (rung.coil !== 'Run' && rung.coil !== 'Sort' && rung.coil !== 'Fill' && rung.coil !== 'Drain' && rung.coil !== 'Unused' && !symbols.includes(rung.coil)))
       errors.push(`Rung ${index + 1}: declare local output tag ${rung.coil} before use`);
     if (numeric.has(rung.coil)) errors.push(`Rung ${index + 1}: numeric tag cannot be a BOOL output coil`);
     const operation = rung.operation;
@@ -81,14 +81,16 @@ export function compileSandboxST(source: string): STProgram {
     const inputs = compiled.declarations.filter(d => d.scope === 'input');
     for (const decl of inputs) {
       if (!SANDBOX_INPUTS.some(tag => tag.toLowerCase() === decl.name.toLowerCase()) || decl.type !== 'BOOL')
-        throw new SyntaxError(`Unsupported VAR_INPUT ${decl.name}; use BOOL Start, StopOK and Photoeye`);
+        throw new SyntaxError(`Unsupported VAR_INPUT ${decl.name}; use BOOL Start, StopOK, Photoeye and TankHigh`);
     }
     const run = compiled.declarations.find(d => d.name.toLowerCase() === 'run');
     if (!run || run.scope !== 'output' || run.type !== 'BOOL')
       throw new SyntaxError('Declare Run : BOOL inside VAR_OUTPUT to control the motor');
   }
-  const sort = compiled.declarations.find(d => d.name.toLowerCase() === 'sort');
-  if (sort && (sort.scope !== 'output' || sort.type !== 'BOOL'))
-    throw new SyntaxError('Declare optional Sort : BOOL inside VAR_OUTPUT');
+  for (const name of ['sort', 'fill', 'drain']) {
+    const output = compiled.declarations.find(d => d.name.toLowerCase() === name);
+    if (output && (output.scope !== 'output' || output.type !== 'BOOL'))
+      throw new SyntaxError(`Declare optional ${name} : BOOL inside VAR_OUTPUT`);
+  }
   return compiled;
 }
