@@ -34,7 +34,7 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad }: { kind: Compo
     <mesh position={[0, 0.17, 0]}><boxGeometry args={[0.9, 0.12, 0.68]} /><meshStandardMaterial color={COLORS.panel} /></mesh>
     <mesh position={[0, 0.9, 0.05]}><sphereGeometry args={[0.07, 10, 8]} /><meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.5} /></mesh>
     <group position={[0.90, 0.46, 0]} rotation={[motorAngleRad, 0, 0]}>
-      {[0, 1, 2].map(i => <mesh key={i} position={[0, 0.18, 0]} rotation={[i * Math.PI * 2 / 3, 0, 0]}>
+      {[0, 1, 2].map(i => <mesh key={i} position={[0, Math.cos(i * Math.PI * 2 / 3) * 0.18, Math.sin(i * Math.PI * 2 / 3) * 0.18]} rotation={[i * Math.PI * 2 / 3, 0, 0]}>
         <boxGeometry args={[0.04, 0.26, 0.1]} />
         <meshStandardMaterial color={COLORS.light} metalness={0.55} />
       </mesh>)}
