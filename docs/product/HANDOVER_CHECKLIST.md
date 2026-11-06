@@ -13,16 +13,20 @@ After reviewing the shipped product against **Cisco Packet Tracer / GNS3** (the 
 
 **Status of the two products:**
 - **Shipped v3 (exercise ladders + employer assessment)** — *retained and live* at `plc-skills-lab.vercel.app`. Kept for the employer audience; becomes an **assessment *mode* on the sandbox** in roadmap phase **P6**. Its PRD is archived at `docs/product/archive/PRD_v3_exercise-assessment.md`. **Do not delete it.**
-- **New sandbox simulator (PRD v4)** — the primary direction; **not built yet** (this entry documents the plan). The salvaged engine (`src/core`, `src/engine`, `src/engineering`, 536 tests) is the foundation — see the PRD §11 salvage map.
+- **New sandbox simulator (PRD v4)** — the primary direction; **P0/P1 first slice is implemented on feature branch and awaits full automated/browser verification**. The salvaged engine (`src/core`, `src/engine`, `src/engineering`, 536 tests) is the foundation — see the PRD §11 salvage map.
 
 **New docs for co-developers (this session):**
 - `docs/product/PRD.md` (v4) · `docs/product/ARCHITECTURE.md` (v4) · `.claude/skills/automation-platform/SKILL.md` · root `CLAUDE.md`.
 
 **v4 roadmap (runnable each phase):** P0 foundations & contracts → **P1 first vertical slice (start/stop motor: place→wire→program→Run through the full tick loop)** → P2 programming depth → P3 plant & devices → P4 electrical & panel → P5 faults & diagnostics → P6 learning/assessment on the sandbox (re-host v3) → P7+ realism (FBD, PLCopen, Modbus/external runtime, HIL).
 
-**Next action:** owner to review PRD/ARCHITECTURE/SKILL and confirm the open decisions in PRD §12 (2.5D-first, Ladder-first, the P1 slice), then P0/P1 build begins.
+**Owner decisions confirmed (6 Nov 2026):** 2.5D-first, Ladder-first, and start/stop motor latch first. The owner explicitly excludes backend work for these versions. P0/P1 code lives on `feat/p0-p1-sandbox-foundation`; it is not merged, accepted, or deployed. Next: run `npm run verify:full` and a real browser play-through on the branch, inspect failures, then review before merging.
 
 ---
+
+## Current P0/P1 implementation note (6 Nov 2026)
+
+On the development branch only: `/sandbox` route and home CTA; drag/place 2.5D components, terminal-to-terminal wiring, editable one-rung Ladder, worker tick orchestrator bridging the existing Ladder and bounded 24V electrical solvers, contactor/motor state feedback, local JSON import/export, and initial deterministic regression tests. Existing v3 exercises and local assessments are unchanged. **Current chat environment could not run the full npm/Vitest/browser suite against the repository; all verification and acceptance gates remain OPEN until logs and actual browser evidence are available.** No backend is planned or authorized.
 
 ## Earlier progress — v3 product (shipped, retained as the assessment layer)
 
@@ -134,10 +138,8 @@ The previous developer was let go. They delivered a real, well-tested **PLC simu
 - [x] Applied to the flagship PLC conveyor scene and the CCTV cable/IP/night/storage/coverage scenes so they read as real equipment
 - [x] Note: these are code-drawn SVG assets (no external images needed). Photographic device art per PRD §12 remains optional and owner-sourced if ever wanted.
 
-### Phase 5 — Backend & accounts
-- [ ] Confirm Supabase (or alternative)
-- [ ] Auth + employer/candidate accounts
-- [ ] Online assignment + stored results behind the existing persistence interface
+### Historical v3 Phase 5 — Backend & accounts (SUPERSEDED / OUT OF SCOPE)
+- [ ] **Do not build** Supabase, authentication, employer accounts, cloud result storage, or server infrastructure in the current frontend-only versions. These were historical v3 plans; new owner approval would be required.
 
 ### Phase 6+ — Scale
 - [ ] Remaining trades (BMS, phone/PC, …)
@@ -148,8 +150,8 @@ The previous developer was let go. They delivered a real, well-tested **PLC simu
 ## 5. Open decisions awaiting owner (also in PRD §13)
 - [x] **Product/brand name** — **EFO Skill Lab** (decided 6 Nov 2026; threaded through the app via `src/platform/config.ts`)
 - [ ] Second trade for Phase 4 (CCTV vs electronics)
-- [ ] Backend choice confirmation (Supabase assumed)
-- [ ] Monetization model (later; affects Phase 5 account design)
+- [x] No backend for current versions (owner decision, 6 Nov 2026)
+- [ ] Monetization, if ever considered, requires a separate owner decision; no payments/paywalls now.
 
 ---
 
