@@ -137,6 +137,11 @@ body::before {
 .picker-go { color: var(--accent); font-weight: 600; font-size: 14px; }
 @media (max-width: 860px) { .picker-grid { grid-template-columns: 1fr; } }
 
+.ladder-progress { display: flex; align-items: center; gap: 14px; margin-top: 20px; max-width: 460px; }
+.ladder-progress-bar { flex: 1; height: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.ladder-progress-bar span { display: block; height: 100%; background: var(--ok); border-radius: 999px; transition: width 0.3s ease; }
+.ladder-progress > span { font-family: var(--mono); font-size: 13px; color: var(--muted); white-space: nowrap; }
+
 /* ---- trade ladder list ---- */
 .ladder-list { list-style: none; padding: 0; margin: 30px 0 0; display: flex; flex-direction: column; gap: 12px; }
 .ladder-item { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }

@@ -34,6 +34,17 @@ export function TradeLadder() {
         <span className="eyebrow">{trade.meta.name} · 1–10 ladder</span>
         <h1 className="page-title">Climb the ladder, rung by rung</h1>
         <p className="sub">{trade.meta.blurb} Each rung is a self-contained, realistic task. Difficulty rises from entry to expert.</p>
+        {(() => {
+          const playable = ladder.filter((r) => r.status === 'playable');
+          const passed = playable.filter((r) => r.def && progress[r.def.id]?.passed).length;
+          if (playable.length === 0) return null;
+          return (
+            <div className="ladder-progress" aria-label={`${passed} of ${playable.length} exercises passed`}>
+              <div className="ladder-progress-bar"><span style={{ width: `${(passed / playable.length) * 100}%` }} /></div>
+              <span className="tabular">{passed} / {playable.length} passed</span>
+            </div>
+          );
+        })()}
 
         <ol className="ladder-list">
           {ladder.map((rung) => {

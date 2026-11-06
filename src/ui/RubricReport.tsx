@@ -23,7 +23,7 @@ export function RubricReport({
   const state = rubric.safetyHold ? 'crit' : rubric.passed ? 'ok' : 'warn';
 
   return (
-    <div className={`result-panel ${state}`}>
+    <div className={`result-panel ${state}`} role="status" aria-live="polite">
       <div className="result-head">
         <div>
           <span className="panel-eyebrow">{mode === 'assessment' ? 'Assessment result' : 'Practice result'}</span>
