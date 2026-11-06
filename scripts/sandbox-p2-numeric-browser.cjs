@@ -82,7 +82,9 @@ async function setNativeInput(page,selector,value) {
     // Alter the comparator: a threshold of 1000 must suppress the motor, not simply redraw its model.
     await setNativeInput(page,`${compare} input[aria-label="Right operand constant"]`,'1000');
     await clickText(page,'▶ Run');
-    await page.waitForFunction(()=>document.querySelector('.sandbox-scan')?.textContent.trim()==='Scan 8',{timeout:8000}).catch(()=>{});
+    await page.waitForFunction(() =>
+      Number(document.querySelector('.sandbox-scan')?.textContent.replace(/\\D/g,'')) >= 8,
+      { timeout: 7000 });
     await page.waitForFunction(()=>document.querySelector('[data-device-id="motor-4"] .sandbox-device-status')?.textContent==='STOPPED',{timeout:7000});
     assert.deepEqual(errors,[]);
     console.log('P2 NUMERIC BROWSER PASS: editable INT/ADD/COMPARE directly governs wired 3D motor');
