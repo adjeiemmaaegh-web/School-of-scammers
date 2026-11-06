@@ -46,7 +46,8 @@ describe('P3 live 3D material flow through wired PLC and physical I/O',()=>{
     expect(w.conveyorOn).toBe(true);
     expect(w.motorOn).toBe(false); // P1 24V motor is optional; conveyor is a separate load
     w=feed(w,'marked');
-    expect(w.plant.parcel?.position).toBe(0);
+    // Feeding during Run also processes this fixed 50ms worker scan.
+    expect(w.plant.parcel?.position).toBe(0.032);
     let sawEye=false,sawGate=false,sawReject=false;
     for(let i=0;i<60;i++) {
       const update=tick(w);w=update.world;
@@ -120,7 +121,7 @@ describe('P3 live 3D material flow through wired PLC and physical I/O',()=>{
     let w=feed(release(start(make())),'marked');
     const snap=renderSnapshot(w);
     snap.plant.parcel!.position=99;
-    expect(w.plant.parcel?.position).toBe(0);
+    expect(w.plant.parcel?.position).toBe(0.032);
     w=scans(w,45);
     expect(w.plant.rejected).toBe(1);
     w=tick(w,[{k:'reset'}]).world;
