@@ -131,7 +131,8 @@ const pairs = [
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-wire-list > div').length === 10);
     await page.click('[data-device-id="start-5"] .sandbox-operate');
     await clickText('▶ Run');
-    await page.waitForFunction(() => document.querySelector('.sandbox-lamps span:nth-child(3)')?.classList.contains('lit'));
+    await page.waitForFunction(() => [...document.querySelectorAll('.sandbox-lamps span')]
+      .some(element => element.textContent.trim() === 'Run' && element.classList.contains('lit')));
     const motorStatus = await page.$eval('[data-device-id="motor-4"] .sandbox-device-status', e => e.textContent.trim());
     assert.equal(motorStatus, 'STOPPED', 'The motor must not run with disconnected PLC output wiring');
     assert.deepEqual(errors, [], 'Browser console/page errors');
