@@ -17,7 +17,7 @@ export type ScanTrace = {
   plcPowered: boolean;
   contactorOn: boolean;
   motorOn: boolean;
-  networks: { rung: string; instruction: string; result: boolean; elapsedMs?: number; count?: number }[];
+  networks: { rung: string; instruction: string; result: boolean; elapsedMs?: number; count?: number; numericResult?: number }[];
   breakpoint: string | null;
 };
 export const MAX_SCAN_TRACE = 300;
@@ -48,6 +48,7 @@ export function buildScanTrace(input: {
       rung: step.rungId, instruction: step.operation, result: step.result,
       ...(step.elapsedMs === undefined ? {} : { elapsedMs: step.elapsedMs }),
       ...(step.count === undefined ? {} : { count: step.count }),
+      ...(step.numericResult === undefined ? {} : { numericResult: step.numericResult }),
     })),
     breakpoint: input.breakpoint,
   };
