@@ -19,7 +19,7 @@ const COLORS = {
   live: '#20d6a6', off: '#52677c', highlight: '#ffa633', cable: '#7793ad',
 };
 
-function DeviceSculpture({ kind, active, pressed }: { kind: ComponentKind; active: boolean; pressed: boolean }) {
+function DeviceSculpture({ kind, active, pressed, motorAngleRad }: { kind: ComponentKind; active: boolean; pressed: boolean; motorAngleRad: number }) {
   const status = active ? COLORS.live : COLORS.off;
   if (kind === 'motor') return <group>
     <mesh position={[0, 0.46, 0]} rotation={[0, 0, Math.PI / 2]}>
@@ -33,6 +33,12 @@ function DeviceSculpture({ kind, active, pressed }: { kind: ComponentKind; activ
     </mesh>
     <mesh position={[0, 0.17, 0]}><boxGeometry args={[0.9, 0.12, 0.68]} /><meshStandardMaterial color={COLORS.panel} /></mesh>
     <mesh position={[0, 0.9, 0.05]}><sphereGeometry args={[0.07, 10, 8]} /><meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.5} /></mesh>
+    <group position={[0.90, 0.46, 0]} rotation={[motorAngleRad, 0, 0]}>
+      {[0, 1, 2].map(i => <mesh key={i} position={[0, 0.18, 0]} rotation={[i * Math.PI * 2 / 3, 0, 0]}>
+        <boxGeometry args={[0.04, 0.26, 0.1]} />
+        <meshStandardMaterial color={COLORS.light} metalness={0.55} />
+      </mesh>)}
+    </group>
   </group>;
   if (kind === 'start' || kind === 'stop') return <group>
     <mesh position={[0, 0.22, 0]}><boxGeometry args={[0.86, 0.38, 0.76]} /><meshStandardMaterial color={COLORS.chassis} metalness={0.2} /></mesh>
@@ -65,8 +71,8 @@ function DeviceSculpture({ kind, active, pressed }: { kind: ComponentKind; activ
   </group>;
 }
 
-function Device3D({ c, active, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
-  c: PlacedComponent; active: boolean; editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
+function Device3D({ c, active, motorAngleRad, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
+  c: PlacedComponent; active: boolean; motorAngleRad: number; editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string, pressed: boolean) => void; onSelect: (id: string) => void;
 }) {
   const [x, y, z] = worldPosition(c);
@@ -77,7 +83,7 @@ function Device3D({ c, active, editable, selectedTerminal, moveTarget, onTermina
       <meshStandardMaterial color={moveTarget === c.id ? COLORS.highlight : COLORS.panel} />
     </mesh>
     <group onClick={e => { e.stopPropagation(); onSelect(c.id); }}>
-      <DeviceSculpture kind={c.kind} active={active} pressed={c.pressed} />
+      <DeviceSculpture kind={c.kind} active={active} pressed={c.pressed} motorAngleRad={motorAngleRad} />
     </group>
     <Html position={[0, 1.22, 0]} center distanceFactor={11}>
       <div className="sandbox-3d-label">
@@ -152,7 +158,7 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
       fadeDistance={35} infiniteGrid={false} />
     {project.wires.map(w => <Cable3D key={w.id} project={project} from={w.from} to={w.to}
       live={snapshot.voltages[w.from] === 24 && snapshot.voltages[w.to] === 24} />)}
-    {project.components.map(c => <Device3D key={c.id} c={c} editable={editable}
+    {project.components.map(c => <Device3D key={c.id} c={c} editable={editable} motorAngleRad={snapshot.motorAngleRad}
       selectedTerminal={selectedTerminal} moveTarget={moveTarget}
       active={c.kind === 'motor' ? snapshot.motorOn : c.kind === 'contactor' ? snapshot.contactorOn :
         c.kind === 'plc' ? snapshot.io.PlcPowered : c.kind === 'start' || c.kind === 'stop' ? c.pressed : false}
