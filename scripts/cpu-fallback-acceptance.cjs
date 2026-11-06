@@ -22,7 +22,7 @@ async function run(){
   await page.goto(base+'/',{waitUntil:'networkidle2',timeout:45000});
   await page.waitForSelector('h1');
   const loaded=await page.evaluate(()=>performance.getEntriesByType('resource').map(e=>e.name));
-  assert.ok(!loaded.some(u=>/OrbitControls-[\w-]+\.js/.test(u)),'3D renderer must not load on landing page');
+  assert.ok(!loaded.some(u=>/(?:OrbitControls|SceneShell|Sandbox3D)-[\w-]+\.js/.test(u)),'3D renderer must not load on landing page');
   console.log('LOW-SPEC LANDING PASS: 3D code lazy-loaded, CPU throttling enabled');
   await page.goto(base+'/workcell-composer',{waitUntil:'domcontentloaded',timeout:45000});
   await page.waitForSelector('.composer-grid',{timeout:20000});
@@ -45,6 +45,25 @@ async function run(){
   await new Promise(r=>setTimeout(r,100));
   const status=await page.$eval('body',e=>e.innerText);
   assert.ok(status.includes('Executed 1 deterministic manual scan'),'PLC teaching scan must work without GPU');
+
+  await page.goto(base+'/sandbox',{waitUntil:'domcontentloaded',timeout:45000});
+  await page.waitForSelector('.sandbox-3d-fallback',{timeout:20000});
+  const message=await page.$eval('.sandbox-3d-fallback',el=>el.textContent||'');
+  assert.ok(message.includes('3D renderer unavailable'),'Open sandbox must clearly disclose no-WebGL mode');
+  const add=await page.evaluate(()=>{
+    const button=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='Place starter layout');
+    if(!button) return false; button.click(); return true;
+  });
+  assert.ok(add,'No-WebGL sandbox layout must remain available');
+  await page.waitForFunction(()=>document.querySelectorAll('.sandbox-patch .sandbox-device').length===6);
+  assert.ok(await page.$('[data-terminal-id="plc-2.I0.0"]'),'Patching terminals remain accessible without graphics');
+  const beforeTick=await page.$eval('.sandbox-scan',el=>Number(el.textContent?.replace(/\\D/g,'')));
+  await page.evaluate(()=>{
+    const button=[...document.querySelectorAll('.sandbox-toolbar button')].find(b=>b.textContent?.trim()==='Step scan');
+    if(!button)throw Error('Step scan missing without WebGL'); button.click();
+  });
+  await page.waitForFunction(n=>Number(document.querySelector('.sandbox-scan')?.textContent.replace(/\\D/g,''))>n,{},beforeTick);
+  console.log('OPEN SANDBOX NO-WEBGL PASS: component controls, terminal patching and PLC scan remain usable');
   assert.deepEqual(errors,[],'No uncaught page errors in no-WebGL flow');
   console.log('LOW-SPEC CPU-ONLY FALLBACK PASS: 4x CPU throttling, optional WebGL disabled, editing and scan remain usable');
  }finally{await browser.close();}
