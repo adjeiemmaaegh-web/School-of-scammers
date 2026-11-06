@@ -63,6 +63,34 @@ describe('P3 live 3D material flow through wired PLC and physical I/O',()=>{
     expect(w.coils.Run).toBe(true);
     expect(renderSnapshot(w).io).toMatchObject({'Q0.0':true, 'Q0.1':false});
   });
+  it('uses the SAME wired photoeye and Q0.1 diverter when learner selects typed Structured Text',()=>{
+    const source = [
+      'VAR_INPUT',
+      ' Start : BOOL;',
+      ' StopOK : BOOL;',
+      ' Photoeye : BOOL;',
+      'END_VAR',
+      'VAR_OUTPUT',
+      ' Run : BOOL;',
+      ' Sort : BOOL;',
+      'END_VAR',
+      'Run := StopOK AND (Start OR Run);',
+      'Sort := Run AND Photoeye;',
+    ].join('\\n');
+    let w=tick(make(),[{k:'loadST',source}]).world;
+    expect(w.project.language).toBe('st');
+    w=feed(release(start(w)),'marked');
+    w=scans(w,45);
+    expect(w.plant).toMatchObject({ accepted:0, rejected:1, parcel:null });
+    expect(w.lastError).toBeNull();
+  });
+  it('publishes genuine parcel feed events even while paused',()=>{
+    const w=make();
+    const result=tick(w,[{k:'feedParcel',kind:'marked'}]);
+    expect(result.snapshot.plant.parcel?.kind).toBe('marked');
+    expect(result.events.some(e=>e.detail.includes('marked package fed'))).toBe(true);
+    expect(result.snapshot.tick).toBe(0);
+  });
   it('accepts an unmarked parcel with the same correct program, without a false photoeye',()=>{
     let w=feed(release(start(make())),'plain');
     let eye=false,gate=false;
