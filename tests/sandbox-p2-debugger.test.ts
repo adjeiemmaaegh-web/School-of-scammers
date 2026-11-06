@@ -72,7 +72,8 @@ describe('P2 extended instruction and debugging workbench', () => {
     expect(w.coils.Run).toBe(false);
     expect(w.breakpointHit).toMatch(/Run falling edge/);
     expect(w.running).toBe(false);
-    w=tick(w,[{k:'step'}]).world;
+    // Electrical contactor and motor state propagate on subsequent worker scans.
+    for(let n=0;n<3;n++) w=tick(w,[{k:'step'}]).world;
     expect(w.motorOn).toBe(false);
   });
   it('rejects unknown edge tags and invalid reset/load tags without corrupting the project', () => {
