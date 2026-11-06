@@ -57,12 +57,12 @@ async function run(){
   assert.ok(add,'No-WebGL sandbox layout must remain available');
   await page.waitForFunction(()=>document.querySelectorAll('.sandbox-patch .sandbox-device').length===6);
   assert.ok(await page.$('[data-terminal-id="plc-2.I0.0"]'),'Patching terminals remain accessible without graphics');
-  const beforeTick=await page.$eval('.sandbox-scan',el=>Number(el.textContent?.replace(/\\D/g,'')));
+  const beforeTick=await page.$eval('.sandbox-scan',el=>Number(el.textContent?.replace(/\D/g,'')));
   await page.evaluate(()=>{
     const button=[...document.querySelectorAll('.sandbox-toolbar button')].find(b=>b.textContent?.trim()==='Step scan');
     if(!button)throw Error('Step scan missing without WebGL'); button.click();
   });
-  await page.waitForFunction(n=>Number(document.querySelector('.sandbox-scan')?.textContent.replace(/\\D/g,''))>n,{},beforeTick);
+  await page.waitForFunction(n=>Number(document.querySelector('.sandbox-scan')?.textContent.replace(/\D/g,''))>n,{},beforeTick);
   console.log('OPEN SANDBOX NO-WEBGL PASS: component controls, terminal patching and PLC scan remain usable');
   assert.deepEqual(errors,[],'No uncaught page errors in no-WebGL flow');
   console.log('LOW-SPEC CPU-ONLY FALLBACK PASS: 4x CPU throttling, optional WebGL disabled, editing and scan remain usable');
