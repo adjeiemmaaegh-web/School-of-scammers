@@ -13,20 +13,20 @@ After reviewing the shipped product against **Cisco Packet Tracer / GNS3** (the 
 
 **Status of the two products:**
 - **Shipped v3 (exercise ladders + employer assessment)** — *retained and live* at `plc-skills-lab.vercel.app`. Kept for the employer audience; becomes an **assessment *mode* on the sandbox** in roadmap phase **P6**. Its PRD is archived at `docs/product/archive/PRD_v3_exercise-assessment.md`. **Do not delete it.**
-- **New sandbox simulator (PRD v4)** — the primary direction; **P0/P1 first slice is implemented on feature branch and awaits full automated/browser verification**. The salvaged engine (`src/core`, `src/engine`, `src/engineering`, 536 tests) is the foundation — see the PRD §11 salvage map.
+- **New sandbox simulator (PRD v4)** — the primary direction; **P0/P1 first 3D slice is implemented on feature branch and awaits complete 3D-specific browser acceptance**. The salvaged engine (`src/core`, `src/engine`, `src/engineering`, 536 tests) is the foundation — see the PRD §11 salvage map.
 
 **New docs for co-developers (this session):**
 - `docs/product/PRD.md` (v4) · `docs/product/ARCHITECTURE.md` (v4) · `.claude/skills/automation-platform/SKILL.md` · root `CLAUDE.md`.
 
 **v4 roadmap (runnable each phase):** P0 foundations & contracts → **P1 first vertical slice (start/stop motor: place→wire→program→Run through the full tick loop)** → P2 programming depth → P3 plant & devices → P4 electrical & panel → P5 faults & diagnostics → P6 learning/assessment on the sandbox (re-host v3) → P7+ realism (FBD, PLCopen, Modbus/external runtime, HIL).
 
-**Owner decisions confirmed (6 Nov 2026):** 2.5D-first, Ladder-first, and start/stop motor latch first. The owner explicitly excludes backend work for these versions. P0/P1 code lives on `feat/p0-p1-sandbox-foundation`; it is not merged, accepted, or deployed. Next: run `npm run verify:full` and a real browser play-through on the branch, inspect failures, then review before merging.
+**Revised owner decisions (6 Nov 2026):** real interactive 3D from P1 (replaces 2.5D-first), Ladder-first, and start/stop motor latch first. The owner explicitly excludes backend work for these versions. P0/P1 code lives on `feat/p0-p1-sandbox-foundation`; it is not merged, accepted, or deployed. Next: run `npm run verify:full` and a real browser play-through on the branch, inspect failures, then review before merging.
 
 ---
 
 ## Current P0/P1 implementation note (6 Nov 2026)
 
-On the development branch only: `/sandbox` route and home CTA; drag/place 2.5D components, terminal-to-terminal wiring, editable one-rung Ladder, worker tick orchestrator bridging the existing Ladder and bounded 24V electrical solvers, contactor/motor state feedback, local JSON import/export, and initial deterministic regression tests plus an automated browser end-to-end check in GitHub CI. Existing v3 exercises and local assessments are unchanged. **Current chat environment could not run the full npm/Vitest/browser suite against the repository; all verification and acceptance gates remain OPEN until logs and actual browser evidence are available.** No backend is planned or authorized.
+On the development branch only: `/sandbox` route and home CTA; drag/place real low-poly 3D components, terminal-to-terminal wiring, editable one-rung Ladder, worker tick orchestrator bridging the existing Ladder and bounded 24V electrical solvers, contactor/motor state feedback, local JSON import/export, and initial deterministic regression tests plus an automated browser end-to-end check in GitHub CI. Existing v3 exercises and local assessments are unchanged. **Prior P1 2.5D CI ran 541/541 tests and the end-to-end browser check successfully. New 3D changes require fresh typecheck, Vitest, 3D WebGL-capable browser acceptance, fallback and cross-browser checks.** No backend is planned or authorized.
 
 ## Earlier progress — v3 product (shipped, retained as the assessment layer)
 
