@@ -108,7 +108,7 @@ export function LiveMonitor({ snapshot, onBreakpoint, onTagBreakpoint }: {
           onClick={exportTrace}>Export scan CSV</button>
       </div>
       <p className="sandbox-help">Latest {snapshot.scanTrace.length} scans (maximum 300). Each record is calculated by the worker; the export contains only simulated signals and network results.</p>
-      <div className="sandbox-scan-history-list" role="table" aria-label="Recent PLC scan trace">
+      <div className="sandbox-scan-history-list" role="table" tabIndex={0} aria-label="Recent PLC scan trace">
         <div role="row"><strong role="columnheader">Scan</strong><strong role="columnheader">Run</strong><strong role="columnheader">Motor</strong></div>
         {snapshot.scanTrace.slice(-12).reverse().map(entry => <div role="row" key={entry.scan}>
           <span role="cell">{entry.scan}</span>
