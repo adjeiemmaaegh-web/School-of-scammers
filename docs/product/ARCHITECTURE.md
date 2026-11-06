@@ -2,6 +2,10 @@
 
 > Companion to PRD v4. Describes **how the open simulator is built** on the salvaged engine. Supersedes the v3 architecture (git history preserves it). Read the PRD first, then this, then the `automation-platform` skill.
 
+## UX-first handoff (owner-approved, 6 November 2026)
+
+Before P2/P3 feature expansion, implement and review the user-facing structure defined in [UX_WORKBENCH_V1.md](UX_WORKBENCH_V1.md). `src/app/SandboxPage.tsx` owns navigation, project toolbar, palette search and dock placement; `src/ui/sandbox/WorkbenchInspector.tsx` reads the worker snapshot for selection/status and routes every input to the existing `Command` interface; `src/render/Sandbox3D.tsx` remains a scene renderer and emits selection and user interactions, not simulated authority. UX work must not change PLC scan, electrical solver, persisted project schema or backend scope. Keep the v3 exercise/assessment paths unchanged. Treat UX approval and actual technical acceptance as separate gates.
+
 ## Implementation scope and status (owner-approved, 6 November 2026)
 
 P0/P1 is a **frontend-only** development increment. No backend, authentication, database server, cloud APIs, or hosted assessment state. The existing employer assessment routes remain functional and will be integrated into the open simulator in P6. Browser storage and local JSON import/export are permitted.
