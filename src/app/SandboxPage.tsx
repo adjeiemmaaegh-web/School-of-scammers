@@ -246,7 +246,7 @@ export function SandboxPage() {
                       c.kind === 'conveyor' ? (live ? 'BELT MOVING' : 'BELT STOPPED') :
                       c.kind === 'photoeye' ? (live ? 'MARK DETECTED' : 'NO MARK') :
                       c.kind === 'diverter' ? (live ? 'REJECT ACTIVE' : 'PASS') :
-                      c.kind === 'supply' ? '24V DC' : c.pressed ? 'PRESSED' : 'RELEASED'</span>
+                      c.kind === 'supply' ? '24V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</span>
                   </div>
                   <div className="sandbox-patch-actions">
                     {(c.kind === 'start' || c.kind === 'stop') && <button
