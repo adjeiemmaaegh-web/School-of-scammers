@@ -177,6 +177,8 @@ Rules that are non-negotiable:
 
 Each phase ends with something runnable end-to-end. The **vertical slice first** principle (one complete sandbox scenario working through the whole loop) beats building modules in isolation.
 
+**P3 active engineering:** The first functional 3D conveyor, mark-sensitive photoeye and wired diverter sorting slice is on draft PR #17 (stacked on PRs #14–16). See [P3_PLANT_PROGRESS.md](P3_PLANT_PROGRESS.md) for the scenario, evidence and still-open P3 device/physics scope. This does not establish full P3 acceptance, Factory I/O parity or release readiness.
+
 **Owner-approved UX-first gate:** after the first P1 3D vertical slice, prepare a dedicated UX/UI workbench design review **before P2 programming depth or P3 plant expansion**. The design blueprint lives at [UX_WORKBENCH_V1.md](UX_WORKBENCH_V1.md): project navigation, device library, 3D canvas, contextual inspector, wiring panel, programming dock, diagnostics, mobile and keyboard/no-WebGL states. The owner subsequently authorized proceeding into P2 development from that prototype. This authorizes engineering continuation **not** production acceptance or merge. The current bounded P2 implementation and remaining gaps are tracked in [P2_PROGRAMMING_PROGRESS.md](P2_PROGRAMMING_PROGRESS.md); existing engine and employer assessments are preserved.
 
 | Phase | Theme | Exit (runnable) |
