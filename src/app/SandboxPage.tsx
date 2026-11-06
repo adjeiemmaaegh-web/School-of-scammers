@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, type ComponentKind } from '../components/registry';
 import { AppHeader } from '../ui/AppHeader';
 import { LadderEditor } from '../program/LadderEditor';
+import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
 import type { Command, ProjectFile, RenderSnapshot, WorkerResponse } from '../sim/signals';
 import './sandbox.css';
 
@@ -15,6 +16,10 @@ export function SandboxPage() {
   const [project, setProject] = useState<ProjectFile | null>(null);
   const [selectedTerminal, setSelectedTerminal] = useState<string | null>(null);
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [libraryQuery, setLibraryQuery] = useState('');
+  const [activeStage, setActiveStage] = useState<'build' | 'wire' | 'program' | 'test'>('build');
+  const [localSave, setLocalSave] = useState<'pending' | 'saved' | 'failed'>('pending');
   const [events, setEvents] = useState<string[]>([]);
   const [clientError, setClientError] = useState<string | null>(null);
   const worker = useRef<Worker | null>(null);
@@ -40,8 +45,20 @@ export function SandboxPage() {
     } catch { setClientError('Saved project could not be read; starting with a blank workspace.'); }
     return () => { engine.terminate(); worker.current = null; };
   }, []);
-  useEffect(() => { if (project) try { localStorage.setItem(STORAGE_KEY, JSON.stringify(project)); } catch {
-    setClientError('Local browser storage is full. Export your project as JSON to keep it.'); } }, [project]);
+  useEffect(() => {
+    if (!project) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
+      setLocalSave('saved');
+    } catch {
+      setLocalSave('failed');
+      setClientError('Local browser storage is full. Export your project as JSON to keep it.');
+    }
+  }, [project]);
+  const goToStage = (stage: 'build' | 'wire' | 'program' | 'test') => {
+    setActiveStage(stage);
+    document.getElementById(`sandbox-stage-${stage}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const uniqueId = (prefix: string): string => {
     let id = '';
     do { id = `${prefix}-${nextId.current++}`; }
@@ -85,22 +102,53 @@ export function SandboxPage() {
       if (file.size > 200000) throw new Error('Project must be under 200 KB');
       const parsed: unknown = JSON.parse(await file.text());
       send([{ k: 'loadProject', project: parsed }]);
-      setSelectedTerminal(null); setMoveTarget(null); setEvents([]); setClientError(null);
+      setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setEvents([]); setClientError(null);
     } catch (e) { setClientError(e instanceof Error ? e.message : 'Project import failed'); }
     ev.target.value = '';
   };
   const editable = !snapshot?.running;
+  const selectedDevice = project?.components.find(c => c.id === selectedDeviceId) ?? null;
+  const visibleKinds = componentKinds.filter(kind => {
+    const definition = COMPONENTS[kind];
+    const words = `${definition.kind} ${definition.label} ${definition.help}`.toLowerCase();
+    return words.includes(libraryQuery.trim().toLowerCase());
+  });
+  const workflow = [
+    { id: 'build' as const, label: 'Build', hint: 'Place equipment', count: project?.components.length ?? 0 },
+    { id: 'wire' as const, label: 'Wire', hint: 'Connect terminals', count: project?.wires.length ?? 0 },
+    { id: 'program' as const, label: 'Program', hint: 'Edit Ladder logic', count: project?.program.rungs.length ?? 0 },
+    { id: 'test' as const, label: 'Test', hint: 'Run and troubleshoot', count: snapshot?.tick ?? 0 },
+  ];
   return <>
     <AppHeader right={<div className="sandbox-header-links"><Link to="/trades">Exercises</Link><Link to="/employer">Assessment</Link></div>} />
-    <main id="main" className="sandbox-page wrap wrap-wide">
-      <div className="sandbox-section-head sandbox-title">
-        <div><span className="eyebrow">EFO Skill Lab · P0/P1 interactive 3D preview</span>
-          <h1>Open automation sandbox</h1>
-          <p>Place real 3D components, wire their terminals, program Ladder, and watch your simulated motor obey the logic.</p></div>
-        <span className="status-pill is-idle">Offline-first · no account</span>
-      </div>
+    <main id="main" className="sandbox-page sandbox-ux wrap wrap-wide">
+      <header className="sandbox-masthead">
+        <div>
+          <p className="sandbox-breadcrumb"><Link to="/">Skills Lab</Link><span>/</span> Simulator <span>/</span> Open workspace</p>
+          <span className="eyebrow">3D engineering workbench · UX preview</span>
+          <h1>Design. Wire. Program. Run.</h1>
+          <p className="sandbox-masthead-lede">Create an industrial control circuit in 3D, program its PLC, and see exactly what your logic does.</p>
+        </div>
+        <div className="sandbox-project-meta" role="status" aria-live="polite">
+          <span className={`sandbox-work-status ${snapshot?.running ? 'is-running' : ''}`}>
+            <i aria-hidden="true" />{snapshot?.running ? 'SIMULATION RUNNING' : 'EDIT MODE'}
+          </span>
+          <strong>Untitled motor-control project</strong>
+          <small>{localSave === 'saved' ? 'Saved in this browser' :
+            localSave === 'failed' ? 'Not saved — export your JSON' : 'Loading local project'}</small>
+        </div>
+      </header>
+      <nav className="sandbox-workflow" aria-label="Sandbox workflow shortcuts">
+        {workflow.map((step, index) => <button type="button" key={step.id}
+          onClick={() => goToStage(step.id)} aria-pressed={activeStage === step.id}
+          className={activeStage === step.id ? 'active' : ''}>
+          <span className="sandbox-workflow-number">{String(index + 1).padStart(2, '0')}</span>
+          <span><strong>{step.label}</strong><small>{step.hint}</small></span>
+          <span className="sandbox-workflow-count">{step.count}</span>
+        </button>)}
+      </nav>
       <div className="sandbox-toolbar">
-        <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
+        <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setActiveStage('build'); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
         <button className="btn ghost small" onClick={layout} disabled={!editable || !!project?.components.length}>Place starter layout</button>
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>
@@ -110,25 +158,42 @@ export function SandboxPage() {
         <button className="btn ghost small" onClick={() => send([{ k: 'step' }])} disabled={!editable}>Step scan</button>
         <button className="btn primary small" onClick={() => send([{ k: snapshot?.running ? 'pause' : 'run' }])}>
           {snapshot?.running ? 'Pause' : '▶ Run'}</button>
-        <span className="sandbox-scan">Scan {snapshot?.tick ?? 0}</span>
+        <span className="sandbox-scan" aria-live="off">Scan {snapshot?.tick ?? 0}</span>
       </div>
       {(clientError || snapshot?.lastError) && <div role="alert" className="sandbox-alert">{clientError || snapshot?.lastError}</div>}
       <div className="sandbox-layout">
         <aside className="sandbox-palette panel" aria-label="Component library">
-          <span className="eyebrow">Components</span>
-          <h2>Device library</h2>
-          <p className="sandbox-help">Drag an item into the 3D workbench or click to add it. Rotate, zoom and pan the model; click any two terminals to connect them.</p>
-          {componentKinds.map(kind => <button key={kind} draggable={editable}
-            onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}
-            onClick={() => place(kind)} disabled={!editable}
-            className="sandbox-palette-item"><strong>{COMPONENTS[kind].label}</strong>
-            <small>{COMPONENTS[kind].help}</small></button>)}
+          <div className="sandbox-rail-heading"><span className="eyebrow">Device library</span><h2>Components</h2>
+            <small>{visibleKinds.length} types available</small></div>
+          <label className="sandbox-library-search">
+            <span>Find equipment</span>
+            <input type="search" value={libraryQuery} onChange={e => setLibraryQuery(e.target.value)}
+              placeholder="Search motors, PLCs…" aria-label="Search component library" />
+          </label>
+          <p className="sandbox-library-help">Drag into the 3D floor or select a device to place it. Edits pause while the PLC runs.</p>
+          <div className="sandbox-palette-list">
+            {visibleKinds.map(kind => <button key={kind} draggable={editable}
+              onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}
+              onClick={() => place(kind)} disabled={!editable}
+              className="sandbox-palette-item">
+              <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
+                {kind === 'plc' ? 'PLC' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
+              </span>
+              <span><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
+              <span className="sandbox-add-device" aria-hidden="true">+</span>
+            </button>)}
+            {!visibleKinds.length && <p className="sandbox-help" role="status">No devices match your search. Try “motor” or “PLC”.</p>}
+          </div>
+          <div className="sandbox-library-foot"><strong>Learning scope</strong><span>24V DC · one PLC · educational simulation</span></div>
         </aside>
-        <div className="sandbox-main">
+        <div className="sandbox-main" id="sandbox-stage-build">
+          <div className="sandbox-scene-heading"><div><span className="eyebrow">Factory floor</span><h2>3D workspace</h2></div>
+            <div><span className="sandbox-scene-stat">{project?.components.length ?? 0} devices</span><span className="sandbox-scene-stat">{project?.wires.length ?? 0} wires</span></div></div>
           <Suspense fallback={<div className="sandbox-3d-loading" role="status">Loading the interactive 3D workbench…</div>}>
             {project && snapshot && <Sandbox3D
               project={project} snapshot={snapshot} editable={editable}
               selectedTerminal={selectedTerminal} moveTarget={moveTarget}
+              selectedDeviceId={selectedDeviceId} onSelectDevice={setSelectedDeviceId}
               onTerminal={connect}
               onOperate={(id, pressed) => send([{ k: 'operate', id, pressed }])}
               onPlace={(kind, at) => place(kind, at.x, at.y)}
@@ -140,7 +205,7 @@ export function SandboxPage() {
             <span>Place and wire your own devices or load the starter equipment (without pre-wiring).</span>
             <button className="btn ghost small" onClick={layout}>Place starter layout</button>
           </div>}
-          <details className="sandbox-patch panel" open>
+          <details id="sandbox-stage-wire" className="sandbox-patch panel" open>
             <summary>Component wiring &amp; keyboard controls · {project?.components.length ?? 0} devices</summary>
             <p className="sandbox-help">These controls access the same terminals and states shown in the 3D workbench. Use them on phones, with a keyboard, or when WebGL is unavailable.</p>
             <div className="sandbox-device-list">
@@ -150,7 +215,8 @@ export function SandboxPage() {
                   c.kind === 'plc' ? snapshot?.io.PlcPowered : c.kind === 'start' || c.kind === 'stop' ? c.pressed : false;
                 return <section className={`sandbox-device ${live ? 'active' : ''}`} key={c.id} data-device-id={c.id}>
                   <div className="sandbox-patch-head">
-                    <strong>{def.label}</strong>
+                    <button type="button" className="sandbox-inspect-link" onClick={() => setSelectedDeviceId(c.id)}
+                      aria-label={`Inspect ${def.label}`}>{def.label}</button>
                     <span className="sandbox-device-status">{c.kind === 'motor' ? (live ? 'RUNNING' : 'STOPPED') :
                       c.kind === 'contactor' ? (live ? 'COIL ON' : 'COIL OFF') :
                       c.kind === 'plc' ? (live ? 'POWER OK' : 'NO POWER') :
@@ -163,7 +229,7 @@ export function SandboxPage() {
                         {c.pressed ? 'Release' : 'Press'}</button>}
                     <button type="button" className="sandbox-position" disabled={!editable}
                       aria-label={`Move ${def.label} in 3D`}
-                      onClick={() => setMoveTarget(c.id)}>Move in 3D</button>
+                      onClick={() => { setMoveTarget(c.id); setSelectedDeviceId(c.id); }}>Move in 3D</button>
                   </div>
                   <div className="sandbox-patch-terminals">
                     {def.terminals.map(t => {
@@ -187,11 +253,20 @@ export function SandboxPage() {
               <p>Contactor: <strong>{snapshot?.contactorOn ? 'energised' : 'off'}</strong> · Motor: <strong>{snapshot?.motorOn ? 'running' : 'stopped'}</strong></p></div>
           </div>
         </div>
+        <WorkbenchInspector project={project ?? { formatVersion: 1, components: [], wires: [], program: { id: 'pending', version: '1', rungs: [] } }}
+          snapshot={snapshot ?? { tick: 0, running: false, components: [], wires: [], io: { Start: false, StopOK: false, Run: false, 'Q0.0': false, PlcPowered: false }, voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0, diagnostics: [], lastError: null }}
+          selectedDevice={selectedDevice} selectedTerminal={selectedTerminal} editable={editable}
+          onTerminal={connect} onCancelWire={() => setSelectedTerminal(null)}
+          onMove={id => setMoveTarget(id)}
+          onOperate={(id, pressed) => send([{ k: 'operate', id, pressed }])}
+          onClearSelection={() => setSelectedDeviceId(null)} />
       </div>
       <div className="sandbox-bottom">
-        {project && snapshot && <LadderEditor document={project.program} snapshot={snapshot}
+        <div id="sandbox-stage-program" className="sandbox-program-dock">
+          {project && snapshot && <LadderEditor document={project.program} snapshot={snapshot}
           disabled={!editable} onChange={program => send([{ k: 'loadProgram', program }])} />}
-        <aside className="sandbox-instruments panel">
+        </div>
+        <aside id="sandbox-stage-test" className="sandbox-instruments panel">
           <span className="eyebrow">Diagnostics</span><h2>Electrical &amp; event trace</h2>
           <p className="sandbox-help">Click a wire's remove button to break a connection and observe what changes. All values come from the simulator.</p>
           <details><summary>Example wiring map</summary><p>{wireGuide}</p></details>
