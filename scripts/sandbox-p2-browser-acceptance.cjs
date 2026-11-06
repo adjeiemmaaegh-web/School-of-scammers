@@ -94,7 +94,38 @@ const clickText = async (page, label) => {
     await clickText(page,'▶ Run');
     await page.waitForFunction(() => document.querySelector('.sandbox-breakpoint-hit')?.textContent === 'Paused at scan 3',{timeout:6000});
     assert.equal(await page.$eval('.sandbox-scan',el => el.textContent.trim()),'Scan 3');
+
+    // The previous numeric breakpoint is cleared before arming a genuine BOOL signal edge.
+    await page.$eval('.sandbox-breakpoint-panel', section => {
+      const clear = [...section.querySelectorAll('button')].find(button => button.textContent.trim() === 'Clear');
+      if (!clear) throw new Error('Missing numeric breakpoint Clear control');
+      clear.click();
+    });
+    await page.waitForFunction(() => !document.querySelector('.sandbox-breakpoint-panel')?.textContent.includes('Armed at scan'));
+    await page.select('select[aria-label="Breakpoint PLC tag"]','Start');
+    await page.select('select[aria-label="Breakpoint signal edge"]','rising');
+    await clickText(page,'Arm edge');
+    await page.waitForFunction(() => document.querySelector('.sandbox-breakpoint-panel')?.textContent.includes('Watching Start'));
+    await clickText(page,'▶ Run');
+    await page.click('[data-device-id="start-5"] .sandbox-operate');
+    await page.waitForFunction(() => document.querySelector('.sandbox-breakpoint-hit')?.textContent.includes('Start rising edge'),
+      {timeout:6000});
+    assert.ok(await page.$('.sandbox-scan-history-list [role="row"]:nth-child(2)'),'Worker scan history must be visible');
+    const exportButton = await page.$eval('.sandbox-scan-history', section => {
+      const button = [...section.querySelectorAll('button')].find(entry => entry.textContent.trim() === 'Export scan CSV');
+      return !!button && !button.disabled;
+    });
+    assert.ok(exportButton,'Real scan evidence must be exportable');
+    // The same editor must expose load and reset controls for the salvaged CTD/CTU instructions.
+    await clickText(page,'Ladder (LD)');
+    await page.select('select[aria-label="Instruction for rung-1"]','ctd');
+    await page.waitForSelector('select[aria-label="Load condition for rung-1"]');
+    await page.select('select[aria-label="Load condition for rung-1"]','Start');
+    await page.waitForFunction(() => document.querySelector('select[aria-label="Load condition for rung-1"]')?.value === 'Start');
+    await page.select('select[aria-label="Instruction for rung-1"]','ctu');
+    await page.waitForSelector('select[aria-label="Reset condition for rung-1"]');
+
     assert.deepEqual(errors,[]);
-    console.log('P2 SANDBOX E2E PASS: real TON through wiring, multi-rung, ST compile/run and worker scan breakpoint');
+    console.log('P2 SANDBOX E2E PASS: wired TON, LD/ST, scan and edge breakpoints, scan history and CTD/CTU editing');
   } finally { await browser.close(); }
 })().catch(e=>{console.error('P2 SANDBOX E2E FAIL', e.stack||String(e));process.exitCode=1;});
