@@ -295,6 +295,16 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const stSort = stResult
     ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'sort')?.[1]
     : undefined;
+  if (stSort !== undefined && typeof stSort !== 'boolean') {
+    const paused: WorldState = {
+      ...w, running: false, coils: { ...w.coils, Run: false, Sort: false },
+      tagValues: { ...w.tagValues, Run: false, Sort: false },
+      motorOn: false, conveyorOn: false, diverterOn: false, contactorOn: false,
+      lastError: 'PLC Sort output must be BOOL',
+    };
+    return { world: paused, snapshot: renderSnapshot(paused),
+      events: [{ tick: w.tick, kind: 'error', detail: 'PLC Sort output must be BOOL' }] };
+  }
   // Structured Text is case-insensitive; the physical Q0.0 binding is always canonical "Run".
   const coils: Record<string, boolean> = stResult
     ? { ...Object.fromEntries(Object.entries(stResult.outputs).filter(([, value]) => typeof value === 'boolean')),
