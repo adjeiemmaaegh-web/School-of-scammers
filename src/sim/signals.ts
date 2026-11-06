@@ -21,6 +21,8 @@ export type WorldState = {
   tick: number;
   coils: Record<string, boolean>;
   ladderMemory: LadderMemory;
+  /** Bounded typed numeric registers retained between simulated PLC scans. */
+  ladderNumeric: Record<string, number>;
   /** Validated AST cached in authoritative worker state, never persisted in ProjectFile. */
   stCompiled: STProgram | null;
   stMemory: Record<string, STValue>;
