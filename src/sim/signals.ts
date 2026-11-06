@@ -3,6 +3,7 @@ import type { STProgram, STValue } from '../engineering/structured-text';
 import type { ComponentKind } from '../components/registry';
 import type { ScanTrace, TagBreakpoint } from '../program/scan-trace';
 import type { SortingPlant, ParcelKind } from '../plant/sorting-conveyor';
+import type { TankProcess } from '../plant/tank-process';
 
 export type XY = { x: number; y: number };
 export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean };
@@ -39,8 +40,11 @@ export type WorldState = {
   plant: SortingPlant;
   conveyorOn: boolean;
   diverterOn: boolean;
+  tank: TankProcess;
+  pumpOn: boolean;
+  drainOn: boolean;
   powered: boolean;
-  inputs: { Start: boolean; StopOK: boolean; Photoeye: boolean };
+  inputs: { Start: boolean; StopOK: boolean; Photoeye: boolean; TankHigh: boolean };
   voltages: Record<string, number | null>;
   diagnostics: string[];
   lastError: string | null;
@@ -65,8 +69,9 @@ export type RenderSnapshot = {
   running: boolean;
   components: PlacedComponent[];
   wires: Wire[];
-  io: { Start: boolean; StopOK: boolean; Photoeye: boolean; Run: boolean; Sort: boolean;
-    'Q0.0': boolean; 'Q0.1': boolean; PlcPowered: boolean };
+  io: { Start: boolean; StopOK: boolean; Photoeye: boolean; TankHigh: boolean;
+    Run: boolean; Sort: boolean; Fill: boolean; Drain: boolean;
+    'Q0.0': boolean; 'Q0.1': boolean; 'Q0.2': boolean; 'Q0.3': boolean; PlcPowered: boolean };
   voltages: Record<string, number | null>;
   contactorOn: boolean;
   motorOn: boolean;
@@ -74,6 +79,9 @@ export type RenderSnapshot = {
   plant: SortingPlant;
   conveyorOn: boolean;
   diverterOn: boolean;
+  tank: TankProcess;
+  pumpOn: boolean;
+  drainOn: boolean;
   diagnostics: string[];
   lastError: string | null;
   language: 'ladder' | 'st';
