@@ -25,7 +25,7 @@ const base = process.env.PLC_BASE_URL || 'http://127.0.0.1:4173';
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-palette-item').length === 1);
     assert.match(await page.$eval('.sandbox-palette-item', el => el.textContent), /24V motor/);
     await search.click({ clickCount: 3 });
-    await page.keyboard.press('ControlOrMeta+A');
+    await page.keyboard.press('Control+A');
     await page.keyboard.press('Backspace');
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-palette-item').length === 6);
 
