@@ -2,6 +2,7 @@ import type { LadderDocument, LadderMemory, LadderStep } from '../engineering/la
 import type { STProgram, STValue } from '../engineering/structured-text';
 import type { ComponentKind } from '../components/registry';
 import type { ScanTrace, TagBreakpoint } from '../program/scan-trace';
+import type { SortingPlant, ParcelKind } from '../plant/sorting-conveyor';
 
 export type XY = { x: number; y: number };
 export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean };
@@ -35,8 +36,11 @@ export type WorldState = {
   contactorOn: boolean;
   motorOn: boolean;
   motorAngleRad: number;
+  plant: SortingPlant;
+  conveyorOn: boolean;
+  diverterOn: boolean;
   powered: boolean;
-  inputs: { Start: boolean; StopOK: boolean };
+  inputs: { Start: boolean; StopOK: boolean; Photoeye: boolean };
   voltages: Record<string, number | null>;
   diagnostics: string[];
   lastError: string | null;
@@ -47,6 +51,7 @@ export type Command =
   | { k: 'wire'; id: string; from: string; to: string }
   | { k: 'unwire'; id: string }
   | { k: 'operate'; id: string; pressed: boolean }
+  | { k: 'feedParcel'; kind: ParcelKind }
   | { k: 'loadProgram'; program: LadderDocument }
   | { k: 'loadST'; source: string }
   | { k: 'activateLanguage'; language: 'ladder' | 'st' }
@@ -60,11 +65,15 @@ export type RenderSnapshot = {
   running: boolean;
   components: PlacedComponent[];
   wires: Wire[];
-  io: { Start: boolean; StopOK: boolean; Run: boolean; 'Q0.0': boolean; PlcPowered: boolean };
+  io: { Start: boolean; StopOK: boolean; Photoeye: boolean; Run: boolean; Sort: boolean;
+    'Q0.0': boolean; 'Q0.1': boolean; PlcPowered: boolean };
   voltages: Record<string, number | null>;
   contactorOn: boolean;
   motorOn: boolean;
   motorAngleRad: number;
+  plant: SortingPlant;
+  conveyorOn: boolean;
+  diverterOn: boolean;
   diagnostics: string[];
   lastError: string | null;
   language: 'ladder' | 'st';
