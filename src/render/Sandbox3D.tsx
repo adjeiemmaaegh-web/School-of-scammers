@@ -5,7 +5,7 @@
  *
  * Original low-poly equipment geometry, no proprietary meshes or trademarks.
  */
-import { useMemo, useRef, useState, type DragEvent } from 'react';
+import { useMemo, useRef, type DragEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Grid, Html, OrbitControls, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { CatmullRomCurve3, Plane, Raycaster, Vector2, Vector3, type Camera } from 'three';
@@ -173,6 +173,7 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
 export type Sandbox3DProps = {
   project: ProjectFile; snapshot: RenderSnapshot;
   editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
+  selectedDeviceId: string | null; onSelectDevice: (id: string) => void;
   onTerminal: (id: string) => void;
   onOperate: (id: string, pressed: boolean) => void;
   onPlace: (kind: ComponentKind, at: XY) => void;
@@ -182,7 +183,6 @@ export type Sandbox3DProps = {
 export function Sandbox3D(props: Sandbox3DProps) {
   const available = useMemo(supportsWebGL, []);
   const camera = useRef<Camera | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
   const onPlaceAt = (at: XY) => {
     if (!props.moveTarget) return;
     props.onMove(props.moveTarget, at);
@@ -212,14 +212,14 @@ export function Sandbox3D(props: Sandbox3DProps) {
       <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
         selectedTerminal={props.selectedTerminal} moveTarget={props.moveTarget}
         onTerminal={props.onTerminal} onOperate={props.onOperate}
-        onSelect={setSelected} onPlaceAt={onPlaceAt} />
+        onSelect={props.onSelectDevice} onPlaceAt={onPlaceAt} />
     </Canvas> : <div className="sandbox-3d-fallback" role="status">
       <strong>3D renderer unavailable on this device</strong>
       <p>The PLC simulator still runs. Use the component patch panel below to wire, operate and inspect devices without WebGL.</p>
     </div>}
     <div className="sandbox-3d-hud">
       <span>3D WORKBENCH · Orbit: drag · Pan: right-drag · Zoom: wheel</span>
-      <span>{props.moveTarget ? 'Move selected: click the workbench floor' : selected ? `Selected: ${selected}` : 'Select a device or terminal'}</span>
+      <span>{props.moveTarget ? 'Move selected: click the workbench floor' : props.selectedDeviceId ? `Selected: ${props.selectedDeviceId}` : 'Select a device or terminal'}</span>
     </div>
   </div>;
 }
