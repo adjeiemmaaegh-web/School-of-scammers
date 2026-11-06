@@ -169,7 +169,7 @@ export function SandboxPage() {
                 const live = c.kind === 'motor' ? snapshot?.motorOn : c.kind === 'contactor' ? snapshot?.contactorOn :
                   c.kind === 'plc' ? snapshot?.io.PlcPowered : c.kind === 'start' || c.kind === 'stop' ? c.pressed : false;
                 return <div key={c.id} className={`sandbox-device ${live ? 'active' : ''}`}
-                  style={{ left: c.x, top: c.y }} draggable={editable}
+                  data-device-id={c.id} style={{ left: c.x, top: c.y }} draggable={editable}
                   onDragStart={ev => ev.dataTransfer.setData('text/plain', `move:${c.id}`)}>
                   <span className="sandbox-device-kind">{c.kind.toUpperCase()}</span>
                   <strong>{def.label}</strong>
@@ -184,7 +184,7 @@ export function SandboxPage() {
                     const id = `${c.id}.${t.name}`;
                     return <button key={id} type="button"
                       className={`sandbox-terminal ${t.side} ${selectedTerminal === id ? 'selected' : ''}`}
-                      style={{ top: t.y - 10 }} title={id} aria-label={`Connect ${id}`}
+                      data-terminal-id={id} style={{ top: t.y - 10 }} title={id} aria-label={`Connect ${id}`}
                       disabled={!editable} onClick={() => connect(id)}>{t.name}</button>;
                   })}
                 </div>;
