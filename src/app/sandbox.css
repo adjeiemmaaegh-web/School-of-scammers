@@ -306,3 +306,22 @@
   .sandbox-ux .sandbox-milestones { grid-template-columns:1fr; }
   .sandbox-ux .sandbox-3d-shell { height:430px; }
 }
+
+/* P3 material handling — restrained instrument panel around authoritative 3D plant. */
+.sandbox-ux .sandbox-sorting-panel { display:grid; gap:12px; margin-top:12px; padding:16px; min-width:0; }
+.sandbox-ux .sandbox-sorting-panel h2 { font-size:18px; margin-top:4px; }
+.sandbox-sort-metrics { display:flex; flex-wrap:wrap; gap:8px; }
+.sandbox-sort-metrics > span { display:flex; gap:8px; justify-content:space-between;
+  padding:9px 12px; border:1px solid var(--line); border-radius:8px;
+  background:var(--surface-2); font:11px var(--mono); min-width:120px; }
+.sandbox-sort-metrics strong { color:var(--ink); }
+.sandbox-sorting-panel details { font-size:12px; border-top:1px solid var(--line); padding-top:8px; }
+.sandbox-sorting-panel summary { cursor:pointer; font-weight:700; }
+.sandbox-sorting-panel details p { margin-top:9px; line-height:1.7; }
+.sandbox-device-glyph.kind-conveyor { background:#285d6e; }
+.sandbox-device-glyph.kind-photoeye { background:#4b5567; }
+.sandbox-device-glyph.kind-diverter { background:#6c5541; }
+@media(max-width:570px) {
+  .sandbox-ux .sandbox-sorting-panel { padding:12px; }
+  .sandbox-sort-metrics > span { flex:1 1 120px; }
+}
