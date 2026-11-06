@@ -1,4 +1,5 @@
-import type { LadderDocument, LadderMemory } from '../engineering/ladder';
+import type { LadderDocument, LadderMemory, LadderStep } from '../engineering/ladder';
+import type { STValue } from '../engineering/structured-text';
 import type { ComponentKind } from '../components/registry';
 
 export type XY = { x: number; y: number };
@@ -9,6 +10,9 @@ export type ProjectFile = {
   components: PlacedComponent[];
   wires: Wire[];
   program: LadderDocument;
+  /** Optional in v1 JSON for backwards compatibility. Defaults to ladder. */
+  language?: 'ladder' | 'st';
+  stSource?: string;
 };
 export type WorldState = {
   project: ProjectFile;
@@ -16,6 +20,11 @@ export type WorldState = {
   tick: number;
   coils: Record<string, boolean>;
   ladderMemory: LadderMemory;
+  stMemory: Record<string, STValue>;
+  tagValues: Record<string, STValue>;
+  ladderSteps: LadderStep[];
+  breakpointScan: number | null;
+  breakpointHit: string | null;
   contactorOn: boolean;
   motorOn: boolean;
   motorAngleRad: number;
@@ -32,6 +41,9 @@ export type Command =
   | { k: 'unwire'; id: string }
   | { k: 'operate'; id: string; pressed: boolean }
   | { k: 'loadProgram'; program: LadderDocument }
+  | { k: 'loadST'; source: string }
+  | { k: 'activateLanguage'; language: 'ladder' | 'st' }
+  | { k: 'breakAtScan'; scan: number | null }
   | { k: 'loadProject'; project: unknown }
   | { k: 'run' | 'pause' | 'step' | 'reset' | 'clear' };
 export type SimEvent = { tick: number; kind: string; detail: string };
@@ -47,6 +59,12 @@ export type RenderSnapshot = {
   motorAngleRad: number;
   diagnostics: string[];
   lastError: string | null;
+  language: 'ladder' | 'st';
+  tagValues: Record<string, STValue>;
+  ladderSteps: LadderStep[];
+  ladderMemory: LadderMemory;
+  breakpointScan: number | null;
+  breakpointHit: string | null;
 };
 export type WorkerRequest = { kind: 'commands'; commands: Command[] };
 export type WorkerResponse = { kind: 'snapshot'; snapshot: RenderSnapshot; events: SimEvent[]; project?: ProjectFile };
