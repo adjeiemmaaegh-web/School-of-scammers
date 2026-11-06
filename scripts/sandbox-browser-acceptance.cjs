@@ -34,8 +34,20 @@ const pairs = [
   try {
     await page.goto(baseUrl + '/sandbox', { waitUntil: 'networkidle0', timeout: 15000 });
     await page.waitForSelector('.sandbox-3d-shell');
-    await page.waitForFunction(() => !!document.querySelector('canvas.sandbox-three-canvas') ||
-      !!document.querySelector('.sandbox-3d-fallback'), { timeout: 15000 });
+    try {
+      await page.waitForFunction(() => !!document.querySelector('canvas.sandbox-three-canvas') ||
+        !!document.querySelector('.sandbox-3d-fallback'), { timeout: 15000 });
+    } catch (error) {
+      const state = await page.evaluate(() => {
+        const shell = document.querySelector('.sandbox-3d-shell');
+        const probe = document.createElement('canvas');
+        return { shellHTML: shell?.innerHTML.slice(0, 2500),
+          text: document.body.innerText.slice(0, 1000),
+          webgl2: !!probe.getContext('webgl2'), webgl1: !!probe.getContext('webgl') };
+      });
+      console.error('3D INIT DIAGNOSTICS', JSON.stringify({ state, pageErrors: errors }));
+      throw error;
+    }
     const renderer = await page.evaluate(() => {
       const canvas = document.querySelector('canvas.sandbox-three-canvas');
       return { hasCanvas: !!canvas, width: canvas?.width ?? 0, height: canvas?.height ?? 0,
