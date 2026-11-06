@@ -8,8 +8,8 @@
 
 - **Real 3D workbench:** place a 24V source, virtual PLC, START/STOP pushbuttons, contactor and simplified DC motor onto an orbitable, zoomable Three.js scene. Drag from the palette or click to place. Connect terminals in 3D or through the accessible patch panel.
 - Click any two terminal buttons to connect a wire; remove wires to test failures. See electrical voltage probes and energized wire overlays.
-- Edit up to eight actual Ladder rungs with local BOOL tags and supported TON/TOF/RTO/TP timers, CTU and edge instructions; or use the new editable Structured Text (ST) tab. The salvaged `src/engineering/ladder.ts` and bounded `src/engineering/structured-text.ts` engines execute the active program while `src/engineering/electrical.ts` resolves circuit wiring.
-- Run, Pause, Step, reset the simulated scan, inspect live tags/timer/counter memory, set a future scan breakpoint, and operate buttons to see the contactor and motor follow the actual program.
+- Edit up to eight actual Ladder rungs with local BOOL tags and supported TON/TOF/RTO/TP timers, CTU/CTD counters with editable reset/load conditions and edge instructions; or use the new editable Structured Text (ST) tab. The salvaged `src/engineering/ladder.ts` and bounded `src/engineering/structured-text.ts` engines execute the active program while `src/engineering/electrical.ts` resolves circuit wiring.
+- Run, Pause, Step, reset the simulated scan, inspect live tags/timer/counter memory, use future-scan or Boolean edge breakpoints, export the latest 300 simulated scan records as CSV, and operate buttons to see the contactor and motor follow the actual program.
 - Save locally in browser storage and import/export project JSON files. **No backend, login, SaaS, payment, cloud database, or server** is required for this version.
 
 For a full start/stop demonstration, connect the supply and PLC power pins, route START and STOP through the PLC inputs, route output Q0.0 into contactor coil A1/A2, and place contactor NO 13/14 in series with the motor. The sandbox UI includes the wiring map.
@@ -27,7 +27,7 @@ The guided exercise ladders and local employer → candidate assignment/result-c
 - `src/sim/orchestrator.ts` — authoritative phase order: commands → electrical → PLC input sampling → selected Ladder/ST scan → output image → contactor → ideal motor → sensors → events → snapshot.
 - `src/sim/worker.ts` — fixed 50ms simulation timestep in a Web Worker, with commands queued at a clock boundary.
 - `src/program/LadderEditor.tsx`, `StructuredTextEditor.tsx`, `ProgrammingDock.tsx`, `LiveMonitor.tsx` — bounded multi-rung LD/ST programming and live instrumentation within the approved UX.
-- `src/program/p2-contract.ts` — P2 validation/compilation limits; `src/app/SandboxPage.tsx` — frontend workbench.
+- `src/program/p2-contract.ts` — P2 validation/compilation limits; `src/program/scan-trace.ts` — bounded worker trace and safe CSV export; `src/app/SandboxPage.tsx` — frontend workbench.
 - `src/render/Sandbox3D.tsx` — original low-poly 3D meshes, cables, orbit controls and interactive scene. Its UI reads snapshots; no electrical or PLC logic is executed inside the renderer.
 - `src/engineering`, `src/core`, `src/engine` — original salvaged engineering engine; **preserved**.
 - `src/app`, `src/ui`, `src/trades`, `src/platform` — original guided exercise and local assessment app; **preserved**.
