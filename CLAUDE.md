@@ -5,6 +5,7 @@
 **Read these first (in order):**
 1. `docs/product/PRD.md` — the product vision and scope (v4).
 2. `docs/product/ARCHITECTURE.md` — how it's built: modules, the tick pipeline, the signal/event contract, the salvage map.
+   **UX/UI-first workbench:** `docs/product/UX_WORKBENCH_V1.md` — review the 3D workspace design and user flows before expanding P2/P3 engineering.
 3. `.claude/skills/automation-platform/SKILL.md` — the day-to-day developer guide and recipes. **Follow it when writing simulator code.**
 4. `docs/product/HANDOVER_CHECKLIST.md` — current status and what's next.
 
