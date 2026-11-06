@@ -22,12 +22,12 @@
 .dc-lab td,.dc-lab th{padding:9px;vertical-align:middle;border-bottom:1px solid #2b4356}
 .dc-lab td{font-size:12px}
 .dc-lab td small{display:block;font-size:11px}
-.dc-lab th{color:#aacbdb;font-size:11px}
+.dc-lab th{color:var(--ink);font-size:11px}
 .dc-lab td button{font-size:11px;margin:2px;padding:7px 9px}
 .dc-lab aside label{display:flex;flex-direction:column;gap:8px;margin:12px 0;font-size:13px}
 .dc-lab .dc-meter{font-family:ui-monospace,SFMono-Regular,monospace;text-align:center;background:#0b292b;border:2px solid #408f83;color:#b7ffca;word-break:break-word;font-size:clamp(18px,2vw,28px);font-weight:800;border-radius:8px;padding:20px 12px;min-height:75px}
 .dc-lab .dc-node-list{display:flex;flex-direction:column;gap:5px;max-height:270px;overflow:auto}
-.dc-lab .dc-node-list>div{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:6px 8px;background:#0d1d2d;border-radius:5px}
+.dc-lab .dc-node-list>div{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:6px 8px;background:#0d1d2d;color:#edf5ff;border-radius:5px}
 .dc-lab .dc-node-list strong{font-variant-numeric:tabular-nums;font-size:12px}
 .dc-lab .dc-node-list button{padding:5px 8px;font-size:11px}
 .dc-lab button:focus-visible,.dc-lab select:focus-visible,.dc-lab input:focus-visible{outline:2px solid #70efce;outline-offset:2px}
