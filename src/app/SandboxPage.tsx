@@ -2,7 +2,8 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ChangeEv
 import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, type ComponentKind } from '../components/registry';
 import { AppHeader } from '../ui/AppHeader';
-import { LadderEditor } from '../program/LadderEditor';
+import { ProgrammingDock } from '../program/ProgrammingDock';
+import { LiveMonitor } from '../program/LiveMonitor';
 import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
 import type { Command, ProjectFile, RenderSnapshot, WorkerResponse } from '../sim/signals';
 import './sandbox.css';
@@ -254,7 +255,12 @@ export function SandboxPage() {
           </div>
         </div>
         <WorkbenchInspector project={project ?? { formatVersion: 1, components: [], wires: [], program: { id: 'pending', version: '1', rungs: [] } }}
-          snapshot={snapshot ?? { tick: 0, running: false, components: [], wires: [], io: { Start: false, StopOK: false, Run: false, 'Q0.0': false, PlcPowered: false }, voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0, diagnostics: [], lastError: null }}
+          snapshot={snapshot ?? { tick: 0, running: false, components: [], wires: [],
+            io: { Start: false, StopOK: false, Run: false, 'Q0.0': false, PlcPowered: false },
+            voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
+            diagnostics: [], lastError: null, language: 'ladder',
+            tagValues: { Start: false, StopOK: false, Run: false },
+            ladderSteps: [], ladderMemory: {}, breakpointScan: null, breakpointHit: null }}
           selectedDevice={selectedDevice} selectedTerminal={selectedTerminal} editable={editable}
           onTerminal={connect} onCancelWire={() => setSelectedTerminal(null)}
           onMove={id => setMoveTarget(id)}
@@ -263,10 +269,14 @@ export function SandboxPage() {
       </div>
       <div className="sandbox-bottom">
         <div id="sandbox-stage-program" className="sandbox-program-dock">
-          {project && snapshot && <LadderEditor document={project.program} snapshot={snapshot}
-          disabled={!editable} onChange={program => send([{ k: 'loadProgram', program }])} />}
+          {project && snapshot && <ProgrammingDock project={project} snapshot={snapshot} disabled={!editable}
+            onLadder={program => send([{ k: 'loadProgram', program }])}
+            onST={source => send([{ k: 'loadST', source }])}
+            onLanguage={language => send([{ k: 'activateLanguage', language }])} />}
         </div>
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
+          {snapshot && <LiveMonitor snapshot={snapshot}
+            onBreakpoint={scan => send([{ k: 'breakAtScan', scan }])} />}
           <span className="eyebrow">Diagnostics</span><h2>Electrical &amp; event trace</h2>
           <p className="sandbox-help">Click a wire's remove button to break a connection and observe what changes. All values come from the simulator.</p>
           <details><summary>Example wiring map</summary><p>{wireGuide}</p></details>
@@ -285,7 +295,7 @@ export function SandboxPage() {
             <p className="sandbox-help">No changes recorded yet.</p>}</div>
         </aside>
       </div>
-      <p className="sandbox-disclaimer">Educational, simplified 24V DC simulation only. Not safety-rated or a substitute for real equipment commissioning. This P1 preview renders real 3D industrial equipment and wiring, but models only one PLC, one supply, a Ladder rung, a contactor and an ideal DC motor; advanced physics, FBD, more devices and higher electrical fidelity remain future phases.</p>
+      <p className="sandbox-disclaimer">Educational, simplified 24V DC simulation only. Not safety-rated or a substitute for commissioning. This P2 development preview uses real 3D equipment and wiring with bounded Ladder/ST PLC programming, up to eight rungs, real timer/counter scan memory and online monitoring. It does not model certified PLC hardware, industrial motor physics, full IEC languages or live machinery.</p>
     </main>
   </>;
 }
