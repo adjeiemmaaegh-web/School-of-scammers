@@ -13,6 +13,7 @@ const STORAGE_KEY = 'efo-open-sandbox-project-v1';
 const CANVAS_W = 1080, CANVAS_H = 580, BOX_W = 170;
 const wireGuide = 'Supply P24 → PLC L+, START A, STOP A, contactor 13. Supply M0 → PLC M, contactor A2, motor M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → contactor A1; contactor 14 → motor L+.';
 const sortingWireGuide = 'For 3D sorting: supply P24 → PLC L+, START A, STOP A, contactor 13, photoeye L+. Supply M0 → PLC M, contactor A2, conveyor M-, photoeye M, diverter A2. START B → I0.0; STOP B → I0.1; PLC Q0.0 → contactor A1; contactor 14 → conveyor L+. Photoeye OUT → PLC I0.2; PLC Q0.1 → diverter A1. Load the sorting Ladder example, Run, press START, and feed marked or plain parcels. Photoeye and diverter must be positioned alongside the conveyor in sensor→diverter order.';
+const tankWireGuide = 'For tank process: P24 to PLC L+, STOP A and level probe L+. M0 to PLC M, pump M-, level probe M and drain valve A2. STOP B to PLC I0.1; level probe OUT to PLC I0.3; PLC Q0.2 to pump L+; PLC Q0.3 to drain valve A1. Mount the pump, probe and valve near the tank. Load the tank control Ladder example, Run and observe filling to 750 ml, switching and drainage until 600 ml. Wrong PLC logic, miswiring or moving equipment alters the real result.';
 export function SandboxPage() {
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
   const [project, setProject] = useState<ProjectFile | null>(null);
@@ -103,6 +104,19 @@ export function SandboxPage() {
       k: 'place', id: `${d.kind}-${i + 1}`, kind: d.kind, at: { x: d.x, y: d.y },
     })));
   };
+  const layoutTank = () => {
+    if (project?.components.length) return;
+    setMoveTarget(null);
+    const devices: { kind: ComponentKind; x: number; y: number }[] = [
+      { kind: 'supply', x: 25, y: 25 }, { kind: 'plc', x: 310, y: 25 },
+      { kind: 'stop', x: 225, y: 245 }, { kind: 'tank', x: 680, y: 290 },
+      { kind: 'pump', x: 525, y: 280 }, { kind: 'levelprobe', x: 700, y: 360 },
+      { kind: 'drainvalve', x: 840, y: 360 },
+    ];
+    send(devices.map((d, i): Command => ({
+      k: 'place', id: `${d.kind}-${i + 1}`, kind: d.kind, at: { x: d.x, y: d.y },
+    })));
+  };
   const exportProject = () => {
     if (!project) return;
     const file = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
@@ -148,7 +162,8 @@ export function SandboxPage() {
           <span className={`sandbox-work-status ${snapshot?.running ? 'is-running' : ''}`}>
             <i aria-hidden="true" />{snapshot?.running ? 'SIMULATION RUNNING' : 'EDIT MODE'}
           </span>
-          <strong>{project?.components.some(c => c.kind === 'conveyor') ?
+          <strong>{project?.components.some(c => c.kind === 'tank') ? 'Untitled tank process project' :
+            project?.components.some(c => c.kind === 'conveyor') ?
             'Untitled conveyor sorting project' : 'Untitled motor-control project'}</strong>
           <small>{localSave === 'saved' ? 'Saved in this browser' :
             localSave === 'failed' ? 'Not saved — export your JSON' : 'Loading local project'}</small>
@@ -168,6 +183,8 @@ export function SandboxPage() {
         <button className="btn ghost small" onClick={layout} disabled={!editable || !!project?.components.length}>Place starter layout</button>
         <button className="btn ghost small" onClick={layoutSorting}
           disabled={!editable || !!project?.components.length}>Place 3D sorting layout</button>
+        <button className="btn ghost small" onClick={layoutTank}
+          disabled={!editable || !!project?.components.length}>Place 3D tank layout</button>
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
@@ -197,7 +214,9 @@ export function SandboxPage() {
               <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
                 {kind === 'plc' ? 'PLC' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
                   kind === 'conveyor' ? 'BELT' : kind === 'photoeye' ? 'EYE' :
-                  kind === 'diverter' ? 'DIV' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
+                  kind === 'diverter' ? 'DIV' : kind === 'tank' ? 'TANK' :
+                  kind === 'pump' ? 'PUMP' : kind === 'levelprobe' ? 'LVL' :
+                  kind === 'drainvalve' ? 'VAL' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
               </span>
               <span><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
               <span className="sandbox-add-device" aria-hidden="true">+</span>
@@ -231,7 +250,10 @@ export function SandboxPage() {
             <div className="sandbox-device-list">
               {project?.components.map(c => {
                 const def = COMPONENTS[c.kind];
-                const live = c.kind === 'conveyor' ? snapshot?.conveyorOn :
+                const live = c.kind === 'pump' ? snapshot?.pumpOn :
+                  c.kind === 'levelprobe' ? snapshot?.io.TankHigh :
+                  c.kind === 'drainvalve' ? snapshot?.drainOn :
+                  c.kind === 'conveyor' ? snapshot?.conveyorOn :
                   c.kind === 'photoeye' ? snapshot?.io.Photoeye :
                   c.kind === 'diverter' ? snapshot?.diverterOn :
                   c.kind === 'motor' ? snapshot?.motorOn : c.kind === 'contactor' ? snapshot?.contactorOn :
@@ -246,6 +268,10 @@ export function SandboxPage() {
                       c.kind === 'conveyor' ? (live ? 'BELT MOVING' : 'BELT STOPPED') :
                       c.kind === 'photoeye' ? (live ? 'MARK DETECTED' : 'NO MARK') :
                       c.kind === 'diverter' ? (live ? 'REJECT ACTIVE' : 'PASS') :
+                      c.kind === 'tank' ? `${Math.round(snapshot?.tank.levelMl ?? 0)} ml` :
+                      c.kind === 'pump' ? (live ? 'PUMPING' : 'STOPPED') :
+                      c.kind === 'levelprobe' ? (live ? 'HIGH LEVEL' : 'LOW LEVEL') :
+                      c.kind === 'drainvalve' ? (live ? 'DRAIN OPEN' : 'CLOSED') :
                       c.kind === 'supply' ? '24V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</span>
                   </div>
                   <div className="sandbox-patch-actions">
@@ -272,7 +298,8 @@ export function SandboxPage() {
           </details>
           <div className="sandbox-status panel">
             <div><span className="eyebrow">Live I/O</span><div className="sandbox-lamps">
-              {(['Start', 'StopOK', 'Photoeye', 'Run', 'Sort', 'Q0.0', 'Q0.1', 'PlcPowered'] as const).map(k =>
+              {(['Start', 'StopOK', 'Photoeye', 'TankHigh', 'Run', 'Sort', 'Fill', 'Drain',
+                  'Q0.0', 'Q0.1', 'Q0.2', 'Q0.3', 'PlcPowered'] as const).map(k =>
                 <span className={snapshot?.io[k] ? 'lit' : ''} key={k}><i />{k}</span>)}
               </div></div>
             <div><span className="eyebrow">Plant</span>
@@ -280,7 +307,11 @@ export function SandboxPage() {
               {project?.components.some(c => c.kind === 'conveyor') && <p>
                 Conveyor: <strong>{snapshot?.conveyorOn ? 'moving' : 'stopped'}</strong> ·
                 Mark eye: <strong>{snapshot?.io.Photoeye ? 'detected' : 'clear'}</strong> ·
-                Diverter: <strong>{snapshot?.diverterOn ? 'reject' : 'pass'}</strong></p>}</div>
+                Diverter: <strong>{snapshot?.diverterOn ? 'reject' : 'pass'}</strong></p>}
+              {project?.components.some(c => c.kind === 'tank') && <p>
+                Tank: <strong data-tank-brief>{Math.round(snapshot?.tank.levelMl ?? 0)} ml</strong> ·
+                Pump: <strong>{snapshot?.pumpOn ? 'on' : 'off'}</strong> ·
+                Drain: <strong>{snapshot?.drainOn ? 'open' : 'closed'}</strong></p>}</div>
           </div>
           {project?.components.some(c => c.kind === 'conveyor') && snapshot && <section
             className="sandbox-sorting-panel panel" aria-label="Conveyor sorting controls">
@@ -306,16 +337,42 @@ export function SandboxPage() {
             <details><summary>Wiring and logic for the sorting exercise</summary>
               <p className="sandbox-help">{sortingWireGuide}</p></details>
           </section>}
+          {project?.components.some(c => c.kind === 'tank') && snapshot && <section
+            className="sandbox-tank-panel panel" aria-label="Tank process controls">
+            <div className="sandbox-section-head"><div>
+              <span className="eyebrow">P3 · fluid handling</span>
+              <h2>Programmable tank process</h2></div>
+              <span className="status-pill is-idle">1000 ml · bounded process model</span></div>
+            <p className="sandbox-help">The real wired Q0.2 inlet pump fills the positioned vessel.
+              The level switch reports HIGH through I0.3 at 750 ml and clears below 600 ml.
+              Q0.3 operates the wired drain valve. All changes come from the worker scan.</p>
+            <div className="sandbox-tank-meter" role="progressbar" aria-label="Tank fill level"
+              aria-valuemin={0} aria-valuemax={1000} aria-valuenow={Math.round(snapshot.tank.levelMl)}>
+              <div className="sandbox-tank-meter-fill" style={{width: `${snapshot.tank.levelMl/10}%`}} />
+            </div>
+            <div className="sandbox-sort-metrics" aria-live="off">
+              <span>Level: <strong data-tank-level>{Math.round(snapshot.tank.levelMl)} ml</strong></span>
+              <span>High switch: <strong data-tank-high>{snapshot.io.TankHigh ? 'HIGH' : 'CLEAR'}</strong></span>
+              <span>Pump: <strong data-tank-pump>{snapshot.pumpOn ? 'ON' : 'OFF'}</strong></span>
+              <span>Drain: <strong data-tank-drain>{snapshot.drainOn ? 'OPEN' : 'CLOSED'}</strong></span>
+            </div>
+            <details><summary>Tank wiring and editable PLC example</summary>
+              <p className="sandbox-help">{tankWireGuide}</p></details>
+          </section>}
         </div>
         <WorkbenchInspector project={project ?? { formatVersion: 1, components: [], wires: [], program: { id: 'pending', version: '1', rungs: [] } }}
           snapshot={snapshot ?? { tick: 0, running: false, components: [], wires: [],
-            io: { Start: false, StopOK: false, Photoeye: false, Run: false, Sort: false,
-              'Q0.0': false, 'Q0.1': false, PlcPowered: false },
+            io: { Start: false, StopOK: false, Photoeye: false, TankHigh: false,
+              Run: false, Sort: false, Fill: false, Drain: false,
+              'Q0.0': false, 'Q0.1': false, 'Q0.2': false, 'Q0.3': false, PlcPowered: false },
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
             conveyorOn: false, diverterOn: false,
             plant: { parcel: null, lastParcelId: 0, photoeyeActive: false, accepted: 0, rejected: 0 },
+            tank: { levelMl: 0, highLevel: false, filledMl: 0, drainedMl: 0, spills: 0 },
+            pumpOn: false, drainOn: false,
             diagnostics: [], lastError: null, language: 'ladder',
-            tagValues: { Start: false, StopOK: false, Photoeye: false, Run: false, Sort: false },
+            tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false,
+              Run: false, Sort: false, Fill: false, Drain: false },
             ladderSteps: [], ladderMemory: {}, breakpointScan: null, breakpointHit: null,
             breakpointTag: null, scanTrace: [] }}
           selectedDevice={selectedDevice} selectedTerminal={selectedTerminal} editable={editable}
@@ -338,7 +395,8 @@ export function SandboxPage() {
           <span className="eyebrow">Diagnostics</span><h2>Electrical &amp; event trace</h2>
           <p className="sandbox-help">Click a wire's remove button to break a connection and observe what changes. All values come from the simulator.</p>
           <details><summary>Example wiring map</summary><p>{wireGuide}</p>
-            {project?.components.some(c => c.kind === 'conveyor') && <p>{sortingWireGuide}</p>}</details>
+            {project?.components.some(c => c.kind === 'conveyor') && <p>{sortingWireGuide}</p>}
+            {project?.components.some(c => c.kind === 'tank') && <p>{tankWireGuide}</p>}</details>
           <h3>Wires ({project?.wires.length ?? 0})</h3>
           <div className="sandbox-wire-list">{project?.wires.map(w =>
             <div key={w.id}><code>{w.from} → {w.to}</code>
@@ -354,7 +412,7 @@ export function SandboxPage() {
             <p className="sandbox-help">No changes recorded yet.</p>}</div>
         </aside>
       </div>
-      <p className="sandbox-disclaimer">Educational, simplified 24V DC simulation only. Not safety-rated or a substitute for commissioning. This P3 preview adds a genuine worker-driven 3D conveyor, marked-parcel optical detector and wired diverter with deterministic material routing. The underlying Ladder/ST and 24V circuit models remain educational and bounded; no factory-grade mechanics, automatic object recognition, hardware PLC, certified safety, full IEC coverage or real machinery are claimed.</p>
+      <p className="sandbox-disclaimer">Educational, simplified 24V DC simulation only. Not safety-rated or a substitute for commissioning. This P3 preview includes deterministic 3D sorting and a bounded tank with wired pump, high-level switch and drain valve. The underlying Ladder/ST and 24V circuit models remain educational and bounded; no factory-grade mechanics, automatic object recognition, hardware PLC, certified safety, full IEC coverage or real machinery are claimed.</p>
     </main>
   </>;
 }
