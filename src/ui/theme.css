@@ -1,0 +1,197 @@
+/* ============================================================
+   Skills Lab — design system
+   Warm-biased neutrals · deep-ink structure · hi-vis safety-amber accent.
+   Three theme states: system (prefers-color-scheme), and explicit
+   data-theme="light" / data-theme="dark".
+   ============================================================ */
+
+:root {
+  /* color — light */
+  --bg: #faf7f2;
+  --surface: #ffffff;
+  --surface-2: #f3eee6;
+  --ink: #17212e;
+  --muted: #5b6575;
+  --line: #e6dfd3;
+  --accent: #e8830d;
+  --accent-ink: #1c1204;
+  --band: #16202e;
+  --band-ink: #ede8df;
+  --band-muted: #95a1b2;
+  --band-line: #2a3647;
+  --ok: #2e8b63;
+  --warn: #d08a1a;
+  --crit: #c0432f;
+
+  /* scene (2.5D canvas) tokens — light */
+  --scene-bg: #eef2f5;
+  --scene-belt-1: #d9dee4;
+  --scene-belt-2: #eef1f4;
+  --scene-roller: #c3cbd4;
+  --scene-tread: #aab4bf;
+  --scene-line: #7d8995;
+  --scene-motor: #d7dde3;
+  --scene-parcel: #e8c48a;
+  --scene-shadow: rgba(23, 33, 46, 0.08);
+  --scene-dim: #c0c7ce;
+
+  /* type */
+  --display: "Archivo", "Archivo Expanded", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --radius: 12px;
+  --radius-lg: 18px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10151c;
+    --surface: #19212b;
+    --surface-2: #141b24;
+    --ink: #ece7df;
+    --muted: #9aa6b4;
+    --line: #2a333f;
+    --accent: #f59e1e;
+    --accent-ink: #1c1204;
+    --band: #0b1119;
+    --band-ink: #ece7df;
+    --band-muted: #8e9aa9;
+    --band-line: #232e3c;
+    --ok: #45b084;
+    --warn: #e0a93c;
+    --crit: #e0674f;
+    --scene-bg: #141c26;
+    --scene-belt-1: #202a36;
+    --scene-belt-2: #2a3542;
+    --scene-roller: #313d4b;
+    --scene-tread: #44525f;
+    --scene-line: #6b7988;
+    --scene-motor: #263241;
+    --scene-parcel: #c79a52;
+    --scene-shadow: rgba(0, 0, 0, 0.35);
+    --scene-dim: #3a4654;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #10151c;
+  --surface: #19212b;
+  --surface-2: #141b24;
+  --ink: #ece7df;
+  --muted: #9aa6b4;
+  --line: #2a333f;
+  --accent: #f59e1e;
+  --accent-ink: #1c1204;
+  --band: #0b1119;
+  --band-ink: #ece7df;
+  --band-muted: #8e9aa9;
+  --band-line: #232e3c;
+  --ok: #45b084;
+  --warn: #e0a93c;
+  --crit: #e0674f;
+  --scene-bg: #141c26;
+  --scene-belt-1: #202a36;
+  --scene-belt-2: #2a3542;
+  --scene-roller: #313d4b;
+  --scene-tread: #44525f;
+  --scene-line: #6b7988;
+  --scene-motor: #263241;
+  --scene-parcel: #c79a52;
+  --scene-shadow: rgba(0, 0, 0, 0.35);
+  --scene-dim: #3a4654;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4 {
+  font-family: var(--display);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0;
+}
+p { margin: 0; }
+a { color: inherit; text-decoration: none; }
+code, .mono { font-family: var(--mono); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  background: var(--accent); color: var(--accent-ink);
+  padding: 10px 16px; border-radius: 0 0 8px 0; font-weight: 600;
+}
+.skip-link:focus { left: 0; }
+
+/* layout */
+.wrap {
+  width: 100%; max-width: 1120px; margin-inline: auto;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+.wrap-wide { max-width: 1280px; }
+
+.eyebrow {
+  font-family: var(--mono); font-size: 12px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--accent); font-weight: 600;
+}
+
+/* buttons */
+.btn {
+  font-family: var(--body); font-weight: 600; font-size: 15px;
+  padding: 12px 18px; border-radius: 10px; border: 1px solid transparent;
+  cursor: pointer; text-decoration: none; display: inline-flex;
+  align-items: center; gap: 9px; justify-content: center;
+  background: var(--surface); color: var(--ink); line-height: 1.2;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:not(:disabled):hover { filter: brightness(1.05); }
+.btn.ghost { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.btn.ghost:not(:disabled):hover { border-color: var(--accent); }
+.btn.small { font-size: 13px; padding: 8px 13px; }
+.btn.block { width: 100%; }
+
+/* chips, pills */
+.chip {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.04em;
+  color: var(--muted); border: 1px solid var(--line);
+  border-radius: 999px; padding: 6px 12px; background: var(--surface);
+}
+.status-pill {
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  padding: 5px 11px; border-radius: 999px; letter-spacing: 0.02em;
+}
+.status-pill.is-ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); }
+.status-pill.is-idle { color: var(--muted); background: var(--surface-2); }
+.status-pill.is-crit { color: var(--crit); background: color-mix(in srgb, var(--crit) 15%, transparent); }
+
+/* cards & panels */
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 24px;
+}
+.panel {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 18px;
+}
+
+/* bands */
+.band { background: var(--surface-2); border-block: 1px solid var(--line); }
+.band-ink { background: var(--band); color: var(--band-ink); }
+.band-ink h1, .band-ink h2, .band-ink h3 { color: var(--band-ink); }
+.band-ink .muted, .band-ink p.sub { color: var(--band-muted); }
+
+.muted { color: var(--muted); }
+.tabular { font-variant-numeric: tabular-nums; }
