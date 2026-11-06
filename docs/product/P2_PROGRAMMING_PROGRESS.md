@@ -6,7 +6,7 @@
 
 The **existing single authoritative Web Worker** now runs either the salvaged `engineering/ladder.ts` interpreter or the bounded `engineering/structured-text.ts` interpreter, against the *same* wired 24V PLC input image and Q0.0/contactor/motor output path. Switching language resets scan memory; it does not introduce a second simulation engine.
 
-The Ladder editor supports up to eight sequential rungs, user-declared local BOOL tags (up to sixteen), series contacts, one-contact two-way parallel branches, NO/NC contacts, coil, TON/TOF/RTO/TP timers, CTU counter and OSR/OSF edge instructions. The runtime already supports some operations not fully editable in this increment; the UI must not imply those are complete. Timer elapsed time and counter values are updated by fixed simulation milliseconds, not browser animations.
+The Ladder editor supports up to eight sequential rungs, up to sixteen local BOOL/INT/DINT/REAL tags, series contacts, one-contact two-way parallel branches, NO/NC contacts, coil, TON/TOF/RTO/TP timers, CTU/CTD counters, OSR/OSF edge instructions, numeric compare instructions and MOV/ADD/SUB/MUL/DIV. The runtime already supports some operations not fully editable in this increment; the UI must not imply those are complete. Timer elapsed time and counter values are updated by fixed simulation milliseconds, not browser animations. Numeric registers persist between scans inside the same worker; arithmetic updates them in rung order and comparisons gate real Boolean outputs. Numeric results are type/range checked; division by zero or overflow pauses and deenergizes the simulated output, not actual machinery. Numeric support is intentionally limited to local tags (no analog field-device binding).
 
 The Structured Text editor is an actual code editor with compilation feedback and a bounded ST parser/interpreter. A typed `Run : BOOL` output (or untyped case-insensitive `run`) controls the real, wired motor. The P1 Ladder program remains saved when ST mode is active; switching back requires deliberate user selection and resets runtime state. Saved `formatVersion:1` JSON is backward compatible with pre-P2 projects missing the optional `language` and `stSource` fields.
 
@@ -21,11 +21,12 @@ Live monitoring displays worker-published PLC tags, timer/counter memory, an exa
 - `scripts/sandbox-p2-browser-acceptance.cjs` — actual browser place/wire/program/timer/ST/Run/scan-and-edge-breakpoints/CTD configuration end-to-end, added to CI.
 - `src/program/scan-trace.ts` — pure bounded scan trace, edge validation, and safe CSV serialization.
 - `tests/sandbox-p2-debugger.test.ts` — wired CTD count-down, rising/falling edge debug, 300-record bound, snapshot isolation, CSV injection defenses and malformed tag rejection.
+- `src/program/NumericInstructionControls.tsx`, `tests/sandbox-p2-numeric.test.ts`, `scripts/sandbox-p2-numeric-browser.cjs` — typed numeric instruction editor, numerical motor-control integration, invalid input/overflow tests, real end-to-end UI test.
 
 ## Still open in the full P2 roadmap
 
-- Typed non-BOOL Ladder tag table; general analog/digital I/O allocation beyond current 24V two-input/one-output demonstration.
-- Full graphical instructions for comparators, MOVE, arithmetic, extended functions/blocks and all Ladder operations in the PRD; CTD is now editable, but comprehensive IEC syntax coverage is **not** claimed.
+- Physical analog input/output allocation and rich typed address/memory mapping beyond current 24V two-input/one-output demonstration. Local BOOL/INT/DINT/REAL tags are implemented, but no physical analog registers exist.
+- Extended typed/composite instructions, richer expression graphs, function blocks and remaining Ladder operations from the PRD. Basic comparators and MOV/ADD/SUB/MUL/DIV are now integrated with explicit bounded registers; comprehensive IEC instruction/syntax coverage is **not** claimed.
 - More advanced rung/timer/counter threshold breakpoints, safe manual input forces with explicit indicators, multi-task PLC scheduling and full replayable instruction-level trace export. Boolean tag-edge and bounded scan CSV are **implemented but not full replay**.
 - Broad verified ST debugging for complex typed programs, language syntax highlighting/autocomplete and unsupported construct guidance.
 - Full cross-browser 3D interactive acceptance and low-spec physical Windows/Edge WebGL testing.
