@@ -177,7 +177,7 @@ Rules that are non-negotiable:
 
 Each phase ends with something runnable end-to-end. The **vertical slice first** principle (one complete sandbox scenario working through the whole loop) beats building modules in isolation.
 
-**Owner-approved UX-first gate:** after the first P1 3D vertical slice, complete a dedicated UX/UI workbench design review **before starting P2 programming depth or P3 plant expansion**. The design blueprint lives at [UX_WORKBENCH_V1.md](UX_WORKBENCH_V1.md): project navigation, device library, 3D canvas, contextual inspector, wiring panel, programming dock, diagnostics, mobile and keyboard/no-WebGL states. The reviewable prototype does not imply owner acceptance or production readiness; existing engine and employer assessments are preserved.
+**Owner-approved UX-first gate:** after the first P1 3D vertical slice, prepare a dedicated UX/UI workbench design review **before P2 programming depth or P3 plant expansion**. The design blueprint lives at [UX_WORKBENCH_V1.md](UX_WORKBENCH_V1.md): project navigation, device library, 3D canvas, contextual inspector, wiring panel, programming dock, diagnostics, mobile and keyboard/no-WebGL states. The owner subsequently authorized proceeding into P2 development from that prototype. This authorizes engineering continuation **not** production acceptance or merge. The current bounded P2 implementation and remaining gaps are tracked in [P2_PROGRAMMING_PROGRESS.md](P2_PROGRAMMING_PROGRESS.md); existing engine and employer assessments are preserved.
 
 | Phase | Theme | Exit (runnable) |
 |---|---|---|
