@@ -5,6 +5,7 @@
  * distance limit, terminate it correctly and prove the link.
  */
 import type { ExerciseDefinition, ExercisePlayProps, RubricResult } from '../../../platform/types';
+import { CameraArt, Scene as Scene2, SwitchArt } from '../../../ui/device-art';
 
 const DISTANCE_M = 85; // run length
 const MAX_M = 100; // Cat cable / PoE limit
@@ -90,20 +91,16 @@ function evaluate(s: S): RubricResult {
 function Scene({ s }: { s: S }) {
   const col = s.cable === 'cat6' ? 'var(--ok)' : s.cable === 'coax' ? 'var(--crit)' : 'var(--scene-dim)';
   return (
-    <svg className="plc-scene" viewBox="0 0 480 170" role="img" aria-label={`Cable run ${DISTANCE_M}m, ${s.cable}, link ${s.linkUp ? 'up' : 'down'}.`}>
-      {/* camera */}
-      <rect x="30" y="60" width="70" height="44" rx="8" fill="var(--scene-motor)" stroke="var(--scene-line)" />
-      <circle cx="65" cy="82" r="10" fill="none" stroke="var(--scene-line)" strokeWidth="2" />
-      <text x="65" y="122" textAnchor="middle" className="scene-label">CAMERA</text>
+    <Scene2 viewBox="0 0 480 170" label={`Cable run ${DISTANCE_M}m, ${s.cable}, link ${s.linkUp ? 'up' : 'down'}.`}>
+      <CameraArt x={26} y={44} scale={0.9} on={s.linkUp} />
+      <text x={60} y={118} textAnchor="middle" className="scene-label">CAMERA</text>
       {/* cable */}
-      <line x1="100" y1="82" x2="380" y2="82" stroke={col} strokeWidth="4" strokeDasharray={s.terminated ? '0' : '8 6'} />
-      <text x="240" y="70" textAnchor="middle" className="scene-label">{s.cable === 'none' ? 'no cable' : s.cable.toUpperCase()} · {DISTANCE_M}m</text>
-      {/* switch */}
-      <rect x="380" y="60" width="70" height="44" rx="8" fill="var(--scene-motor)" stroke="var(--scene-line)" />
-      <circle cx="415" cy="72" r="4" fill={s.linkUp ? 'var(--ok)' : 'var(--scene-dim)'} />
-      <text x="415" y="122" textAnchor="middle" className="scene-label">PoE SWITCH</text>
+      <line x1="100" y1="82" x2="372" y2="82" stroke={col} strokeWidth="4" strokeDasharray={s.terminated ? '0' : '8 6'} />
+      <text x="236" y="70" textAnchor="middle" className="scene-label">{s.cable === 'none' ? 'no cable' : s.cable.toUpperCase()} · {DISTANCE_M}m</text>
+      <SwitchArt x={360} y={66} scale={0.95} ports={8} lit={s.linkUp ? 1 : 0} />
+      <text x={415} y={118} textAnchor="middle" className="scene-label">PoE SWITCH</text>
       <text x="240" y="150" textAnchor="middle" className="scene-label" fill={s.linkUp ? 'var(--ok)' : 'var(--muted)'}>{s.tested ? (s.linkUp ? 'LINK UP · PoE OK' : 'NO LINK') : 'not tested'}</text>
-    </svg>
+    </Scene2>
   );
 }
 

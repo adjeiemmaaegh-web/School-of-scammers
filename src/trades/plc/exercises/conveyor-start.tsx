@@ -8,6 +8,7 @@
  */
 import { useId } from 'react';
 import type { ExerciseDefinition, ExercisePlayProps, RubricResult } from '../../../platform/types';
+import { ConveyorArt, MotorArt, ParcelArt, PhotoeyeArt, Scene, StackLightArt } from '../../../ui/device-art';
 import {
   initialMachine,
   inputs,
@@ -45,59 +46,21 @@ function ConveyorScene({ machine }: { machine: Machine }) {
   const running = machine.motor;
   const sensorOk = machine.sensorHealthy;
   return (
-    <svg
-      className="plc-scene"
+    <Scene
       viewBox="0 0 480 240"
-      role="img"
-      aria-label={`Conveyor scene. Motor is ${running ? 'running' : 'stopped'}. Sensor circuit is ${sensorOk ? 'healthy' : 'faulted'}.`}
+      label={`Conveyor scene. Motor is ${running ? 'running' : 'stopped'}. Sensor circuit is ${sensorOk ? 'healthy' : 'faulted'}.`}
     >
-      <defs>
-        <linearGradient id="belt" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="var(--scene-belt-2)" />
-          <stop offset="1" stopColor="var(--scene-belt-1)" />
-        </linearGradient>
-      </defs>
-      {/* floor shadow */}
-      <ellipse cx="240" cy="210" rx="190" ry="16" fill="var(--scene-shadow)" />
-      {/* belt body */}
-      <rect x="60" y="120" width="360" height="40" rx="8" fill="url(#belt)" stroke="var(--scene-line)" />
-      {/* rollers */}
-      {[82, 240, 398].map((cx) => (
-        <circle key={cx} cx={cx} cy="140" r="22" fill="var(--scene-roller)" stroke="var(--scene-line)" strokeWidth="2" />
-      ))}
-      {/* belt tread marks (animate when running) */}
-      <g className={running ? 'belt-move' : ''}>
-        {[90, 150, 210, 270, 330, 390].map((x) => (
-          <line key={x} x1={x} y1="124" x2={x} y2="156" stroke="var(--scene-tread)" strokeWidth="3" />
-        ))}
-      </g>
-      {/* parcel on belt */}
+      <ConveyorArt x={58} y={104} length={360} running={running} />
       <g className={running ? 'parcel-move' : ''}>
-        <rect x="120" y="92" width="34" height="30" rx="3" fill="var(--scene-parcel)" stroke="var(--scene-line)" />
-        <line x1="137" y1="92" x2="137" y2="122" stroke="var(--scene-line)" strokeWidth="1.5" />
+        <ParcelArt x={120} y={100} />
       </g>
-      {/* motor */}
-      <g>
-        <rect x="396" y="150" width="54" height="44" rx="6" fill="var(--scene-motor)" stroke="var(--scene-line)" />
-        <circle cx="423" cy="172" r="12" fill="none" stroke="var(--scene-line)" strokeWidth="2" className={running ? 'spin' : ''} />
-        <path d="M423 162v20M413 172h20" stroke="var(--scene-line)" strokeWidth="2" className={running ? 'spin' : ''} />
-        <text x="423" y="208" textAnchor="middle" className="scene-label">MOTOR</text>
-        <circle cx="440" cy="158" r="4" fill={running ? 'var(--ok)' : 'var(--scene-dim)'} />
-      </g>
-      {/* photoeye sensor */}
-      <g>
-        <rect x="208" y="60" width="26" height="20" rx="3" fill={sensorOk ? 'var(--scene-motor)' : 'var(--crit)'} stroke="var(--scene-line)" />
-        <line x1="221" y1="80" x2="221" y2="116" stroke={sensorOk ? 'var(--ok)' : 'var(--crit)'} strokeWidth="2" strokeDasharray="4 3" />
-        <text x="221" y="52" textAnchor="middle" className="scene-label">{sensorOk ? 'SENSOR' : 'SENSOR ✕'}</text>
-      </g>
-      {/* status tower */}
-      <g>
-        <rect x="30" y="96" width="16" height="64" rx="4" fill="var(--scene-motor)" stroke="var(--scene-line)" />
-        <circle cx="38" cy="110" r="5" fill={machine.estop ? 'var(--crit)' : 'var(--scene-dim)'} />
-        <circle cx="38" cy="128" r="5" fill={!running && !machine.estop ? 'var(--warn)' : 'var(--scene-dim)'} />
-        <circle cx="38" cy="146" r="5" fill={running ? 'var(--ok)' : 'var(--scene-dim)'} />
-      </g>
-    </svg>
+      <MotorArt x={384} y={150} scale={0.78} running={running} />
+      <PhotoeyeArt x={232} y={58} healthy={sensorOk} beamLen={56} />
+      <text x={244} y={48} textAnchor="middle" className="scene-label" fill={sensorOk ? 'var(--muted)' : 'var(--crit)'}>
+        {sensorOk ? 'PHOTOEYE' : 'PHOTOEYE ✕'}
+      </text>
+      <StackLightArt x={40} y={96} red={machine.estop} amber={!running && !machine.estop} green={running} />
+    </Scene>
   );
 }
 

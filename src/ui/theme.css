@@ -34,6 +34,11 @@
   --scene-parcel: #e8c48a;
   --scene-shadow: rgba(23, 33, 46, 0.08);
   --scene-dim: #c0c7ce;
+  --scene-metal-hi: #f3f6f9;
+  --scene-metal-lo: #b9c3cd;
+  --scene-steel: #9aa6b2;
+  --scene-lens: #1b2735;
+  --scene-glass: #cad7e3;
 
   /* type */
   --display: "Archivo", "Archivo Expanded", system-ui, sans-serif;
@@ -72,6 +77,11 @@
     --scene-parcel: #c79a52;
     --scene-shadow: rgba(0, 0, 0, 0.35);
     --scene-dim: #3a4654;
+    --scene-metal-hi: #35424f;
+    --scene-metal-lo: #141c25;
+    --scene-steel: #46535f;
+    --scene-lens: #070c11;
+    --scene-glass: #2e3d4c;
     color-scheme: dark;
   }
 }
@@ -102,6 +112,11 @@
   --scene-parcel: #c79a52;
   --scene-shadow: rgba(0, 0, 0, 0.35);
   --scene-dim: #3a4654;
+  --scene-metal-hi: #35424f;
+  --scene-metal-lo: #141c25;
+  --scene-steel: #46535f;
+  --scene-lens: #070c11;
+  --scene-glass: #2e3d4c;
   color-scheme: dark;
 }
 

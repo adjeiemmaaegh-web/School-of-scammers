@@ -5,6 +5,7 @@
  * the gateway, and add it to the NVR so it comes online.
  */
 import type { ExerciseDefinition, ExercisePlayProps, RubricResult } from '../../../platform/types';
+import { CameraArt, NvrArt, Scene as Scene2, SwitchArt } from '../../../ui/device-art';
 
 const SUBNET = '192.168.1'; // /24
 const NVR_IP = '192.168.1.1';
@@ -90,20 +91,17 @@ function evaluate(s: S): RubricResult {
 
 function Scene({ s }: { s: S }) {
   return (
-    <svg className="plc-scene" viewBox="0 0 480 180" role="img" aria-label="NVR, switch and camera network.">
-      <rect x="30" y="60" width="90" height="50" rx="8" fill="var(--scene-motor)" stroke="var(--scene-line)" />
-      <text x="75" y="88" textAnchor="middle" className="scene-label">NVR</text>
-      <text x="75" y="100" textAnchor="middle" className="scene-label">{NVR_IP}</text>
-      <line x1="120" y1="85" x2="200" y2="85" stroke="var(--scene-line)" strokeWidth="3" />
-      <rect x="200" y="60" width="80" height="50" rx="8" fill="var(--scene-motor)" stroke="var(--scene-line)" />
-      <text x="240" y="90" textAnchor="middle" className="scene-label">SWITCH</text>
-      <line x1="280" y1="85" x2="360" y2="85" stroke={online(s) ? 'var(--ok)' : 'var(--scene-dim)'} strokeWidth="3" />
-      <rect x="360" y="60" width="90" height="50" rx="8" fill="var(--scene-motor)" stroke={online(s) ? 'var(--ok)' : 'var(--scene-line)'} strokeWidth={online(s) ? 2.4 : 1.6} />
-      <circle cx="405" cy="72" r="4" fill={online(s) ? 'var(--ok)' : 'var(--crit)'} />
-      <text x="405" y="92" textAnchor="middle" className="scene-label">CAMERA</text>
-      <text x="405" y="104" textAnchor="middle" className="scene-label">{s.ip ?? '—'}</text>
-      <text x="240" y="150" textAnchor="middle" className="scene-label" fill={online(s) ? 'var(--ok)' : 'var(--muted)'}>{online(s) ? 'CHANNEL ONLINE' : s.added ? 'camera unreachable' : 'existing cam: ' + EXISTING_CAM}</text>
-    </svg>
+    <Scene2 viewBox="0 0 480 180" label="NVR, switch and camera network.">
+      <NvrArt x={14} y={54} scale={0.8} online={online(s)} />
+      <text x={64} y={112} textAnchor="middle" className="scene-label">{NVR_IP}</text>
+      <line x1="104" y1="78" x2="188" y2="78" stroke="var(--scene-line)" strokeWidth="3" />
+      <SwitchArt x={186} y={60} scale={0.78} ports={8} lit={online(s) ? 2 : 1} />
+      <text x={232} y={112} textAnchor="middle" className="scene-label">SWITCH</text>
+      <line x1="284" y1="78" x2="356" y2="78" stroke={online(s) ? 'var(--ok)' : 'var(--scene-dim)'} strokeWidth="3" />
+      <CameraArt x={356} y={52} kind="dome" on={online(s)} />
+      <text x={388} y={102} textAnchor="middle" className="scene-label">{s.ip ?? '—'}</text>
+      <text x="240" y="156" textAnchor="middle" className="scene-label" fill={online(s) ? 'var(--ok)' : 'var(--muted)'}>{online(s) ? 'CHANNEL ONLINE' : s.added ? 'camera unreachable' : 'existing cam: ' + EXISTING_CAM}</text>
+    </Scene2>
   );
 }
 

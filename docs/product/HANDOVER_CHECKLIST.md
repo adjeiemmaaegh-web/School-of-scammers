@@ -98,12 +98,16 @@ The previous developer was let go. They delivered a real, well-tested **PLC simu
 - [x] Employer review of returned result (rubric + evidence)
 - [ ] Nice-to-have later: visual replay of the evidence timeline
 
-### Phase 4 — Second trade 🚧 (CCTV)
+### Phase 4 — Second trade ✅ (CCTV, full 1–10)
 - [x] Second trade chosen: **CCTV install** (owner decision)
 - [x] Implemented as a trade module against the contract — **no shell/engine forks** (`src/trades/cctv/`, registered in `registry.ts`)
-- [x] Starter ladder (ranks 1–5): camera coverage & aiming, cable & termination, IP addressing & NVR, PoE power budget, offline-fault diagnosis (seeded)
-- [x] Each verified headless (correct path → 100%); CCTV flipped from "coming soon" to available
-- [ ] Author CCTV ranks 6–10 (designed as planned rungs)
+- [x] **Full 1–10 ladder authored & playable**: camera aiming, cable & termination, IP/NVR, PoE budget, offline diagnosis (seeded), night & IR, storage & retention sizing, multi-camera coverage, bandwidth & stream profiles, system handover (seeded capstone)
+- [x] Each verified headless (correct path → 100%); CCTV is available in the picker
+
+### Device artwork ✅
+- [x] Reusable, theme-aware SVG device-art library (`src/ui/device-art.tsx`): motor, conveyor, photoeye, stack light, contactor, CCTV camera (bullet/dome), NVR, PoE switch, parcel — with gradients/shading
+- [x] Applied to the flagship PLC conveyor scene and the CCTV cable/IP/night/storage/coverage scenes so they read as real equipment
+- [x] Note: these are code-drawn SVG assets (no external images needed). Photographic device art per PRD §12 remains optional and owner-sourced if ever wanted.
 
 ### Phase 5 — Backend & accounts
 - [ ] Confirm Supabase (or alternative)
