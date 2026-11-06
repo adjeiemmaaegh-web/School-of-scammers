@@ -18,6 +18,7 @@ export type WorldState = {
   ladderMemory: LadderMemory;
   contactorOn: boolean;
   motorOn: boolean;
+  motorAngleRad: number;
   powered: boolean;
   inputs: { Start: boolean; StopOK: boolean };
   voltages: Record<string, number | null>;
@@ -43,6 +44,7 @@ export type RenderSnapshot = {
   voltages: Record<string, number | null>;
   contactorOn: boolean;
   motorOn: boolean;
+  motorAngleRad: number;
   diagnostics: string[];
   lastError: string | null;
 };
