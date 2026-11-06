@@ -7,6 +7,7 @@ import { ExercisePage } from './ExercisePage';
 import { EmployerPage } from './EmployerPage';
 import { CandidatePage } from './CandidatePage';
 import { AppHeader } from '../ui/AppHeader';
+import { SandboxPage } from './SandboxPage';
 
 /* Legacy engine lab surfaces — kept reachable under /labs/* so the salvaged
    simulation engine stays exercised and nothing is orphaned during the rebuild. */
@@ -85,6 +86,7 @@ export function App() {
       <a className="skip-link" href="#main">Skip to main content</a>
       <Routes>
         <Route path="/" element={<FrontDoor />} />
+        <Route path="/sandbox" element={<SandboxPage />} />
         <Route path="/trades" element={<TradePicker />} />
         <Route path="/trade/:tradeId" element={<TradeLadder />} />
         <Route path="/exercise/:exerciseId" element={<ExercisePage />} />
