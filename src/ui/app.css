@@ -206,6 +206,13 @@ body::before {
 .criterion-bar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
 .criterion small { color: var(--muted); font-size: 12.5px; }
 .result-actions { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.action-trail { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+.trail-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 9px; max-height: 260px; overflow: auto; }
+.trail-list li { display: flex; gap: 12px; align-items: baseline; font-size: 13px; }
+.trail-list li.rejected .trail-detail code { color: var(--crit); }
+.trail-time { font-family: var(--mono); font-size: 11.5px; color: var(--muted); flex: 0 0 auto; min-width: 38px; }
+.trail-detail { color: var(--ink); }
+.trail-detail code { font-size: 11.5px; color: var(--muted); margin-right: 4px; }
 
 /* ---- exercise simulation (shared sim chrome) ---- */
 .exercise-sim { display: flex; flex-direction: column; gap: 16px; }

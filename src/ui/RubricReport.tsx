@@ -1,4 +1,10 @@
+import { useState } from 'react';
 import type { AttemptResult, ExerciseMode } from '../platform/types';
+
+function fmtTime(ms: number): string {
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
 
 export function RubricReport({
   result,
@@ -12,6 +18,7 @@ export function RubricReport({
   actions?: React.ReactNode;
 }) {
   const { rubric } = result;
+  const [trailOpen, setTrailOpen] = useState(mode === 'assessment');
   const pct = rubric.max > 0 ? Math.round((rubric.score / rubric.max) * 100) : 0;
   const state = rubric.safetyHold ? 'crit' : rubric.passed ? 'ok' : 'warn';
 
@@ -48,6 +55,27 @@ export function RubricReport({
           );
         })}
       </div>
+
+      {result.evidence.length > 0 && (
+        <div className="action-trail">
+          <button className="hints-toggle" onClick={() => setTrailOpen(!trailOpen)} aria-expanded={trailOpen}>
+            <span className="panel-eyebrow">Action trail · {result.evidence.length} steps</span>
+            <span>{trailOpen ? '−' : '+'}</span>
+          </button>
+          {trailOpen && (
+            <ol className="trail-list">
+              {result.evidence.map((e) => (
+                <li key={e.index} className={e.accepted ? '' : 'rejected'}>
+                  <span className="trail-time tabular">{fmtTime(e.at)}</span>
+                  <span className="trail-detail">
+                    <code>{e.action}</code> {e.detail}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
 
       <p className="muted small">
         Attempt took {Math.round(result.durationMs / 1000)}s · {result.evidence.length} recorded actions.
