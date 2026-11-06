@@ -21,7 +21,7 @@ export const COMPONENTS: Record<ComponentKind, Definition> = {
 };
 export const componentKinds = Object.keys(COMPONENTS) as ComponentKind[];
 export function terminalExists(terminalId: string, components: readonly { id: string; kind: ComponentKind }[]): boolean {
-  const dot = terminalId.lastIndexOf('.');
+  const dot = terminalId.indexOf('.');
   if (dot < 1) return false;
   const id = terminalId.slice(0, dot), terminal = terminalId.slice(dot + 1);
   const component = components.find(c => c.id === id);
