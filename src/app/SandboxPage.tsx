@@ -276,7 +276,8 @@ export function SandboxPage() {
         </div>
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
           {snapshot && <LiveMonitor snapshot={snapshot}
-            onBreakpoint={scan => send([{ k: 'breakAtScan', scan }])} />}
+            onBreakpoint={scan => send([{ k: 'breakAtScan', scan }])}
+            onTagBreakpoint={breakpoint => send([{ k: 'breakOnTag', breakpoint }])} />}
           <span className="eyebrow">Diagnostics</span><h2>Electrical &amp; event trace</h2>
           <p className="sandbox-help">Click a wire's remove button to break a connection and observe what changes. All values come from the simulator.</p>
           <details><summary>Example wiring map</summary><p>{wireGuide}</p></details>
