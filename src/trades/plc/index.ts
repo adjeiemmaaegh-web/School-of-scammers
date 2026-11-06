@@ -1,5 +1,6 @@
 import type { PlannedExercise, TradeModule } from '../../platform/types';
 import { conveyorStart } from './exercises/conveyor-start';
+import { sensorWiring } from './exercises/sensor-wiring';
 
 /**
  * PLC & industrial automation — the flagship trade.
@@ -8,7 +9,6 @@ import { conveyorStart } from './exercises/conveyor-start';
  */
 const planned: PlannedExercise[] = [
   { rank: 2, title: 'Motor seal-in & stop interlock', summary: 'Build a latching start/stop rung with a seal-in contact and a stop permissive.', estMinutes: 25 },
-  { rank: 3, title: '24V sensor to PLC input', summary: 'Wire a discrete sensor to an input card and confirm the signal in the I/O image.', estMinutes: 25 },
   { rank: 4, title: 'Timed conveyor run-on', summary: 'Add an on-delay timer so the belt runs on after the part clears the photoeye.', estMinutes: 30 },
   { rank: 5, title: 'Part counting & batch stop', summary: 'Count parts with a CTU and stop the line when a batch target is reached.', estMinutes: 35 },
   { rank: 6, title: 'Motor starter fault diagnosis', summary: 'Diagnose fuse, overload and contactor faults from I/O and feedback evidence.', estMinutes: 40 },
@@ -25,6 +25,6 @@ export const plcModule: TradeModule = {
     blurb: 'Program ladder logic, wire 24V control circuits, diagnose faults and commission machines.',
     status: 'available',
   },
-  exercises: [conveyorStart],
+  exercises: [conveyorStart, sensorWiring],
   planned,
 };
