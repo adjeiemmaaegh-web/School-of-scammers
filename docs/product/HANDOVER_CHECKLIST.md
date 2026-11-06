@@ -34,6 +34,14 @@ Development branch `feat/p0-p1-sandbox-foundation`; draft review PR #14. **Owner
 
 **Release status:** REVIEW / NO-GO for merging to `main` until owner review and any required remaining real-device / graphics browser gates are resolved. Do not imply feature/accuracy parity with Factory I/O. Next practical task after P1 review is expanding the device library and PLC programming depth under the 3D-first roadmap, keeping all functionality frontend-only.
 
+## P2 programming continuation (owner-authorized source work; review-only)
+
+After the owner approved proceeding from the UX-first prototype, P2 source work started on branch `engineering/p2-plc-programming`, draft PR #16, stacked on unmerged UX PR #15 and 3D PR #14. It retains the 3D workbench and both assessment/exercise routes with **no backend**. The actual PLC worker now runs either (1) a multi-rung LadderDocument (up to eight networks, local BOOL tags, timers, CTU and edge operations) or (2) compiled bounded Structured Text, with a single physical output mapping to Q0.0. The ST AST is compiled on language activation, cached in worker state, and re-used across scans. Worker-published tag values, per-rung memory, real editor feedback and an after-scan breakpoint feed the approved programming/diagnostics interface. Old `formatVersion:1` JSON remains importable.
+
+Program and UI evidence: `tests/sandbox-p2-programming.test.ts` covers wired motor behavior under TON, CTU and ST, case-insensitive ST `Run`, malformed programs, scan breakpoints and legacy projects. `scripts/sandbox-p2-browser-acceptance.cjs` creates the 11-wire circuit in a browser, edits two Ladder rungs and a real TON, then compiles/runs ST and arms a real worker breakpoint. `docs/product/P2_PROGRAMMING_PROGRESS.md` lists the explicit remaining P2 features; **this is a bounded increment, NOT full P2 exit.** New program semantics do not imply IEC 61131-3 fidelity, certified safety, or physical equipment acceptance. CI evidence must be recorded for the final commit before acceptance.
+
+The developer has not merged PR #14, #15 or #16 or promoted an external deployment. Owner review, real WebGL/low-spec physical Windows and complete P2 feature gates remain open.
+
 ## Earlier progress — v3 product (shipped, retained as the assessment layer)
 
 > **Status:** v3 is complete and live: two trades with full 1–10 ladders (PLC + CCTV = 20 playable exercises), two-audience shell, local employer→candidate assessment with evidence trail, device-art visuals, mobile-ready, branded "EFO Skill Lab". This is the assessment layer referenced above.
