@@ -161,7 +161,7 @@
 }
 .sandbox-workflow-number {
   flex:0 0 auto; display:inline-grid; place-items:center; width:33px; height:33px;
-  border-radius:8px; font:700 12px var(--mono); background:var(--line); color:var(--muted);
+  border-radius:8px; font:700 12px var(--mono); background:var(--surface); border:1px solid var(--line); color:var(--ink);
 }
 .sandbox-workflow .active .sandbox-workflow-number { color:var(--accent-ink); background:var(--accent); }
 .sandbox-workflow button > span:nth-child(2) { min-width:0; display:flex; flex-direction:column; gap:2px; }
