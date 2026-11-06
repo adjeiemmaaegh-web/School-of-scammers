@@ -83,7 +83,7 @@ async function setNativeInput(page,selector,value) {
     await setNativeInput(page,`${compare} input[aria-label="Right operand constant"]`,'1000');
     await clickText(page,'▶ Run');
     await page.waitForFunction(() =>
-      Number(document.querySelector('.sandbox-scan')?.textContent.replace(/\\D/g,'')) >= 8,
+      Number(document.querySelector('.sandbox-scan')?.textContent.replace(/\D/g,'')) >= 8,
       { timeout: 7000 });
     await page.waitForFunction(()=>document.querySelector('[data-device-id="motor-4"] .sandbox-device-status')?.textContent==='STOPPED',{timeout:7000});
     assert.deepEqual(errors,[]);
