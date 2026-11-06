@@ -120,6 +120,25 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
     <mesh position={[-0.28,0.65,-0.3]}><sphereGeometry args={[0.06,8,8]} />
       <meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.5} /></mesh>
   </group>;
+  if (kind === 'breaker' || kind === 'overload') return <group>
+    <mesh position={[0, 0.47, 0]}><boxGeometry args={[0.84,0.83,0.68]} />
+      <meshStandardMaterial color={COLORS.chassis} metalness={0.22} /></mesh>
+    <mesh position={[0,0.53,-0.355]}><boxGeometry args={[0.56,0.48,0.04]} />
+      <meshStandardMaterial color={COLORS.panel} /></mesh>
+    <group rotation={[0,0,active ? 0 : -0.75]}>
+      <mesh position={[0,0.62,-0.41]}><boxGeometry args={[0.12,0.43,0.12]} />
+        <meshStandardMaterial color={active ? COLORS.live : '#e76c66'} metalness={0.3} /></mesh>
+    </group>
+    <mesh position={[0.29,0.84,-0.38]}><sphereGeometry args={[0.06,10,8]} />
+      <meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.48} /></mesh>
+  </group>;
+  if (kind === 'lamp') return <group>
+    <mesh position={[0,0.20,0]}><cylinderGeometry args={[0.40,0.40,0.18,18]} />
+      <meshStandardMaterial color={COLORS.panel} metalness={0.5} /></mesh>
+    <mesh position={[0,0.53,0]}><sphereGeometry args={[0.33,18,14]} />
+      <meshStandardMaterial color={active ? '#f4bc65' : '#637382'}
+        emissive={active ? '#e8a438' : '#000000'} emissiveIntensity={active ? 0.9 : 0} /></mesh>
+  </group>;
   if (kind === 'motor') return <group>
     <mesh position={[0, 0.46, 0]} rotation={[0, 0, Math.PI / 2]}>
       <cylinderGeometry args={[0.34, 0.34, 0.84, 18]} /><meshStandardMaterial color={active ? '#247f72' : COLORS.chassis} metalness={0.35} roughness={0.5} />
@@ -200,6 +219,9 @@ function Device3D({ c, active, motorAngleRad, parcel, tankLevelMl, editable, sel
           c.kind === 'pump' ? (active ? 'PUMPING' : 'STOPPED') :
           c.kind === 'levelprobe' ? (active ? 'HIGH LEVEL' : 'LOW LEVEL') :
           c.kind === 'drainvalve' ? (active ? 'DRAIN OPEN' : 'CLOSED') :
+          c.kind === 'breaker' ? (active ? 'CLOSED' : 'TRIPPED') :
+          c.kind === 'overload' ? (active ? '95-96 CLOSED' : 'TRIPPED') :
+          c.kind === 'lamp' ? (active ? 'ILLUMINATED' : 'OFF') :
           c.kind === 'supply' ? '24 V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</small>
         {(c.kind === 'start' || c.kind === 'stop') && <button type="button"
           disabled={false} onPointerDown={e => e.stopPropagation()}
@@ -279,6 +301,9 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
         c.kind === 'pump' ? snapshot.pumpOn :
         c.kind === 'drainvalve' ? snapshot.drainOn :
         c.kind === 'levelprobe' ? snapshot.io.TankHigh :
+        c.kind === 'breaker' ? !snapshot.breakerTripped :
+        c.kind === 'overload' ? !snapshot.overloadTripped :
+        c.kind === 'lamp' ? snapshot.lampOn :
         c.kind === 'start' || c.kind === 'stop' ? c.pressed : false}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect} />)}
     <OrbitControls makeDefault enablePan enableZoom enableRotate
