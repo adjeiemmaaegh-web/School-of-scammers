@@ -113,6 +113,14 @@ describe('P2 real worker programming modes and scan-state contract', () => {
     expect(runtime.running).toBe(false);
     expect(runtime.lastError).toMatch(/Run output must be BOOL/);
   });
+  it('maps case-insensitive ST output to canonical wired Run/Q0.0', () => {
+    let w = tick(build(), [{ k: 'loadST', source: 'run := Start AND StopOK;' },
+      { k: 'operate', id: 'start', pressed: true }, { k: 'run' }]).world;
+    w = scan(w, 5);
+    expect(w.coils.Run).toBe(true);
+    expect(renderSnapshot(w).io['Q0.0']).toBe(true);
+    expect(w.motorOn).toBe(true);
+  });
   it('handles future scan breakpoints without forcing any I/O', () => {
     let w = tick(build(), [{ k: 'breakAtScan', scan: 3 },
       { k: 'operate', id: 'start', pressed: true }, { k: 'run' }]).world;
