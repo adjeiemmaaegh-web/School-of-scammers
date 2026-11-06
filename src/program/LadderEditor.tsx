@@ -6,7 +6,7 @@ import { blankProgram, latchProgram } from '../sim/orchestrator';
 import { MAX_SANDBOX_RUNGS, MAX_SANDBOX_SYMBOLS } from './p2-contract';
 
 type Props = { document: LadderDocument; snapshot: RenderSnapshot; disabled: boolean; onChange: (doc: LadderDocument) => void };
-const BUILT_INS = ['Start', 'StopOK', 'Run', 'Unused'];
+const BUILT_INS = ['Start', 'StopOK', 'Photoeye', 'Run', 'Sort', 'Unused'];
 const operationFor = (kind: string, target: string): RungOperation | undefined => {
   if (kind === 'coil') return undefined;
   if (kind === 'ton' || kind === 'tof' || kind === 'rto' || kind === 'tp') return { kind, presetMs: 250 };
@@ -42,7 +42,7 @@ export function LadderEditor({ document, snapshot, disabled, onChange }: Props) 
   const numericTags = symbols.filter(tag => ['INT','DINT','REAL'].includes(document.symbols![tag].type ?? 'BOOL'));
   const boolSymbols = symbols.filter(tag => !numericTags.includes(tag));
   const tags = Array.from(new Set([...BUILT_INS, ...boolSymbols, ...document.rungs.map(r => r.coil)]));
-  const coils = Array.from(new Set(['Run', 'Unused', ...boolSymbols]));
+  const coils = Array.from(new Set(['Run', 'Sort', 'Unused', ...boolSymbols]));
   const live: Record<string, boolean | number> = { ...snapshot.tagValues, Unused: false };
 
   const patchRung = (rungId: string, replacement: Rung) => onChange({
