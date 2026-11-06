@@ -45,6 +45,7 @@ export function FrontDoor() {
         }
       />
 
+      <main id="main" tabIndex={-1}>
       {/* Hero */}
       <section className="hero">
         <div className="wrap wrap-wide hero-grid">
@@ -244,6 +245,7 @@ export function FrontDoor() {
         </div>
       </section>
 
+      </main>
       <footer className="site-foot">
         <div className="wrap wrap-wide foot-inner">
           <span>{BRAND.name}</span>
