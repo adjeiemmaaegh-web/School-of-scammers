@@ -19,7 +19,7 @@ async function main(){
    await pause(500);
   }
   assert.equal(serving,true,'Compiled Vite preview must launch on Windows');
-  browser=await chromium.launch({channel:'msedge',headless:true});
+  browser=await chromium.launch({channel:'msedge',headless:true,args:['--enable-webgl','--use-angle=d3d11']});
   const page=await browser.newPage({viewport:{width:1280,height:800}});
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   const routes=['/','/engineering','/workcell-composer','/process-control','/assessments','/dc-circuit'];
@@ -27,6 +27,25 @@ async function main(){
    const response=await page.goto(base+route,{waitUntil:'domcontentloaded',timeout:35000});
    assert.ok(response?.ok(),'Edge route '+route);
    await page.locator('h1').first().waitFor({timeout:20000});
+  }
+  await page.goto(base+'/sandbox',{waitUntil:'domcontentloaded'});
+  await page.locator('.sandbox-3d-shell').waitFor({timeout:20000});
+  await page.waitForFunction(() => !!document.querySelector('canvas.sandbox-three-canvas') ||
+    !!document.querySelector('.sandbox-3d-fallback'), { timeout:20000 });
+  const graphics = await page.evaluate(() => {
+    const canvas=document.querySelector('canvas.sandbox-three-canvas');
+    return {rendered3D:!!canvas && canvas.width>0 && canvas.height>0,
+      fallback:document.querySelector('.sandbox-3d-fallback')?.textContent?.trim()??null};
+  });
+  if(graphics.rendered3D){
+    await page.getByRole('button',{name:'Place starter layout'}).first().click();
+    await page.locator('[data-scene-terminal-id="plc-2.I0.0"]').waitFor({timeout:10000});
+    assert.equal(await page.locator('.sandbox-device').count(),6,'3D workbench and patch panel must agree on placed devices');
+    console.log('NATIVE EDGE 3D WEBGL PASS: live 3D device terminals and patch panel are available');
+  }else{
+    assert.ok(graphics.fallback?.includes('3D renderer unavailable'),
+      '3D unavailable message must be explicit when Windows host disables WebGL');
+    console.log('NATIVE EDGE 3D WEBGL UNVERIFIED: hosted runner disabled WebGL; real WebGL acceptance remains OPEN');
   }
   await page.goto(base+'/workcell-composer',{waitUntil:'domcontentloaded'});
   await page.getByLabel('Commissioning scenario template').selectOption('packaging-cell');
@@ -51,7 +70,7 @@ async function main(){
   const report={scope:'GitHub-hosted Windows Edge browser, not 8GB owner hardware',
    validHardwareAcceptance:false,validSafariAcceptance:false,validMobileDeviceAcceptance:false,
    platform:os.platform(),release:os.release(),arch:os.arch(),totalMemoryGiB:Math.round(os.totalmem()/1073741824*10)/10,
-   edgeVersion:browser.version(),routes,checks:['scene FAT','reference PLC CSV panel','PLCopen ST editor','anonymous trial panel','390px responsive'],pageErrors:errors,passed:true};
+   edgeVersion:browser.version(),threeDWebGLVerified:graphics.rendered3D,threeDFallback:graphics.fallback,routes,checks:['scene FAT','reference PLC CSV panel','PLCopen ST editor','anonymous trial panel','390px responsive'],pageErrors:errors,passed:true};
   fs.mkdirSync('qa-artifacts',{recursive:true});
   fs.writeFileSync('qa-artifacts/windows-edge-smoke.json',JSON.stringify(report,null,2)+'\n');
   console.log('NATIVE WINDOWS EDGE HOSTED RUNNER PASS',report.edgeVersion);
