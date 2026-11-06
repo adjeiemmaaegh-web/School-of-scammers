@@ -58,3 +58,10 @@
 .sandbox-breakpoint-panel > p { font-size:11px; }
 .sandbox-breakpoint-hit { font-weight:700; color:var(--crit); }
 @media(max-width:570px) { .sandbox-ux .sandbox-language-tabs > span { flex-basis:100%; text-align:left; }.sandbox-ux .sandbox-rung-controls label { flex:1; }.sandbox-ux .sandbox-rung-controls :is(select,input) { max-width:100%; }.sandbox-rung-execution { flex-basis:100%; } }
+
+/* Ensure small live execution labels remain readable in both themes. */
+.sandbox-ux .sandbox-rung-execution { color:#155c40; }
+@media (prefers-color-scheme:dark) {
+  :root:not([data-theme="light"]) .sandbox-ux .sandbox-rung-execution { color:#a4f0c9; }
+}
+:root[data-theme="dark"] .sandbox-ux .sandbox-rung-execution { color:#a4f0c9; }
