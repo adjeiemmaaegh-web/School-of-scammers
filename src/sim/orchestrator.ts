@@ -167,11 +167,13 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (!component || !['breaker', 'overload'].includes(component.kind) ||
           (cmd.action !== 'trip' && cmd.action !== 'reset'))
         world = setError(world, 'Invalid breaker/overload control');
-      else if (component.kind === 'breaker')
-        world = { ...world, breakerTripped: cmd.action === 'trip' };
-      else world = { ...world, overloadTripped: cmd.action === 'trip' };
-      commandEvents.push({ tick: world.tick, kind: 'protection',
-        detail: `${component.kind} ${cmd.action === 'trip' ? 'opened (manual training trip)' : 'reset by learner'}` });
+      else {
+        world = component.kind === 'breaker'
+          ? { ...world, breakerTripped: cmd.action === 'trip' }
+          : { ...world, overloadTripped: cmd.action === 'trip' };
+        commandEvents.push({ tick: world.tick, kind: 'protection',
+          detail: `${component.kind} ${cmd.action === 'trip' ? 'opened (manual training trip)' : 'reset by learner'}` });
+      }
     } else if (cmd.k === 'setMeterProbe') {
       if ((cmd.lead !== 'positive' && cmd.lead !== 'negative') ||
           (cmd.terminal !== null && (!terminalExists(cmd.terminal, world.project.components) ||
