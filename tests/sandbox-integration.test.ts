@@ -31,6 +31,8 @@ describe('P1 open sandbox: real ladder → wiring → motor', () => {
     w = tick(w, [{ k: 'operate', id: 'start', pressed: true }, { k: 'run' }]).world;
     w = scan(w, 3);
     expect(renderSnapshot(w).motorOn).toBe(true);
+    const angleWhenRunning = w.motorAngleRad;
+    expect(angleWhenRunning).toBeGreaterThan(0);
     w = tick(w, [{ k: 'operate', id: 'start', pressed: false }]).world;
     w = scan(w, 3);
     expect(w.inputs.Start).toBe(false);
@@ -38,6 +40,9 @@ describe('P1 open sandbox: real ladder → wiring → motor', () => {
     w = tick(w, [{ k: 'operate', id: 'stop', pressed: true }]).world;
     w = scan(w, 3);
     expect(renderSnapshot(w).motorOn).toBe(false);
+    const angleAtStop = w.motorAngleRad;
+    w = scan(w, 4);
+    expect(w.motorAngleRad).toBe(angleAtStop);
   });
   it('wrong ladder logic stops the motor after releasing Start', () => {
     let w = fixture();
