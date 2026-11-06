@@ -66,6 +66,7 @@ describe('P1 open sandbox: real ladder → wiring → motor', () => {
     const source = fixture();
     const bad = { ...source.project, wires: [{ id: 'fake', from: 'missing.A', to: 'plc.I0.0' }] };
     expect(() => validateProject(bad)).toThrow(/wire/);
+    expect(() => validateProject({ ...source.project, components: [{ ...source.project.components[0], kind: '__proto__' }] })).toThrow(/component/);
     const next = tick(source, [{ k: 'loadProject', project: bad }]).world;
     expect(next.project).toEqual(source.project);
     expect(next.lastError).toMatch(/wire/);
