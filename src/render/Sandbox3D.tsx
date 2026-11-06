@@ -11,6 +11,7 @@ import { Grid, Html, OrbitControls, GizmoHelper, GizmoViewport } from '@react-th
 import { CatmullRomCurve3, Plane, Raycaster, Vector2, Vector3, type Camera } from 'three';
 import { COMPONENTS, type ComponentKind } from '../components/registry';
 import type { PlacedComponent, ProjectFile, RenderSnapshot, XY } from '../sim/signals';
+import type { Parcel } from '../plant/sorting-conveyor';
 import { supportsWebGL } from '../components/SceneShell';
 import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-coordinates';
 
@@ -19,8 +20,53 @@ const COLORS = {
   live: '#20d6a6', off: '#52677c', highlight: '#ffa633', cable: '#7793ad',
 };
 
-function DeviceSculpture({ kind, active, pressed, motorAngleRad }: { kind: ComponentKind; active: boolean; pressed: boolean; motorAngleRad: number }) {
+function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel }: {
+  kind: ComponentKind; active: boolean; pressed: boolean; motorAngleRad: number; parcel?: Parcel | null;
+}) {
   const status = active ? COLORS.live : COLORS.off;
+  if (kind === 'conveyor') return <group>
+    <mesh position={[0,0.46,0]}><boxGeometry args={[4.0,0.24,0.95]} />
+      <meshStandardMaterial color="#243d4c" metalness={0.4} roughness={0.6} /></mesh>
+    <mesh position={[0,0.60,0]}><boxGeometry args={[3.95,0.045,0.78]} />
+      <meshStandardMaterial color={active ? '#347181' : '#243847'} roughness={0.85} /></mesh>
+    {[-0.55,0.55].map(z => <mesh key={z} position={[0,0.66,z]}>
+      <boxGeometry args={[4.1,0.2,0.055]} /><meshStandardMaterial color={COLORS.steel} metalness={0.6} /></mesh>)}
+    {[-1.72,-1.17,-0.62,-0.07,0.48,1.03,1.58].map(x => <mesh key={x}
+      position={[x,0.33,0]} rotation={[Math.PI/2,0,0]}>
+      <cylinderGeometry args={[0.14,0.14,0.79,12]} />
+      <meshStandardMaterial color="#607b8f" metalness={0.5} /></mesh>)}
+    {[-1.45,1.45].map(x => [-0.4,0.4].map(z => <mesh key={`${x}-${z}`} position={[x,0.17,z]}>
+      <boxGeometry args={[0.08,0.46,0.08]} /><meshStandardMaterial color={COLORS.steel} /></mesh>))}
+    {parcel && <group position={[-1.9 + parcel.position*3.8, 0.87,
+      parcel.route === 'reject' ? 0.9 : 0]}>
+      <mesh><boxGeometry args={[0.42,0.40,0.40]} />
+        <meshStandardMaterial color={parcel.kind === 'marked' ? '#f0a75a' : '#7cb4c9'} /></mesh>
+      <mesh position={[0,0.205,0]}><boxGeometry args={[0.26,0.015,0.26]} />
+        <meshStandardMaterial color={parcel.kind === 'marked' ? '#602c28' : '#d3e4ef'} /></mesh>
+    </group>}
+    <mesh position={[0,0.15,-0.57]}><boxGeometry args={[0.52,0.24,0.23]} />
+      <meshStandardMaterial color={status} emissive={active ? COLORS.live : '#000000'} emissiveIntensity={0.22} /></mesh>
+  </group>;
+  if (kind === 'photoeye') return <group>
+    <mesh position={[0,0.44,0]}><boxGeometry args={[0.48,0.60,0.48]} />
+      <meshStandardMaterial color={COLORS.chassis} metalness={0.45} /></mesh>
+    <mesh position={[0,0.55,-0.26]}><boxGeometry args={[0.28,0.28,0.045]} />
+      <meshStandardMaterial color={COLORS.panel} /></mesh>
+    <mesh position={[0,0.58,-0.29]}><sphereGeometry args={[0.105,16,10]} />
+      <meshStandardMaterial color={status} emissive={status} emissiveIntensity={active ? 0.8 : 0.1} /></mesh>
+    <mesh position={[0,0.1,0]}><boxGeometry args={[0.12,0.28,0.12]} />
+      <meshStandardMaterial color={COLORS.steel} /></mesh>
+  </group>;
+  if (kind === 'diverter') return <group>
+    <mesh position={[0,0.29,0]}><boxGeometry args={[0.9,0.54,0.75]} />
+      <meshStandardMaterial color={COLORS.chassis} metalness={0.3} /></mesh>
+    <group rotation={[0, active ? 0.65 : 0, 0]}>
+      <mesh position={[0.35,0.55,0]}><boxGeometry args={[1.04,0.12,0.18]} />
+        <meshStandardMaterial color={active ? '#f0a75a' : COLORS.steel} metalness={0.4} /></mesh>
+    </group>
+    <mesh position={[-0.28,0.65,-0.3]}><sphereGeometry args={[0.06,8,8]} />
+      <meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.5} /></mesh>
+  </group>;
   if (kind === 'motor') return <group>
     <mesh position={[0, 0.46, 0]} rotation={[0, 0, Math.PI / 2]}>
       <cylinderGeometry args={[0.34, 0.34, 0.84, 18]} /><meshStandardMaterial color={active ? '#247f72' : COLORS.chassis} metalness={0.35} roughness={0.5} />
@@ -71,8 +117,9 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad }: { kind: Compo
   </group>;
 }
 
-function Device3D({ c, active, motorAngleRad, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
-  c: PlacedComponent; active: boolean; motorAngleRad: number; editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
+function Device3D({ c, active, motorAngleRad, parcel, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
+  c: PlacedComponent; active: boolean; motorAngleRad: number; parcel?: Parcel | null;
+  editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string, pressed: boolean) => void; onSelect: (id: string) => void;
 }) {
   const [x, y, z] = worldPosition(c);
@@ -83,14 +130,19 @@ function Device3D({ c, active, motorAngleRad, editable, selectedTerminal, moveTa
       <meshStandardMaterial color={moveTarget === c.id ? COLORS.highlight : COLORS.panel} />
     </mesh>
     <group onClick={e => { e.stopPropagation(); onSelect(c.id); }}>
-      <DeviceSculpture kind={c.kind} active={active} pressed={c.pressed} motorAngleRad={motorAngleRad} />
+      <DeviceSculpture kind={c.kind} active={active} pressed={c.pressed} motorAngleRad={motorAngleRad}
+        parcel={c.kind === 'conveyor' ? parcel : null} />
     </group>
     <Html position={[0, 1.22, 0]} center distanceFactor={11}>
       <div className="sandbox-3d-label">
         <strong>{def.label}</strong>
         <small>{c.kind === 'motor' ? (active ? 'RUNNING' : 'STOPPED') :
           c.kind === 'contactor' ? (active ? 'ENERGISED' : 'OFF') :
-          c.kind === 'plc' ? (active ? 'POWERED' : 'UNPOWERED') : c.kind === 'supply' ? '24 V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</small>
+          c.kind === 'plc' ? (active ? 'POWERED' : 'UNPOWERED') :
+          c.kind === 'conveyor' ? (active ? 'BELT MOVING' : 'BELT STOPPED') :
+          c.kind === 'photoeye' ? (active ? 'MARK DETECTED' : 'NO MARK') :
+          c.kind === 'diverter' ? (active ? 'REJECT ACTIVE' : 'PASS') :
+          c.kind === 'supply' ? '24 V DC' : c.pressed ? 'PRESSED' : 'RELEASED'</small>
         {(c.kind === 'start' || c.kind === 'stop') && <button type="button"
           disabled={false} onPointerDown={e => e.stopPropagation()}
           onClick={e => { e.stopPropagation(); onOperate(c.id, !c.pressed); }}>{c.pressed ? 'Release' : 'Press'}</button>}
@@ -159,9 +211,14 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
     {project.wires.map(w => <Cable3D key={w.id} project={project} from={w.from} to={w.to}
       live={snapshot.voltages[w.from] === 24 && snapshot.voltages[w.to] === 24} />)}
     {project.components.map(c => <Device3D key={c.id} c={c} editable={editable} motorAngleRad={snapshot.motorAngleRad}
+      parcel={snapshot.plant.parcel}
       selectedTerminal={selectedTerminal} moveTarget={moveTarget}
       active={c.kind === 'motor' ? snapshot.motorOn : c.kind === 'contactor' ? snapshot.contactorOn :
-        c.kind === 'plc' ? snapshot.io.PlcPowered : c.kind === 'start' || c.kind === 'stop' ? c.pressed : false}
+        c.kind === 'plc' ? snapshot.io.PlcPowered :
+        c.kind === 'conveyor' ? snapshot.conveyorOn :
+        c.kind === 'diverter' ? snapshot.diverterOn :
+        c.kind === 'photoeye' ? snapshot.io.Photoeye :
+        c.kind === 'start' || c.kind === 'stop' ? c.pressed : false}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect} />)}
     <OrbitControls makeDefault enablePan enableZoom enableRotate
       minDistance={4.4} maxDistance={23} minPolarAngle={0.1} maxPolarAngle={Math.PI / 2.05}
