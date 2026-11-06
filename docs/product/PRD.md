@@ -1,7 +1,7 @@
 # EFO Skill Lab — Product Requirements Document (v4)
 
 > **Product:** a comprehensive, browser-based **virtual industrial-automation laboratory** — the industrial-automation equivalent of Cisco Packet Tracer, with the programming depth of Siemens TIA Portal and the interactive 3D plant simulation of Factory I/O.
-> **Version:** 4.0 · **Date:** 6 November 2026 · **Status:** Active product direction. Supersedes PRD v3 (exercise/assessment), archived at `docs/product/archive/PRD_v3_exercise-assessment.md` and **retained** as the spec for the assessment layer.
+> **Version:** 4.1 · **Date:** 6 November 2026 · **Status:** Owner-approved direction; P0/P1 implementation in development branch. Supersedes PRD v3 (exercise/assessment), archived at `docs/product/archive/PRD_v3_exercise-assessment.md` and **retained** as the spec for the assessment layer.
 > **Owner:** product owner. **Builders:** Claude + co-developers (read this, then `ARCHITECTURE.md`, then the `automation-platform` skill).
 
 ---
@@ -16,7 +16,7 @@ But it is **not a simulation environment** for students. Packet Tracer and GNS3 
 
 This PRD specifies that platform. The v3 exercise/assessment product becomes a **mode layered on top** of this sandbox (a saved scenario + objectives + rubric), not a separate app.
 
-**Crucial, money-saving fact:** the hardest part of this vision — a deterministic PLC **scan engine**, ladder & Structured Text execution, an electrical netlist solver, fault models, deterministic replay — **already exists** in this repo's salvaged engine (`src/engine`, `src/core`, `src/engineering`). The problem was never the engine; it was the absence of the open, integrated, visual sandbox around it. This PRD builds that sandbox on the existing engine. See §11 for the salvage map.
+**Crucial engineering fact:** reusable bounded educational pieces — a deterministic PLC **scan engine**, Ladder and Structured Text interpreters, a simplified 24V electrical solver, fault models, and replay helpers — **already exist** in this repo's salvaged engine (`src/engine`, `src/core`, `src/engineering`). The problem was never the engine; it was the absence of the open, integrated, visual sandbox around it. This PRD builds that sandbox on the existing engine. See §11 for the salvage map.
 
 ---
 
@@ -165,7 +165,7 @@ Rules that are non-negotiable:
 ## 8. Non-goals / honest limits (initial release)
 
 - Not a safety-rated controller; not certified instruction; not a substitute for live-work training. Always stated.
-- No cloud, accounts, or server dependency for the core (assessment accounts are a later, optional layer).
+- **No backend for this version.** No authentication, cloud database, server, SaaS infrastructure, employer accounts, or remote assessment storage. Sandbox projects are stored in the browser and import/export as local files; the existing employer assignment code flow remains local-only. Backend additions require a separate explicit scope decision.
 - Not a clone of TIA Portal / Factory I/O / Packet Tracer UI or assets; no claimed vendor compatibility without verification.
 - No full IEC 61131-3 coverage at first — a **documented supported subset**; unsupported constructs fail explicitly, never silently.
 - No photoreal physics for every machine; fidelity is "faithful category of behaviour," tiered and labelled.
@@ -218,13 +218,13 @@ Measured by **how accurately and consistently the integrated system behaves**, n
 
 ---
 
-## 12. Open decisions (owner input, non-blocking)
+## 12. Owner-approved decisions for P0/P1
 
-1. **2.5D-first vs full-3D-first for the plant.** Recommendation: 2.5D-first for the vertical slice (fast, approachable, Packet-Tracer-like), add targeted 3D in P3. (Factory I/O is full 3D; matching that from day one is far heavier.)
-2. **3D engine when we get there:** Three.js (already a dependency) vs Babylon.js. Recommendation: Three.js unless a Babylon feature is needed.
-3. **First editor:** Ladder first (most used in training), FBD later. Agree?
-4. **Scope of the P1 slice:** confirm "start/stop motor latch" as the first end-to-end scenario (smallest thing that exercises the whole §7 loop).
-5. **Relationship of the two products in the UI:** one app with a "Sandbox" home and an "Exercises/Assessment" section, or kept as separate entries? (Recommend one app, two entry modes.)
+1. **Approved: 2.5D first.** Build the open wiring/plant workspace in 2.5D for P0/P1; add targeted 3D in P3, not at the expense of control fidelity.
+2. **3D engine in P3:** keep the existing Three.js dependency as the default unless an explicit requirement justifies changing it.
+3. **Approved: Ladder first.** P1 starts with an editable single-rung LD subset; expand LD/ST in P2 and introduce FBD in P7+.
+4. **Approved: start/stop latch.** First real circuit: user-placed 24V source, PLC, START/STOP, contactor, motor; user-wired terminals; editable seal-in rung; correctly and incorrectly behaving outputs, tested across the full scan loop.
+5. **UI implementation decision:** one browser application with an open Sandbox entry and retained Exercises/Assessment routes. The v3 assessment capability is not removed; deeper integration occurs at P6.
 
 ---
 
