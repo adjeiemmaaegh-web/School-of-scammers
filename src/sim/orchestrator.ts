@@ -59,7 +59,7 @@ export function validateProject(raw: unknown): ProjectFile {
   const components: PlacedComponent[] = [];
   const ids = new Set<string>();
   for (const entry of p.components) {
-    if (!entry || !validId(entry.id) || ids.has(entry.id) || !(entry.kind in COMPONENTS) || !validPos(entry)) {
+    if (!entry || !validId(entry.id) || ids.has(entry.id) || !Object.hasOwn(COMPONENTS, entry.kind) || !validPos(entry)) {
       throw new Error('Invalid component in project');
     }
     ids.add(entry.id);
@@ -95,7 +95,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): { wor
       else world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, pressed: cmd.pressed } : c) } };
     } else if (!canEdit(world)) world = setError(world, 'Pause simulation before modifying the project');
     else if (cmd.k === 'place') {
-      if (!validId(cmd.id) || !(cmd.kind in COMPONENTS) || !validPos(cmd.at) ||
+      if (!validId(cmd.id) || !Object.hasOwn(COMPONENTS, cmd.kind) || !validPos(cmd.at) ||
           world.project.components.some(c => c.id === cmd.id) || world.project.components.length >= 40) world = setError(world, 'Invalid component placement');
       else if ((cmd.kind === 'plc' || cmd.kind === 'supply') && world.project.components.some(c => c.kind === cmd.kind)) world = setError(world, 'P1 supports one PLC and one supply');
       else world = { ...world, project: { ...world.project, components: [...world.project.components, { id: cmd.id, kind: cmd.kind, x: cmd.at.x, y: cmd.at.y, pressed: false }] } };
