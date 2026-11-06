@@ -52,14 +52,21 @@ export function WorkbenchInspector({
 
   const definition = COMPONENTS[selectedDevice.kind];
   const isPressed = selectedDevice.pressed;
-  const isLive = selectedDevice.kind === 'conveyor' ? snapshot.conveyorOn :
+  const isLive = selectedDevice.kind === 'pump' ? snapshot.pumpOn :
+    selectedDevice.kind === 'levelprobe' ? snapshot.io.TankHigh :
+    selectedDevice.kind === 'drainvalve' ? snapshot.drainOn :
+    selectedDevice.kind === 'conveyor' ? snapshot.conveyorOn :
     selectedDevice.kind === 'photoeye' ? snapshot.io.Photoeye :
     selectedDevice.kind === 'diverter' ? snapshot.diverterOn :
     selectedDevice.kind === 'motor' ? snapshot.motorOn :
     selectedDevice.kind === 'contactor' ? snapshot.contactorOn :
     selectedDevice.kind === 'plc' ? snapshot.io.PlcPowered :
     selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' ? isPressed : true;
-  const state = selectedDevice.kind === 'conveyor' ? (isLive ? 'Belt moving' : 'Belt stopped') :
+  const state = selectedDevice.kind === 'tank' ? `${Math.round(snapshot.tank.levelMl)} / 1000 ml` :
+    selectedDevice.kind === 'pump' ? (isLive ? 'Filling' : 'Off') :
+    selectedDevice.kind === 'levelprobe' ? (isLive ? 'High level' : 'Below level switch') :
+    selectedDevice.kind === 'drainvalve' ? (isLive ? 'Open' : 'Closed') :
+    selectedDevice.kind === 'conveyor' ? (isLive ? 'Belt moving' : 'Belt stopped') :
     selectedDevice.kind === 'photoeye' ? (isLive ? 'Mark detected' : 'No mark') :
     selectedDevice.kind === 'diverter' ? (isLive ? 'Reject active' : 'Pass position') :
     selectedDevice.kind === 'motor' ? (isLive ? 'Running' : 'Stopped') :
@@ -85,7 +92,8 @@ export function WorkbenchInspector({
         onClick={() => onOperate(selectedDevice.id, !isPressed)}>
         {isPressed ? 'Release pushbutton' : 'Press pushbutton'}
       </button>}
-    <div className="sandbox-inspector-subheading"><h3>Terminals</h3><small>Click two pins to wire</small></div>
+    <div className="sandbox-inspector-subheading"><h3>Terminals</h3><small>{definition.terminals.length ?
+        'Click two pins to wire' : 'Passive process device (no electrical terminals)'}</small></div>
     <div className="sandbox-inspector-terminals">
       {definition.terminals.map(t => {
         const id = `${selectedDevice.id}.${t.name}`;
