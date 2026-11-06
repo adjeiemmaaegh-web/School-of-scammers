@@ -122,7 +122,8 @@ describe('P2 bounded numeric Ladder and physical circuit integration', () => {
     w=tick(w,[{k:'pause'},{k:'reset'}]).world;
     expect(w.tick).toBe(0);
     expect(w.ladderNumeric).toEqual({});
-    w=tick(w,[{k:'step'}]).world;
+    // The pressed START contact is intentionally preserved by Reset; release it before checking initialization.
+    w=tick(w,[{k:'operate',id:'start',pressed:false},{k:'step'}]).world;
     expect(w.tagValues.Count).toBe(0);
     expect(validateProject({...w.project,language:undefined,stSource:undefined}).program.symbols?.Count.type).toBe('INT');
     const plain=executeLadder({id:'old',version:'1',rungs:[{id:'one',elements:[C('Start')],coil:'Run'}]},
