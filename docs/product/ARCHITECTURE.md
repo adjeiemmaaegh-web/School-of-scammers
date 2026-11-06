@@ -6,6 +6,10 @@
 
 Before P2/P3 feature expansion, implement and review the user-facing structure defined in [UX_WORKBENCH_V1.md](UX_WORKBENCH_V1.md). `src/app/SandboxPage.tsx` owns navigation, project toolbar, palette search and dock placement; `src/ui/sandbox/WorkbenchInspector.tsx` reads the worker snapshot for selection/status and routes every input to the existing `Command` interface; `src/render/Sandbox3D.tsx` remains a scene renderer and emits selection and user interactions, not simulated authority. UX work must not change PLC scan, electrical solver, persisted project schema or backend scope. Keep the v3 exercise/assessment paths unchanged. Treat UX approval and actual technical acceptance as separate gates.
 
+## P2 programming integration (engineering continuation)
+
+The owner authorized proceeding from the UX prototype into P2 source development. The worker continues to be the only source of PLC/electrical truth. `src/program/p2-contract.ts` validates a bounded multi-rung Ladder document and compiles the salvage `structured-text.ts` subset; `src/sim/orchestrator.ts` executes exactly one active language per scan, with actual physical I/O sampled from the 24V netlist. `src/program/ProgrammingDock.tsx` switches between the editable multi-rung `LadderEditor` and `StructuredTextEditor`, while `LiveMonitor.tsx` displays published tags/memory and a worker-owned scan breakpoint. The project remains `formatVersion:1` with optional `language`/`stSource` fields so pre-P2 files import unchanged. No GUI control is permitted to compute motor, timer or counter states outside the worker. See [P2_PROGRAMMING_PROGRESS.md](P2_PROGRAMMING_PROGRESS.md) for explicit omissions; do not present full P2 as accepted.
+
 ## Implementation scope and status (owner-approved, 6 November 2026)
 
 P0/P1 is a **frontend-only** development increment. No backend, authentication, database server, cloud APIs, or hosted assessment state. The existing employer assessment routes remain functional and will be integrated into the open simulator in P6. Browser storage and local JSON import/export are permitted.
