@@ -52,11 +52,17 @@ export function WorkbenchInspector({
 
   const definition = COMPONENTS[selectedDevice.kind];
   const isPressed = selectedDevice.pressed;
-  const isLive = selectedDevice.kind === 'motor' ? snapshot.motorOn :
+  const isLive = selectedDevice.kind === 'conveyor' ? snapshot.conveyorOn :
+    selectedDevice.kind === 'photoeye' ? snapshot.io.Photoeye :
+    selectedDevice.kind === 'diverter' ? snapshot.diverterOn :
+    selectedDevice.kind === 'motor' ? snapshot.motorOn :
     selectedDevice.kind === 'contactor' ? snapshot.contactorOn :
     selectedDevice.kind === 'plc' ? snapshot.io.PlcPowered :
     selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' ? isPressed : true;
-  const state = selectedDevice.kind === 'motor' ? (isLive ? 'Running' : 'Stopped') :
+  const state = selectedDevice.kind === 'conveyor' ? (isLive ? 'Belt moving' : 'Belt stopped') :
+    selectedDevice.kind === 'photoeye' ? (isLive ? 'Mark detected' : 'No mark') :
+    selectedDevice.kind === 'diverter' ? (isLive ? 'Reject active' : 'Pass position') :
+    selectedDevice.kind === 'motor' ? (isLive ? 'Running' : 'Stopped') :
     selectedDevice.kind === 'contactor' ? (isLive ? 'Coil energised' : 'Coil off') :
     selectedDevice.kind === 'plc' ? (isLive ? 'Powered' : 'Unpowered') :
     selectedDevice.kind === 'supply' ? '24V DC source' : isPressed ? 'Pressed' : 'Released';
