@@ -38,6 +38,8 @@ jobs:
           curl --silent --fail http://127.0.0.1:4173/ > /dev/null
       - name: Open sandbox P1 - place, wire, program, run and test failures
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-browser-acceptance.cjs
+      - name: UX-first workbench - workflow, device inspector and responsive design
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux-acceptance.cjs
       - name: Browser smoke - routes, machine control, meter, assessment and mobile
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
       - name: Offline deep-link and lazy-lab cache acceptance
