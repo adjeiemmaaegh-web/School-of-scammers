@@ -6,6 +6,7 @@ import { executeStructuredText, type STResult, type STValue } from '../engineeri
 import { compileSandboxST, DEFAULT_ST_SOURCE, validateSandboxProgram } from '../program/p2-contract';
 import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from '../program/scan-trace';
 import { feedPlant, freshPlant, stepPlant } from '../plant/sorting-conveyor';
+import { freshTank, stepTank } from '../plant/tank-process';
 export { validateSandboxProgram } from '../program/p2-contract';
 import type { Command, PlacedComponent, ProjectFile, RenderSnapshot, SimEvent, WorldState } from './signals';
 
@@ -39,6 +40,22 @@ export const sortingProgram = (): LadderDocument => ({
     ], coil: 'Sort' },
   ],
 });
+/** P3 fluid handling: a motor-independent pump fills until the HIGH level switch trips,
+ * then a wired drain valve lowers the tank; all logic remains user-editable.
+ */
+export const tankProgram = (): LadderDocument => ({
+  id: 'tank-control', version: '1.0', rungs: [
+    { id: 'inlet-pump', elements: [
+      { type:'contact', tag:'StopOK' },
+      { type:'contact', tag:'TankHigh', normallyClosed:true },
+    ], coil:'Fill' },
+    { id:'outlet-valve', elements: [
+      { type:'contact', tag:'StopOK' },
+      { type:'contact', tag:'TankHigh' },
+    ], coil:'Drain' },
+    { id:'inactive-motor', elements: [{ type:'contact',tag:'Unused' }], coil:'Run' },
+  ],
+});
 export const newProject = (): ProjectFile => ({
   formatVersion: 1, components: [], wires: [], program: blankProgram(),
   language: 'ladder', stSource: DEFAULT_ST_SOURCE,
@@ -48,11 +65,12 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     project, running: false, tick: 0, coils: {}, ladderMemory: {}, ladderNumeric: {},
     stCompiled: project.language === 'st' ? compileSandboxST(project.stSource ?? '') : null,
     stMemory: {},
-    tagValues: { Start: false, StopOK: false, Photoeye: false, Run: false, Sort: false }, ladderSteps: [],
+    tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, Run: false, Sort: false, Fill: false, Drain: false }, ladderSteps: [],
     breakpointScan: null, breakpointHit: null, breakpointTag: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     plant: freshPlant(), conveyorOn: false, diverterOn: false,
-    powered: false, inputs: { Start: false, StopOK: false, Photoeye: false },
+    tank: freshTank(), pumpOn: false, drainOn: false,
+    powered: false, inputs: { Start: false, StopOK: false, Photoeye: false, TankHigh: false },
     voltages: {}, diagnostics: [], lastError: null,
   };
 }
@@ -143,7 +161,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
     else if (cmd.k === 'place') {
       if (!validId(cmd.id) || !Object.hasOwn(COMPONENTS, cmd.kind) || !validPos(cmd.at) ||
           world.project.components.some(c => c.id === cmd.id) || world.project.components.length >= 40) world = setError(world, 'Invalid component placement');
-      else if (['plc', 'supply', 'conveyor', 'photoeye', 'diverter'].includes(cmd.kind) &&
+      else if (['plc', 'supply', 'conveyor', 'photoeye', 'diverter', 'tank', 'pump', 'levelprobe', 'drainvalve'].includes(cmd.kind) &&
         world.project.components.some(c => c.kind === cmd.kind))
         world = setError(world, 'This educational workbench supports one of each station component');
       else world = { ...world, project: { ...world.project, components: [...world.project.components, { id: cmd.id, kind: cmd.kind, x: cmd.at.x, y: cmd.at.y, pressed: false }] } };
@@ -209,16 +227,22 @@ function buildCircuit(world: WorldState): Device[] {
         a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.0'), closed: world.coils.Run === true });
       devices.push({ id: `${c.id}-Q1`, kind: 'switch',
         a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.1'), closed: world.coils.Sort === true });
+      devices.push({ id: `${c.id}-Q2`, kind: 'switch',
+        a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.2'), closed: world.coils.Fill === true });
+      devices.push({ id: `${c.id}-Q3`, kind: 'switch',
+        a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.3'), closed: world.coils.Drain === true });
     }
     if (c.kind === 'photoeye') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
       a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'), closed: world.plant.photoeyeActive });
+    if (c.kind === 'levelprobe') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
+      a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'), closed: world.tank.highLevel });
     if (c.kind === 'contactor') {
       devices.push({ id: c.id, kind: 'load', positive: terminal(c.id, 'A1'), negative: terminal(c.id, 'A2'), nominalVolts: 24 });
       devices.push({ id: `${c.id}-NO`, kind: 'switch', a: terminal(c.id, '13'), b: terminal(c.id, '14'), closed: world.contactorOn });
     }
-    if (c.kind === 'motor' || c.kind === 'conveyor') devices.push({ id: c.id, kind: 'load',
+    if (c.kind === 'motor' || c.kind === 'conveyor' || c.kind === 'pump') devices.push({ id: c.id, kind: 'load',
       positive: terminal(c.id, 'L+'), negative: terminal(c.id, 'M-'), nominalVolts: 24 });
-    if (c.kind === 'diverter') devices.push({ id: c.id, kind: 'load',
+    if (c.kind === 'diverter' || c.kind === 'drainvalve') devices.push({ id: c.id, kind: 'load',
       positive: terminal(c.id, 'A1'), negative: terminal(c.id, 'A2'), nominalVolts: 24 });
   }
   return devices;
