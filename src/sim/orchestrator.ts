@@ -103,9 +103,12 @@ export function validateProject(raw: unknown): ProjectFile {
 }
 const setError = (world: WorldState, message: string): WorldState => ({ ...world, lastError: message });
 const canEdit = (world: WorldState) => !world.running;
-function applyCommands(initial: WorldState, commands: readonly Command[]): { world: WorldState; forceStep: boolean } {
+function applyCommands(initial: WorldState, commands: readonly Command[]): {
+  world: WorldState; forceStep: boolean; events: SimEvent[];
+} {
   let world = initial;
   let forceStep = false;
+  const commandEvents: SimEvent[] = [];
   for (const cmd of commands) {
     world = { ...world, lastError: null };
     if (cmd.k === 'run') {
@@ -128,9 +131,10 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): { wor
         world = setError(world, 'Unknown parcel type');
       else {
         const fed = feedPlant(world.plant, cmd.kind);
+        const succeeded = fed.plant !== world.plant;
         world = { ...world, plant: fed.plant };
-        if (fed.events[0]?.includes('already') || fed.events[0]?.includes('limit'))
-          world = setError(world, fed.events[0]);
+        if (!succeeded) world = setError(world, fed.events[0] ?? 'Unable to feed parcel');
+        else for (const detail of fed.events) commandEvents.push({ tick: world.tick, kind: 'plant', detail });
       }
     } else if (cmd.k === 'operate') {
       if (!world.project.components.some(c => c.id === cmd.id && (c.kind === 'start' || c.kind === 'stop'))) world = setError(world, 'Only pushbuttons can be operated');
@@ -190,7 +194,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): { wor
       try { world = createWorld(validateProject(cmd.project)); } catch (e) { world = setError(world, e instanceof Error ? e.message : 'Invalid project'); }
     }
   }
-  return { world, forceStep };
+  return { world, forceStep, events: commandEvents };
 }
 function buildCircuit(world: WorldState): Device[] {
   const devices: Device[] = [];
@@ -244,7 +248,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // 1. Apply commands. Run/Pause/Step are commands, not renderer state.
   const change = applyCommands(initial, commands);
   let w = change.world;
-  const events: SimEvent[] = [];
+  const events: SimEvent[] = [...change.events];
   if (!w.running && !change.forceStep) return { world: w, snapshot: renderSnapshot(w), events };
   // 2. Solve the 24V netlist using last scan's actuator/output state.
   const circuit = solveDiscrete24V({ devices: buildCircuit(w), wires: w.project.wires.map(wire => [wire.from, wire.to] as const) });
