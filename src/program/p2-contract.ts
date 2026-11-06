@@ -33,6 +33,12 @@ export function validateSandboxProgram(program: LadderDocument): string[] {
     if (rung.elements.length > 8 || rung.elements.length < 1) errors.push(`Rung ${index + 1} needs 1–8 series elements`);
     if (!safeTag(rung.coil) || (rung.coil !== 'Run' && rung.coil !== 'Unused' && !symbols.includes(rung.coil)))
       errors.push(`Rung ${index + 1}: declare local output tag ${rung.coil} before use`);
+    const operation = rung.operation;
+    if ((operation?.kind === 'rto' || operation?.kind === 'ctu') &&
+      operation.resetTag !== undefined && !known.has(operation.resetTag))
+      errors.push(`Rung ${index + 1}: reset tag ${operation.resetTag} is not declared`);
+    if (operation?.kind === 'ctd' && !known.has(operation.loadTag))
+      errors.push(`Rung ${index + 1}: load tag ${operation.loadTag} is not declared`);
     for (const element of rung.elements) {
       if (element.type === 'contact' && !known.has(element.tag)) errors.push(`Rung ${index + 1}: unknown contact ${element.tag}`);
       if (element.type === 'branch' &&
