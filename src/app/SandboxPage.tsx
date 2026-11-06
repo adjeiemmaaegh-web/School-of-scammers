@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent, type ChangeEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, type ComponentKind } from '../components/registry';
 import { AppHeader } from '../ui/AppHeader';
@@ -6,32 +6,19 @@ import { LadderEditor } from '../program/LadderEditor';
 import type { Command, ProjectFile, RenderSnapshot, WorkerResponse } from '../sim/signals';
 import './sandbox.css';
 
+const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
 const CANVAS_W = 1080, CANVAS_H = 580, BOX_W = 170;
 const wireGuide = 'Supply P24 → PLC L+, START A, STOP A, contactor 13. Supply M0 → PLC M, contactor A2, motor M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → contactor A1; contactor 14 → motor L+.';
-function pinPosition(id: string, name: string, project: ProjectFile | null): { x: number; y: number } | null {
-  const c = project?.components.find(c => c.id === id);
-  const t = c && COMPONENTS[c.kind].terminals.find(t => t.name === name);
-  return c && t ? { x: c.x + (t.side === 'right' ? BOX_W : 0), y: c.y + t.y } : null;
-}
-function wirePath(from: string, to: string, project: ProjectFile | null): string | null {
-  const [fromId, ...fromPin] = from.split('.');
-  const [toId, ...toPin] = to.split('.');
-  const a = pinPosition(fromId, fromPin.join('.'), project);
-  const b = pinPosition(toId, toPin.join('.'), project);
-  if (!a || !b) return null;
-  const bend = Math.max(35, Math.abs(a.x - b.x) * 0.4);
-  return `M ${a.x} ${a.y} C ${a.x + bend} ${a.y}, ${b.x - bend} ${b.y}, ${b.x} ${b.y}`;
-}
 export function SandboxPage() {
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
   const [project, setProject] = useState<ProjectFile | null>(null);
   const [selectedTerminal, setSelectedTerminal] = useState<string | null>(null);
+  const [moveTarget, setMoveTarget] = useState<string | null>(null);
   const [events, setEvents] = useState<string[]>([]);
   const [clientError, setClientError] = useState<string | null>(null);
   const worker = useRef<Worker | null>(null);
   const nextId = useRef(1);
-  const canvas = useRef<HTMLDivElement | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const send = useCallback((commands: Command[]) => {
     worker.current?.postMessage({ kind: 'commands', commands });
@@ -68,20 +55,7 @@ export function SandboxPage() {
       y: Math.max(5, Math.min(CANVAS_H - 145, y ?? 25 + Math.floor(i / 5) * 175)),
     } }]);
   };
-  const drop = (ev: DragEvent<HTMLDivElement>) => {
-    ev.preventDefault();
-    const value = ev.dataTransfer.getData('text/plain');
-    const rect = ev.currentTarget.getBoundingClientRect();
-    const x = ev.clientX - rect.left - BOX_W / 2, y = ev.clientY - rect.top - 65;
-    if (value.startsWith('add:')) {
-      const kind = value.slice(4) as ComponentKind;
-      if (Object.hasOwn(COMPONENTS, kind)) place(kind, x, y);
-    } else if (value.startsWith('move:')) {
-      const id = value.slice(5);
-      send([{ k: 'move', id, to: { x: Math.max(5, Math.min(CANVAS_W - BOX_W - 5, x)),
-        y: Math.max(5, Math.min(CANVAS_H - 145, y)) } }]);
-    }
-  };
+  const move = (id: string, at: { x: number; y: number }) => send([{ k: 'move', id, to: at }]);
   const connect = (terminal: string) => {
     if (!selectedTerminal) { setSelectedTerminal(terminal); return; }
     if (selectedTerminal !== terminal) send([{ k: 'wire', id: uniqueId('wire'), from: selectedTerminal, to: terminal }]);
@@ -89,6 +63,7 @@ export function SandboxPage() {
   };
   const layout = () => {
     if (project?.components.length) return;
+    setMoveTarget(null);
     const devices: { kind: ComponentKind; x: number; y: number }[] = [
       { kind: 'supply', x: 25, y: 25 }, { kind: 'plc', x: 350, y: 25 },
       { kind: 'contactor', x: 650, y: 25 }, { kind: 'motor', x: 870, y: 25 },
@@ -110,7 +85,7 @@ export function SandboxPage() {
       if (file.size > 200000) throw new Error('Project must be under 200 KB');
       const parsed: unknown = JSON.parse(await file.text());
       send([{ k: 'loadProject', project: parsed }]);
-      setSelectedTerminal(null); setEvents([]); setClientError(null);
+      setSelectedTerminal(null); setMoveTarget(null); setEvents([]); setClientError(null);
     } catch (e) { setClientError(e instanceof Error ? e.message : 'Project import failed'); }
     ev.target.value = '';
   };
@@ -119,13 +94,13 @@ export function SandboxPage() {
     <AppHeader right={<div className="sandbox-header-links"><Link to="/trades">Exercises</Link><Link to="/employer">Assessment</Link></div>} />
     <main id="main" className="sandbox-page wrap wrap-wide">
       <div className="sandbox-section-head sandbox-title">
-        <div><span className="eyebrow">EFO Skill Lab · P0/P1 development preview</span>
+        <div><span className="eyebrow">EFO Skill Lab · P0/P1 interactive 3D preview</span>
           <h1>Open automation sandbox</h1>
-          <p>Build, connect, program and test an actual simulated 24V motor control circuit.</p></div>
+          <p>Place real 3D components, wire their terminals, program Ladder, and watch your simulated motor obey the logic.</p></div>
         <span className="status-pill is-idle">Offline-first · no account</span>
       </div>
       <div className="sandbox-toolbar">
-        <button className="btn ghost small" onClick={() => send([{ k: 'clear' }])} disabled={!editable}>New blank project</button>
+        <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
         <button className="btn ghost small" onClick={layout} disabled={!editable || !!project?.components.length}>Place starter layout</button>
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>
@@ -142,7 +117,7 @@ export function SandboxPage() {
         <aside className="sandbox-palette panel" aria-label="Component library">
           <span className="eyebrow">Components</span>
           <h2>Device library</h2>
-          <p className="sandbox-help">Drag an item onto the workspace or click to add it. Click two terminals to connect a wire.</p>
+          <p className="sandbox-help">Drag an item into the 3D workbench or click to add it. Rotate, zoom and pan the model; click any two terminals to connect them.</p>
           {componentKinds.map(kind => <button key={kind} draggable={editable}
             onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}
             onClick={() => place(kind)} disabled={!editable}
@@ -150,47 +125,59 @@ export function SandboxPage() {
             <small>{COMPONENTS[kind].help}</small></button>)}
         </aside>
         <div className="sandbox-main">
-          <div className="sandbox-canvas-scroll" aria-label="Scrollable workspace">
-            <div ref={canvas} className="sandbox-canvas" onDragOver={e => e.preventDefault()} onDrop={drop}>
-              <svg className="sandbox-wires" viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`} aria-hidden="true">
-                {project?.wires.map(w => {
-                  const d = wirePath(w.from, w.to, project);
-                  const energized = snapshot?.voltages[w.from] === 24 && snapshot?.voltages[w.to] === 24;
-                  return d && <path key={w.id} d={d} className={energized ? 'live-wire' : ''} />;
-                })}
-              </svg>
-              {!project?.components.length && <div className="sandbox-empty">
-                <h2>Your workspace is empty</h2>
-                <p>Choose a device on the left, wire its terminals, then edit the Ladder program below. The simulator obeys your wiring and code, including mistakes.</p>
-                <button className="btn primary small" onClick={layout}>Place starter layout</button>
-              </div>}
+          <Suspense fallback={<div className="sandbox-3d-loading" role="status">Loading the interactive 3D workbench…</div>}>
+            {project && snapshot && <Sandbox3D
+              project={project} snapshot={snapshot} editable={editable}
+              selectedTerminal={selectedTerminal} moveTarget={moveTarget}
+              onTerminal={connect}
+              onOperate={(id, pressed) => send([{ k: 'operate', id, pressed }])}
+              onPlace={(kind, at) => place(kind, at.x, at.y)}
+              onMove={move} onMoveFinished={() => setMoveTarget(null)}
+            />}
+          </Suspense>
+          {!project?.components.length && <div className="sandbox-3d-empty">
+            <strong>Start with an empty 3D factory workbench.</strong>
+            <span>Place and wire your own devices or load the starter equipment (without pre-wiring).</span>
+            <button className="btn ghost small" onClick={layout}>Place starter layout</button>
+          </div>}
+          <details className="sandbox-patch panel" open>
+            <summary>Component wiring &amp; keyboard controls · {project?.components.length ?? 0} devices</summary>
+            <p className="sandbox-help">These controls access the same terminals and states shown in the 3D workbench. Use them on phones, with a keyboard, or when WebGL is unavailable.</p>
+            <div className="sandbox-device-list">
               {project?.components.map(c => {
                 const def = COMPONENTS[c.kind];
                 const live = c.kind === 'motor' ? snapshot?.motorOn : c.kind === 'contactor' ? snapshot?.contactorOn :
                   c.kind === 'plc' ? snapshot?.io.PlcPowered : c.kind === 'start' || c.kind === 'stop' ? c.pressed : false;
-                return <div key={c.id} className={`sandbox-device ${live ? 'active' : ''}`}
-                  data-device-id={c.id} style={{ left: c.x, top: c.y }} draggable={editable}
-                  onDragStart={ev => ev.dataTransfer.setData('text/plain', `move:${c.id}`)}>
-                  <span className="sandbox-device-kind">{c.kind.toUpperCase()}</span>
-                  <strong>{def.label}</strong>
-                  {(c.kind === 'start' || c.kind === 'stop') ?
-                    <button className={`sandbox-operate ${c.pressed ? 'pressed' : ''}`}
-                      onClick={() => send([{ k: 'operate', id: c.id, pressed: !c.pressed }])}>
-                      {c.pressed ? 'Release' : 'Press'}</button> :
+                return <section className={`sandbox-device ${live ? 'active' : ''}`} key={c.id} data-device-id={c.id}>
+                  <div className="sandbox-patch-head">
+                    <strong>{def.label}</strong>
                     <span className="sandbox-device-status">{c.kind === 'motor' ? (live ? 'RUNNING' : 'STOPPED') :
                       c.kind === 'contactor' ? (live ? 'COIL ON' : 'COIL OFF') :
-                      c.kind === 'plc' ? (live ? 'POWER OK' : 'NO POWER') : '24V DC'}</span>}
-                  {def.terminals.map(t => {
-                    const id = `${c.id}.${t.name}`;
-                    return <button key={id} type="button"
-                      className={`sandbox-terminal ${t.side} ${selectedTerminal === id ? 'selected' : ''}`}
-                      data-terminal-id={id} style={{ top: t.y - 10 }} title={id} aria-label={`Connect ${id}`}
-                      disabled={!editable} onClick={() => connect(id)}>{t.name}</button>;
-                  })}
-                </div>;
+                      c.kind === 'plc' ? (live ? 'POWER OK' : 'NO POWER') :
+                      c.kind === 'supply' ? '24V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</span>
+                  </div>
+                  <div className="sandbox-patch-actions">
+                    {(c.kind === 'start' || c.kind === 'stop') && <button
+                      className={`sandbox-operate ${c.pressed ? 'pressed' : ''}`}
+                      onClick={() => send([{ k: 'operate', id: c.id, pressed: !c.pressed }])}>
+                        {c.pressed ? 'Release' : 'Press'}</button>}
+                    <button type="button" className="sandbox-position" disabled={!editable}
+                      aria-label={`Move ${def.label} in 3D`}
+                      onClick={() => setMoveTarget(c.id)}>Move in 3D</button>
+                  </div>
+                  <div className="sandbox-patch-terminals">
+                    {def.terminals.map(t => {
+                      const id = `${c.id}.${t.name}`;
+                      return <button key={id} type="button"
+                        className={`sandbox-terminal ${selectedTerminal === id ? 'selected' : ''}`}
+                        data-terminal-id={id} title={id} aria-label={`Connect ${id}`}
+                        disabled={!editable} onClick={() => connect(id)}>{t.name}</button>;
+                    })}
+                  </div>
+                </section>;
               })}
             </div>
-          </div>
+          </details>
           <div className="sandbox-status panel">
             <div><span className="eyebrow">Live I/O</span><div className="sandbox-lamps">
               {(['Start', 'StopOK', 'Run', 'Q0.0', 'PlcPowered'] as const).map(k =>
@@ -223,7 +210,7 @@ export function SandboxPage() {
             <p className="sandbox-help">No changes recorded yet.</p>}</div>
         </aside>
       </div>
-      <p className="sandbox-disclaimer">Educational, simplified 24V DC simulation only. Not safety-rated or a substitute for real equipment commissioning. This P1 preview implements one PLC, one supply, a Ladder rung, a contactor and a DC motor; full 3D, FBD, more devices and advanced electrical fidelity remain future phases.</p>
+      <p className="sandbox-disclaimer">Educational, simplified 24V DC simulation only. Not safety-rated or a substitute for real equipment commissioning. This P1 preview renders real 3D industrial equipment and wiring, but models only one PLC, one supply, a Ladder rung, a contactor and an ideal DC motor; advanced physics, FBD, more devices and higher electrical fidelity remain future phases.</p>
     </main>
   </>;
 }
