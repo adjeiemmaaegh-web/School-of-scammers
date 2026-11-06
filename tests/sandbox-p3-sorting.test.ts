@@ -76,7 +76,7 @@ describe('P3 live 3D material flow through wired PLC and physical I/O',()=>{
       'END_VAR',
       'Run := StopOK AND (Start OR Run);',
       'Sort := Run AND Photoeye;',
-    ].join('\\n');
+    ].join('\n');
     let w=tick(make(),[{k:'loadST',source}]).world;
     expect(w.project.language).toBe('st');
     w=feed(release(start(w)),'marked');
