@@ -112,6 +112,9 @@ body::before {
 .trade-card h3 { font-size: 15.5px; }
 .trade-status { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; }
 .trade-status.live { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+/* Small availability labels need a stronger foreground than the indicator green. */
+:root:not([data-theme="dark"]) .trade-status.live { color: #155c3f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .trade-status.live { color: #8be6b8; } }
 .trade-status.soon { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
 @media (max-width: 900px) { .trades-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 420px) { .trades-grid { grid-template-columns: 1fr; } }
