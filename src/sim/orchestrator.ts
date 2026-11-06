@@ -30,7 +30,9 @@ export const newProject = (): ProjectFile => ({
 });
 export function createWorld(project: ProjectFile = newProject()): WorldState {
   return {
-    project, running: false, tick: 0, coils: {}, ladderMemory: {}, stMemory: {},
+    project, running: false, tick: 0, coils: {}, ladderMemory: {},
+    stCompiled: project.language === 'st' ? compileSandboxST(project.stSource ?? '') : null,
+    stMemory: {},
     tagValues: { Start: false, StopOK: false, Run: false }, ladderSteps: [],
     breakpointScan: null, breakpointHit: null,
     contactorOn: false, motorOn: false, motorAngleRad: 0,
@@ -208,7 +210,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   try {
     if (powered) {
       if (w.project.language === 'st') {
-        const compiled = compileSandboxST(w.project.stSource ?? '');
+        const compiled = w.stCompiled ?? compileSandboxST(w.project.stSource ?? '');
         stResult = executeStructuredText(compiled, inputs, w.stMemory);
         const run = Object.entries(stResult.outputs).find(([key]) => key.toLowerCase() === 'run')?.[1];
         if (typeof run !== 'boolean') throw new TypeError('ST Run output must be BOOL');
