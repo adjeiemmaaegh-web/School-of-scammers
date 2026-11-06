@@ -1,52 +1,51 @@
-# PLC Skills Lab
+# Skills Lab
 
-**Browser-based virtual PLC and industrial automation training.** PLC Skills Lab is a frontend-only educational simulator with ladder logic, a bounded Structured Text interpreter, electrical wiring labs, deterministic virtual machinery, fault diagnosis, commissioning exercises, typed I/O debugging and offline project/session exports.
+**A browser-based virtual simulator and practical-assessment platform for the skilled trades — "Cisco Packet Tracer for the trades."** Learners build real hands-on skills in simulation; employers test candidates on realistic, job-like tasks instead of book knowledge. It launches with **PLC & industrial automation** and is architected to expand to CCTV, BMS, phone & PC repair, and electronics.
 
-**[Open PLC Skills Lab](https://plc-skills-lab.vercel.app/)** · [Engineering Workbench](https://plc-skills-lab.vercel.app/engineering) · [Exercise catalogue](https://plc-skills-lab.vercel.app/labs)
+> **Status:** active rebuild. The product was reset from the previous developer's PLC-only "simulation-first" codebase to the two-audience vision in [`docs/product/PRD.md`](docs/product/PRD.md). The deterministic simulation **engine was kept**; the product shell around it was rebuilt. `Skills Lab` is a working name — the brand is still an open decision.
+>
+> **This is an educational simulation.** It models the *categories* of trade work (programming, wiring, diagnosis, commissioning). It is **not** a safety-rated controller, not certified instruction, and not a substitute for live-work training. Limits are stated, not hidden.
 
-**Status: educational development/beta application; full PRD and industrial acceptance remain NO-GO.** These simulations must never control physical machinery or be represented as certified electrical, safety, or PLC instruction. Vendor-specific scan semantics, field physics and safety accuracy have not been independently validated.
+## What's here
 
-## Practical workflows
-- Author NO/NC contacts, branches, output coils, on/off/fixed/retentive timers, up/down counters and edge instructions in the ladder editor.
-- Practice bounded BOOL/INT/DINT/REAL/LREAL Structured Text, CASE, FOR, persistent memory and single-program PLCopen XML 2.01 import/export. Unsupported IEC constructs fail explicitly.
-- Exchange simple graphical Ladder Diagram NO/NC contacts, branches and coils as bounded PLCopen LD XML; unsupported instructions are rejected. Add custom PLC tags without editing JSON.
-- Wire idealized 24 V circuits, diagnose shorts/opens, use a virtual multimeter, and complete conveyor, motor starter, pneumatic, PID and DC network labs.
-- Build and commission 3D workcells from **13 equipment kinds** and four PLC-driven templates. Tune normalized actuator rise/fall behavior and observe pump/valve-dependent tank fill; run simulated FAT against the edited scene.
-- Run an opt-in PLC-driven parcel conveyor: inject cartons or metal parts, watch actual simulated position-triggered sensor inputs, divert parts with a pusher, and inspect timed material event evidence.
-- Examine actual **simulated** scan snapshots, typed I/O, timers, counters, transitions, CSV evidence and offline replay. Compare externally captured real-PLC BOOL scan CSV against the teaching ladder engine; reference provenance remains unverified until independent review.
-- Use simulation-only PLC input forcing for Start, SensorOK, Photoeye and ExitSensor. Isolate **virtual** power before changing forces. The watch table shows both underlying readings and forced PLC values. Safety power, guard, stop and outputs cannot be forced.
-- Export projects/sessions as JSON; browser-local storage is not a durable backup. Record consent-based anonymous instructor/learner observations in Assessments, without claiming human tests were already performed.
+Two experiences over one simulation engine:
 
-This repository includes **no** backend, authentication, database, employer management or payment features; a separate team owns those systems.
+- **Learner lab** — pick a trade, climb a **1–10 ranked exercise ladder**, and learn by doing: guided briefs, live objectives, hints, instant feedback, reset & replay.
+- **Employer ↔ candidate assessment** — an employer builds a ranked practical test and shares it (link/code); a candidate completes it under exam conditions; the employer gets back an evidence-backed rubric result. *(Local-only in this version — no accounts yet; a backend is a later phase.)*
 
-## Offline use
-Visit the hosted app once online in a service-worker-capable browser. The production build installs a versioned static cache of the HTML and lazy engineering routes for offline reopening. Reconnect for updates. Offline caches do not synchronize, back up or safeguard private project files; export your work. Local development does not register the production service worker.
+The flagship **PLC** trade ships with a fully playable rank-1 exercise ("conveyor will not start") built on the salvaged engine, and ranks 2–10 designed on the ladder. The original engine lab tools remain reachable under `/labs/*`.
 
-## Local development and verification
-Requires Node.js 22 and npm with registry access.
+## Architecture (short version)
 
-    npm ci
-    npm run dev
-    npm run verify:engineering:offline
-    npm run verify:full
+```
+Experience layer (src/app, src/ui)  →  front door, trade picker, ladder, ExercisePlayer
+Platform layer   (src/platform)     →  exercise runtime, types, persistence boundary
+Trade modules    (src/trades)       →  registry + plc (pluggable; CCTV/BMS/… later)
+Simulation engine(src/engine, core, engineering)  →  salvaged, deterministic, tested
+```
 
-The production build runs semantic TypeScript, Vite, and an offline precache generator. GitHub CI additionally executes Vitest, headless Chrome interaction, offline navigation, Firefox, Linux WebKit, accessibility, no-WebGL fallback, and transfer-size checks. **Green tests verify the implemented training subset, not hardware equivalence or full PRD completion.**
+Full design: [`docs/product/ARCHITECTURE.md`](docs/product/ARCHITECTURE.md). Adding a trade is adding a module in `src/trades/` and registering it — no shell or engine changes.
 
-## Specifications and release handover
-- [Simulation-first PRD](docs/product/PRD.md)
-- [Approved roadmap](docs/product/ROADMAP.md)
-- [Release completion register](docs/RELEASE_COMPLETION_2026-11-05.md)
-- [Standards, real-device, legal and human-validation gate register](docs/RELEASE_STANDARDS_AND_ACCEPTANCE_2026-11-05.md)
-- [Physical device test protocol](qa/PHYSICAL_DEVICE_ACCEPTANCE_PROTOCOL.md)
-- [Reference PLC measurement protocol](qa/PLC_REFERENCE_MEASUREMENT_PROTOCOL.md)
-- [Independent learner/instructor study protocol](qa/INDEPENDENT_INSTRUCTOR_LEARNER_PROTOCOL.md)
-- [Dependency and license provenance](docs/LICENSE_PROVENANCE_REVIEW_2026-11-05.md)
-- [Transitive dependency license evidence](docs/DEPENDENCY_LICENSE_TRIAGE_2026-11-06.md)
-- [Committed lockfile and reproducible CI](docs/REPRODUCIBLE_DEPENDENCIES_2026-11-06.md)
-- [Ladder XML interchange limits and evidence](docs/PLCOPEN_LD_INTERCHANGE_2026-11-06.md)
-- [Input force and offline behavior](docs/FORCE_AND_OFFLINE_COMPLETION_2026-11-05.md)
+## Local development
 
-Remaining release gates include expert PLC reference verification, low-spec 8 GB Windows measurements, actual low-spec Windows, Safari and real mobile acceptance (Windows-hosted Edge CI is separate), complete licensing and dependency review, broader plant/3D scene authoring, and independent instructional assessment.
+Requires Node.js 22.
 
-- [Virtual machine catalogue and source acceptance](docs/FACTORY_MACHINE_CATALOG_COMPLETION_2026-11-05.md)
-- [Geometric parcel-flow training model](docs/MATERIAL_FLOW_INTEGRATION_2026-11-06.md)
+```bash
+npm ci
+npm run dev        # Vite dev server
+npm test           # Vitest engine suite (536 tests)
+npm run build      # tsc + Vite + offline precache
+npm run verify:full
+```
+
+Deploys to Vercel.
+
+## Project docs
+
+- [Product requirements (PRD v3)](docs/product/PRD.md) — vision, audiences, exercise model, roadmap
+- [Architecture](docs/product/ARCHITECTURE.md)
+- [Handover & checklist](docs/product/HANDOVER_CHECKLIST.md) — current state and what's next
+- [Competitor benchmark](docs/product/COMPETITOR_AND_MIT_REVIEW.md)
+- [Archived legacy docs & reports](docs/archive/) — the previous developer's PRD, roadmap, and ~70 build reports (kept for history)
+
+The repository contains **no** backend, authentication, database, or payment features yet; those are a later phase, designed for behind the persistence boundary.

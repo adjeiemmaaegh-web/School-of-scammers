@@ -1,7 +1,16 @@
 # Handover & Checklist — Developer Takeover
 
 > **Purpose:** Capture the state of the project at takeover from the previous developer, and track the work to realign it with the product vision in `docs/product/PRD.md` (v3).
-> **Date started:** 6 November 2026 · **Status:** Phase 0 (Reset & foundations) in progress.
+> **Date started:** 6 November 2026 · **Status:** Phases 0, 1 and 3 delivered; Phase 2 (full 1–10 ladder) in progress.
+
+## Progress snapshot (6 Nov 2026)
+- ✅ **Phase 0** — repo cleaned, engine audited, contracts defined (`src/platform/types.ts`), ARCHITECTURE + README updated to v3.
+- ✅ **Phase 1** — new two-audience shell, design system, and the rank-1 PLC exercise playable end-to-end in learning **and** assessment mode.
+- ✅ **Phase 3** — local employer→candidate assessment flow (build assignment → share code/link → candidate takes under exam conditions → result code → employer review).
+- 🚧 **Phase 2** — ladder UI done + rank 1 built; ranks 2–10 designed as planned rungs, authored incrementally.
+- ⏳ **Phase 4+** — second trade, then backend/accounts.
+
+Everything builds, typechecks, and the 536 engine tests pass; a headless run plays the conveyor exercise to a 100% pass with no console errors.
 
 ---
 
@@ -58,34 +67,36 @@ The previous developer was let go. They delivered a real, well-tested **PLC simu
 - [x] Write new PRD (v3) — `docs/product/PRD.md`
 - [x] Archive legacy PRD & roadmap to `docs/product/archive/`
 - [x] Write this handover/checklist
-- [ ] **Owner review & sign-off on the PRD** ← next gate
-- [ ] Clean repo root: move `*_INCREMENT_REPORT.md`, manifests, and stray logs into `docs/archive/` (keep, don't delete)
-- [ ] Engine audit: document the engine's **usable public surface** (what functions/exports the new shell will call) — the "contract"
-- [ ] Draft the **trade-module interface** and **exercise-definition schema** (device catalog, scene, objectives, rubric, evidence)
-- [ ] Draft the **persistence interface** (so local v1 and backend later share one boundary)
-- [ ] Update `docs/product/ARCHITECTURE.md` to match PRD v3
+- [x] **Owner review & sign-off on the PRD** (approved 6 Nov 2026)
+- [x] Clean repo root: moved 72 `*_INCREMENT_REPORT.md`, manifests, and logs into `docs/archive/legacy-reports/` (kept, not deleted)
+- [x] Engine audit: engine's usable surface documented in `docs/product/ARCHITECTURE.md`; trade modules call `engine/simulation.ts`, `engine/assessment.ts`, `core/plc.ts`
+- [x] Define the **trade-module interface** and **exercise-definition schema** → `src/platform/types.ts`
+- [x] Define the **persistence interface** → `src/platform/persistence.ts` (local v1; backend slots behind same functions)
+- [x] Update `docs/product/ARCHITECTURE.md` to match PRD v3
 - [x] Confirm tests pass on this machine (`npm ci && npm test` → **536 tests / 73 files passing**, 6 Nov 2026)
 
-### Phase 1 — New shell & first great exercise
-- [ ] Design system / visual language (tokens, components) — approachable, modern
-- [ ] Two-audience front door (Student vs Employer)
-- [ ] Trade picker (PLC active; others "coming soon")
-- [ ] Redesigned in-exercise UI: work-order brief + objectives + **simulation canvas as the star** + progressive-disclosure instrumentation
-- [ ] Hybrid 2.5D canvas foundation with one targeted 3D element (e.g. conveyor)
-- [ ] One polished PLC exercise ("conveyor won't start") end-to-end in **Student** mode
-- [ ] Same exercise in **Assessment** mode (hints off, evidence + rubric result)
-- [ ] Usability check: a first-timer completes it with no instructions
+### Phase 1 — New shell & first great exercise ✅
+- [x] Design system / visual language (`src/ui/theme.css` + `app.css`) — light/dark, responsive
+- [x] Two-audience front door (`src/app/FrontDoor.tsx`)
+- [x] Trade picker (PLC active; others "coming soon") (`src/app/TradePicker.tsx`)
+- [x] Redesigned in-exercise UI: brief + live objectives + **simulation canvas as the star** + progressive-disclosure instrumentation (`src/ui/ExercisePlayer.tsx`)
+- [x] Hybrid 2.5D canvas (SVG conveyor scene bound to engine state)
+- [x] Rank-1 PLC exercise end-to-end in **learning** mode
+- [x] Same exercise in **assessment** mode (hints off, evidence + rubric)
+- [x] Headless usability/interaction check passes (plays through to 100%)
 
-### Phase 2 — PLC 1–10 ladder
-- [ ] Define the 10 ranked PLC exercises (rank, scenario, objectives, rubric) — map onto engine capabilities
-- [ ] Author exercises 1–10 with hints + evidence capture
-- [ ] Progression UI (the ladder as the main learner surface)
+### Phase 2 — PLC 1–10 ladder 🚧
+- [x] Ladder progression UI as the main learner surface (`src/app/TradeLadder.tsx`)
+- [x] Rank 1 authored and playable
+- [x] Ranks 2–10 designed as planned rungs (titles/summaries in `src/trades/plc/index.ts`)
+- [ ] Author ranks 2–10 as fully playable exercises (follow the `conveyor-start.tsx` pattern)
 
-### Phase 3 — Local assessment flow
-- [ ] Employer: select/configure exercise + difficulty
-- [ ] Export an assignment (link/file) for a candidate
-- [ ] Candidate completes; export evidence/result
-- [ ] Employer report view (pass/fail, rubric, timeline, replay)
+### Phase 3 — Local assessment flow ✅
+- [x] Employer: select exercise + label, generate assignment (`src/app/EmployerPage.tsx`)
+- [x] Shareable assignment link + code
+- [x] Candidate completes under exam conditions; result code export (`src/app/CandidatePage.tsx`)
+- [x] Employer review of returned result (rubric + evidence)
+- [ ] Nice-to-have later: visual replay of the evidence timeline
 
 ### Phase 4 — Second trade
 - [ ] Pick second trade (CCTV vs electronics — owner decision)
@@ -119,6 +130,18 @@ The previous developer was let go. They delivered a real, well-tested **PLC simu
 - [ ] Brand/logo files (once named)
 
 ---
+
+## 6b. How to author a new exercise (the pattern)
+
+The rank-1 exercise `src/trades/plc/exercises/conveyor-start.tsx` is the template. To add a rung:
+
+1. **Write the simulation as pure logic.** Either reuse an engine state machine (as conveyor-start reuses `engine/simulation.ts`) or write a small reducer `reduce(state, action) → { next, event? }`. Keep it deterministic and seedable.
+2. **Fill in the `ExerciseDefinition`** — id, trade, rank, title, scenario (work-order brief), `objectives`, `hints`, `init`, `reduce`, `objectiveStatus`, `evaluate` (return a `RubricResult`), and a `Play` component.
+3. **Build the `Play` component** — the 2.5D canvas (inline SVG bound to state) plus the controls and any instruments (progressive disclosure). Use the shared `exercise-sim` / `sim-canvas` / `sim-controls` classes.
+4. **Register it** — add the def to `exercises` in `src/trades/plc/index.ts` and remove its stub from `planned`. The ladder, routing, learner page, and assessment flow pick it up automatically.
+5. **Verify** — `npx tsc --noEmit`, `npm test`, and a quick dev-server play-through.
+
+No shell, runtime, or routing changes are needed per exercise — that's the point of the contract.
 
 ## 7. Working style going forward (lessons from the churn)
 - **Fewer, meaningful docs.** No per-task "increment report" spam. This checklist + the PRD + ADRs for real architectural decisions are enough.
