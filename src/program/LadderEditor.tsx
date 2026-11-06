@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Branch, Contact, LadderDocument, NumericRungOperation, NumericTagType, Rung, RungElement, RungOperation } from '../engineering/ladder';
 import { NumericInstructionControls } from './NumericInstructionControls';
 import type { RenderSnapshot } from '../sim/signals';
-import { blankProgram, latchProgram } from '../sim/orchestrator';
+import { blankProgram, latchProgram, sortingProgram } from '../sim/orchestrator';
 import { MAX_SANDBOX_RUNGS, MAX_SANDBOX_SYMBOLS } from './p2-contract';
 
 type Props = { document: LadderDocument; snapshot: RenderSnapshot; disabled: boolean; onChange: (doc: LadderDocument) => void };
@@ -230,11 +230,12 @@ export function LadderEditor({ document, snapshot, disabled, onChange }: Props) 
           disabled={document.rungs.length >= MAX_SANDBOX_RUNGS || symbols.length >= MAX_SANDBOX_SYMBOLS}
           onClick={addRung}>+ Add rung</button>
         <button type="button" className="btn ghost small" onClick={() => onChange(latchProgram())}>Load editable latch example</button>
+        <button type="button" className="btn ghost small" onClick={() => onChange(sortingProgram())}>Load sorting program example</button>
         <button type="button" className="btn ghost small" onClick={reset}>Reset to one contact</button>
       </div>
       <div className="sandbox-tag-editor">
         <div><span className="eyebrow">Local tag table</span><h3>BOOL and numeric registers</h3>
-          <p className="sandbox-help">Physical inputs: Start (I0.0), StopOK (I0.1); physical output: Run (Q0.0). Local tags are internal to the simulated PLC.</p></div>
+          <p className="sandbox-help">Physical inputs: Start (I0.0), StopOK (I0.1), Photoeye (I0.2); physical outputs: Run (Q0.0), Sort (Q0.1). Local tags are internal to the simulated PLC.</p></div>
         <div className="sandbox-add-tag">
           <label htmlFor="sandbox-new-tag">Tag name</label>
           <input id="sandbox-new-tag" type="text" value={newTag} maxLength={40}
