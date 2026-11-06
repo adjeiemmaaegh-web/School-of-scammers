@@ -325,3 +325,18 @@
   .sandbox-ux .sandbox-sorting-panel { padding:12px; }
   .sandbox-sort-metrics > span { flex:1 1 120px; }
 }
+
+/* P3 tank and fluid handling: original lightweight 3D, read-only calibrated display. */
+.sandbox-ux .sandbox-tank-panel { display:grid; gap:12px; padding:16px; min-width:0; margin-top:12px; }
+.sandbox-ux .sandbox-tank-panel h2 { font-size:18px; margin-top:4px; }
+.sandbox-ux .sandbox-tank-meter { width:100%; height:19px; border:1px solid var(--line);
+  border-radius:10px; overflow:hidden; background:var(--surface-2); }
+.sandbox-ux .sandbox-tank-meter-fill { height:100%; min-width:0; background:#2585ac;
+  transition:none; }
+.sandbox-ux .sandbox-tank-panel details { font-size:12px; border-top:1px solid var(--line); padding-top:8px; }
+.sandbox-ux .sandbox-tank-panel summary { cursor:pointer; font-weight:700; }
+.sandbox-device-glyph.kind-tank { background:#295269; }
+.sandbox-device-glyph.kind-pump { background:#267477; }
+.sandbox-device-glyph.kind-levelprobe { background:#586478; }
+.sandbox-device-glyph.kind-drainvalve { background:#70614b; }
+@media(max-width:570px) { .sandbox-ux .sandbox-tank-panel { padding:12px; } }
