@@ -21,6 +21,24 @@ export const latchProgram = (): LadderDocument => ({
     ], coil: 'Run' },
   ],
 });
+/** The P1 editor intentionally supports one rung and one-contact parallel legs. */
+export function validateSandboxProgram(program: LadderDocument): string[] {
+  const errors = validateLadder(program);
+  if (errors.length) return errors;
+  if (program.rungs.length !== 1) return ['P1 supports exactly one editable rung'];
+  const rung = program.rungs[0];
+  if (rung.elements.length > 8 || rung.elements.length < 1) return ['P1 rung needs 1–8 elements'];
+  const validContact = (c: { tag: string }) => ['Start', 'StopOK', 'Run', 'Unused'].includes(c.tag);
+  if (!['Run', 'Unused'].includes(rung.coil)) return ['P1 output coil must be Run or Unused'];
+  for (const element of rung.elements) {
+    if (element.type === 'contact' && !validContact(element)) return ['Unsupported P1 contact tag'];
+    if (element.type === 'branch' &&
+      (element.alternatives.length !== 2 ||
+       element.alternatives.some(path => path.length !== 1 || !validContact(path[0]))))
+      return ['P1 supports two one-contact parallel paths'];
+  }
+  return [];
+}
 export const newProject = (): ProjectFile => ({ formatVersion: 1, components: [], wires: [], program: blankProgram() });
 export function createWorld(project: ProjectFile = newProject()): WorldState {
   return { project, running: false, tick: 0, coils: {}, ladderMemory: {}, contactorOn: false, motorOn: false,
@@ -54,7 +72,7 @@ export function validateProject(raw: unknown): ProjectFile {
         !terminalExists(wire.from, components) || !terminalExists(wire.to, components)) throw new Error('Invalid wire in project');
     wireIds.add(wire.id);
   }
-  const programErrors = validateLadder(p.program);
+  const programErrors = validateSandboxProgram(p.program);
   if (programErrors.length) throw new Error(programErrors.join('; '));
   return { formatVersion: 1, components, wires: p.wires.map(w => ({ id: w.id, from: w.from, to: w.to })), program: p.program };
 }
@@ -66,7 +84,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): { wor
   for (const cmd of commands) {
     world = { ...world, lastError: null };
     if (cmd.k === 'run') {
-      const issues = validateLadder(world.project.program);
+      const issues = validateSandboxProgram(world.project.program);
       world = issues.length ? setError(world, issues.join('; ')) : { ...world, running: true };
     } else if (cmd.k === 'pause') world = { ...world, running: false };
     else if (cmd.k === 'step') { world = { ...world, running: false }; forceStep = true; }
@@ -93,7 +111,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): { wor
     } else if (cmd.k === 'unwire') {
       world = { ...world, project: { ...world.project, wires: world.project.wires.filter(w => w.id !== cmd.id) } };
     } else if (cmd.k === 'loadProgram') {
-      const errors = validateLadder(cmd.program);
+      const errors = validateSandboxProgram(cmd.program);
       if (errors.length) world = setError(world, errors.join('; '));
       else world = { ...createWorld({ ...world.project, program: cmd.program }) };
     } else if (cmd.k === 'loadProject') {
