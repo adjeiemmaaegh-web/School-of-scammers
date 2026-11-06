@@ -2,6 +2,14 @@
 
 > Companion to PRD v4. Describes **how the open simulator is built** on the salvaged engine. Supersedes the v3 architecture (git history preserves it). Read the PRD first, then this, then the `automation-platform` skill.
 
+## Implementation scope and status (owner-approved, 6 November 2026)
+
+P0/P1 is a **frontend-only** development increment. No backend, authentication, database server, cloud APIs, or hosted assessment state. The existing employer assessment routes remain functional and will be integrated into the open simulator in P6. Browser storage and local JSON import/export are permitted.
+
+The first vertical slice intentionally runs the salvaged `engineering/ladder.ts` Ladder interpreter and `engineering/electrical.ts` bounded 24V solver rather than claiming full IEC 61131-3 or general electrical simulation. The actual bridge lives at `src/sim/orchestrator.ts`; `src/sim/worker.ts` owns tick scheduling and authoritative state; `src/components/registry.ts` holds the P1 device catalogue; `src/program/LadderEditor.tsx` edits the limited rung; `src/app/SandboxPage.tsx` is the new UI. Later modules should be extracted behind interfaces without reimplementing tick order.
+
+The motor in P1 is an idealised **24V DC load**, not an industrial three-phase motor; the ordinary STOP switch is not a safety-rated E-stop. One PLC, one supply, an editable one-rung Ladder subset, and a fixed 50ms scan are intentional P1 constraints. Documentation/test results must distinguish built features from planned features.
+
 ## 1. The one picture
 
 ```
