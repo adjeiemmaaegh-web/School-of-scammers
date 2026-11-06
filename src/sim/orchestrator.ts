@@ -231,7 +231,15 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'PLC runtime failed';
-    const paused = { ...w, running: false, lastError: `PLC runtime error: ${message}` };
+    // Fail closed in the *simulated* plant. Do not publish stale energized outputs
+    // after an arithmetic fault (overflow, division by zero, invalid typed write).
+    const paused: WorldState = {
+      ...w, running: false, coils: { ...w.coils, Run: false },
+      tagValues: { ...w.tagValues, Run: false },
+      contactorOn: false, motorOn: false, voltages: {},
+      diagnostics: [...w.diagnostics, 'PLC scan interrupted; simulated outputs deenergized'],
+      lastError: `PLC runtime error: ${message}`,
+    };
     return { world: paused, snapshot: renderSnapshot(paused),
       events: [{ tick: w.tick, kind: 'error', detail: message }] };
   }
