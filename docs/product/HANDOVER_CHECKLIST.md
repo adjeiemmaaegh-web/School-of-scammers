@@ -26,7 +26,7 @@ After reviewing the shipped product against **Cisco Packet Tracer / GNS3** (the 
 
 ## Current P0/P1 implementation note (6 Nov 2026)
 
-On the development branch only: `/sandbox` route and home CTA; drag/place 2.5D components, terminal-to-terminal wiring, editable one-rung Ladder, worker tick orchestrator bridging the existing Ladder and bounded 24V electrical solvers, contactor/motor state feedback, local JSON import/export, and initial deterministic regression tests. Existing v3 exercises and local assessments are unchanged. **Current chat environment could not run the full npm/Vitest/browser suite against the repository; all verification and acceptance gates remain OPEN until logs and actual browser evidence are available.** No backend is planned or authorized.
+On the development branch only: `/sandbox` route and home CTA; drag/place 2.5D components, terminal-to-terminal wiring, editable one-rung Ladder, worker tick orchestrator bridging the existing Ladder and bounded 24V electrical solvers, contactor/motor state feedback, local JSON import/export, and initial deterministic regression tests plus an automated browser end-to-end check in GitHub CI. Existing v3 exercises and local assessments are unchanged. **Current chat environment could not run the full npm/Vitest/browser suite against the repository; all verification and acceptance gates remain OPEN until logs and actual browser evidence are available.** No backend is planned or authorized.
 
 ## Earlier progress — v3 product (shipped, retained as the assessment layer)
 
