@@ -1,11 +1,36 @@
 import { useEffect, useState } from 'react';
 import type { RenderSnapshot } from '../sim/signals';
+import { scanTraceCsv, type EdgeDirection, type TagBreakpoint } from './scan-trace';
 
-export function LiveMonitor({ snapshot, onBreakpoint }: {
+export function LiveMonitor({ snapshot, onBreakpoint, onTagBreakpoint }: {
   snapshot: RenderSnapshot; onBreakpoint: (scan: number | null) => void;
+  onTagBreakpoint: (breakpoint: TagBreakpoint | null) => void;
 }) {
   const [target, setTarget] = useState('');
   const [watch, setWatch] = useState('');
+  const [edgeTag, setEdgeTag] = useState('Run');
+  const [edgeDirection, setEdgeDirection] = useState<EdgeDirection>('rising');
+  const boolTags = Object.entries(snapshot.tagValues).filter(([,value]) =>
+    typeof value === 'boolean').map(([name]) => name);
+  useEffect(() => {
+    if (snapshot.breakpointTag) {
+      setEdgeTag(snapshot.breakpointTag.tag);
+      setEdgeDirection(snapshot.breakpointTag.edge);
+    }
+  }, [snapshot.breakpointTag?.tag, snapshot.breakpointTag?.edge]);
+  const exportTrace = () => {
+    if (snapshot.scanTrace.length === 0) return;
+    const csv = scanTraceCsv(snapshot.scanTrace);
+    const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `plc-scan-trace-${snapshot.tick}.csv`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
   useEffect(() => {
     if (snapshot.breakpointScan !== null) setTarget(String(snapshot.breakpointScan));
   }, [snapshot.breakpointScan]);
@@ -48,6 +73,50 @@ export function LiveMonitor({ snapshot, onBreakpoint }: {
       </div>
       {snapshot.breakpointScan !== null && <p role="status">Armed at scan {snapshot.breakpointScan}</p>}
       {snapshot.breakpointHit && <p className="sandbox-breakpoint-hit" role="status">{snapshot.breakpointHit}</p>}
+    </div>
+    <div className="sandbox-breakpoint-panel">
+      <h3>Tag edge breakpoint</h3>
+      <p className="sandbox-help">Pause after the worker detects a real BOOL transition during a simulated scan. Never overrides physical inputs or outputs.</p>
+      <div className="sandbox-breakpoint-fields">
+        <label>PLC tag
+          <select aria-label="Breakpoint PLC tag" value={boolTags.includes(edgeTag) ? edgeTag : boolTags[0] ?? ''}
+            onChange={event => setEdgeTag(event.target.value)}>
+            {boolTags.map(tag => <option key={tag} value={tag}>{tag}</option>)}
+          </select>
+        </label>
+        <label>Signal edge
+          <select aria-label="Breakpoint signal edge" value={edgeDirection}
+            onChange={event => setEdgeDirection(event.target.value as EdgeDirection)}>
+            <option value="rising">Rising</option>
+            <option value="falling">Falling</option>
+            <option value="either">Either</option>
+          </select>
+        </label>
+      </div>
+      <div>
+        <button className="btn ghost small" type="button" disabled={snapshot.running || boolTags.length === 0}
+          onClick={() => onTagBreakpoint({ tag: boolTags.includes(edgeTag) ? edgeTag : boolTags[0], edge: edgeDirection })}>Arm edge</button>
+        <button className="btn ghost small" type="button" disabled={snapshot.running || snapshot.breakpointTag === null}
+          onClick={() => onTagBreakpoint(null)}>Clear edge</button>
+      </div>
+      {snapshot.breakpointTag && <p role="status">Watching {snapshot.breakpointTag.tag} — {snapshot.breakpointTag.edge} edge</p>}
+    </div>
+    <div className="sandbox-scan-history">
+      <div className="sandbox-section-head">
+        <div><span className="eyebrow">PLC debugger</span><h3>Scan history</h3></div>
+        <button type="button" className="btn ghost small" disabled={snapshot.scanTrace.length === 0}
+          onClick={exportTrace}>Export scan CSV</button>
+      </div>
+      <p className="sandbox-help">Latest {snapshot.scanTrace.length} scans (maximum 300). Each record is calculated by the worker; the export contains only simulated signals and network results.</p>
+      <div className="sandbox-scan-history-list" role="table" aria-label="Recent PLC scan trace">
+        <div role="row"><strong role="columnheader">Scan</strong><strong role="columnheader">Run</strong><strong role="columnheader">Motor</strong></div>
+        {snapshot.scanTrace.slice(-12).reverse().map(entry => <div role="row" key={entry.scan}>
+          <span role="cell">{entry.scan}</span>
+          <span role="cell">{entry.run ? 'TRUE' : 'FALSE'}</span>
+          <span role="cell">{entry.motorOn ? 'RUNNING' : 'STOPPED'}</span>
+        </div>)}
+        {!snapshot.scanTrace.length && <p className="sandbox-help">Run or Step to capture scan evidence.</p>}
+      </div>
     </div>
   </section>;
 }
