@@ -24,7 +24,7 @@ async function run(){
     const report=await window.axe.run(document,{runOnly:{type:'tag',values:tagSet}});
     return {serious:report.violations.filter(v=>['critical','serious'].includes(v.impact)).map(v=>({id:v.id,impact:v.impact,count:v.nodes.length,targets:v.nodes.slice(0,5).flatMap(n=>n.target)})),moderate:report.violations.filter(v=>v.impact==='moderate').map(v=>v.id)};
    },tags);
-   if(result.serious.length)failures.push({route,issues:result.serious});
+   if(result.serious.length){ failures.push({route,issues:result.serious}); console.log('AXE DETAILS',route,JSON.stringify(result.serious)); }
    console.log('AXE ROUTE',route,'serious/critical',result.serious.length,'moderate',result.moderate.length);
   }
   await page.goto(base+'/',{waitUntil:'domcontentloaded',timeout:40000});
