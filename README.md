@@ -14,7 +14,7 @@
 
 For a full start/stop demonstration, connect the supply and PLC power pins, route START and STOP through the PLC inputs, route output Q0.0 into contactor coil A1/A2, and place contactor NO 13/14 in series with the motor. The sandbox UI includes the wiring map.
 
-This development preview intentionally supports **one PLC, one supply, up to eight limited Ladder rungs or bounded ST, and an idealized 24V DC circuit**. It is *not* a general circuit solver, vendor PLC runtime, real motor physics simulator, or safety-rated E-stop system. More PLC programming functions, typed Ladder tags, additional devices, and industrial-grade electrical realism are later roadmap phases; real 3D rendering now starts in P1. Never substitute this simulator for physical equipment acceptance or safety training.
+This development preview intentionally supports **one PLC, one supply, up to eight bounded Ladder rungs (local BOOL/INT/DINT/REAL tags, numeric compare/MOV/arithmetic) or bounded ST, and an idealized 24V DC circuit**. It is *not* a general circuit solver, vendor PLC runtime, real motor physics simulator, or safety-rated E-stop system. More PLC programming functions, physical analog I/O mapping, additional devices, and industrial-grade electrical realism are later roadmap phases; real 3D rendering now starts in P1. Never substitute this simulator for physical equipment acceptance or safety training.
 
 ## Existing app retained
 
