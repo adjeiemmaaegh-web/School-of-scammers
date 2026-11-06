@@ -30,10 +30,10 @@ async function main(){
   }
   await page.goto(base+'/sandbox',{waitUntil:'domcontentloaded'});
   await page.locator('.sandbox-3d-shell').waitFor({timeout:20000});
-  await page.waitForFunction(() => !!document.querySelector('canvas.sandbox-three-canvas') ||
+  await page.waitForFunction(() => !!document.querySelector('.sandbox-three-canvas canvas') ||
     !!document.querySelector('.sandbox-3d-fallback'), { timeout:20000 });
   const graphics = await page.evaluate(() => {
-    const canvas=document.querySelector('canvas.sandbox-three-canvas');
+    const canvas=document.querySelector('.sandbox-three-canvas canvas');
     return {rendered3D:!!canvas && canvas.width>0 && canvas.height>0,
       fallback:document.querySelector('.sandbox-3d-fallback')?.textContent?.trim()??null};
   });
