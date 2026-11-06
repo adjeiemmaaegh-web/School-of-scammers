@@ -52,7 +52,10 @@ export function WorkbenchInspector({
 
   const definition = COMPONENTS[selectedDevice.kind];
   const isPressed = selectedDevice.pressed;
-  const isLive = selectedDevice.kind === 'pump' ? snapshot.pumpOn :
+  const isLive = selectedDevice.kind === 'breaker' ? !snapshot.breakerTripped :
+    selectedDevice.kind === 'overload' ? !snapshot.overloadTripped :
+    selectedDevice.kind === 'lamp' ? snapshot.lampOn :
+    selectedDevice.kind === 'pump' ? snapshot.pumpOn :
     selectedDevice.kind === 'levelprobe' ? snapshot.io.TankHigh :
     selectedDevice.kind === 'drainvalve' ? snapshot.drainOn :
     selectedDevice.kind === 'conveyor' ? snapshot.conveyorOn :
@@ -62,7 +65,10 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'contactor' ? snapshot.contactorOn :
     selectedDevice.kind === 'plc' ? snapshot.io.PlcPowered :
     selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' ? isPressed : true;
-  const state = selectedDevice.kind === 'tank' ? `${Math.round(snapshot.tank.levelMl)} / 1000 ml` :
+  const state = selectedDevice.kind === 'breaker' ? (isLive ? 'Closed' : 'Tripped open') :
+    selectedDevice.kind === 'overload' ? (isLive ? '95-96 closed' : '95-96 tripped open') :
+    selectedDevice.kind === 'lamp' ? (isLive ? 'Illuminated' : 'Off') :
+    selectedDevice.kind === 'tank' ? `${Math.round(snapshot.tank.levelMl)} / 1000 ml` :
     selectedDevice.kind === 'pump' ? (isLive ? 'Filling' : 'Off') :
     selectedDevice.kind === 'levelprobe' ? (isLive ? 'High level' : 'Below level switch') :
     selectedDevice.kind === 'drainvalve' ? (isLive ? 'Open' : 'Closed') :
