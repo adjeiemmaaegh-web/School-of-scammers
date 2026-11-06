@@ -31,7 +31,7 @@ export const newProject = (): ProjectFile => ({
 });
 export function createWorld(project: ProjectFile = newProject()): WorldState {
   return {
-    project, running: false, tick: 0, coils: {}, ladderMemory: {},
+    project, running: false, tick: 0, coils: {}, ladderMemory: {}, ladderNumeric: {},
     stCompiled: project.language === 'st' ? compileSandboxST(project.stSource ?? '') : null,
     stMemory: {},
     tagValues: { Start: false, StopOK: false, Run: false }, ladderSteps: [],
@@ -227,7 +227,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
         stResult = executeStructuredText(compiled, inputs, w.stMemory);
         const run = Object.entries(stResult.outputs).find(([key]) => key.toLowerCase() === 'run')?.[1];
         if (typeof run !== 'boolean') throw new TypeError('ST Run output must be BOOL');
-      } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs);
+      } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs, w.ladderNumeric);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'PLC runtime failed';
@@ -244,7 +244,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
         Run: stRun === true }
     : ladderResult?.outputs ?? {};
   const tagValues: Record<string, STValue> = {
-    ...inputs, ...(stResult?.signals ?? {}), ...coils,
+    ...inputs, ...(stResult?.signals ?? {}), ...(ladderResult?.numericValues ?? {}), ...coils,
     Run: coils.Run === true, Unused: false,
   };
   // 5. Publish output image (Q0.0 follows coil Run, only when PLC is powered).
@@ -277,6 +277,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   w = {
     ...w, tick: nextTick, coils, scanTrace: appendScanTrace(w.scanTrace, trace),
     ladderMemory: ladderResult?.memory ?? {},
+    ladderNumeric: ladderResult?.numericValues ?? {},
     ladderSteps: [...(ladderResult?.steps ?? [])],
     stMemory: stResult?.memory ?? {},
     tagValues, powered, inputs, contactorOn, motorOn, motorAngleRad,
