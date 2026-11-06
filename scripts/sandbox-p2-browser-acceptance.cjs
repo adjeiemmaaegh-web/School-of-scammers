@@ -119,6 +119,7 @@ const clickText = async (page, label) => {
     assert.ok(exportButton,'Real scan evidence must be exportable');
     // The same editor must expose load and reset controls for the salvaged CTD/CTU instructions.
     await clickText(page,'Ladder (LD)');
+    await page.waitForSelector('select[aria-label="Instruction for rung-1"]', { timeout: 8000 });
     await page.select('select[aria-label="Instruction for rung-1"]','ctd');
     await page.waitForSelector('select[aria-label="Load condition for rung-1"]');
     await page.select('select[aria-label="Load condition for rung-1"]','Start');
