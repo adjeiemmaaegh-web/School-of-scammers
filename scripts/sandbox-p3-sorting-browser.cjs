@@ -68,7 +68,9 @@ async function button(page,text) {
     const contacts=await page.$$('[data-rung-id="sort-at-eye"] select[aria-label="Contact tag"]');
     assert.equal(contacts.length,2);
     await contacts[1].select('Unused');
-    await page.waitForFunction(()=>document.querySelector('[data-rung-id="sort-at-eye"] select[aria-label="Contact tag"]:last-of-type')?.value === 'Unused').catch(()=>{});
+    await page.waitForFunction(() => [...document.querySelectorAll(
+      '[data-rung-id="sort-at-eye"] select[aria-label="Contact tag"]')]
+      .some(select => select.value === 'Unused'), { timeout: 6000 });
     await button(page,'▶ Run');
     await page.waitForFunction(()=>document.querySelector('[data-device-id="conveyor-4"] .sandbox-device-status')?.textContent==='BELT MOVING',{timeout:9000});
     await button(page,'Feed marked parcel');
