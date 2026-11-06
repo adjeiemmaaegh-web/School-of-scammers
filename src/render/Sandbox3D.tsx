@@ -8,40 +8,16 @@
 import { useMemo, useRef, useState, type DragEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Grid, Html, OrbitControls, GizmoHelper, GizmoViewport } from '@react-three/drei';
-import { CatmullRomCurve3, Plane, Raycaster, TubeGeometry, Vector2, Vector3, type Camera } from 'three';
+import { CatmullRomCurve3, Plane, Raycaster, Vector2, Vector3, type Camera } from 'three';
 import { COMPONENTS, type ComponentKind } from '../components/registry';
 import type { PlacedComponent, ProjectFile, RenderSnapshot, XY } from '../sim/signals';
 import { supportsWebGL } from '../components/SceneShell';
+import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-coordinates';
 
-const WIDTH = 1080;
-const DEPTH = 580;
-const SCALE = 100;
-const BODY_W = 170;
-const BODY_D = 130;
 const COLORS = {
   chassis: '#35546b', steel: '#829bb0', panel: '#192b3c', light: '#d3e4ef',
   live: '#20d6a6', off: '#52677c', highlight: '#ffa633', cable: '#7793ad',
 };
-const clamp = (n: number, lower: number, upper: number) => Math.max(lower, Math.min(upper, n));
-
-export function worldPosition(c: Pick<PlacedComponent, 'x' | 'y'>): [number, number, number] {
-  return [(c.x + BODY_W / 2 - WIDTH / 2) / SCALE, 0, (c.y + BODY_D / 2 - DEPTH / 2) / SCALE];
-}
-export function projectPlacement(point: { x: number; z: number }): XY {
-  return {
-    x: Math.round(clamp(point.x * SCALE + WIDTH / 2 - BODY_W / 2, 5, WIDTH - BODY_W - 5)),
-    y: Math.round(clamp(point.z * SCALE + DEPTH / 2 - BODY_D / 2, 5, DEPTH - BODY_D - 15)),
-  };
-}
-function terminalPoint(project: ProjectFile, fullId: string): Vector3 | null {
-  const dot = fullId.indexOf('.');
-  if (dot < 1) return null;
-  const c = project.components.find(c => c.id === fullId.slice(0, dot));
-  const t = c && COMPONENTS[c.kind].terminals.find(t => t.name === fullId.slice(dot + 1));
-  if (!c || !t) return null;
-  const [x, , z] = worldPosition(c);
-  return new Vector3(x + (t.side === 'left' ? -0.64 : 0.64), 0.35, z + (t.y - 65) / 120);
-}
 
 function DeviceSculpture({ kind, active, pressed }: { kind: ComponentKind; active: boolean; pressed: boolean }) {
   const status = active ? COLORS.live : COLORS.off;
