@@ -2,11 +2,11 @@ import { useState } from 'react';
 import type { Branch, Contact, LadderDocument, NumericRungOperation, NumericTagType, Rung, RungElement, RungOperation } from '../engineering/ladder';
 import { NumericInstructionControls } from './NumericInstructionControls';
 import type { RenderSnapshot } from '../sim/signals';
-import { blankProgram, latchProgram, sortingProgram } from '../sim/orchestrator';
+import { blankProgram, latchProgram, sortingProgram, tankProgram } from '../sim/orchestrator';
 import { MAX_SANDBOX_RUNGS, MAX_SANDBOX_SYMBOLS } from './p2-contract';
 
 type Props = { document: LadderDocument; snapshot: RenderSnapshot; disabled: boolean; onChange: (doc: LadderDocument) => void };
-const BUILT_INS = ['Start', 'StopOK', 'Photoeye', 'Run', 'Sort', 'Unused'];
+const BUILT_INS = ['Start', 'StopOK', 'Photoeye', 'TankHigh', 'Run', 'Sort', 'Fill', 'Drain', 'Unused'];
 const operationFor = (kind: string, target: string): RungOperation | undefined => {
   if (kind === 'coil') return undefined;
   if (kind === 'ton' || kind === 'tof' || kind === 'rto' || kind === 'tp') return { kind, presetMs: 250 };
@@ -42,7 +42,7 @@ export function LadderEditor({ document, snapshot, disabled, onChange }: Props) 
   const numericTags = symbols.filter(tag => ['INT','DINT','REAL'].includes(document.symbols![tag].type ?? 'BOOL'));
   const boolSymbols = symbols.filter(tag => !numericTags.includes(tag));
   const tags = Array.from(new Set([...BUILT_INS, ...boolSymbols, ...document.rungs.map(r => r.coil)]));
-  const coils = Array.from(new Set(['Run', 'Sort', 'Unused', ...boolSymbols]));
+  const coils = Array.from(new Set(['Run', 'Sort', 'Fill', 'Drain', 'Unused', ...boolSymbols]));
   const live: Record<string, boolean | number> = { ...snapshot.tagValues, Unused: false };
 
   const patchRung = (rungId: string, replacement: Rung) => onChange({
@@ -231,11 +231,12 @@ export function LadderEditor({ document, snapshot, disabled, onChange }: Props) 
           onClick={addRung}>+ Add rung</button>
         <button type="button" className="btn ghost small" onClick={() => onChange(latchProgram())}>Load editable latch example</button>
         <button type="button" className="btn ghost small" onClick={() => onChange(sortingProgram())}>Load sorting program example</button>
+        <button type="button" className="btn ghost small" onClick={() => onChange(tankProgram())}>Load tank control example</button>
         <button type="button" className="btn ghost small" onClick={reset}>Reset to one contact</button>
       </div>
       <div className="sandbox-tag-editor">
         <div><span className="eyebrow">Local tag table</span><h3>BOOL and numeric registers</h3>
-          <p className="sandbox-help">Physical inputs: Start (I0.0), StopOK (I0.1), Photoeye (I0.2); physical outputs: Run (Q0.0), Sort (Q0.1). Local tags are internal to the simulated PLC.</p></div>
+          <p className="sandbox-help">Physical inputs: Start (I0.0), StopOK (I0.1), Photoeye (I0.2), TankHigh (I0.3); outputs: Run (Q0.0), Sort (Q0.1), Fill (Q0.2), Drain (Q0.3). Local tags are internal to the simulated PLC.</p></div>
         <div className="sandbox-add-tag">
           <label htmlFor="sandbox-new-tag">Tag name</label>
           <input id="sandbox-new-tag" type="text" value={newTag} maxLength={40}
