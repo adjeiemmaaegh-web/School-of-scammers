@@ -5,6 +5,7 @@ import { AppHeader } from '../ui/AppHeader';
 import { ProgrammingDock } from '../program/ProgrammingDock';
 import { LiveMonitor } from '../program/LiveMonitor';
 import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
+import { TroubleshootingPanel } from '../ui/sandbox/TroubleshootingPanel';
 import type { Command, ProjectFile, RenderSnapshot, WorkerResponse } from '../sim/signals';
 import './sandbox.css';
 
@@ -482,7 +483,7 @@ export function SandboxPage() {
             pumpOn: false, drainOn: false,
             breakerTripped: false, overloadTripped: false, lampOn: false,
             meter: { positive:null, negative:null, volts:null, status:'select' },
-            diagnostics: [], lastError: null, language: 'ladder',
+            diagnostics: [], lastError: null, alarms: [], language: 'ladder',
             tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
               Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
             ladderSteps: [], ladderMemory: {}, breakpointScan: null, breakpointHit: null,
@@ -540,6 +541,8 @@ export function SandboxPage() {
                 'Select both probes'}
             </output>
           </section>
+          {project && snapshot && <TroubleshootingPanel project={project} snapshot={snapshot}
+            editable={editable} send={send} />}
           <h3>Voltage probes (V)</h3>
           <div className="sandbox-volts">{Object.entries(snapshot?.voltages ?? {}).filter(([name]) =>
             name.includes('I0.') || name.includes('Q0.') || name.endsWith('A1')).map(([name, value]) =>

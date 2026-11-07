@@ -9,6 +9,30 @@ import type { MeterReading } from '../electrical/panel-meter';
 export type XY = { x: number; y: number };
 export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean };
 export type Wire = { id: string; from: string; to: string };
+/** Component/wire failures that alter what the circuit solver sees (P5). */
+export type FaultKind = 'wire-open' | 'contactor-coil-open' | 'contactor-welded' | 'motor-open-winding' | 'button-stuck';
+export type FaultSpec = {
+  id: string;
+  kind: FaultKind;
+  /** Component id, or wire id for 'wire-open'. */
+  target: string;
+  /** 'button-stuck' only: the mechanism is stuck as if pressed (true) or as if released (false). */
+  stuckPressed?: boolean;
+  /** Hidden faults are not described in learner-facing lists or events until revealed. This is a
+   *  UX convention for local practice, not security: exported project JSON still contains them. */
+  hidden: boolean;
+};
+export type AlarmCode = 'START_FAILURE' | 'UNCOMMANDED_RUN';
+/** Supervisory alarm: states a symptom only and never names a hidden cause. */
+export type AlarmRecord = {
+  id: number;
+  code: AlarmCode;
+  severity: 'warning' | 'fault';
+  message: string;
+  raisedAtScan: number;
+  clearedAtScan: number | null;
+};
+export type AlarmWatch = { noResponse: number; uncommanded: number; nextId: number };
 export type ProjectFile = {
   formatVersion: 1;
   components: PlacedComponent[];
@@ -17,6 +41,8 @@ export type ProjectFile = {
   /** Optional in v1 JSON for backwards compatibility. Defaults to ladder. */
   language?: 'ladder' | 'st';
   stSource?: string;
+  /** Optional in v1 JSON for backwards compatibility. Defaults to no faults. */
+  faults?: FaultSpec[];
 };
 export type WorldState = {
   project: ProjectFile;
@@ -58,6 +84,9 @@ export type WorldState = {
   voltages: Record<string, number | null>;
   diagnostics: string[];
   lastError: string | null;
+  /** Bounded supervisory alarm history (P5). Reset with the world. */
+  alarms: AlarmRecord[];
+  alarmWatch: AlarmWatch;
 };
 export type Command =
   | { k: 'place'; id: string; kind: ComponentKind; at: XY }
@@ -68,6 +97,14 @@ export type Command =
   /** Flip a pushbutton/E-stop using the worker's authoritative state. UIs must use this
    *  rather than `operate` with `!pressed` from a snapshot, which is stale between scans. */
   | { k: 'operateToggle'; id: string }
+  /** The worker assigns the fault id. Allowed any time: faults can occur while running. */
+  | { k: 'injectFault'; kind: FaultKind; target: string; stuckPressed?: boolean; hidden: boolean }
+  /** Deterministically picks one applicable fault from the current project using `seed`. */
+  | { k: 'injectSeededFault'; seed: number; hidden: boolean }
+  | { k: 'clearFault'; id: string }
+  | { k: 'revealFault'; id: string }
+  /** Replace a component or re-terminate a wire. Needs the simulation paused (isolated). */
+  | { k: 'repair'; target: string }
   | { k: 'feedParcel'; kind: ParcelKind }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
@@ -108,6 +145,7 @@ export type RenderSnapshot = {
   meter: MeterReading;
   diagnostics: string[];
   lastError: string | null;
+  alarms: AlarmRecord[];
   language: 'ladder' | 'st';
   tagValues: Record<string, STValue>;
   ladderSteps: LadderStep[];

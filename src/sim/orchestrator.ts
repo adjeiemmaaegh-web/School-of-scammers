@@ -8,8 +8,13 @@ import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from 
 import { feedPlant, freshPlant, stepPlant } from '../plant/sorting-conveyor';
 import { freshTank, stepTank } from '../plant/tank-process';
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
+import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
+import {
+  describeFault, effectivePressed, faultsOf, hasFault, nextFaultId, pickSeededFault,
+  solverWires, validateFaults,
+} from './faults';
 export { validateSandboxProgram } from '../program/p2-contract';
-import type { Command, PlacedComponent, ProjectFile, RenderSnapshot, SimEvent, WorldState } from './signals';
+import type { Command, FaultSpec, PlacedComponent, ProjectFile, RenderSnapshot, SimEvent, WorldState } from './signals';
 
 export const SCAN_MS = 50;
 export const blankProgram = (): LadderDocument => ({
@@ -116,6 +121,7 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     meter: emptyMeter(),
     powered: false, inputs: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false },
     voltages: {}, diagnostics: [], lastError: null,
+    alarms: [], alarmWatch: freshAlarmWatch(),
   };
 }
 const terminal = (id: string, pin: string) => `${id}.${pin}`;
@@ -161,15 +167,23 @@ export function validateProject(raw: unknown): ProjectFile {
     if (p.language === 'st' && !p.stSource) throw new Error('ST mode requires a compiled source');
     if (p.stSource) compileSandboxST(p.stSource);
   }
+  const wires = p.wires.map(w => ({ id: w.id, from: w.from, to: w.to }));
+  const faults = validateFaults(p.faults, components, wires);
   return {
-    formatVersion: 1, components,
-    wires: p.wires.map(w => ({ id: w.id, from: w.from, to: w.to })), program: p.program,
+    formatVersion: 1, components, wires, program: p.program,
     ...(p.language !== undefined ? { language: p.language } : {}),
     ...(p.stSource !== undefined ? { stSource: p.stSource } : {}),
+    // Omitted when empty so legacy and fault-free projects keep their exact v1 shape.
+    ...(faults.length ? { faults } : {}),
   };
 }
 const setError = (world: WorldState, message: string): WorldState => ({ ...world, lastError: message });
 const canEdit = (world: WorldState) => !world.running;
+/** Replace the fault list, omitting the key when empty so fault-free projects keep their v1 shape. */
+function withFaults(world: WorldState, faults: readonly FaultSpec[]): WorldState {
+  const { faults: _previous, ...rest } = world.project;
+  return { ...world, project: faults.length ? { ...rest, faults: [...faults] } : rest };
+}
 function applyCommands(initial: WorldState, commands: readonly Command[]): {
   world: WorldState; forceStep: boolean; events: SimEvent[];
 } {
@@ -215,7 +229,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         const candidate = resettingBreaker ? { ...world, breakerTripped: false } : world;
         const circuit = resettingBreaker ? solveDiscrete24V({
           devices: buildCircuit(candidate),
-          wires: candidate.project.wires.map(wire => [wire.from, wire.to] as const),
+          wires: solverWires(candidate.project),
         }) : null;
         if (circuit?.diagnostics.some(d => d.startsWith('Supply short'))) {
           world = setError(world, 'Remove the short circuit before resetting the branch breaker');
@@ -250,7 +264,51 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         const pressed = cmd.k === 'operate' ? cmd.pressed : !target.pressed;
         world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, pressed } : c) } };
       }
+    } else if (cmd.k === 'injectFault' || cmd.k === 'injectSeededFault') {
+      // Faults can occur while running, so injection is not gated on pause. The fault only changes
+      // what the circuit solver is given; no symptom is set here (see sim/faults.ts).
+      const existing = faultsOf(world.project);
+      let picked: { kind: FaultSpec['kind']; target: string; stuckPressed?: boolean } | null;
+      if (cmd.k === 'injectSeededFault') {
+        picked = Number.isSafeInteger(cmd.seed) ? pickSeededFault(world.project, cmd.seed) : null;
+        if (!Number.isSafeInteger(cmd.seed)) world = setError(world, 'Fault seed must be a whole number');
+        else if (!picked) world = setError(world, 'No applicable fault for this project');
+      } else {
+        picked = { kind: cmd.kind, target: cmd.target,
+          ...(cmd.stuckPressed !== undefined ? { stuckPressed: cmd.stuckPressed } : {}) };
+      }
+      if (picked) {
+        try {
+          const faults = validateFaults([...existing, { id: nextFaultId(existing), ...picked, hidden: cmd.hidden }],
+            world.project.components, world.project.wires);
+          world = withFaults(world, faults);
+          commandEvents.push({ tick: world.tick, kind: 'fault', detail: cmd.hidden
+            ? 'A fault was injected (hidden)'
+            : `Fault injected: ${describeFault(faults[faults.length - 1])}` });
+        } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Invalid fault'); }
+      }
+    } else if (cmd.k === 'clearFault' || cmd.k === 'revealFault') {
+      const fault = faultsOf(world.project).find(f => f.id === cmd.id);
+      if (!fault) world = setError(world, 'Unknown fault');
+      else if (cmd.k === 'clearFault') {
+        world = withFaults(world, faultsOf(world.project).filter(f => f.id !== cmd.id));
+        commandEvents.push({ tick: world.tick, kind: 'fault', detail: fault.hidden
+          ? 'A hidden fault was cleared' : `Fault cleared: ${describeFault(fault)}` });
+      } else if (fault.hidden) {
+        world = withFaults(world, faultsOf(world.project).map(f => f.id === cmd.id ? { ...f, hidden: false } : f));
+        commandEvents.push({ tick: world.tick, kind: 'fault', detail: `Fault revealed: ${describeFault(fault)}` });
+      }
     } else if (!canEdit(world)) world = setError(world, 'Pause simulation before modifying the project');
+    else if (cmd.k === 'repair') {
+      // Replacing a part is only possible with the plant isolated (paused). The event is neutral on
+      // purpose: it never says whether anything was wrong, so guess-and-replace is not rewarded.
+      if (!world.project.components.some(c => c.id === cmd.target) && !world.project.wires.some(w => w.id === cmd.target))
+        world = setError(world, 'Nothing to repair: unknown component or wire');
+      else {
+        world = withFaults(world, faultsOf(world.project).filter(f => f.target !== cmd.target));
+        commandEvents.push({ tick: world.tick, kind: 'repair', detail: `Replaced ${cmd.target} with the simulation isolated` });
+      }
+    }
     else if (cmd.k === 'place') {
       if (!validId(cmd.id) || !Object.hasOwn(COMPONENTS, cmd.kind) || !validPos(cmd.at) ||
           world.project.components.some(c => c.id === cmd.id) || world.project.components.length >= 40) world = setError(world, 'Invalid component placement');
@@ -269,6 +327,9 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       else world = { ...world, project: { ...world.project, wires: [...world.project.wires, { id: cmd.id, from: cmd.from, to: cmd.to }] } };
     } else if (cmd.k === 'unwire') {
       world = { ...world, project: { ...world.project, wires: world.project.wires.filter(w => w.id !== cmd.id) } };
+      // Removing a broken conductor is a legitimate repair, and a dangling fault would make the
+      // exported project fail validation.
+      world = withFaults(world, faultsOf(world.project).filter(f => !(f.kind === 'wire-open' && f.target === cmd.id)));
     } else if (cmd.k === 'loadProgram') {
       const errors = validateSandboxProgram(cmd.program);
       if (errors.length) world = setError(world, errors.join('; '));
@@ -319,10 +380,14 @@ function buildCircuit(world: WorldState): Device[] {
       id: c.id, kind: 'switch', a: terminal(c.id,'95'), b: terminal(c.id,'96'),
       closed: !world.overloadTripped,
     });
-    if (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') devices.push({
-      id: c.id, kind: 'switch', a: terminal(c.id, 'A'), b: terminal(c.id, 'B'),
-      closed: c.kind === 'start' || c.kind === 'reversebutton' ? c.pressed : !c.pressed,
-    });
+    if (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') {
+      // A stuck-button fault overrides what the operator did; the circuit sees the stuck contact.
+      const pressed = effectivePressed(world.project, c);
+      devices.push({
+        id: c.id, kind: 'switch', a: terminal(c.id, 'A'), b: terminal(c.id, 'B'),
+        closed: c.kind === 'start' || c.kind === 'reversebutton' ? pressed : !pressed,
+      });
+    }
     if (c.kind === 'plc') {
       devices.push({ id: `${c.id}-Q`, kind: 'switch',
         a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.0'), closed: world.coils.Run === true });
@@ -342,25 +407,34 @@ function buildCircuit(world: WorldState): Device[] {
     if (c.kind === 'levelprobe') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
       a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'), closed: world.tank.highLevel });
     if (c.kind === 'contactor') {
-      devices.push({ id: c.id, kind: 'load', positive: terminal(c.id, 'A1'), negative: terminal(c.id, 'A2'), nominalVolts: 24 });
-      devices.push({ id: `${c.id}-NO`, kind: 'switch', a: terminal(c.id, '13'), b: terminal(c.id, '14'), closed: world.contactorOn });
+      // Open coil: not part of the circuit, so it never pulls in (A1-A2 still measures 24 V).
+      if (!hasFault(world.project, 'contactor-coil-open', c.id))
+        devices.push({ id: c.id, kind: 'load', positive: terminal(c.id, 'A1'), negative: terminal(c.id, 'A2'), nominalVolts: 24 });
+      // Welded contacts stay closed whatever the coil does.
+      devices.push({ id: `${c.id}-NO`, kind: 'switch', a: terminal(c.id, '13'), b: terminal(c.id, '14'),
+        closed: world.contactorOn || hasFault(world.project, 'contactor-welded', c.id) });
     }
     if (c.kind === 'forwardcontactor' || c.kind === 'reversecontactor') {
-      const on = c.kind === 'forwardcontactor' ? world.forwardContactorOn : world.reverseContactorOn;
-      devices.push({ id: c.id, kind: 'load', positive: terminal(c.id, 'A1'),
-        negative: terminal(c.id, 'A2'), nominalVolts: 24 });
+      // The NC auxiliary is mechanically linked to the NO contacts, so a weld opens it too.
+      const on = (c.kind === 'forwardcontactor' ? world.forwardContactorOn : world.reverseContactorOn) ||
+        hasFault(world.project, 'contactor-welded', c.id);
+      if (!hasFault(world.project, 'contactor-coil-open', c.id))
+        devices.push({ id: c.id, kind: 'load', positive: terminal(c.id, 'A1'),
+          negative: terminal(c.id, 'A2'), nominalVolts: 24 });
       devices.push({ id: `${c.id}-NO`, kind: 'switch', a: terminal(c.id, '13'),
         b: terminal(c.id, '14'), closed: on });
       devices.push({ id: `${c.id}-NC`, kind: 'switch', a: terminal(c.id, '21'),
         b: terminal(c.id, '22'), closed: !on });
     }
-    if (c.kind === 'revmotor') {
+    if (c.kind === 'revmotor' && !hasFault(world.project, 'motor-open-winding', c.id)) {
       devices.push({ id: `${c.id}-F`, kind: 'load', positive: terminal(c.id, 'F+'),
         negative: terminal(c.id, 'M-'), nominalVolts: 24 });
       devices.push({ id: `${c.id}-R`, kind: 'load', positive: terminal(c.id, 'R+'),
         negative: terminal(c.id, 'M-'), nominalVolts: 24 });
     }
-    if (c.kind === 'motor' || c.kind === 'conveyor' || c.kind === 'pump' || c.kind === 'lamp') devices.push({ id: c.id, kind: 'load',
+    // Open winding: the load is not part of the circuit. Terminals still measure 24 V; nothing moves.
+    if ((c.kind === 'motor' || c.kind === 'conveyor' || c.kind === 'pump' || c.kind === 'lamp') &&
+        !hasFault(world.project, 'motor-open-winding', c.id)) devices.push({ id: c.id, kind: 'load',
       positive: terminal(c.id, 'L+'), negative: terminal(c.id, 'M-'), nominalVolts: 24 });
     if (c.kind === 'diverter' || c.kind === 'drainvalve') devices.push({ id: c.id, kind: 'load',
       positive: terminal(c.id, 'A1'), negative: terminal(c.id, 'A2'), nominalVolts: 24 });
@@ -389,6 +463,7 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     breakerTripped: world.breakerTripped, overloadTripped: world.overloadTripped,
     lampOn: world.lampOn, meter: { ...world.meter },
     diagnostics: [...world.diagnostics], lastError: world.lastError,
+    alarms: world.alarms.map(a => ({ ...a })),
     language: world.project.language ?? 'ladder',
     tagValues: { ...world.tagValues }, ladderSteps: [...world.ladderSteps],
     ladderMemory: { ...world.ladderMemory },
@@ -411,7 +486,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     if (w.meter.positive || w.meter.negative) {
       const pausedCircuit = solveDiscrete24V({
         devices: buildCircuit(w),
-        wires: w.project.wires.map(wire => [wire.from, wire.to] as const),
+        wires: solverWires(w.project),
       });
       w = { ...w, voltages: pausedCircuit.voltage,
         meter: measureDC24(pausedCircuit.voltage, pausedCircuit.diagnostics,
@@ -420,7 +495,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     return { world: w, snapshot: renderSnapshot(w), events };
   }
   // 2. Solve the 24V netlist using last scan's actuator/output state.
-  const wires = w.project.wires.map(wire => [wire.from, wire.to] as const);
+  const wires = solverWires(w.project);
   let circuit = solveDiscrete24V({ devices: buildCircuit(w), wires });
   // An ideal direct short downstream of the CLOSED breaker trips its latched
   // protective contact. An unfused upstream short does NOT get false protection.
@@ -600,6 +675,15 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     ? `Paused at scan ${nextTick}: ${w.breakpointTag.tag} ${w.breakpointTag.edge} edge` : null;
   const breakpointHit = scanHit ?? edgeHit;
   if (breakpointHit) events.push({ tick: nextTick, kind: 'breakpoint', detail: breakpointHit });
+  // Supervisory alarms report commanded-vs-observed symptoms only; they never name a cause.
+  const alarmUpdate = updateAlarms({
+    scan: nextTick, monitored: powered && !!motor, runCommanded: coils.Run === true,
+    motorEnergized: motorOn, alarms: w.alarms, watch: w.alarmWatch,
+  });
+  for (const a of alarmUpdate.raised) events.push({ tick: nextTick, kind: 'alarm',
+    detail: `Alarm (${a.severity}): ${a.message}` });
+  for (const a of alarmUpdate.cleared) events.push({ tick: nextTick, kind: 'alarm',
+    detail: `Alarm cleared: ${a.code}` });
   const trace = buildScanTrace({
     scan: nextTick, simulatedMs: nextTick * dtMs, language: w.project.language ?? 'ladder',
     start: inputs.Start, stopOK: inputs.StopOK, run: coils.Run === true,
@@ -613,6 +697,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     ladderSteps: [...(ladderResult?.steps ?? [])],
     stMemory: stResult?.memory ?? {},
     tagValues, powered, inputs, contactorOn, motorOn, motorAngleRad,
+    alarms: alarmUpdate.alarms, alarmWatch: alarmUpdate.watch,
     forwardContactorOn, reverseContactorOn, motorDirection,
     reverseMotorAngleRad, interlockConflict,
     conveyorOn, diverterOn, plant: nextPlant.plant,

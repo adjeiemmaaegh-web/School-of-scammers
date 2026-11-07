@@ -52,6 +52,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-panel-browser.cjs
       - name: P4 3D reversing - physical dual NC interlocks and motor direction browser E2E
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-reversing-browser.cjs
+      - name: P5 troubleshooting - hidden fault, symptom-only alarm, multimeter diagnosis and part replacement
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-faults-browser.cjs
       - name: Browser smoke - routes, machine control, meter, assessment and mobile
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
       - name: Offline deep-link and lazy-lab cache acceptance
