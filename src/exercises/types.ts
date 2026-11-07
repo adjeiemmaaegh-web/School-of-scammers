@@ -9,7 +9,8 @@
  *
  * Pure and DOM-free: no Date, no Math.random — the same project and evidence always grade the same.
  */
-import type { EvidenceEvent, Objective, Rank, TradeId } from '../platform/types';
+import type { EvidenceEvent, Objective } from '../platform/types';
+import type { ScenarioMeta } from './meta';
 import type { ProjectFile } from '../sim/signals';
 
 export interface GradeContext {
@@ -34,17 +35,7 @@ export interface ScenarioCheck {
   run: (ctx: GradeContext) => CheckOutcome;
 }
 
-export interface ScenarioDefinition {
-  id: string;
-  trade: TradeId;
-  /** Difficulty on the shared 1..10 ladder. */
-  rank: Rank;
-  version: string;
-  title: string;
-  estMinutes: number;
-  summary: string;
-  /** Work-order-style brief shown beside the workbench. */
-  scenario: string;
+export interface ScenarioDefinition extends ScenarioMeta {
   hints: string[];
   /** What the learner starts with. `seed` picks variants (e.g. which fault). */
   starter: (seed: number) => ProjectFile;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getLadder, getTrade } from '../trades/registry';
-import { SCENARIOS } from '../exercises';
+import { SCENARIO_META } from '../exercises/meta';
 import { loadProgress, type ProgressMap } from '../platform/persistence';
 import { AppHeader } from '../ui/AppHeader';
 
@@ -85,7 +85,7 @@ export function TradeLadder() {
           })}
         </ol>
         {(() => {
-          const scenarios = SCENARIOS.filter(s => s.trade === trade.meta.id).sort((a, b) => a.rank - b.rank);
+          const scenarios = SCENARIO_META.filter(s => s.trade === trade.meta.id).sort((a, b) => a.rank - b.rank);
           if (!scenarios.length) return null;
           return (
             <section aria-labelledby="sandbox-scenarios-h" className="ladder-scenarios">

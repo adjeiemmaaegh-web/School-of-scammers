@@ -2,8 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { decodeAssignment, encodeResult } from '../platform/persistence';
 import { getExercise } from '../trades/registry';
-import { getScenario } from '../exercises';
-import type { ScenarioSession } from '../exercises/session';
+import { getScenarioMeta } from '../exercises/meta';
+import type { ScenarioRequest } from '../exercises/session';
 import type { Assignment, AttemptResult } from '../platform/types';
 import { AppHeader } from '../ui/AppHeader';
 import { CopyField } from '../ui/CopyField';
@@ -35,10 +35,10 @@ export function CandidatePage() {
   }, []);
 
   const exerciseDef = useMemo(() => (assignment ? getExercise(assignment.exerciseId) : undefined), [assignment]);
-  const scenarioDef = useMemo(() => (assignment ? getScenario(assignment.exerciseId) : undefined), [assignment]);
+  const scenarioDef = useMemo(() => (assignment ? getScenarioMeta(assignment.exerciseId) : undefined), [assignment]);
   const def = exerciseDef ?? scenarioDef;
-  const session = useMemo<ScenarioSession | null>(() => (assignment && scenarioDef ? {
-    def: scenarioDef, mode: 'assessment', seed: assignment.seed, allowRestart: false, assignment,
+  const session = useMemo<ScenarioRequest | null>(() => (assignment && scenarioDef ? {
+    scenarioId: scenarioDef.id, mode: 'assessment', seed: assignment.seed, allowRestart: false, assignment,
     resultActions: (result: AttemptResult) => <ReturnCode result={result} />,
   } : null), [assignment, scenarioDef]);
 
@@ -112,7 +112,7 @@ export function CandidatePage() {
 
   if (session) return <Suspense fallback={<main id="main" className="wrap wrap-wide page">
     <p role="status">Loading the 3D engineering workbench…</p></main>}>
-    <SandboxPage key={`${session.def.id}:${session.seed}`} scenario={session} /></Suspense>;
+    <SandboxPage key={`${session.scenarioId}:${session.seed}`} scenario={session} /></Suspense>;
 
   return (
     <>

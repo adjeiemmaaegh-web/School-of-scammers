@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { getScenario } from '../exercises';
-import type { ScenarioSession } from '../exercises/session';
+import { getScenarioMeta } from '../exercises/meta';
+import type { ScenarioRequest } from '../exercises/session';
 import { recordProgress } from '../platform/persistence';
 import type { AttemptResult } from '../platform/types';
 import { AppHeader } from '../ui/AppHeader';
@@ -14,7 +14,7 @@ const rollSeed = () => Math.floor(Math.random() * 1_000_000) + 1;
 export function ScenarioPage() {
   const { scenarioId = '' } = useParams();
   const [params] = useSearchParams();
-  const def = getScenario(scenarioId);
+  const def = getScenarioMeta(scenarioId);
   const querySeed = Number.parseInt(params.get('seed') ?? '', 10);
   const [seed, setSeed] = useState<number>(() => {
     if (Number.isSafeInteger(querySeed) && querySeed > 0) return querySeed;
@@ -31,8 +31,8 @@ export function ScenarioPage() {
     try { localStorage.setItem(seedKey(scenarioId), String(fresh)); } catch { /* seed just will not persist */ }
     setSeed(fresh);
   }, [scenarioId]);
-  const session = useMemo<ScenarioSession | null>(() => def ? {
-    def, mode: 'learning', seed, allowRestart: true, onRestart,
+  const session = useMemo<ScenarioRequest | null>(() => def ? {
+    scenarioId: def.id, mode: 'learning', seed, allowRestart: true, onRestart,
     onSubmitted: (r: AttemptResult) => {
       const pct = r.rubric.max > 0 ? Math.round((r.rubric.score / r.rubric.max) * 100) : 0;
       recordProgress(r.assignment.exerciseId, pct, r.rubric.passed);

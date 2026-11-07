@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getTrade } from '../trades/registry';
-import { SCENARIOS } from '../exercises';
+import { SCENARIO_META } from '../exercises/meta';
 import {
   assignmentLink,
   decodeResult,
@@ -16,7 +16,7 @@ export function EmployerPage() {
   const plc = getTrade('plc');
   const playable = useMemo(() => plc?.exercises ?? [], [plc]);
   const [exerciseId, setExerciseId] = useState(playable[0]?.id ?? '');
-  const scenarios = useMemo(() => SCENARIOS.filter(s => s.trade === 'plc'), []);
+  const scenarios = useMemo(() => SCENARIO_META.filter(s => s.trade === 'plc'), []);
   const [label, setLabel] = useState('');
   const [assignment, setAssignment] = useState<Assignment | null>(null);
 

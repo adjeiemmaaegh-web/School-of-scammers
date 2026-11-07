@@ -8,7 +8,14 @@ import {
 import { feed, loadBench, press, release, run, scan, until } from './probe';
 import { layoutSignature, repairedTargets } from './grade';
 import { usedMultimeter } from './evidence';
+import { getScenarioMeta, type ScenarioMeta } from './meta';
 import type { CheckOutcome, GradeContext, ScenarioCheck, ScenarioDefinition } from './types';
+
+const meta = (id: string): ScenarioMeta => {
+  const m = getScenarioMeta(id);
+  if (!m) throw new Error(`Scenario ${id} has no metadata entry`);
+  return m;
+};
 
 const ok = (pass: boolean, yes: string, no: string): CheckOutcome => ({ pass, reason: pass ? yes : no });
 
@@ -67,15 +74,7 @@ const motorChecks = (project: ProjectFile) => ({
  * 1 · Build a start/stop motor starter  (rank 2)
  * ------------------------------------------------------------------------------------------- */
 const startStop: ScenarioDefinition = {
-  id: 'plc-sbx-startstop',
-  trade: 'plc', rank: 2, version: '1.0',
-  title: 'Build a start/stop motor starter',
-  estMinutes: 20,
-  summary: 'Wire a 24 V PLC, two pushbuttons, a contactor and a motor, then write the seal-in logic.',
-  scenario:
-    'Work order: the devices for a small 24 V motor starter are mounted but nothing is connected and the PLC runs a placeholder program.\n' +
-    'Wire the power, the START button (input I0.0), the STOP button (input I0.1) and the contactor coil (output Q0.0). Feed the motor through the contactor\'s power contact. ' +
-    'Then program the PLC so START latches the motor on and STOP always drops it. You are graded on how the finished starter behaves, not on how you built it.',
+  ...meta('plc-sbx-startstop'),
   hints: [
     'Start with the supply: P24 and M0 both go to the PLC. Then connect each device in turn and use the multimeter to confirm 24 V where you expect it.',
     'The STOP button is normally closed in real panels: the PLC input is ON while STOP is released. The StopOK tag follows that.',
@@ -115,15 +114,7 @@ function faultedStarter(seed: number): ProjectFile {
 }
 const faultTargets = (ctx: GradeContext) => (ctx.starter.faults ?? []).map(f => f.target);
 const findFault: ScenarioDefinition = {
-  id: 'plc-sbx-find-fault',
-  trade: 'plc', rank: 4, version: '1.0',
-  title: 'Find and repair the motor-starter fault',
-  estMinutes: 25,
-  summary: 'A working starter has been sabotaged. Diagnose it with the meter and replace only the faulty part.',
-  scenario:
-    'Work order: the 24 V motor starter on this bench stopped working. Wiring and program were checked last month and are believed correct.\n' +
-    'Operate the starter, read the I/O lamps and alarms, and use the multimeter to locate the fault. Pause the simulation, replace only the part you have proven faulty, ' +
-    'and confirm the starter works again. Replacing healthy parts, rebuilding the circuit or editing the program counts against you. Nothing tells you what is wrong: replacing a part never says whether it was the cause.',
+  ...meta('plc-sbx-find-fault'),
   hints: [
     'Reproduce the symptom first: press START, then STOP, and watch the alarm list and the Q0.0 lamp.',
     'A meter reading of 24 V across a coil that is not pulling in points at the coil; 24 V present up to a terminal but nothing beyond it points at the conductor or part after it.',
@@ -193,16 +184,7 @@ const sortCheck = (kinds: ('plain' | 'marked')[], wantAccepted: number, wantReje
       `${no} (accepted ${w.plant.accepted}, rejected ${w.plant.rejected}).`);
   };
 const sorting: ScenarioDefinition = {
-  id: 'plc-sbx-sorting',
-  trade: 'plc', rank: 5, version: '1.0',
-  title: 'Program the sorting conveyor',
-  estMinutes: 30,
-  summary: 'The line is wired. Write the Ladder so it runs the belt and diverts only marked parcels.',
-  scenario:
-    'Work order: a single-lane conveyor with a mark-detecting photoeye (input I0.2) and a reject diverter (output Q0.1) has been wired. The belt contactor is on Q0.0, START is I0.0 and STOP is I0.1. ' +
-    'The PLC still holds a placeholder program.\n' +
-    'Program it so START runs the belt until STOP, marked parcels are pushed off the belt by the diverter, and plain parcels pass. Use the "Feed parcel" buttons to test. ' +
-    'You are graded on what the line does with real parcels.',
+  ...meta('plc-sbx-sorting'),
   hints: [
     'The diverter output has its own tag (Sort). It should be driven only while the belt runs and the photoeye sees a mark.',
     'The belt needs a latch just like a motor starter: START latches, STOP drops.',
@@ -243,15 +225,7 @@ function tankRun(project: ProjectFile, scans: number): { trace: WorldState[]; st
   return { trace: r.trace, start: w };
 }
 const tank: ScenarioDefinition = {
-  id: 'plc-sbx-tank',
-  trade: 'plc', rank: 6, version: '1.0',
-  title: 'Program the tank level control',
-  estMinutes: 30,
-  summary: 'Fill to the high-level switch, then drain until it clears, then repeat. Never overflow; STOP halts everything.',
-  scenario:
-    'Work order: a 1000 ml demonstration tank has an inlet pump (output Q0.2), a drain valve (Q0.3), a level switch (input I0.3) and a STOP button (I0.1), all wired. The PLC still holds a placeholder program.\n' +
-    'Program the cycle: fill until the level switch reports HIGH (it trips at 750 ml and clears below 600 ml), then drain until it clears, then fill again. ' +
-    'The pump must never run while the tank is HIGH, the tank must never overflow, and STOP must halt the pump and the drain valve at once.',
+  ...meta('plc-sbx-tank'),
   hints: [
     'The level switch has hysteresis: once HIGH it stays HIGH until the level falls below 600 ml. You can use that instead of a second sensor.',
     'Two outputs, two rungs. Each is a condition on StopOK and on TankHigh (normal or negated).',

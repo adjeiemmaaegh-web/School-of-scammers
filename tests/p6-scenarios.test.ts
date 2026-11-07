@@ -314,3 +314,24 @@ describe('answer hygiene and E2E pins', () => {
     expect([f.kind, f.target]).toEqual(['contactor-coil-open', 'con']);
   });
 });
+
+describe('landing-bundle hygiene', () => {
+  it('scenario metadata and the catalogue agree, in the same order', async () => {
+    const { SCENARIO_META } = await import('../src/exercises/meta');
+    expect(SCENARIO_META.map(m => m.id)).toEqual(SCENARIOS.map(s => s.id));
+    for (const m of SCENARIO_META) {
+      const d = def(m.id);
+      expect({ trade: d.trade, rank: d.rank, version: d.version, title: d.title, estMinutes: d.estMinutes, summary: d.summary, scenario: d.scenario })
+        .toEqual({ trade: m.trade, rank: m.rank, version: m.version, title: m.title, estMinutes: m.estMinutes, summary: m.summary, scenario: m.scenario });
+    }
+  });
+  it('pages that only list scenarios must not drag the simulator into the landing bundle', async () => {
+    const { readFileSync } = await import('node:fs');
+    const read = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), 'utf8');
+    expect(read('exercises/meta.ts')).not.toMatch(/from '\.\.?\/(sim|engineering|plant|electrical|program)/);
+    for (const page of ['app/TradeLadder.tsx', 'app/EmployerPage.tsx', 'app/CandidatePage.tsx', 'app/ScenarioPage.tsx']) {
+      const src = read(page);
+      expect(src, `${page} must import scenario metadata only`).not.toMatch(/from '\.\.\/exercises'|exercises\/catalogue|exercises\/grade|exercises\/probe/);
+    }
+  });
+});

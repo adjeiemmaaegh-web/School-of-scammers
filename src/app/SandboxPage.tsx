@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, type ComponentKind } from '../components/registry';
 import { AppHeader } from '../ui/AppHeader';
@@ -8,7 +8,8 @@ import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
 import { TroubleshootingPanel } from '../ui/sandbox/TroubleshootingPanel';
 import { ScenarioPanel } from '../ui/sandbox/ScenarioPanel';
 import { appendEvidence, evidenceFromCommand } from '../exercises/evidence';
-import { scenarioStorageKey, type ScenarioSession } from '../exercises/session';
+import { scenarioStorageKey, type ScenarioRequest, type ScenarioSession } from '../exercises/session';
+import { getScenario } from '../exercises/catalogue';
 import type { AttemptResult, EvidenceEvent, RubricResult } from '../platform/types';
 import type { Command, ProjectFile, RenderSnapshot, WorkerResponse } from '../sim/signals';
 import './sandbox.css';
@@ -26,7 +27,14 @@ const reverseWireGuide = 'P4 forward/reverse (21 wires): supply P24 → breaker 
  * worker, the same 3D scene and the same tools, plus a work order, the scenario's starter project,
  * an evidence trail and a headless outcome grader. Answer-revealing helpers are hidden.
  */
-export function SandboxPage({ scenario }: { scenario?: ScenarioSession } = {}) {
+export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest } = {}) {
+  // Resolved here, inside the lazy workbench chunk, so linking pages stay light.
+  const scenario = useMemo<ScenarioSession | undefined>(() => {
+    const def = request ? getScenario(request.scenarioId) : undefined;
+    if (!request || !def) return undefined;
+    const { scenarioId: _id, ...rest } = request;
+    return { ...rest, def };
+  }, [request]);
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
   const [project, setProject] = useState<ProjectFile | null>(null);
   const [selectedTerminal, setSelectedTerminal] = useState<string | null>(null);
