@@ -5,6 +5,11 @@ import {
 import { MOTOR_LINKS } from '../src/exercises/layouts';
 import { faultCandidates } from '../src/sim/faults';
 import { createWorld, latchProgram, sortingProgram, tankProgram, tick } from '../src/sim/orchestrator';
+import metaSrc from '../src/exercises/meta.ts?raw';
+import ladderSrc from '../src/app/TradeLadder.tsx?raw';
+import employerSrc from '../src/app/EmployerPage.tsx?raw';
+import candidateSrc from '../src/app/CandidatePage.tsx?raw';
+import scenarioPageSrc from '../src/app/ScenarioPage.tsx?raw';
 import type { EvidenceEvent } from '../src/platform/types';
 import type { Command, ProjectFile } from '../src/sim/signals';
 
@@ -325,13 +330,16 @@ describe('landing-bundle hygiene', () => {
         .toEqual({ trade: m.trade, rank: m.rank, version: m.version, title: m.title, estMinutes: m.estMinutes, summary: m.summary, scenario: m.scenario });
     }
   });
-  it('pages that only list scenarios must not drag the simulator into the landing bundle', async () => {
-    const { readFileSync } = await import('node:fs');
-    const read = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), 'utf8');
-    expect(read('exercises/meta.ts')).not.toMatch(/from '\.\.?\/(sim|engineering|plant|electrical|program)/);
-    for (const page of ['app/TradeLadder.tsx', 'app/EmployerPage.tsx', 'app/CandidatePage.tsx', 'app/ScenarioPage.tsx']) {
-      const src = read(page);
-      expect(src, `${page} must import scenario metadata only`).not.toMatch(/from '\.\.\/exercises'|exercises\/catalogue|exercises\/grade|exercises\/probe/);
+  it('pages that only list scenarios must not drag the simulator into the landing bundle', () => {
+    // Raw source text via Vite's ?raw (no Node typings needed, so the strict CI `tsc -b` stays happy).
+    expect(metaSrc).not.toMatch(/from '\.\.?\/(sim|engineering|plant|electrical|program)/);
+    const pages: Record<string, string> = {
+      'TradeLadder.tsx': ladderSrc, 'EmployerPage.tsx': employerSrc,
+      'CandidatePage.tsx': candidateSrc, 'ScenarioPage.tsx': scenarioPageSrc,
+    };
+    for (const [name, src] of Object.entries(pages)) {
+      expect(src, `${name} must import scenario metadata only`)
+        .not.toMatch(/from '\.\.\/exercises'|exercises\/catalogue|exercises\/grade|exercises\/probe/);
     }
   });
 });
