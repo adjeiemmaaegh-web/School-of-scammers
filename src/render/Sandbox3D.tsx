@@ -214,7 +214,7 @@ function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, ed
           c.kind === 'forwardcontactor' || c.kind === 'reversecontactor' ? (active ? 'CLOSED' : 'OPEN') :
           c.kind === 'motor' ? (active ? 'RUNNING' : 'STOPPED') :
           c.kind === 'contactor' ? (active ? 'ENERGISED' : 'OFF') :
-          c.kind === 'plc' ? (active ? 'POWERED' : 'UNPOWERED') :
+          c.kind === 'plc' || c.kind === 'plc16' ? (active ? 'POWERED' : 'UNPOWERED') :
           c.kind === 'conveyor' ? (active ? 'BELT MOVING' : 'BELT STOPPED') :
           c.kind === 'photoeye' ? (active ? 'MARK DETECTED' : 'NO MARK') :
           c.kind === 'diverter' ? (active ? 'REJECT ACTIVE' : 'PASS') :

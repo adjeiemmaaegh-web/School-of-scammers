@@ -104,7 +104,7 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'diverter' ? (isLive ? 'Reject active' : 'Pass position') :
     selectedDevice.kind === 'motor' ? (isLive ? 'Running' : 'Stopped') :
     selectedDevice.kind === 'contactor' ? (isLive ? 'Coil energised' : 'Coil off') :
-    selectedDevice.kind === 'plc' ? (isLive ? 'Powered' : 'Unpowered') :
+    (selectedDevice.kind === 'plc' || selectedDevice.kind === 'plc16') ? (isLive ? 'Powered' : 'Unpowered') :
     selectedDevice.kind === 'supply' ? '24V DC source' :
     selectedDevice.kind === 'estop' ? (isPressed ? 'NC open · latched' : 'NC closed · reset') :
     isPressed ? 'Pressed' : 'Released';

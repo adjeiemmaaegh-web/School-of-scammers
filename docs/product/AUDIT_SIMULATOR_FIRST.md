@@ -48,4 +48,6 @@ Step 3 (part): plant devices are now per-instance (several conveyor lanes, tanks
 
 Step 5 (first version): a complete user-authored two-station plant (17 devices, 32 wires, two PLCs and programs) is built from an empty project, commissioned, troubleshot, saved and reloaded by automated tests, including a real-browser run through the UI (slice 4 in `SANDBOX_BREADTH_PROGRESS.md`). Exact X/Y positioning was added to the inspector to make precise, accessible placement possible.
 
+Step 3 (configurable PLC I/O): a 16-input/16-output controller with user-nameable tags now exists next to the classic one, with an I/O map per PLC driving scanning, outputs, validation and the editors (slice 5 in `SANDBOX_BREADTH_PROGRESS.md`). Still open: I/O expansion modules, analog I/O, and a data-driven device registry for the rest of the library.
+
 Each step lands as its own verified, documented PR. Existing working functionality (exercises, assessments, `/labs`, scenario grading) is preserved throughout.

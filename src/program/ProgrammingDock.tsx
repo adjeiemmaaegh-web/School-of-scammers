@@ -5,15 +5,18 @@ import { StructuredTextEditor } from './StructuredTextEditor';
 import { DEFAULT_ST_SOURCE } from './p2-contract';
 import './programming.css';
 
-export function ProgrammingDock({ project, snapshot, disabled, onLadder, onST, onLanguage, showExamples = true }: {
+export function ProgrammingDock({ project, snapshot, disabled, onLadder, onST, onLanguage, showExamples = true, io }: {
   project: ProjectFile; snapshot: RenderSnapshot; disabled: boolean;
   /** Solved example programs and samples. Off in graded scenarios. */
   showExamples?: boolean;
+  /** Selected PLC's I/O points; for a classic controller (or none) the fixed classic names apply. */
+  io?: { kind: string; inputs: { terminal: string; tag: string }[]; outputs: { terminal: string; tag: string }[] };
   onLadder: (program: LadderDocument) => void;
   onST: (source: string) => void;
   onLanguage: (language: 'ladder' | 'st') => void;
 }) {
   const language = project.language ?? 'ladder';
+  const configurable = io?.kind === 'plc16';
   return <div className="sandbox-programming-dock">
     <div className="sandbox-language-tabs" role="group" aria-label="PLC programming language">
       <button type="button" disabled={disabled} aria-pressed={language === 'ladder'}
@@ -24,7 +27,7 @@ export function ProgrammingDock({ project, snapshot, disabled, onLadder, onST, o
     </div>
     {language === 'st'
       ? <StructuredTextEditor source={project.stSource ?? DEFAULT_ST_SOURCE} snapshot={snapshot}
-        disabled={disabled} onActivate={onST} showSamples={showExamples} />
-      : <LadderEditor document={project.program} snapshot={snapshot} disabled={disabled} onChange={onLadder} showExamples={showExamples} />}
+        disabled={disabled} onActivate={onST} showSamples={showExamples && !configurable} io={configurable ? io : undefined} />
+      : <LadderEditor document={project.program} snapshot={snapshot} disabled={disabled} onChange={onLadder} showExamples={showExamples && !configurable} io={configurable ? io : undefined} />}
   </div>;
 }

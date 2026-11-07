@@ -2,26 +2,32 @@ import { useEffect, useMemo, useState } from 'react';
 import { compileSandboxST, DEFAULT_ST_SOURCE } from './p2-contract';
 import type { RenderSnapshot } from '../sim/signals';
 
-export function StructuredTextEditor({ source, disabled, snapshot, onActivate, showSamples = true }: {
+export function StructuredTextEditor({ source, disabled, snapshot, onActivate, showSamples = true, io }: {
   source: string; disabled: boolean; snapshot: RenderSnapshot; onActivate: (source: string) => void;
   /** The start/stop sample and worked example line. Off in graded scenarios. */
   showSamples?: boolean;
+  /** The selected PLC's I/O points, when it is not the classic controller. */
+  io?: { inputs: { terminal: string; tag: string }[]; outputs: { terminal: string; tag: string }[] };
 }) {
   const [draft, setDraft] = useState(source || DEFAULT_ST_SOURCE);
   useEffect(() => { setDraft(source || DEFAULT_ST_SOURCE); }, [source]);
   const validation = useMemo(() => {
     try {
-      const program = compileSandboxST(draft);
+      // Validate against THIS PLC's tag names (the classic names when no I/O map is given).
+      const program = compileSandboxST(draft, io ? { inputs: io.inputs.map(p => p.tag), outputs: io.outputs.map(p => p.tag),
+        requireRun: io.outputs.some(p => p.tag === 'Run') } : undefined);
       return { message: 'Source compiles in the bounded teaching subset', ok: true,
         outputs: program.assignedOutputs.join(', ') };
     } catch (error) { return { message: error instanceof Error ? error.message : String(error), ok: false, outputs: '' }; }
-  }, [draft]);
+  }, [draft, io]);
   return <section className="sandbox-st-editor" aria-label="Structured Text editor">
     <div className="sandbox-section-head">
       <div><span className="eyebrow">PLC programming language</span><h2>Structured Text</h2></div>
       <span className="status-pill is-idle">Bounded IEC-style teaching subset</span>
     </div>
-    <p className="sandbox-help">Write and compile real Structured Text. The simulator uses the compiled code on every scan, with persistent variable memory. Output <code>Run : BOOL</code> controls Q0.0.</p>
+    <p className="sandbox-help">Write and compile real Structured Text. The simulator uses the compiled code on every scan, with persistent variable memory. {io
+      ? <>Declare the inputs you read as <code>VAR_INPUT</code> and the outputs you drive as <code>VAR_OUTPUT</code>, all BOOL, using this PLC's tag names: inputs {io.inputs.map(p => `${p.tag} (${p.terminal})`).join(', ')}; outputs {io.outputs.map(p => `${p.tag} (${p.terminal})`).join(', ')}.</>
+      : <>Output <code>Run : BOOL</code> controls Q0.0.</>}</p>
     <label className="sandbox-st-label" htmlFor="sandbox-st-source">Structured Text program</label>
     <textarea id="sandbox-st-source" value={draft} rows={14} spellCheck={false}
       disabled={disabled} onChange={event => setDraft(event.target.value)}
