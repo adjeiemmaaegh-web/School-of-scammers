@@ -101,6 +101,14 @@ async function direction(page,value) {
   await direction(page,'STOPPED');
   // Remove a real NC link: safe PLC request cannot power forward coil.
   await clickText(page,'Pause');
+  // The Worker acknowledges Pause asynchronously; wait until edit controls
+  // are enabled before removing a real wire.
+  await page.waitForFunction(()=>[...document.querySelectorAll('.sandbox-toolbar button')]
+    .some(b=>b.textContent.trim()==='▶ Run'),{timeout:7000});
+  await page.waitForFunction(()=>[...document.querySelectorAll('.sandbox-wire-list > div')]
+    .some(el=>el.textContent.includes('reversecontactor-9.22') &&
+      el.textContent.includes('forwardcontactor-8.A1') &&
+      !el.querySelector('button')?.disabled),{timeout:7000});
   const removed=await page.evaluate(()=>{
     const row=[...document.querySelectorAll('.sandbox-wire-list > div')].find(el=>
       el.textContent.includes('reversecontactor-9.22') &&
