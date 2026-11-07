@@ -57,6 +57,33 @@ export const tankProgram = (): LadderDocument => ({
     { id:'inactive-motor', elements: [{ type:'contact',tag:'Unused' }], coil:'Run' },
   ],
 });
+/** P4 bounded forward/reverse exercise. Cross-interlocked PLC rungs supplement
+ * real NC auxiliary contacts on the two physical virtual contactors.
+ * Both buttons pressed together inhibit both requests.
+ */
+export const reversingProgram = (): LadderDocument => ({
+  id: 'reversible-motor', version: '1.0', rungs: [
+    { id: 'forward-enable', elements: [
+      { type: 'contact', tag: 'StopOK' },
+      { type: 'contact', tag: 'ReverseRequest', normallyClosed: true },
+      { type: 'contact', tag: 'Reverse', normallyClosed: true },
+      { type: 'branch', alternatives: [
+        [{ type: 'contact', tag: 'Start' }],
+        [{ type: 'contact', tag: 'Forward' }],
+      ] },
+    ], coil: 'Forward' },
+    { id: 'reverse-enable', elements: [
+      { type: 'contact', tag: 'StopOK' },
+      { type: 'contact', tag: 'Start', normallyClosed: true },
+      { type: 'contact', tag: 'Forward', normallyClosed: true },
+      { type: 'branch', alternatives: [
+        [{ type: 'contact', tag: 'ReverseRequest' }],
+        [{ type: 'contact', tag: 'Reverse' }],
+      ] },
+    ], coil: 'Reverse' },
+    { id: 'inactive-dol', elements: [{ type: 'contact', tag: 'Unused' }], coil: 'Run' },
+  ],
+});
 export const newProject = (): ProjectFile => ({
   formatVersion: 1, components: [], wires: [], program: blankProgram(),
   language: 'ladder', stSource: DEFAULT_ST_SOURCE,
@@ -66,14 +93,17 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     project, running: false, tick: 0, coils: {}, ladderMemory: {}, ladderNumeric: {},
     stCompiled: project.language === 'st' ? compileSandboxST(project.stSource ?? '') : null,
     stMemory: {},
-    tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, Run: false, Sort: false, Fill: false, Drain: false }, ladderSteps: [],
+    tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
+      Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false }, ladderSteps: [],
     breakpointScan: null, breakpointHit: null, breakpointTag: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
+    forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
+    reverseMotorAngleRad: 0, interlockConflict: false,
     plant: freshPlant(), conveyorOn: false, diverterOn: false,
     tank: freshTank(), pumpOn: false, drainOn: false,
     breakerTripped: false, overloadTripped: false, lampOn: false,
     meter: emptyMeter(),
-    powered: false, inputs: { Start: false, StopOK: false, Photoeye: false, TankHigh: false },
+    powered: false, inputs: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false },
     voltages: {}, diagnostics: [], lastError: null,
   };
 }
@@ -201,14 +231,14 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       } };
     } else if (cmd.k === 'operate') {
       if (!world.project.components.some(c => c.id === cmd.id &&
-        (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop')))
+        (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton')))
         world = setError(world, 'Only pushbuttons and training E-stop can be operated');
       else world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, pressed: cmd.pressed } : c) } };
     } else if (!canEdit(world)) world = setError(world, 'Pause simulation before modifying the project');
     else if (cmd.k === 'place') {
       if (!validId(cmd.id) || !Object.hasOwn(COMPONENTS, cmd.kind) || !validPos(cmd.at) ||
           world.project.components.some(c => c.id === cmd.id) || world.project.components.length >= 40) world = setError(world, 'Invalid component placement');
-      else if (['plc', 'supply', 'conveyor', 'photoeye', 'diverter', 'tank', 'pump', 'levelprobe', 'drainvalve', 'breaker', 'overload', 'estop'].includes(cmd.kind) &&
+      else if (['plc', 'supply', 'conveyor', 'photoeye', 'diverter', 'tank', 'pump', 'levelprobe', 'drainvalve', 'breaker', 'overload', 'estop', 'reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor'].includes(cmd.kind) &&
         world.project.components.some(c => c.kind === cmd.kind))
         world = setError(world, 'This educational workbench supports one of each station component');
       else world = { ...world, project: { ...world.project, components: [...world.project.components, { id: cmd.id, kind: cmd.kind, x: cmd.at.x, y: cmd.at.y, pressed: false }] } };
@@ -273,9 +303,9 @@ function buildCircuit(world: WorldState): Device[] {
       id: c.id, kind: 'switch', a: terminal(c.id,'95'), b: terminal(c.id,'96'),
       closed: !world.overloadTripped,
     });
-    if (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop') devices.push({
+    if (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') devices.push({
       id: c.id, kind: 'switch', a: terminal(c.id, 'A'), b: terminal(c.id, 'B'),
-      closed: c.kind === 'start' ? c.pressed : !c.pressed,
+      closed: c.kind === 'start' || c.kind === 'reversebutton' ? c.pressed : !c.pressed,
     });
     if (c.kind === 'plc') {
       devices.push({ id: `${c.id}-Q`, kind: 'switch',
@@ -286,6 +316,10 @@ function buildCircuit(world: WorldState): Device[] {
         a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.2'), closed: world.coils.Fill === true });
       devices.push({ id: `${c.id}-Q3`, kind: 'switch',
         a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.3'), closed: world.coils.Drain === true });
+      devices.push({ id: `${c.id}-Q4`, kind: 'switch',
+        a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.4'), closed: world.coils.Forward === true });
+      devices.push({ id: `${c.id}-Q5`, kind: 'switch',
+        a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.5'), closed: world.coils.Reverse === true });
     }
     if (c.kind === 'photoeye') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
       a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'), closed: world.plant.photoeyeActive });
@@ -294,6 +328,21 @@ function buildCircuit(world: WorldState): Device[] {
     if (c.kind === 'contactor') {
       devices.push({ id: c.id, kind: 'load', positive: terminal(c.id, 'A1'), negative: terminal(c.id, 'A2'), nominalVolts: 24 });
       devices.push({ id: `${c.id}-NO`, kind: 'switch', a: terminal(c.id, '13'), b: terminal(c.id, '14'), closed: world.contactorOn });
+    }
+    if (c.kind === 'forwardcontactor' || c.kind === 'reversecontactor') {
+      const on = c.kind === 'forwardcontactor' ? world.forwardContactorOn : world.reverseContactorOn;
+      devices.push({ id: c.id, kind: 'load', positive: terminal(c.id, 'A1'),
+        negative: terminal(c.id, 'A2'), nominalVolts: 24 });
+      devices.push({ id: `${c.id}-NO`, kind: 'switch', a: terminal(c.id, '13'),
+        b: terminal(c.id, '14'), closed: on });
+      devices.push({ id: `${c.id}-NC`, kind: 'switch', a: terminal(c.id, '21'),
+        b: terminal(c.id, '22'), closed: !on });
+    }
+    if (c.kind === 'revmotor') {
+      devices.push({ id: `${c.id}-F`, kind: 'load', positive: terminal(c.id, 'F+'),
+        negative: terminal(c.id, 'M-'), nominalVolts: 24 });
+      devices.push({ id: `${c.id}-R`, kind: 'load', positive: terminal(c.id, 'R+'),
+        negative: terminal(c.id, 'M-'), nominalVolts: 24 });
     }
     if (c.kind === 'motor' || c.kind === 'conveyor' || c.kind === 'pump' || c.kind === 'lamp') devices.push({ id: c.id, kind: 'load',
       positive: terminal(c.id, 'L+'), negative: terminal(c.id, 'M-'), nominalVolts: 24 });
