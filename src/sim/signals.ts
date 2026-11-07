@@ -36,6 +36,38 @@ export type AlarmRecord = {
   clearedAtScan: number | null;
 };
 export type AlarmWatch = { noResponse: number; uncommanded: number; nextId: number };
+/** The program of one additional PLC. The first PLC's program stays in the legacy top-level fields. */
+export type PlcProgram = {
+  program: LadderDocument;
+  language?: 'ladder' | 'st';
+  stSource?: string;
+};
+/** The five physical input tags a PLC samples (I0.0..I0.4) and its six output coils (Q0.0..Q0.5). */
+export type PlcInputs = { Start: boolean; StopOK: boolean; Photoeye: boolean; TankHigh: boolean; ReverseRequest: boolean };
+/** Scan state of one additional PLC. The first PLC's scan state lives in the legacy WorldState fields. */
+export type PlcRuntime = {
+  powered: boolean;
+  inputs: PlcInputs;
+  coils: Record<string, boolean>;
+  tagValues: Record<string, STValue>;
+  ladderMemory: LadderMemory;
+  ladderNumeric: Record<string, number>;
+  ladderSteps: LadderStep[];
+  stCompiled: STProgram | null;
+  stMemory: Record<string, STValue>;
+};
+/** What the UI may show about any one PLC (first or additional). */
+export type PlcView = {
+  powered: boolean;
+  language: 'ladder' | 'st';
+  inputs: PlcInputs;
+  coils: Record<string, boolean>;
+  outputs: { 'Q0.0': boolean; 'Q0.1': boolean; 'Q0.2': boolean; 'Q0.3': boolean; 'Q0.4': boolean; 'Q0.5': boolean };
+  /** Live variables and rung results of this PLC's last scan, for the programming dock's monitor. */
+  tagValues: Record<string, STValue>;
+  ladderSteps: LadderStep[];
+  ladderMemory: LadderMemory;
+};
 export type ProjectFile = {
   formatVersion: 1;
   components: PlacedComponent[];
@@ -46,6 +78,8 @@ export type ProjectFile = {
   stSource?: string;
   /** Optional in v1 JSON for backwards compatibility. Defaults to no faults. */
   faults?: FaultSpec[];
+  /** Programs of PLCs beyond the first, keyed by PLC component id. Omitted for single-PLC projects. */
+  plcPrograms?: Record<string, PlcProgram>;
 };
 export type WorldState = {
   project: ProjectFile;
@@ -67,6 +101,12 @@ export type WorldState = {
   contactorOn: boolean;
   motorOn: boolean;
   motorAngleRad: number;
+  /** Scan state of every PLC after the first, by component id. */
+  plcs: Record<string, PlcRuntime>;
+  /** Energised state of every contactor, motor and lamp by component id (the legacy booleans mirror the first). */
+  deviceOn: Record<string, boolean>;
+  /** Shaft angle of every motor by component id (the legacy angle mirrors the first). */
+  motorAngles: Record<string, number>;
   forwardContactorOn: boolean;
   reverseContactorOn: boolean;
   motorDirection: 'stopped' | 'forward' | 'reverse';
@@ -111,9 +151,10 @@ export type Command =
   | { k: 'feedParcel'; kind: ParcelKind }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
-  | { k: 'loadProgram'; program: LadderDocument }
-  | { k: 'loadST'; source: string }
-  | { k: 'activateLanguage'; language: 'ladder' | 'st' }
+  /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
+  | { k: 'loadProgram'; program: LadderDocument; plc?: string }
+  | { k: 'loadST'; source: string; plc?: string }
+  | { k: 'activateLanguage'; language: 'ladder' | 'st'; plc?: string }
   | { k: 'breakAtScan'; scan: number | null }
   | { k: 'breakOnTag'; breakpoint: TagBreakpoint | null }
   | { k: 'loadProject'; project: unknown }
@@ -131,6 +172,12 @@ export type RenderSnapshot = {
   contactorOn: boolean;
   motorOn: boolean;
   motorAngleRad: number;
+  /** Every PLC (first and additional) by component id. */
+  plcs: Record<string, PlcView>;
+  /** Energised state of every contactor, motor and lamp by component id. */
+  deviceOn: Record<string, boolean>;
+  /** Shaft angle of every motor by component id. */
+  motorAngles: Record<string, number>;
   forwardContactorOn: boolean;
   reverseContactorOn: boolean;
   motorDirection: 'stopped' | 'forward' | 'reverse';

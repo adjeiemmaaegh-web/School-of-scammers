@@ -147,10 +147,16 @@ describe('P4 protected educational motor panel and worker-owned meter',()=>{
   });
   it('rejects duplicate protection elements and persists old v1 projects',()=>{
     const w=fixture();
-    for(const kind of ['breaker','overload','estop'] as const) {
+    // Breaker and overload trip state is still one flag per plant, so a second of either is refused.
+    for(const kind of ['breaker','overload'] as const) {
       const duplicate=tick(w,[{k:'place',kind,id:'bad',at:{x:900,y:450}}]).world;
       expect(duplicate.lastError).toMatch(/one of each station/);
     }
+    // An E-stop is a latched NC contact whose state lives on its own component, so every panel can
+    // have one (multi-panel work).
+    const second=tick(w,[{k:'place',kind:'estop',id:'estop2',at:{x:900,y:450}}]).world;
+    expect(second.lastError).toBeNull();
+    expect(second.project.components.filter(c=>c.kind==='estop')).toHaveLength(2);
     const bad={...w.project,components:[...w.project.components,
       {...w.project.components.find(c=>c.kind==='breaker')!,id:'cb2'}]};
     expect(()=>validateProject(bad)).toThrow(/Only one breaker/);

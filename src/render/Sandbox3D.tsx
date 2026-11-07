@@ -14,6 +14,7 @@ import type { PlacedComponent, ProjectFile, RenderSnapshot, XY } from '../sim/si
 import type { Parcel } from '../plant/sorting-conveyor';
 import { supportsWebGL } from '../components/SceneShell';
 import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-coordinates';
+import { perDeviceLive } from '../sim/device-state';
 
 const COLORS = {
   chassis: '#35546b', steel: '#829bb0', panel: '#192b3c', light: '#d3e4ef',
@@ -294,15 +295,14 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
     {project.wires.map(w => <Cable3D key={w.id} project={project} from={w.from} to={w.to}
       live={snapshot.voltages[w.from] === 24 && snapshot.voltages[w.to] === 24} />)}
     {project.components.map(c => <Device3D key={c.id} c={c} editable={editable}
-      motorAngleRad={c.kind === 'revmotor' ? snapshot.reverseMotorAngleRad : snapshot.motorAngleRad}
+      motorAngleRad={c.kind === 'revmotor' ? snapshot.reverseMotorAngleRad : snapshot.motorAngles[c.id] ?? snapshot.motorAngleRad}
       direction={c.kind === 'revmotor' ? snapshot.motorDirection : undefined}
       parcel={snapshot.plant.parcel} tankLevelMl={snapshot.tank.levelMl}
       selectedTerminal={selectedTerminal} moveTarget={moveTarget}
       active={c.kind === 'revmotor' ? snapshot.motorDirection !== 'stopped' :
         c.kind === 'forwardcontactor' ? snapshot.forwardContactorOn :
         c.kind === 'reversecontactor' ? snapshot.reverseContactorOn :
-        c.kind === 'motor' ? snapshot.motorOn : c.kind === 'contactor' ? snapshot.contactorOn :
-        c.kind === 'plc' ? snapshot.io.PlcPowered :
+        c.kind === 'motor' || c.kind === 'contactor' || c.kind === 'plc' || c.kind === 'lamp' ? perDeviceLive(snapshot, c) === true :
         c.kind === 'conveyor' ? snapshot.conveyorOn :
         c.kind === 'diverter' ? snapshot.diverterOn :
         c.kind === 'photoeye' ? snapshot.io.Photoeye :
@@ -311,7 +311,6 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
         c.kind === 'levelprobe' ? snapshot.io.TankHigh :
         c.kind === 'breaker' ? !snapshot.breakerTripped :
         c.kind === 'overload' ? !snapshot.overloadTripped :
-        c.kind === 'lamp' ? snapshot.lampOn :
         c.kind === 'estop' ? !c.pressed :
         c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect} />)}

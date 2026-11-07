@@ -1,5 +1,6 @@
 import { COMPONENTS } from '../../components/registry';
 import type { PlacedComponent, ProjectFile, RenderSnapshot } from '../../sim/signals';
+import { perDeviceLive } from '../../sim/device-state';
 
 type Props = {
   project: ProjectFile;
@@ -59,16 +60,13 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'reversebutton' ? isPressed :
     selectedDevice.kind === 'breaker' ? !snapshot.breakerTripped :
     selectedDevice.kind === 'overload' ? !snapshot.overloadTripped :
-    selectedDevice.kind === 'lamp' ? snapshot.lampOn :
     selectedDevice.kind === 'pump' ? snapshot.pumpOn :
     selectedDevice.kind === 'levelprobe' ? snapshot.io.TankHigh :
     selectedDevice.kind === 'drainvalve' ? snapshot.drainOn :
     selectedDevice.kind === 'conveyor' ? snapshot.conveyorOn :
     selectedDevice.kind === 'photoeye' ? snapshot.io.Photoeye :
     selectedDevice.kind === 'diverter' ? snapshot.diverterOn :
-    selectedDevice.kind === 'motor' ? snapshot.motorOn :
-    selectedDevice.kind === 'contactor' ? snapshot.contactorOn :
-    selectedDevice.kind === 'plc' ? snapshot.io.PlcPowered :
+    selectedDevice.kind === 'motor' || selectedDevice.kind === 'contactor' || selectedDevice.kind === 'plc' || selectedDevice.kind === 'lamp' ? perDeviceLive(snapshot, selectedDevice) === true :
     selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' ? !isPressed : true;
   const state = selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
     selectedDevice.kind === 'forwardcontactor' ? (isLive ? 'Forward contact closed' : 'Open') :

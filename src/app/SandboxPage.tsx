@@ -7,6 +7,8 @@ import { LiveMonitor } from '../program/LiveMonitor';
 import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
 import { TroubleshootingPanel } from '../ui/sandbox/TroubleshootingPanel';
 import { ScenarioPanel } from '../ui/sandbox/ScenarioPanel';
+import { perDeviceLive } from '../sim/device-state';
+import { plcComponents, programOf } from '../sim/plcs';
 import { appendEvidence, evidenceFromCommand } from '../exercises/evidence';
 import { scenarioStorageKey, type ScenarioRequest, type ScenarioSession } from '../exercises/session';
 import { getScenario } from '../exercises/catalogue';
@@ -18,6 +20,7 @@ const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ def
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
 const CANVAS_W = 1080, CANVAS_H = 580, BOX_W = 170;
 const wireGuide = 'Supply P24 → PLC L+, START A, STOP A, contactor 13. Supply M0 → PLC M, contactor A2, motor M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → contactor A1; contactor 14 → motor L+.';
+const twoPanelWireGuide = 'Each panel is wired like the single starter, from its own supply: P24 → PLC L+, START A, STOP A, contactor 13; M0 → PLC M, contactor A2, motor M-; START B → I0.0; STOP B → I0.1; PLC Q0.0 → contactor A1; contactor 14 → motor L+. Panel 2 uses supply-2, plc-2, start-2, stop-2, contactor-2 and motor-2. To make one panel depend on another, tie the two supplies\' M0 terminals together (a shared common) and wire one PLC\'s output (for example plc-1 Q0.0) to the other PLC\'s input (plc-2 I0.0). Without a shared common, two supplies are isolated and no signal can cross. Select a PLC (click it, or use its tab above the editor) to program it separately.';
 const sortingWireGuide = 'For 3D sorting: supply P24 → PLC L+, START A, STOP A, contactor 13, photoeye L+. Supply M0 → PLC M, contactor A2, conveyor M-, photoeye M, diverter A2. START B → I0.0; STOP B → I0.1; PLC Q0.0 → contactor A1; contactor 14 → conveyor L+. Photoeye OUT → PLC I0.2; PLC Q0.1 → diverter A1. Load the sorting Ladder example, Run, press START, and feed marked or plain parcels. Photoeye and diverter must be positioned alongside the conveyor in sensor→diverter order.';
 const tankWireGuide = 'For tank process: P24 to PLC L+, STOP A and level probe L+. M0 to PLC M, pump M-, level probe M and drain valve A2. STOP B to PLC I0.1; level probe OUT to PLC I0.3; PLC Q0.2 to pump L+; PLC Q0.3 to drain valve A1. Mount the pump, probe and valve near the tank. Load the tank control Ladder example, Run and observe filling to 750 ml, switching and drainage until 600 ml. Wrong PLC logic, miswiring or moving equipment alters the real result.';
 const protectedDOLGuide = 'Protected DOL training circuit (16 wires): supply P24 → breaker IN; breaker OUT → E-stop A; E-stop B → PLC L+, START A, STOP A and contactor 13. Supply M0 → PLC M, contactor A2, motor M- and pilot lamp M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → overload 95; overload 96 → contactor A1; contactor 14 → motor L+ and lamp L+. Load editable latch program. Press E-stop to open the upstream NC supply path (training demonstration, NOT a certified safety function), reset it manually. Trip overload to open coil path. For a breaker short demo, wire breaker OUT directly to supply M0, Run or Step to trip; remove that wire before reset. Use meter probes to compare actual net potentials.';
@@ -40,6 +43,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [selectedTerminal, setSelectedTerminal] = useState<string | null>(null);
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [selectedPlcId, setSelectedPlcId] = useState<string | null>(null);
   const [libraryQuery, setLibraryQuery] = useState('');
   const [activeStage, setActiveStage] = useState<'build' | 'wire' | 'program' | 'test'>('build');
   const [localSave, setLocalSave] = useState<'pending' | 'saved' | 'failed'>('pending');
@@ -196,6 +200,18 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       k: 'place', id: `${d.kind}-${i + 1}`, kind: d.kind, at: { x: d.x, y: d.y },
     })));
   };
+  /** Two complete, unwired starter panels side by side: each with its own supply, PLC, buttons, contactor and motor. */
+  const layoutTwoPanels = () => {
+    if (project?.components.length) return;
+    setMoveTarget(null);
+    const columns = [10, 185, 360];
+    const rows = [25, 215];
+    const panel = (n: number, dx: number): Command[] => ([
+      ['supply', 0, 0], ['plc', 1, 0], ['contactor', 2, 0], ['start', 0, 1], ['stop', 1, 1], ['motor', 2, 1],
+    ] as const).map(([kind, col, row]): Command => ({
+      k: 'place', id: `${kind}-${n}`, kind, at: { x: dx + columns[col], y: rows[row] } }));
+    send([...panel(1, 0), ...panel(2, 535)]);
+  };
   const layoutTank = () => {
     if (project?.components.length) return;
     setMoveTarget(null);
@@ -256,7 +272,20 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     ev.target.value = '';
   };
   const editable = !snapshot?.running;
+  // Several PLCs: the programming dock, live I/O lamps and monitor follow the selected PLC.
+  const plcList = project ? plcComponents(project) : [];
+  const activePlcId = plcList.find(c => c.id === selectedPlcId)?.id ?? plcList[0]?.id;
+  const activePlcView = activePlcId ? snapshot?.plcs[activePlcId] : undefined;
+  const dockProject = project && activePlcId ? { ...project, ...programOf(project, activePlcId) } : project;
+  const dockSnapshot = snapshot && activePlcView ? { ...snapshot, language: activePlcView.language,
+    tagValues: activePlcView.tagValues, ladderSteps: activePlcView.ladderSteps, ladderMemory: activePlcView.ladderMemory } : snapshot;
+  const activeIo: Record<string, boolean> = { ...(snapshot?.io ?? {}), ...(activePlcView ? {
+    ...activePlcView.inputs, ...activePlcView.coils, ...activePlcView.outputs, PlcPowered: activePlcView.powered } : {}) };
   const selectedDevice = project?.components.find(c => c.id === selectedDeviceId) ?? null;
+  const selectDevice = (id: string | null) => {
+    setSelectedDeviceId(id);
+    if (id && project?.components.find(c => c.id === id)?.kind === 'plc') setSelectedPlcId(id);
+  };
   const visibleKinds = componentKinds.filter(kind => {
     const definition = COMPONENTS[kind];
     const words = `${definition.kind} ${definition.label} ${definition.help}`.toLowerCase();
@@ -282,7 +311,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <span className={`sandbox-work-status ${snapshot?.running ? 'is-running' : ''}`}>
             <i aria-hidden="true" />{snapshot?.running ? 'SIMULATION RUNNING' : 'EDIT MODE'}
           </span>
-          <strong>{scenario ? scenario.def.title : project?.components.some(c => c.kind === 'revmotor') ? 'Untitled forward/reverse motor panel' :
+          <strong>{scenario ? scenario.def.title : plcList.length > 1 ? `Untitled multi-panel project (${plcList.length} PLCs)` : project?.components.some(c => c.kind === 'revmotor') ? 'Untitled forward/reverse motor panel' :
             project?.components.some(c => c.kind === 'breaker') ? 'Untitled protected 24V DOL panel' :
             project?.components.some(c => c.kind === 'tank') ? 'Untitled tank process project' :
             project?.components.some(c => c.kind === 'conveyor') ?
@@ -306,6 +335,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         <button className="btn ghost small" onClick={layout} disabled={!editable || !!project?.components.length}>Place starter layout</button>
         <button className="btn ghost small" onClick={layoutSorting}
           disabled={!editable || !!project?.components.length}>Place 3D sorting layout</button>
+        <button className="btn ghost small" onClick={layoutTwoPanels} data-layout-two-panels
+          disabled={!editable || !!project?.components.length}>Place two-panel layout</button>
         <button className="btn ghost small" onClick={layoutTank}
           disabled={!editable || !!project?.components.length}>Place 3D tank layout</button>
         <button className="btn ghost small" onClick={layoutProtectedDOL}
@@ -365,7 +396,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             {project && snapshot && <Sandbox3D
               project={project} snapshot={snapshot} editable={editable}
               selectedTerminal={selectedTerminal} moveTarget={moveTarget}
-              selectedDeviceId={selectedDeviceId} onSelectDevice={setSelectedDeviceId}
+              selectedDeviceId={selectedDeviceId} onSelectDevice={selectDevice}
               onTerminal={connect}
               onOperate={id => send([{ k: 'operateToggle', id }])}
               onPlace={(kind, at) => place(kind, at.x, at.y)}
@@ -383,25 +414,25 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <div className="sandbox-device-list">
               {project?.components.map(c => {
                 const def = COMPONENTS[c.kind];
-                const live = c.kind === 'revmotor' ? snapshot?.motorDirection !== 'stopped' :
+                const perDevice = snapshot ? perDeviceLive(snapshot, c) : undefined;
+                const live = perDevice !== undefined ? perDevice :
+                  c.kind === 'revmotor' ? snapshot?.motorDirection !== 'stopped' :
                   c.kind === 'forwardcontactor' ? snapshot?.forwardContactorOn :
                   c.kind === 'reversecontactor' ? snapshot?.reverseContactorOn :
                   c.kind === 'reversebutton' ? c.pressed :
                   c.kind === 'breaker' ? !snapshot?.breakerTripped :
                   c.kind === 'overload' ? !snapshot?.overloadTripped :
                   c.kind === 'estop' ? !c.pressed :
-                  c.kind === 'lamp' ? snapshot?.lampOn :
                   c.kind === 'pump' ? snapshot?.pumpOn :
                   c.kind === 'levelprobe' ? snapshot?.io.TankHigh :
                   c.kind === 'drainvalve' ? snapshot?.drainOn :
                   c.kind === 'conveyor' ? snapshot?.conveyorOn :
                   c.kind === 'photoeye' ? snapshot?.io.Photoeye :
                   c.kind === 'diverter' ? snapshot?.diverterOn :
-                  c.kind === 'motor' ? snapshot?.motorOn : c.kind === 'contactor' ? snapshot?.contactorOn :
-                  c.kind === 'plc' ? snapshot?.io.PlcPowered : c.kind === 'start' || c.kind === 'stop' ? c.pressed : false;
+                  c.kind === 'start' || c.kind === 'stop' ? c.pressed : false;
                 return <section className={`sandbox-device ${live ? 'active' : ''}`} key={c.id} data-device-id={c.id}>
                   <div className="sandbox-patch-head">
-                    <button type="button" className="sandbox-inspect-link" onClick={() => setSelectedDeviceId(c.id)}
+                    <button type="button" className="sandbox-inspect-link" onClick={() => selectDevice(c.id)}
                       aria-label={`Inspect ${def.label}`}>{def.label}</button>
                     <span className="sandbox-device-status">{c.kind === 'motor' ? (live ? 'RUNNING' : 'STOPPED') :
                       c.kind === 'contactor' ? (live ? 'COIL ON' : 'COIL OFF') :
@@ -436,7 +467,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                       {live ? 'Trip (training)' : 'Reset protection'}</button>}
                     <button type="button" className="sandbox-position" disabled={!editable}
                       aria-label={`Move ${def.label} in 3D`}
-                      onClick={() => { setMoveTarget(c.id); setSelectedDeviceId(c.id); }}>Move in 3D</button>
+                      onClick={() => { setMoveTarget(c.id); selectDevice(c.id); }}>Move in 3D</button>
                   </div>
                   <div className="sandbox-patch-terminals">
                     {def.terminals.map(t => {
@@ -452,10 +483,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             </div>
           </details>
           <div className="sandbox-status panel">
-            <div><span className="eyebrow">Live I/O</span><div className="sandbox-lamps">
+            <div><span className="eyebrow">Live I/O{plcList.length > 1 && activePlcId ? ` · ${activePlcId}` : ''}</span><div className="sandbox-lamps">
               {(['Start', 'StopOK', 'Photoeye', 'TankHigh', 'ReverseRequest', 'Run', 'Sort', 'Fill', 'Drain', 'Forward', 'Reverse',
                   'Q0.0', 'Q0.1', 'Q0.2', 'Q0.3', 'Q0.4', 'Q0.5', 'PlcPowered'] as const).map(k =>
-                <span className={snapshot?.io[k] ? 'lit' : ''} key={k}><i />{k}</span>)}
+                <span className={activeIo[k] ? 'lit' : ''} key={k}><i />{k}</span>)}
               </div></div>
             <div><span className="eyebrow">Plant</span>
               <p>Contactor: <strong>{snapshot?.contactorOn ? 'energised' : 'off'}</strong> · Motor: <strong>{snapshot?.motorOn ? 'running' : 'stopped'}</strong></p>
@@ -568,6 +599,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               'Q0.0': false, 'Q0.1': false, 'Q0.2': false, 'Q0.3': false,
               'Q0.4': false, 'Q0.5': false, PlcPowered: false },
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
+            plcs: {}, deviceOn: {}, motorAngles: {},
             forwardContactorOn: false, reverseContactorOn: false,
             motorDirection: 'stopped', reverseMotorAngleRad: 0, interlockConflict: false,
             conveyorOn: false, diverterOn: false,
@@ -589,11 +621,20 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       </div>
       <div className="sandbox-bottom">
         <div id="sandbox-stage-program" className="sandbox-program-dock">
-          {project && snapshot && <ProgrammingDock project={project} snapshot={snapshot} disabled={!editable}
+          {plcList.length > 1 && <div className="sandbox-plc-tabs" role="group" aria-label="Choose which PLC to program">
+            <span className="eyebrow">Program</span>
+            {plcList.map(c => <button key={c.id} type="button" data-plc-tab={c.id}
+              className={c.id === activePlcId ? 'active' : ''} aria-pressed={c.id === activePlcId}
+              onClick={() => setSelectedPlcId(c.id)}>{c.id}
+              <small>{snapshot?.plcs[c.id]?.powered ? 'powered' : 'no power'}</small></button>)}
+            {activePlcId !== plcList[0].id && <small className="sandbox-help">The scan trace, scan breakpoints and tag breakpoints
+              follow the first PLC ({plcList[0].id}); the I/O lamps and the program editor follow {activePlcId}.</small>}
+          </div>}
+          {dockProject && dockSnapshot && <ProgrammingDock project={dockProject} snapshot={dockSnapshot} disabled={!editable}
             showExamples={!scenario}
-            onLadder={program => send([{ k: 'loadProgram', program }])}
-            onST={source => send([{ k: 'loadST', source }])}
-            onLanguage={language => send([{ k: 'activateLanguage', language }])} />}
+            onLadder={program => send([{ k: 'loadProgram', program, ...(activePlcId ? { plc: activePlcId } : {}) }])}
+            onST={source => send([{ k: 'loadST', source, ...(activePlcId ? { plc: activePlcId } : {}) }])}
+            onLanguage={language => send([{ k: 'activateLanguage', language, ...(activePlcId ? { plc: activePlcId } : {}) }])} />}
         </div>
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
           {snapshot && <LiveMonitor snapshot={snapshot}
@@ -602,6 +643,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <span className="eyebrow">Diagnostics</span><h2>Electrical &amp; event trace</h2>
           <p className="sandbox-help">Click a wire's remove button to break a connection and observe what changes. All values come from the simulator.</p>
           {!scenario && <details><summary>Example wiring map</summary><p>{wireGuide}</p>
+            {plcList.length > 1 && <p>{twoPanelWireGuide}</p>}
             {project?.components.some(c => c.kind === 'conveyor') && <p>{sortingWireGuide}</p>}
             {project?.components.some(c => c.kind === 'tank') && <p>{tankWireGuide}</p>}
             {project?.components.some(c => c.kind === 'overload') && <p>{protectedDOLGuide}</p>}
