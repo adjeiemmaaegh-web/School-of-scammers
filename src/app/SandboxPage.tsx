@@ -40,6 +40,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   }, [request]);
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
   const [project, setProject] = useState<ProjectFile | null>(null);
+  // Undo for destructive edits (remove / add panel): the project as it was before each one that took effect.
+  const projectRef = useRef<ProjectFile | null>(null);
+  const pendingUndo = useRef<ProjectFile | null>(null);
+  const [undoStack, setUndoStack] = useState<ProjectFile[]>([]);
   const [selectedTerminal, setSelectedTerminal] = useState<string | null>(null);
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
@@ -67,6 +71,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         return e ? appendEvidence(log, at, e.action, e.detail) : log;
       }, prev));
     }
+    if (commands.some(c => c.k === 'remove' || c.k === 'addPanel')) pendingUndo.current = projectRef.current;
     worker.current?.postMessage({ kind: 'commands', commands });
   }, [scenario]);
   useEffect(() => {
@@ -75,7 +80,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     engine.onmessage = (ev: MessageEvent<WorkerResponse>) => {
       if (ev.data?.kind !== 'snapshot') return;
       setSnapshot(ev.data.snapshot);
-      if (ev.data.project) setProject(ev.data.project);
+      if (pendingUndo.current) {
+        // The worker answered the destructive command: keep an undo point only if it actually changed the project.
+        const before = pendingUndo.current;
+        pendingUndo.current = null;
+        if (ev.data.project) setUndoStack(stack => [...stack.slice(-9), before]);
+      }
+      if (ev.data.project) { projectRef.current = ev.data.project; setProject(ev.data.project); }
       if (scenario) {
         // Repairs are recorded from the worker's own events, so a rejected attempt is never counted.
         const repairs = ev.data.events.filter(e => e.kind === 'repair');
@@ -205,7 +216,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     if (project?.components.length) return;
     setMoveTarget(null);
     const columns = [10, 185, 360];
-    const rows = [25, 215];
+    const rows = [10, 150];
     const panel = (n: number, dx: number): Command[] => ([
       ['supply', 0, 0], ['plc', 1, 0], ['contactor', 2, 0], ['start', 0, 1], ['stop', 1, 1], ['motor', 2, 1],
     ] as const).map(([kind, col, row]): Command => ({
@@ -282,6 +293,40 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const activeIo: Record<string, boolean> = { ...(snapshot?.io ?? {}), ...(activePlcView ? {
     ...activePlcView.inputs, ...activePlcView.coils, ...activePlcView.outputs, PlcPowered: activePlcView.powered } : {}) };
   const selectedDevice = project?.components.find(c => c.id === selectedDeviceId) ?? null;
+  const removeDevice = (id: string) => {
+    if (selectedDeviceId === id) setSelectedDeviceId(null);
+    if (selectedTerminal?.startsWith(`${id}.`)) setSelectedTerminal(null);
+    send([{ k: 'remove', id }]);
+  };
+  const undo = () => {
+    const previous = undoStack[undoStack.length - 1];
+    if (!previous) return;
+    setUndoStack(stack => stack.slice(0, -1));
+    setSelectedDeviceId(null); setSelectedTerminal(null); setMoveTarget(null);
+    send([{ k: 'loadProject', project: previous }]);
+  };
+  // The toolbar is sticky: keep it just below the sticky app header, whatever height the header has.
+  useEffect(() => {
+    const header = document.querySelector('.app-header');
+    if (!header) return;
+    const apply = () => document.documentElement.style.setProperty('--app-header-h', `${Math.round(header.getBoundingClientRect().height)}px`);
+    apply();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(apply) : null;
+    observer?.observe(header);
+    window.addEventListener('resize', apply);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', apply); document.documentElement.style.removeProperty('--app-header-h'); };
+  }, []);
+  // Delete removes the selected device (when paused), like a bench tool; never while typing in a field.
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Delete' || !selectedDeviceId || snapshot?.running) return;
+      const el = ev.target as HTMLElement | null;
+      if (el && /^(input|textarea|select)$/i.test(el.tagName)) return;
+      removeDevice(selectedDeviceId);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
   const selectDevice = (id: string | null) => {
     setSelectedDeviceId(id);
     if (id && project?.components.find(c => c.id === id)?.kind === 'plc') setSelectedPlcId(id);
@@ -335,6 +380,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         <button className="btn ghost small" onClick={layout} disabled={!editable || !!project?.components.length}>Place starter layout</button>
         <button className="btn ghost small" onClick={layoutSorting}
           disabled={!editable || !!project?.components.length}>Place 3D sorting layout</button>
+        <button className="btn ghost small" data-add-panel onClick={() => send([{ k: 'addPanel', template: 'motor-starter' }])}
+          disabled={!editable}>Add starter panel</button>
         <button className="btn ghost small" onClick={layoutTwoPanels} data-layout-two-panels
           disabled={!editable || !!project?.components.length}>Place two-panel layout</button>
         <button className="btn ghost small" onClick={layoutTank}
@@ -344,6 +391,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         <button className="btn ghost small" onClick={layoutReverser}
           disabled={!editable || !!project?.components.length}>Place reversing DOL layout</button>
         </>}
+        <button className="btn ghost small" data-undo onClick={undo}
+          disabled={!editable || !undoStack.length}>Undo</button>
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         {!scenario && <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>}
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
@@ -465,6 +514,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                       onClick={() => send([{k:'operateProtection',id:c.id,
                         action:live ? 'trip' : 'reset'}])}>
                       {live ? 'Trip (training)' : 'Reset protection'}</button>}
+                    <button type="button" className="sandbox-position sandbox-remove" data-remove-device disabled={!editable}
+                      aria-label={`Remove ${def.label} ${c.id}`} onClick={() => removeDevice(c.id)}>Remove</button>
                     <button type="button" className="sandbox-position" disabled={!editable}
                       aria-label={`Move ${def.label} in 3D`}
                       onClick={() => { setMoveTarget(c.id); selectDevice(c.id); }}>Move in 3D</button>

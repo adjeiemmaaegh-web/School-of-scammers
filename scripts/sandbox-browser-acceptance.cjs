@@ -48,6 +48,13 @@ const pairs = [
       console.error('3D INIT DIAGNOSTICS', JSON.stringify({ state, pageErrors: errors }));
       throw error;
     }
+    // The canvas starts at the browser default (300x150) until the 3D layer has measured its container.
+    // Dropping onto the floor before that maps to the wrong place, so wait for the real size (no canvas,
+    // as with WebGL blocked, needs no wait).
+    await page.waitForFunction(() => {
+      const c = document.querySelector('.sandbox-three-canvas canvas');
+      return !c || c.width > 320;
+    }, { timeout: 10000 }).catch(() => {});
     const renderer = await page.evaluate(() => {
       const canvas = document.querySelector('.sandbox-three-canvas canvas');
       return { hasCanvas: !!canvas, width: canvas?.width ?? 0, height: canvas?.height ?? 0,

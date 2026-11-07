@@ -24,6 +24,10 @@ After reviewing the shipped product against **Cisco Packet Tracer / GNS3** (the 
 
 ---
 
+## Sandbox breadth slice 2 — editing a plant (7 November 2026, DRAFT)
+
+Branch `engineering/p8-edit-plant`, stacked on `engineering/p7-multi-plc` (PR #20). Remove a device (full cleanup, first-PLC promotion), one-click pre-wired starter panels, Undo, Delete key; fixed the toolbar sliding behind the app header. 19 new mutation-checked unit tests and a real-browser E2E. Details and limits: [SANDBOX_BREADTH_PROGRESS.md](SANDBOX_BREADTH_PROGRESS.md).
+
 ## Sandbox breadth slice 1 — several PLCs and panels (7 November 2026, DRAFT)
 
 Branch `engineering/p7-multi-plc` from `main` (which now contains P0–P6 via PR #19, deployed to production). Details, design rules and limits: [SANDBOX_BREADTH_PROGRESS.md](SANDBOX_BREADTH_PROGRESS.md). Up to 6 PLCs and 6 supplies; per-PLC Ladder/ST programs; per-device state; isolated supplies; PLC tabs, two-panel layout and per-device status in the UI. Evidence: 39 new unit tests (mutation-checked), a real-browser E2E, 749 unit tests total. **Limits:** plant devices and protection are still single-instance; a short de-powers every PLC; alarms/scan trace follow the first PLC; no inter-PLC network. Owner direction: the sandbox ("Packet Tracer for PLCs") is the priority; the interview side is on hold.

@@ -6,6 +6,8 @@ export function evidenceFromCommand(cmd: Command): { action: string; detail: str
   switch (cmd.k) {
     case 'place': return { action: 'place', detail: `Placed ${cmd.kind} ${cmd.id}` };
     case 'move': return { action: 'move', detail: `Moved ${cmd.id}` };
+    case 'remove': return { action: 'remove', detail: `Removed ${cmd.id}` };
+    case 'addPanel': return { action: 'place', detail: 'Added a starter panel' };
     case 'wire': return { action: 'wire', detail: `Wired ${cmd.from} to ${cmd.to}` };
     case 'unwire': return { action: 'unwire', detail: `Removed wire ${cmd.id}` };
     case 'loadProgram': return { action: 'program', detail: 'Edited the Ladder program' };

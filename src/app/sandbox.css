@@ -100,7 +100,7 @@
 .sandbox-patch-head { display:flex; align-items:start; flex-wrap:wrap; justify-content:space-between; gap:6px; }
 .sandbox-patch-head strong { font-size:12px; }
 .sandbox-patch-head .sandbox-device-status { font-size:10px; }
-.sandbox-patch-actions { display:flex; align-items:center; gap:6px; }
+.sandbox-patch-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-width:0; }
 .sandbox-position { border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--ink); padding:5px 7px; font-size:10px; cursor:pointer; }
 .sandbox-position:disabled { opacity:.5; cursor:not-allowed; }
 .sandbox-patch-terminals { display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
@@ -172,7 +172,8 @@
   padding:3px 7px; font:11px var(--mono); background:var(--surface);
 }
 .sandbox-ux .sandbox-toolbar {
-  position:sticky; top:0; z-index:9; padding:11px; margin-bottom:16px;
+  /* Sit just below the sticky app header (its measured height), never behind it. */
+  position:sticky; top:var(--app-header-h, 64px); z-index:9; padding:11px; margin-bottom:16px;
   border:1px solid var(--line); border-radius:12px; background:var(--surface);
   box-shadow:0 4px 16px var(--scene-shadow);
 }
@@ -415,3 +416,7 @@
 .sandbox-ux .sandbox-plc-tabs button small { font-weight:400; color:var(--muted); font-size:11px; }
 .sandbox-ux .sandbox-plc-tabs button.active { border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
 .sandbox-ux .sandbox-plc-tabs .sandbox-help { flex-basis:100%; margin:0; }
+
+/* P8 · editing a plant: remove */
+.sandbox-ux .sandbox-remove { color:var(--ink); }
+.sandbox-ux .sandbox-remove:hover:not(:disabled), .sandbox-ux .sandbox-remove:focus-visible { border-color:#b3412f; color:#b3412f; }
