@@ -19,7 +19,7 @@ import type { FaultKind, FaultSpec, PlacedComponent, ProjectFile, Wire } from '.
 
 export const MAX_FAULTS = 8;
 export const FAULT_KINDS: readonly FaultKind[] = [
-  'wire-open', 'contactor-coil-open', 'contactor-welded', 'motor-open-winding', 'button-stuck',
+  'wire-open', 'contactor-coil-open', 'contactor-welded', 'motor-open-winding', 'button-stuck', 'sensor-stuck',
 ];
 const COMPONENT_TARGETS: Record<Exclude<FaultKind, 'wire-open'>, readonly ComponentKind[]> = {
   'contactor-coil-open': ['contactor', 'forwardcontactor', 'reversecontactor'],
@@ -27,6 +27,7 @@ const COMPONENT_TARGETS: Record<Exclude<FaultKind, 'wire-open'>, readonly Compon
   'motor-open-winding': ['motor', 'revmotor', 'conveyor', 'pump'],
   // The training E-stop is deliberately not fault-injectable here.
   'button-stuck': ['start', 'stop', 'reversebutton'],
+  'sensor-stuck': ['photoeye', 'levelprobe'],
 };
 export const FAULT_LABEL: Record<FaultKind, string> = {
   'wire-open': 'Open conductor (broken wire)',
@@ -34,6 +35,7 @@ export const FAULT_LABEL: Record<FaultKind, string> = {
   'contactor-welded': 'Contactor contacts welded',
   'motor-open-winding': 'Motor winding open',
   'button-stuck': 'Pushbutton contact stuck',
+  'sensor-stuck': 'Sensor output stuck',
 };
 const ID = /^[A-Za-z0-9_-]{1,45}$/;
 
@@ -73,6 +75,17 @@ export function effectivePressed(project: ProjectFile, c: PlacedComponent): bool
   return stuck ? stuck.stuckPressed === true : c.pressed;
 }
 
+/**
+ * The level a sensor's output switch presents to the circuit. `truth` is what the plant says the
+ * sensor detects; a stuck-output fault replaces it, so the sensor lies to the PLC while the plant
+ * (and the 3D scene) keep their real state. An unpowered sensor still outputs nothing, because
+ * this only decides whether the L+ to OUT switch is closed.
+ */
+export function effectiveSensor(project: ProjectFile, c: PlacedComponent, truth: boolean): boolean {
+  const stuck = faultsOf(project).find(f => f.kind === 'sensor-stuck' && f.target === c.id);
+  return stuck ? stuck.stuckActive === true : truth;
+}
+
 /** Wires as the solver sees them: open conductors are present but conduct nothing. */
 export function solverWires(project: ProjectFile): ReadonlyArray<readonly [string, string]> {
   const open = new Set(faultsOf(project).filter(f => f.kind === 'wire-open').map(f => f.target));
@@ -86,6 +99,7 @@ export function describeFault(f: FaultSpec): string {
     case 'contactor-welded': return `Welded contacts in ${f.target}`;
     case 'motor-open-winding': return `Open winding in ${f.target}`;
     case 'button-stuck': return `Pushbutton ${f.target} contact stuck as if ${f.stuckPressed ? 'pressed' : 'released'}`;
+    case 'sensor-stuck': return `Sensor ${f.target} output stuck ${f.stuckActive ? 'ON' : 'OFF'}`;
   }
 }
 
@@ -108,12 +122,16 @@ export function validateFaults(
     if (kind === 'button-stuck') {
       if (typeof f.stuckPressed !== 'boolean') throw new Error(`Fault ${f.id} needs a stuckPressed state`);
     } else if (f.stuckPressed !== undefined) throw new Error(`Fault ${f.id} cannot set stuckPressed`);
+    if (kind === 'sensor-stuck') {
+      if (typeof f.stuckActive !== 'boolean') throw new Error(`Fault ${f.id} needs a stuckActive state`);
+    } else if (f.stuckActive !== undefined) throw new Error(`Fault ${f.id} cannot set stuckActive`);
     const key = `${kind}:${f.target}`;
     if (parts.has(key)) throw new Error('Duplicate fault on the same part');
     ids.add(f.id);
     parts.add(key);
     return { id: f.id, kind, target: f.target, hidden: f.hidden,
-      ...(kind === 'button-stuck' ? { stuckPressed: f.stuckPressed as boolean } : {}) };
+      ...(kind === 'button-stuck' ? { stuckPressed: f.stuckPressed as boolean } : {}),
+      ...(kind === 'sensor-stuck' ? { stuckActive: f.stuckActive as boolean } : {}) };
   });
 }
 
@@ -143,6 +161,9 @@ export function faultCandidates(project: ProjectFile): FaultCandidate[] {
       if (kind === 'button-stuck') {
         push({ kind, target: c.id, stuckPressed: true });
         push({ kind, target: c.id, stuckPressed: false });
+      } else if (kind === 'sensor-stuck') {
+        push({ kind, target: c.id, stuckActive: true });
+        push({ kind, target: c.id, stuckActive: false });
       } else push({ kind, target: c.id });
     }
   }

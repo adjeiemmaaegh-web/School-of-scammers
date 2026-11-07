@@ -10,7 +10,7 @@ export type XY = { x: number; y: number };
 export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean };
 export type Wire = { id: string; from: string; to: string };
 /** Component/wire failures that alter what the circuit solver sees (P5). */
-export type FaultKind = 'wire-open' | 'contactor-coil-open' | 'contactor-welded' | 'motor-open-winding' | 'button-stuck';
+export type FaultKind = 'wire-open' | 'contactor-coil-open' | 'contactor-welded' | 'motor-open-winding' | 'button-stuck' | 'sensor-stuck';
 export type FaultSpec = {
   id: string;
   kind: FaultKind;
@@ -18,6 +18,9 @@ export type FaultSpec = {
   target: string;
   /** 'button-stuck' only: the mechanism is stuck as if pressed (true) or as if released (false). */
   stuckPressed?: boolean;
+  /** 'sensor-stuck' only: the electrical output is stuck ON (true) or OFF (false) whatever the
+   *  sensor actually detects. The plant's own truth is unaffected, so the sensor lies to the PLC. */
+  stuckActive?: boolean;
   /** Hidden faults are not described in learner-facing lists or events until revealed. This is a
    *  UX convention for local practice, not security: exported project JSON still contains them. */
   hidden: boolean;
@@ -98,7 +101,7 @@ export type Command =
    *  rather than `operate` with `!pressed` from a snapshot, which is stale between scans. */
   | { k: 'operateToggle'; id: string }
   /** The worker assigns the fault id. Allowed any time: faults can occur while running. */
-  | { k: 'injectFault'; kind: FaultKind; target: string; stuckPressed?: boolean; hidden: boolean }
+  | { k: 'injectFault'; kind: FaultKind; target: string; stuckPressed?: boolean; stuckActive?: boolean; hidden: boolean }
   /** Deterministically picks one applicable fault from the current project using `seed`. */
   | { k: 'injectSeededFault'; seed: number; hidden: boolean }
   | { k: 'clearFault'; id: string }

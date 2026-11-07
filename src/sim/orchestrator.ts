@@ -10,8 +10,8 @@ import { freshTank, stepTank } from '../plant/tank-process';
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
-  describeFault, effectivePressed, faultsOf, hasFault, nextFaultId, pickSeededFault,
-  solverWires, validateFaults,
+  describeFault, effectivePressed, effectiveSensor, faultsOf, hasFault, nextFaultId, pickSeededFault,
+  solverWires, validateFaults, type FaultCandidate,
 } from './faults';
 export { validateSandboxProgram } from '../program/p2-contract';
 import type { Command, FaultSpec, PlacedComponent, ProjectFile, RenderSnapshot, SimEvent, WorldState } from './signals';
@@ -268,14 +268,15 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       // Faults can occur while running, so injection is not gated on pause. The fault only changes
       // what the circuit solver is given; no symptom is set here (see sim/faults.ts).
       const existing = faultsOf(world.project);
-      let picked: { kind: FaultSpec['kind']; target: string; stuckPressed?: boolean } | null;
+      let picked: FaultCandidate | null;
       if (cmd.k === 'injectSeededFault') {
         picked = Number.isSafeInteger(cmd.seed) ? pickSeededFault(world.project, cmd.seed) : null;
         if (!Number.isSafeInteger(cmd.seed)) world = setError(world, 'Fault seed must be a whole number');
         else if (!picked) world = setError(world, 'No applicable fault for this project');
       } else {
         picked = { kind: cmd.kind, target: cmd.target,
-          ...(cmd.stuckPressed !== undefined ? { stuckPressed: cmd.stuckPressed } : {}) };
+          ...(cmd.stuckPressed !== undefined ? { stuckPressed: cmd.stuckPressed } : {}),
+          ...(cmd.stuckActive !== undefined ? { stuckActive: cmd.stuckActive } : {}) };
       }
       if (picked) {
         try {
@@ -402,10 +403,14 @@ function buildCircuit(world: WorldState): Device[] {
       devices.push({ id: `${c.id}-Q5`, kind: 'switch',
         a: terminal(c.id, 'L+'), b: terminal(c.id, 'Q0.5'), closed: world.coils.Reverse === true });
     }
+    // A stuck-output sensor lies to the PLC: only its electrical output changes. The plant truth
+    // (world.plant.photoeyeActive / world.tank.highLevel) keeps computing from real geometry and level.
     if (c.kind === 'photoeye') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
-      a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'), closed: world.plant.photoeyeActive });
+      a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'),
+      closed: effectiveSensor(world.project, c, world.plant.photoeyeActive) });
     if (c.kind === 'levelprobe') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
-      a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'), closed: world.tank.highLevel });
+      a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'),
+      closed: effectiveSensor(world.project, c, world.tank.highLevel) });
     if (c.kind === 'contactor') {
       // Open coil: not part of the circuit, so it never pulls in (A1-A2 still measures 24 V).
       if (!hasFault(world.project, 'contactor-coil-open', c.id))

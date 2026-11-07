@@ -21,6 +21,7 @@ export function TroubleshootingPanel({ project, snapshot, editable, send }: Prop
   const [kind, setKind] = useState<FaultKind>('contactor-coil-open');
   const [target, setTarget] = useState('');
   const [stuckPressed, setStuckPressed] = useState(true);
+  const [stuckActive, setStuckActive] = useState(true);
   const [hidden, setHidden] = useState(false);
   const [seed, setSeed] = useState(1);
   const [repairTarget, setRepairTarget] = useState('');
@@ -57,12 +58,19 @@ export function TroubleshootingPanel({ project, snapshot, editable, send }: Prop
             onChange={e => setStuckPressed(e.target.value === 'pressed')}>
             <option value="pressed">pressed</option><option value="released">released</option>
           </select></label>}
+        {kind === 'sensor-stuck' && <label>Output stuck
+          <select data-fault-stuck-active value={stuckActive ? 'on' : 'off'}
+            onChange={e => setStuckActive(e.target.value === 'on')}>
+            <option value="on">ON (always reports detected)</option>
+            <option value="off">OFF (never reports detected)</option>
+          </select></label>}
         <label className="sandbox-fault-check">
           <input type="checkbox" data-fault-hidden checked={hidden}
             onChange={e => setHidden(e.target.checked)} /> Hide the cause until revealed</label>
         <button type="button" className="btn ghost small" data-fault-inject disabled={!chosen}
           onClick={() => send([{ k: 'injectFault', kind, target: chosen, hidden,
-            ...(kind === 'button-stuck' ? { stuckPressed } : {}) }])}>Inject fault</button>
+            ...(kind === 'button-stuck' ? { stuckPressed } : {}),
+            ...(kind === 'sensor-stuck' ? { stuckActive } : {}) }])}>Inject fault</button>
       </div>
       <div className="sandbox-fault-form">
         <label>Mystery fault seed

@@ -54,6 +54,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-reversing-browser.cjs
       - name: P5 troubleshooting - hidden fault, symptom-only alarm, multimeter diagnosis and part replacement
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-faults-browser.cjs
+      - name: P5 sensor troubleshooting - stuck photoeye lies to the PLC on the running sorting line
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-sensor-browser.cjs
       - name: Browser smoke - routes, machine control, meter, assessment and mobile
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
       - name: Offline deep-link and lazy-lab cache acceptance
