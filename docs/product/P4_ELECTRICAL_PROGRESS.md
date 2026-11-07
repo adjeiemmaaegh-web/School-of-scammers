@@ -58,3 +58,38 @@ Select red and black meter probes from actual terminal IDs; disconnected nodes r
 **Verification is based on actual CI, not source existence.** The previous P4 nine-device implementation passed 598/598 tests and browser/Windows checks (see draft PR #18 historical evidence). The new E-stop/16-wire continuation requires its own completed CI run. Physical low-spec Windows WebGL, cross-browser full 3D, human visual review and hardware testing remain **unverified**.
 
 **Not yet built:** forward/reverse or star-delta 3-phase motor control, genuine contactor electrical/mechanical interlocking, overcurrent/amperes and thermal breaker/overload ratings, safety-certified emergency stop circuits, realistic mains and standards-grade schematic wiring, calibrated electrical instruments. Full P2/P3 backlog is still open. **P4 and commercial release are NO-GO / INCOMPLETE.**
+
+
+## P4 continuation — wired forward/reverse 24V motor interlock
+
+This next source increment adds **a second genuine electrical panel workcell** to the same authoritative 50 ms Web Worker. It is a *24V educational abstraction*, not three-phase reversing hardware, a certified E-stop or a mains-rated starter. Components: reversible motor (`F+` / `R+` / `M-`), forward and reverse contactors (A1/A2 coil, NO 13/14, NC 21/22), and a second momentary reverse command button. PLC I0.4 samples `ReverseRequest`; Q0.4 and Q0.5 drive `Forward` and `Reverse` BOOL outputs from editable Ladder or bounded Structured Text. All prior I/O, P1/P2/P3 workcells and protected DOL are retained.
+
+**Build exercise:** Press **Place reversing DOL layout** on a blank 3D workbench. This places 10 devices, *without* prewired shortcuts. Patch 21 actual connections in this order:
+
+1. supply.P24 → breaker.IN
+2. breaker.OUT → estop.A
+3. estop.B → plc.L+
+4. supply.M0 → plc.M
+5. estop.B → start.A
+6. start.B → plc.I0.0
+7. estop.B → reversebutton.A
+8. reversebutton.B → plc.I0.4
+9. estop.B → stop.A
+10. stop.B → plc.I0.1
+11. supply.M0 → forwardcontactor.A2
+12. supply.M0 → reversecontactor.A2
+13. plc.Q0.4 → reversecontactor.21
+14. reversecontactor.22 → forwardcontactor.A1
+15. plc.Q0.5 → forwardcontactor.21
+16. forwardcontactor.22 → reversecontactor.A1
+17. estop.B → forwardcontactor.13
+18. estop.B → reversecontactor.13
+19. forwardcontactor.14 → revmotor.F+
+20. reversecontactor.14 → revmotor.R+
+21. supply.M0 → revmotor.M-
+
+**Run:** Select **Load forward/reverse example**, Run, press/release START (forward), press/release STOP (off), then press/release REVERSE (reverse). Each energized contactor closes its 13/14 NO motor feed while **opening its 21/22 NC auxiliary** in the other contactor's coil path. The example PLC rungs inhibit simultaneous button requests and latch one direction until stopped. The worker computes actual direction and signed shaft angle from the connected motor load terminals. An incorrect user program demanding both coils does not get magically rewritten: it raises a simulated mechanical-interlock conflict and prevents either contactor from closing. Connecting both F+ and R+ to a live source inhibits the motor and publishes a wiring diagnostic. Unwiring a true NC link, pressing the latching training E-stop or disconnecting the supply changes the genuine circuit and motor behavior, not only visual state.
+
+New tests: `tests/sandbox-p4-reversing.test.ts` (normal and incorrect control sequences, physical missing interlocks, contradictory feeds, emergency stop, ST path and replay); `scripts/sandbox-p4-reversing-browser.cjs` (real user-built 21-wire Chrome 3D E2E, includes deliberately broken wire); added to GitHub Actions. **Do not count these as passing until their final CI run confirms it.**
+
+**Open and explicitly not certified:** actual 3-phase reversing/star-delta, mechanically rated interlocks, current-limited supply/thermal overcurrent physics, calibrated instrument accuracy, safe emergency stop design, physical low-spec Windows and real cross-browser 3D acceptance. Earlier P2/P3 gates are also open. No backend, auth, cloud, payments, external deployment or `main` merge authorized.
