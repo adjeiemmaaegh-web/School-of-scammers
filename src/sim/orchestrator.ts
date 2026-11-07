@@ -62,22 +62,33 @@ export const tankProgram = (): LadderDocument => ({
  * Both buttons pressed together inhibit both requests.
  */
 export const reversingProgram = (): LadderDocument => ({
-  id: 'reversible-motor', version: '1.0', rungs: [
+  id: 'reversible-motor', version: '1.0',
+  symbols: {
+    ForwardStart: { description: 'Forward request allowed only without reverse request', type: 'BOOL' },
+    ReverseStart: { description: 'Reverse request allowed only without forward request', type: 'BOOL' },
+  },
+  rungs: [
+    { id: 'forward-request', elements: [
+      { type: 'contact', tag: 'Start' },
+      { type: 'contact', tag: 'ReverseRequest', normallyClosed: true },
+    ], coil: 'ForwardStart' },
+    { id: 'reverse-request', elements: [
+      { type: 'contact', tag: 'ReverseRequest' },
+      { type: 'contact', tag: 'Start', normallyClosed: true },
+    ], coil: 'ReverseStart' },
     { id: 'forward-enable', elements: [
       { type: 'contact', tag: 'StopOK' },
-      { type: 'contact', tag: 'ReverseRequest', normallyClosed: true },
       { type: 'contact', tag: 'Reverse', normallyClosed: true },
       { type: 'branch', alternatives: [
-        [{ type: 'contact', tag: 'Start' }],
+        [{ type: 'contact', tag: 'ForwardStart' }],
         [{ type: 'contact', tag: 'Forward' }],
       ] },
     ], coil: 'Forward' },
     { id: 'reverse-enable', elements: [
       { type: 'contact', tag: 'StopOK' },
-      { type: 'contact', tag: 'Start', normallyClosed: true },
       { type: 'contact', tag: 'Forward', normallyClosed: true },
       { type: 'branch', alternatives: [
-        [{ type: 'contact', tag: 'ReverseRequest' }],
+        [{ type: 'contact', tag: 'ReverseStart' }],
         [{ type: 'contact', tag: 'Reverse' }],
       ] },
     ], coil: 'Reverse' },
