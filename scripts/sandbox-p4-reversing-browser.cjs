@@ -78,8 +78,14 @@ async function direction(page,value) {
   assert.equal(await page.$eval('[data-direction]',e=>e.textContent),'REVERSE');
   await clickDevice(page,'start-5'); // release
   await clickDevice(page,'stop-7'); await direction(page,'STOPPED'); await clickDevice(page,'stop-7');
-  // Simultaneous requests from stopped condition are blocked in user Ladder.
+  // Queue both physical buttons while PLC scans are PAUSED, so the first
+  // worker scan sees genuinely simultaneous requests (not two clicks separated
+  // by a running 50 ms scan).
+  await clickText(page,'Pause');
+  await page.waitForFunction(()=>[...document.querySelectorAll('.sandbox-toolbar button')]
+    .some(b=>b.textContent.trim()==='▶ Run'));
   await clickDevice(page,'start-5');await clickDevice(page,'reversebutton-6');
+  await clickText(page,'▶ Run');
   await page.waitForFunction(()=>[...document.querySelectorAll('.sandbox-lamps span')].some(e=>
     e.textContent.trim()==='ReverseRequest'&&e.classList.contains('lit')));
   await new Promise(resolve=>setTimeout(resolve,350));
