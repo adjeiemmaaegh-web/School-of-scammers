@@ -52,7 +52,11 @@ export function WorkbenchInspector({
 
   const definition = COMPONENTS[selectedDevice.kind];
   const isPressed = selectedDevice.pressed;
-  const isLive = selectedDevice.kind === 'breaker' ? !snapshot.breakerTripped :
+  const isLive = selectedDevice.kind === 'revmotor' ? snapshot.motorDirection !== 'stopped' :
+    selectedDevice.kind === 'forwardcontactor' ? snapshot.forwardContactorOn :
+    selectedDevice.kind === 'reversecontactor' ? snapshot.reverseContactorOn :
+    selectedDevice.kind === 'reversebutton' ? isPressed :
+    selectedDevice.kind === 'breaker' ? !snapshot.breakerTripped :
     selectedDevice.kind === 'overload' ? !snapshot.overloadTripped :
     selectedDevice.kind === 'lamp' ? snapshot.lampOn :
     selectedDevice.kind === 'pump' ? snapshot.pumpOn :
@@ -65,7 +69,11 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'contactor' ? snapshot.contactorOn :
     selectedDevice.kind === 'plc' ? snapshot.io.PlcPowered :
     selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' ? !isPressed : true;
-  const state = selectedDevice.kind === 'breaker' ? (isLive ? 'Closed' : 'Tripped open') :
+  const state = selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
+    selectedDevice.kind === 'forwardcontactor' ? (isLive ? 'Forward contact closed' : 'Open') :
+    selectedDevice.kind === 'reversecontactor' ? (isLive ? 'Reverse contact closed' : 'Open') :
+    selectedDevice.kind === 'reversebutton' ? (isPressed ? 'Request pressed' : 'Released') :
+    selectedDevice.kind === 'breaker' ? (isLive ? 'Closed' : 'Tripped open') :
     selectedDevice.kind === 'overload' ? (isLive ? '95-96 closed' : '95-96 tripped open') :
     selectedDevice.kind === 'lamp' ? (isLive ? 'Illuminated' : 'Off') :
     selectedDevice.kind === 'tank' ? `${Math.round(snapshot.tank.levelMl)} / 1000 ml` :
@@ -95,7 +103,7 @@ export function WorkbenchInspector({
     </div>
     <button type="button" className="btn ghost small sandbox-inspector-move" disabled={!editable}
       onClick={() => onMove(selectedDevice.id)}>Move on 3D floor</button>
-    {(selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop') &&
+    {(selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' || selectedDevice.kind === 'reversebutton') &&
       <button type="button" className="btn primary small sandbox-inspector-operate"
         onClick={() => onOperate(selectedDevice.id, !isPressed)}>
         {selectedDevice.kind === 'estop' ?
