@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { COMPONENTS } from '../../components/registry';
+import { paramSpecsOf, paramValue, type ParamSpec } from '../../components/params';
 import type { PlacedComponent, ProjectFile, RenderSnapshot } from '../../sim/signals';
 import { perDeviceLive } from '../../sim/device-state';
 
@@ -17,6 +18,8 @@ type Props = {
   /** Toggle a pushbutton/E-stop. The worker resolves the new state (see Command `operateToggle`). */
   onOperate: (id: string) => void;
   onClearSelection: () => void;
+  /** Change a device setting (see Command `setParam`). */
+  onSetParam: (id: string, key: string, value: number) => void;
 };
 
 /** Largest top-left coordinates that keep a device (170 x 130) on the 1080 x 580 floor. */
@@ -42,10 +45,28 @@ function PositionField({ label, attr, max, value, disabled, onCommit }: {
   </label>;
 }
 
+/** A device setting (e.g. an on-delay relay's delay): a draft that commits on Enter or blur, clamped and snapped to the spec. */
+function ParamField({ spec, value, disabled, onCommit }: { spec: ParamSpec; value: number; disabled: boolean; onCommit: (n: number) => void }) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => { setDraft(String(value)); }, [value]);
+  const commit = () => {
+    const n = Number(draft);
+    if (draft.trim() === '' || !Number.isFinite(n)) { setDraft(String(value)); return; }
+    const next = Math.max(spec.min, Math.min(spec.max, Math.round(n / spec.step) * spec.step));
+    setDraft(String(next));
+    if (next !== value) onCommit(next);
+  };
+  return <label>{spec.label} ({spec.unit})
+    <input type="number" data-param={spec.key} min={spec.min} max={spec.max} step={spec.step} value={draft} disabled={disabled}
+      onChange={e => setDraft(e.target.value)} onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }} />
+  </label>;
+}
+
 /** Read-only contextual view of the worker snapshot. Actions emit existing Commands. */
 export function WorkbenchInspector({
   project, snapshot, selectedDevice, selectedTerminal, editable,
-  onTerminal, onCancelWire, onMove, onMoveTo, onOperate, onClearSelection,
+  onTerminal, onCancelWire, onMove, onMoveTo, onOperate, onClearSelection, onSetParam,
 }: Props) {
   const hasLatchBranch = project.program.rungs.some(rung =>
     rung.elements.some(element => element.type === 'branch'));
@@ -98,6 +119,7 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'stacklight' ? (['R', 'Y', 'G'].filter(l => snapshot.deviceOn[`${selectedDevice.id}-${l}`]).join(' · ') || 'All lamps off') :
     selectedDevice.kind === 'cylinder' ? (() => { const r = snapshot.cylinders[selectedDevice.id]; const base = !r || r.retractLimit ? 'Retracted' : r.extendLimit ? 'Extended' : `Moving ${Math.round(r.position * 100)}%`; return r?.alarm ? `${base} · ${r.alarm}` : base; })() :
     selectedDevice.kind === 'relay' ? (isLive ? 'Energised' : 'Released') :
+    selectedDevice.kind === 'timerelay' ? (() => { const t = snapshot.timers[selectedDevice.id]; return !t || t.elapsedMs === 0 ? 'Coil off' : t.done ? 'Contacts transferred' : `Timing ${(t.elapsedMs / 1000).toFixed(1)} / ${(t.delayMs / 1000).toFixed(1)} s`; })() :
     selectedDevice.kind === 'tank' ? `${Math.round(snapshot.vessels[selectedDevice.id]?.levelMl ?? 0)} / 1000 ml` :
     selectedDevice.kind === 'pump' ? (isLive ? 'Filling' : 'Off') :
     selectedDevice.kind === 'levelprobe' ? (isLive ? 'High level' : 'Below level switch') :
@@ -129,6 +151,10 @@ export function WorkbenchInspector({
       <PositionField key={`${selectedDevice.id}-y`} label="Y" attr="data-pos-y" max={FLOOR_MAX_Y} value={selectedDevice.y} disabled={!editable}
         onCommit={y => onMoveTo(selectedDevice.id, { x: selectedDevice.x, y })} />
     </div>
+    {paramSpecsOf(selectedDevice.kind).length > 0 && <div className="sandbox-inspector-position" role="group" aria-label="Device settings">
+      {paramSpecsOf(selectedDevice.kind).map(spec => <ParamField key={`${selectedDevice.id}-${spec.key}`} spec={spec} disabled={!editable}
+        value={paramValue(project.params, selectedDevice.id, spec)} onCommit={n => onSetParam(selectedDevice.id, spec.key, n)} />)}
+    </div>}
     <p className="sandbox-help">Sensors, diverters, pumps and level switches act on the conveyor or tank they are placed beside, so exact positions matter.</p>
     <button type="button" className="btn ghost small sandbox-inspector-move" disabled={!editable}
       onClick={() => onMove(selectedDevice.id)}>Move on 3D floor</button>

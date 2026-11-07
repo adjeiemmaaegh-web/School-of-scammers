@@ -23,8 +23,8 @@ export const FAULT_KINDS: readonly FaultKind[] = [
   'cylinder-no-air', 'cylinder-jammed', 'cylinder-ext-switch-dead', 'cylinder-ret-switch-dead',
 ];
 const COMPONENT_TARGETS: Record<Exclude<FaultKind, 'wire-open'>, readonly ComponentKind[]> = {
-  'contactor-coil-open': ['contactor', 'forwardcontactor', 'reversecontactor', 'relay'],
-  'contactor-welded': ['contactor', 'forwardcontactor', 'reversecontactor', 'relay'],
+  'contactor-coil-open': ['contactor', 'forwardcontactor', 'reversecontactor', 'relay', 'timerelay'],
+  'contactor-welded': ['contactor', 'forwardcontactor', 'reversecontactor', 'relay', 'timerelay'],
   'motor-open-winding': ['motor', 'revmotor', 'conveyor', 'pump'],
   // The training E-stop is deliberately not fault-injectable here.
   'button-stuck': ['start', 'stop', 'reversebutton'],

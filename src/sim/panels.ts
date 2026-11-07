@@ -33,6 +33,12 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     const { faults: _old, ...rest } = next;
     next = faults.length ? { ...rest, faults } : rest;
   }
+  if (project.params?.[id]) {
+    const { params: _old, ...rest } = next;
+    const kept = { ...project.params };
+    delete kept[id];
+    next = Object.keys(kept).length ? { ...rest, params: kept } : rest;
+  }
   if (isPlcKind(target.kind)) {
     const wasFirst = primaryPlcId(project) === id;
     const promoted = wasFirst ? extraPlcs(project)[0] : undefined;

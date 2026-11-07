@@ -92,6 +92,8 @@ export type ProjectFile = {
   plcPrograms?: Record<string, PlcProgram>;
   /** Tag names of the configurable (16/16) controllers, by PLC id. Omitted when every name is the default. */
   plcIo?: Record<string, { inputs: Record<string, string>; outputs: Record<string, string> }>;
+  /** Device settings that differ from the default (a timer relay's delay), by component id then setting key. */
+  params?: Record<string, Record<string, number>>;
 };
 export type WorldState = {
   project: ProjectFile;
@@ -121,6 +123,8 @@ export type WorldState = {
   tripped: Record<string, boolean>;
   /** Rod position, limit switches and valve state of every pneumatic cylinder, by component id. */
   cylinders: Record<string, CylinderState>;
+  /** Milliseconds each on-delay relay's coil has been energised (capped at its delay), by component id. */
+  timers: Record<string, number>;
   /** Scan state of every PLC after the first, by component id. */
   plcs: Record<string, PlcRuntime>;
   /** Energised state of every contactor, motor and lamp by component id (the legacy booleans mirror the first). */
@@ -170,6 +174,8 @@ export type Command =
   | { k: 'repair'; target: string }
   /** Delete a device and everything that depended on it (its wires, faults, PLC program). Paused only. */
   | { k: 'remove'; id: string }
+  /** Set a device setting (e.g. an on-delay relay's delay). Validated against its spec. Paused only. */
+  | { k: 'setParam'; id: string; key: string; value: number }
   /** Drop in a ready-made, pre-wired start/stop starter panel at a free spot (or `at`). Paused only. */
   | { k: 'addPanel'; template: 'motor-starter'; at?: XY }
   /** `conveyor` names the lane; omitted means the first conveyor (the single-conveyor behaviour). */
@@ -208,6 +214,8 @@ export type RenderSnapshot = {
   /** Trip state of every breaker and overload by component id. */
   tripped: Record<string, boolean>;
   /** Every pneumatic cylinder by component id: rod position 0 (retracted)..1 (extended) and its limit switches. */
+  /** Every on-delay relay by component id: elapsed and preset milliseconds, and whether its contacts have transferred. */
+  timers: Record<string, { elapsedMs: number; delayMs: number; done: boolean }>;
   cylinders: Record<string, { position: number; extendLimit: boolean; retractLimit: boolean; command: string; alarm: string | null; conflict: boolean }>;
   /** Energised state of every contactor, motor and lamp by component id. */
   deviceOn: Record<string, boolean>;

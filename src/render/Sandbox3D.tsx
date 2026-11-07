@@ -192,7 +192,7 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
       <mesh position={[-0.58, 0.78, 0]}><boxGeometry args={[0.2, 0.14, 0.26]} /><meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.35} /></mesh>
     </group>;
   }
-  if (kind === 'contactor' || kind === 'relay' || kind === 'forwardcontactor' || kind === 'reversecontactor') return <group>
+  if (kind === 'contactor' || kind === 'relay' || kind === 'timerelay' || kind === 'forwardcontactor' || kind === 'reversecontactor') return <group>
     <mesh position={[0, 0.5, 0]}><boxGeometry args={[1, 0.89, 0.78]} /><meshStandardMaterial color={COLORS.chassis} /></mesh>
     <mesh position={[0, 0.75, -0.4]}><boxGeometry args={[0.72, 0.3, 0.04]} /><meshStandardMaterial color={COLORS.panel} /></mesh>
     {[-0.27, 0, 0.27].map(x => <mesh key={x} position={[x, 0.51, -0.405]}>
@@ -241,6 +241,7 @@ function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, ro
           c.kind === 'forwardcontactor' || c.kind === 'reversecontactor' ? (active ? 'CLOSED' : 'OPEN') :
           c.kind === 'motor' ? (active ? 'RUNNING' : 'STOPPED') :
           c.kind === 'contactor' || c.kind === 'relay' ? (active ? 'ENERGISED' : 'OFF') :
+          c.kind === 'timerelay' ? (active ? 'CONTACTS ON' : 'OFF') :
           c.kind === 'stacklight' ? (['R', 'Y', 'G'].filter(l => lamps?.[l as 'R' | 'Y' | 'G']).join(' · ') || 'ALL OFF') :
           c.kind === 'cylinder' ? (rod === undefined ? 'RETRACTED' : rod >= 0.999 ? 'EXTENDED' : rod <= 0.001 ? 'RETRACTED' : `MOVING ${Math.round(rod * 100)}%`) :
           c.kind === 'plc' || c.kind === 'plc16' ? (active ? 'POWERED' : 'UNPOWERED') :

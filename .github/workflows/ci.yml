@@ -62,6 +62,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p13-relay-cylinder-browser.cjs
       - name: Cylinder faults and stack light - PLC-driven stack light, no-air and dead-limit-switch faults, repair clears the alarm
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p14-cylinder-faults-browser.cjs
+      - name: On-delay relay and device settings - hard-wired timer, dial set in the inspector, TIMING then CONTACTS ON, reset on early release
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p15-timer-relay-browser.cjs
       - name: Configurable I/O - a 16/16 PLC with named tags in both banks, refused renames, persistence
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p12-configurable-io-browser.cjs
       - name: Authored plant - build a two-station plant from an empty floor through the UI, commission, troubleshoot, reload

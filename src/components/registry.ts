@@ -1,5 +1,5 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
-export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor';
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor';
 export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
@@ -21,6 +21,10 @@ export const COMPONENTS: Record<ComponentKind, Definition> = {
     { name: '13', side: 'left', y: 86, role: 'passive' }, { name: '14', side: 'right', y: 86, role: 'passive' },
     { name: '23', side: 'left', y: 112, role: 'passive' }, { name: '24', side: 'right', y: 112, role: 'passive' },
     { name: '21', side: 'left', y: 138, role: 'passive' }, { name: '22', side: 'right', y: 138, role: 'passive' }] },
+  timerelay: { kind: 'timerelay', label: '24V on-delay relay', help: 'Coil A1/A2: after the coil has been energised for the set delay (inspector), NO contact 13-14 closes and NC contact 21-22 opens; both release at once when the coil drops. Set the delay while paused.', terminals: [
+    { name: 'A1', side: 'left', y: 24, role: 'load' }, { name: 'A2', side: 'left', y: 48, role: 'load' },
+    { name: '13', side: 'left', y: 100, role: 'passive' }, { name: '14', side: 'right', y: 100, role: 'passive' },
+    { name: '21', side: 'left', y: 126, role: 'passive' }, { name: '22', side: 'right', y: 126, role: 'passive' }] },
   cylinder: { kind: 'cylinder', label: 'Pneumatic cylinder', help: 'Double-acting cylinder: EXT+ / RET+ solenoids to M- (energising both holds it), limit switches EXT_LS / RET_LS powered from L+. Air is assumed available.', terminals: [
     { name: 'EXT+', side: 'left', y: 28, role: 'load' }, { name: 'RET+', side: 'left', y: 54, role: 'load' },
     { name: 'M-', side: 'left', y: 80, role: 'load' }, { name: 'L+', side: 'left', y: 106, role: 'supply' },
