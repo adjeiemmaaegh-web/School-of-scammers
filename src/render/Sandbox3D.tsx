@@ -297,22 +297,15 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
     {project.components.map(c => <Device3D key={c.id} c={c} editable={editable}
       motorAngleRad={c.kind === 'revmotor' ? snapshot.reverseMotorAngleRad : snapshot.motorAngles[c.id] ?? snapshot.motorAngleRad}
       direction={c.kind === 'revmotor' ? snapshot.motorDirection : undefined}
-      parcel={snapshot.plant.parcel} tankLevelMl={snapshot.tank.levelMl}
+      parcel={c.kind === 'conveyor' ? snapshot.lanes[c.id]?.parcel ?? null : null} tankLevelMl={c.kind === 'tank' ? snapshot.vessels[c.id]?.levelMl ?? 0 : 0}
       selectedTerminal={selectedTerminal} moveTarget={moveTarget}
-      active={c.kind === 'revmotor' ? snapshot.motorDirection !== 'stopped' :
+      active={perDeviceLive(snapshot, c) ?? (c.kind === 'revmotor' ? snapshot.motorDirection !== 'stopped' :
         c.kind === 'forwardcontactor' ? snapshot.forwardContactorOn :
         c.kind === 'reversecontactor' ? snapshot.reverseContactorOn :
-        c.kind === 'motor' || c.kind === 'contactor' || c.kind === 'plc' || c.kind === 'lamp' ? perDeviceLive(snapshot, c) === true :
-        c.kind === 'conveyor' ? snapshot.conveyorOn :
-        c.kind === 'diverter' ? snapshot.diverterOn :
         c.kind === 'photoeye' ? snapshot.io.Photoeye :
-        c.kind === 'pump' ? snapshot.pumpOn :
-        c.kind === 'drainvalve' ? snapshot.drainOn :
         c.kind === 'levelprobe' ? snapshot.io.TankHigh :
-        c.kind === 'breaker' ? !snapshot.breakerTripped :
-        c.kind === 'overload' ? !snapshot.overloadTripped :
         c.kind === 'estop' ? !c.pressed :
-        c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false}
+        c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false)}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect} />)}
     <OrbitControls makeDefault enablePan enableZoom enableRotate
       minDistance={4.4} maxDistance={23} minPolarAngle={0.1} maxPolarAngle={Math.PI / 2.05}

@@ -29,7 +29,7 @@ The goal this serves: a learner builds a *plant*, not one fixed circuit: several
 
 ## Limits — read before relying on it
 
-- **Still single-instance:** conveyor, photoeye, diverter, tank, pump, level probe, drain valve, breaker, overload, and the forward/reverse set. Those plant models and protection flags are not multi-instance, so two sorting lines or two protected panels are not possible yet.
+- **Still single-instance after slice 3:** only the forward/reverse drive set. (Slice 1 originally listed conveyor, tank, protection and more as single-instance; slice 3 removed that.)
 - **A short anywhere de-powers every PLC.** The solver reports one global short; it does not isolate it to one supply's panel.
 - **Supervisory alarms, the scan trace and scan/tag breakpoints follow the first PLC only** (the I/O lamps, tag monitor and ladder highlights follow the selected PLC). A `START_FAILURE`-style alarm for a second panel does not exist yet.
 - **No communication between PLCs other than wiring** (no Ethernet/Modbus/Profinet, no HMI).
@@ -53,6 +53,18 @@ CI: manual dispatch on the branch, [run 42387921585](https://github.com/adjeiemm
 Two regressions in my own earlier work surfaced while verifying this slice, and are fixed: (1) the new Remove button made the device-card action row too wide on a phone (the row now wraps; the multi-PLC E2E's 390 px check caught it, and now names the offending elements); (2) with the toolbar correctly below the header it covers a band of the viewport, so three older E2E scripts that clicked an element already partly visible behind it now scroll the target to the centre first, as a person would. `sandbox-browser-acceptance.cjs` also had a latent race (it dropped onto the 3D floor before the canvas had measured itself, still 300x150) that appeared in back-to-back runs; it now waits for the real canvas size and passed 6 of 6 standalone and 3 of 3 after another script.
 
 Limits: no copy/paste of arbitrary selections, no multi-select, no undo for ordinary edits (placing, wiring, moving), only for remove/add panel; one panel template; undo history lives in the page, not in the saved project.
+
+## Slice 3 — per-instance plant devices (branch `engineering/p9-simulator-first`)
+
+The plant models were single-instance by design. They are now generalised, using the same pattern as the PLCs: per-instance state keyed by component id, with the legacy single-device fields kept as a mirror of the first so every existing project and test behaves as before.
+
+- **Conveyor lanes** (`WorldState.lanes`): every conveyor is its own lane with its own parcel, counters and photoeye truth. A photoeye or diverter belongs to the conveyor it is positioned along (the plant's existing geometry rule); in range of several, the **nearest** wins (`src/sim/stations.ts`). `feedParcel` takes an optional `conveyor` id (default: the first).
+- **Vessels** (`WorldState.vessels`): every tank is its own vessel; pumps, drain valves and level switches belong to the tank they are mounted beside (nearest wins). A level switch reads its own tank.
+- **Protection** (`WorldState.tripped`): breakers and overloads each have their own trip state. A short trips the first closed breaker whose opening isolates it; an unfused short is never given false protection.
+- **Per-device state** (`deviceOn`) now also covers conveyors, diverters, pumps and drain valves; the 3D scene, the device cards, the inspector and the process panels show each lane and tank individually (one sorting panel per conveyor, one tank panel per tank).
+- Placement limits are lifted for conveyor, photoeye, diverter, tank, pump, level switch, drain valve, breaker and overload. **Still one per project:** the reversing drive set (forward contactor, reverse contactor, reversible motor, reverse button), because its contactor pairing and interlock are not generalised yet.
+- Evidence: `tests/multi-plant.test.ts` (19: station assignment, two lines sorting different parcels at once through their own PLCs and photoeyes, a stuck eye lying only to its own PLC, a stopped belt, two tanks cycling independently, a cut pump wire on one tank, STOP on one PLC, per-tank level switches, two breakers tripping separately, no reset into a standing short, determinism), mutation-checked: photoeye truth from the first lane, level switch from the first tank, global trips, belt energy from the first conveyor, broken nearest-wins, pump power from the first pump, feed ignoring the lane (seven mutants, all caught). All 768 earlier tests still pass; five asserted the removed one-of-each limit and were rewritten to the new rule. `scripts/sandbox-p10-multiplant-browser.cjs` (real Chrome): two lanes and two tanks in one project each, inside the real floor, PLCs programmed through their tabs, independent sorting, belts, tank cycles and STOPs read from the DOM.
+- **Limits:** one photoeye and one diverter act per lane (the first assigned; extra ones read the same lane); one pump/valve/switch geometry per tank; sensor cards still show the first PLC's input rather than each sensor's own output; alarms and the scan trace still follow the first PLC; the floor is a fixed 1080 x 580 px.
 
 ## Next slices (proposed, not started)
 

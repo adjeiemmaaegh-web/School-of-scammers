@@ -80,12 +80,12 @@ export function FrontDoor() {
             <div className="cap"><h3>Open 3D workspace</h3><p>Place, move and remove devices on a 3D floor; add a ready-made starter panel when you want a head start.</p><span className="tag">drag · click · Delete · Undo</span></div>
             <div className="cap"><h3>Terminal-level wiring</h3><p>Connect individual terminals of supplies, PLCs, buttons, contactors, sensors and loads. Separate supplies stay isolated until you tie their commons.</p><span className="tag">24 V DC · virtual multimeter</span></div>
             <div className="cap"><h3>Several PLCs, each programmed</h3><p>Up to six controllers, each with its own Ladder or Structured Text program, I/O and scan. Wire one PLC's output into another's input.</p><span className="tag">Ladder · Structured Text</span></div>
-            <div className="cap"><h3>A real scan engine</h3><p>A deterministic scan runs your actual logic against a live plant: motors, a conveyor with parcels and a mark sensor, a tank with a pump, level switch and valve.</p><span className="tag">run · pause · step · breakpoints</span></div>
+            <div className="cap"><h3>A real scan engine</h3><p>A deterministic scan runs your actual logic against a live plant: motors, any number of conveyors with parcels and mark sensors, tanks with pumps, level switches and valves.</p><span className="tag">run · pause · step · breakpoints</span></div>
             <div className="cap"><h3>Break it, measure it, fix it</h3><p>Inject open wires, dead coils, welded contacts and stuck sensors, read the alarms, measure with the meter and replace the faulty part.</p><span className="tag">faults · alarms · repair</span></div>
             <div className="cap"><h3>Yours, in your browser</h3><p>Your project saves locally and exports as JSON. No account, no server, no install.</p><span className="tag">frontend-only</span></div>
           </div>
           <div className="limits">
-            <strong>Where it is today.</strong> This is a bounded, educational 24 V simulator, not a model of any vendor's PLC and never safety-rated. Today there is one conveyor, one tank and one protection set per project, the PLC has a fixed five-input, six-output layout, and there is no Function Block Diagram editor yet. Widening the equipment and the I/O is the current engineering priority.
+            <strong>Where it is today.</strong> This is a bounded, educational 24 V simulator, not a model of any vendor's PLC and never safety-rated. Today the PLC has a fixed five-input, six-output layout, the equipment library is small (24 V electrical devices, one conveyor-and-sorter model, one tank model, one reversing drive), and there is no Function Block Diagram editor yet. Widening the equipment and the I/O is the current engineering priority.
           </div>
           <div className="cta-row" style={{ marginTop: 22 }}>
             <Link className="btn primary" to="/sandbox">Open the simulator →</Link>

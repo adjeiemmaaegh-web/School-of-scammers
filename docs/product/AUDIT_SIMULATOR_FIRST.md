@@ -44,4 +44,6 @@ Automated and passing: 768 unit tests (many mutation-checked), 14 real-browser s
 
 **Status:** step 1 is done on branch `engineering/p9-simulator-first`: the home page now leads with the simulator ("Build, wire, program and run a virtual factory"), a primary navigation (**Simulator · Learn & Practice · Assessments**) is on every page, and `/learn` and `/assess` are separate hub pages; assessment copy is a single secondary section, and the limits are stated on the home page. Checked by `scripts/simulator-first-browser.cjs` (home copy and CTA order, section order, the same nav on nine routes, free entry to an empty floor, phone width) and the accessibility audit now covers `/learn` and `/assess`. All routes and flows (exercises, scenarios, labs, employer, candidate) are unchanged.
 
+Step 3 (part): plant devices are now per-instance (several conveyor lanes, tanks and breakers; slice 3 in `SANDBOX_BREADTH_PROGRESS.md`). Still open in step 3: configurable PLC I/O and tag mapping, I/O modules, and a data-driven device definition registry. The reversing drive set is the last single-instance device.
+
 Each step lands as its own verified, documented PR. Existing working functionality (exercises, assessments, `/labs`, scenario grading) is preserved throughout.

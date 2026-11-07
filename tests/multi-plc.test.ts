@@ -264,8 +264,8 @@ describe('power, errors and limits', () => {
     expect(tick(w, [{ k: 'place', id: 'p6', kind: 'plc', at: { x: 10, y: 500 } }]).world.lastError).toMatch(/At most 6 PLCs/);
     expect(tick(w, [{ k: 'place', id: 's6', kind: 'supply', at: { x: 10, y: 500 } }]).world.lastError).toMatch(/At most 6 24V supplies/);
   });
-  it('still one conveyor, tank and breaker: those plant models are not multi-instance yet', () => {
-    const w = tick(createWorld(), [{ k: 'place', id: 'c1', kind: 'conveyor', at: { x: 10, y: 10 } }, { k: 'place', id: 'c2', kind: 'conveyor', at: { x: 300, y: 10 } }]).world;
+  it('the reversing drive set is still one per project (its contactor pairing is not generalised yet)', () => {
+    const w = tick(createWorld(), [{ k: 'place', id: 'r1', kind: 'revmotor', at: { x: 10, y: 10 } }, { k: 'place', id: 'r2', kind: 'revmotor', at: { x: 300, y: 10 } }]).world;
     expect(w.lastError).toMatch(/one of each station/);
   });
 });

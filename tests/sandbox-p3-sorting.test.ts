@@ -157,12 +157,12 @@ describe('P3 live 3D material flow through wired PLC and physical I/O',()=>{
     expect(w.tick).toBe(0);
     expect(validateProject(w.project).components).toHaveLength(8);
   });
-  it('rejects repeated conveyor/eye/diverter placement and unknown parcel commands',()=>{
+  it('allows several conveyors, eyes and diverters (each conveyor is its own lane) and rejects unknown parcel commands',()=>{
     const w=make();
     for(const kind of ['conveyor','photoeye','diverter'] as const){
-      const bad=tick(w,[{k:'place',kind,id:`duplicate-${kind}`,at:{x:900,y:400}}]).world;
-      expect(bad.project.components).toHaveLength(8);
-      expect(bad.lastError).toMatch(/one of each station component/);
+      const added=tick(w,[{k:'place',kind,id:`second-${kind}`,at:{x:900,y:400}}]).world;
+      expect(added.project.components).toHaveLength(9);
+      expect(added.lastError).toBeNull();
     }
     expect(tick(w,[{k:'feedParcel',kind:'invalid' as 'plain'}]).world.lastError).toMatch(/Unknown parcel type/);
   });

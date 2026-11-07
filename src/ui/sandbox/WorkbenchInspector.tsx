@@ -58,15 +58,9 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'forwardcontactor' ? snapshot.forwardContactorOn :
     selectedDevice.kind === 'reversecontactor' ? snapshot.reverseContactorOn :
     selectedDevice.kind === 'reversebutton' ? isPressed :
-    selectedDevice.kind === 'breaker' ? !snapshot.breakerTripped :
-    selectedDevice.kind === 'overload' ? !snapshot.overloadTripped :
-    selectedDevice.kind === 'pump' ? snapshot.pumpOn :
     selectedDevice.kind === 'levelprobe' ? snapshot.io.TankHigh :
-    selectedDevice.kind === 'drainvalve' ? snapshot.drainOn :
-    selectedDevice.kind === 'conveyor' ? snapshot.conveyorOn :
     selectedDevice.kind === 'photoeye' ? snapshot.io.Photoeye :
-    selectedDevice.kind === 'diverter' ? snapshot.diverterOn :
-    selectedDevice.kind === 'motor' || selectedDevice.kind === 'contactor' || selectedDevice.kind === 'plc' || selectedDevice.kind === 'lamp' ? perDeviceLive(snapshot, selectedDevice) === true :
+    perDeviceLive(snapshot, selectedDevice) !== undefined ? perDeviceLive(snapshot, selectedDevice) === true :
     selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' ? !isPressed : true;
   const state = selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
     selectedDevice.kind === 'forwardcontactor' ? (isLive ? 'Forward contact closed' : 'Open') :
@@ -75,7 +69,7 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'breaker' ? (isLive ? 'Closed' : 'Tripped open') :
     selectedDevice.kind === 'overload' ? (isLive ? '95-96 closed' : '95-96 tripped open') :
     selectedDevice.kind === 'lamp' ? (isLive ? 'Illuminated' : 'Off') :
-    selectedDevice.kind === 'tank' ? `${Math.round(snapshot.tank.levelMl)} / 1000 ml` :
+    selectedDevice.kind === 'tank' ? `${Math.round(snapshot.vessels[selectedDevice.id]?.levelMl ?? 0)} / 1000 ml` :
     selectedDevice.kind === 'pump' ? (isLive ? 'Filling' : 'Off') :
     selectedDevice.kind === 'levelprobe' ? (isLive ? 'High level' : 'Below level switch') :
     selectedDevice.kind === 'drainvalve' ? (isLive ? 'Open' : 'Closed') :

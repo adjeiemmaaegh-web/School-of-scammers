@@ -140,10 +140,14 @@ describe('P4 electrical/panel: real 24V safety-isolation teaching model',()=>{
     expect(malformed.lastError).toMatch(/existing terminal/);
     expect(malformed.meter).toEqual(emptyMeter());
     expect(w.meter).toEqual(emptyMeter());
-    const bad={...w.project,components:[...w.project.components,{
+    // Several breakers are allowed now (each has its own trip state); the reversing set is still one only.
+    const two={...w.project,components:[...w.project.components,{
       id:'breaker-two',kind:'breaker',x:400,y:400,pressed:false,
     }]};
-    expect(()=>validateProject(bad)).toThrow(/Only one breaker/);
+    expect(()=>validateProject(two)).not.toThrow();
+    const bad={...w.project,components:[...w.project.components,
+      {id:'rev-a',kind:'revmotor',x:400,y:400,pressed:false},{id:'rev-b',kind:'revmotor',x:500,y:400,pressed:false}]};
+    expect(()=>validateProject(bad)).toThrow(/Only one revmotor/);
     const result=tick(w,[{k:'loadProject',project:bad}]).world;
     expect(result.project).toEqual(w.project);
   });
