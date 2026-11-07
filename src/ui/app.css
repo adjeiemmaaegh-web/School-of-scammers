@@ -321,3 +321,32 @@ body::before {
   .spin { transform-origin: 423px 172px; animation: spin 1.1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 }
+
+/* ---- primary navigation: Simulator first, Learn second, Assessments last and quieter ---- */
+.primary-nav { display: flex; align-items: center; gap: 4px; margin-left: 18px; flex-wrap: wrap; }
+.pn-link { padding: 7px 12px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted); border: 1px solid transparent; }
+.pn-link:hover { color: var(--ink); background: var(--surface); }
+.pn-link.is-active { color: var(--ink); background: var(--surface); border-color: var(--line); }
+.pn-sim { color: var(--accent-text); font-weight: 800; }
+.pn-secondary { font-weight: 500; font-size: 13px; }
+@media (max-width: 720px) {
+  .app-header-inner { flex-wrap: wrap; row-gap: 6px; }
+  .primary-nav { order: 3; flex-basis: 100%; margin-left: 0; }
+}
+
+/* ---- simulator-first home ---- */
+.cap-grid { margin-top: 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.cap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px; }
+.cap h3 { margin: 0 0 6px; font-size: 17px; }
+.cap p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.cap .tag { display: inline-block; margin-top: 10px; font-size: 11px; font-family: var(--mono); color: var(--accent-text); }
+.limits { margin-top: 22px; padding: 16px 20px; border: 1px dashed var(--line); border-radius: var(--radius-lg); color: var(--muted); font-size: 14px; line-height: 1.55; }
+.limits strong { color: var(--ink); }
+.secondary-band { border-top: 1px solid var(--line); }
+.hub-cards { margin-top: 24px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.hub-card { display: flex; flex-direction: column; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 22px; }
+.hub-card:hover { border-color: var(--accent); }
+.hub-card h2, .hub-card h3 { margin: 0; font-size: 18px; }
+.hub-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; flex: 1; }
+.hub-card .go { font-weight: 700; font-size: 14px; color: var(--accent-text); }
+@media (max-width: 900px) { .cap-grid, .hub-cards { grid-template-columns: minmax(0, 1fr); } }

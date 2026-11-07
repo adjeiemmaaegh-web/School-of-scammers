@@ -42,4 +42,6 @@ Automated and passing: 768 unit tests (many mutation-checked), 14 real-browser s
 5. **Complete user-authored multi-device scenario from an empty project**, built and verified end to end by an automated test with no pre-wired template.
 6. **Project library** in the sandbox and keep extending automated tests; track hardware/physical/advanced-fidelity verification separately.
 
+**Status:** step 1 is done on branch `engineering/p9-simulator-first`: the home page now leads with the simulator ("Build, wire, program and run a virtual factory"), a primary navigation (**Simulator · Learn & Practice · Assessments**) is on every page, and `/learn` and `/assess` are separate hub pages; assessment copy is a single secondary section, and the limits are stated on the home page. Checked by `scripts/simulator-first-browser.cjs` (home copy and CTA order, section order, the same nav on nine routes, free entry to an empty floor, phone width) and the accessibility audit now covers `/learn` and `/assess`. All routes and flows (exercises, scenarios, labs, employer, candidate) are unchanged.
+
 Each step lands as its own verified, documented PR. Existing working functionality (exercises, assessments, `/labs`, scenario grading) is preserved throughout.

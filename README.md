@@ -2,7 +2,7 @@
 
 **Open, browser-based industrial automation sandbox** — build a system from components, wire it, edit real Ladder logic, then Run, Step and troubleshoot. Inspired by the workflow of Cisco Packet Tracer/GNS3, PLC programming engineering tools, and Factory I/O; this is an original educational simulator, not a vendor clone.
 
-**Current state:** PRD v4.2 direction approved; P0/P1 3D and UX review branches retain their own draft PRs; the subsequent P2 Ladder/ST programming continuation is in a separate draft branch, not merged or production-approved. The previously shipped guided exercises (PLC + CCTV) and local employer/candidate assessments remain intact. The new primary entry is `/sandbox`; existing exercises are under `/trades`.
+**Current state (7 November 2026):** the simulator is the primary product; learning and assessments are separate, secondary sections (see the navigation: **Simulator · Learn & Practice · Assessments**). P0–P6 are merged to `main`; several PLCs/panels (PR #20) and device editing (PR #21) are open drafts. An honest audit against the product objective, with what is missing, is in [docs/product/AUDIT_SIMULATOR_FIRST.md](docs/product/AUDIT_SIMULATOR_FIRST.md).
 
 ## Several PLCs and panels (in development)
 

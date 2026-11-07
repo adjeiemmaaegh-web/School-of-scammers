@@ -5,6 +5,9 @@ import { TradePicker } from './TradePicker';
 import { TradeLadder } from './TradeLadder';
 import { ExercisePage } from './ExercisePage';
 import { ScenarioPage } from './ScenarioPage';
+import { LearnPage } from './LearnPage';
+import { AssessPage } from './AssessPage';
+import { LEGACY_LABS } from './labs-index';
 import { EmployerPage } from './EmployerPage';
 import { CandidatePage } from './CandidatePage';
 import { AppHeader } from '../ui/AppHeader';
@@ -21,16 +24,7 @@ const PneumaticLab = React.lazy(() => import('../components/PneumaticLab').then(
 const DcNetworkLab = React.lazy(() => import('../components/DcNetworkLab').then((m) => ({ default: m.DcNetworkLab })));
 const ElectricalBenchLab = React.lazy(() => import('../components/ElectricalBenchLab').then((m) => ({ default: m.ElectricalBenchLab })));
 
-const LEGACY_LABS = [
-  { path: 'engineering', label: 'PLC & wiring studio', detail: 'Ladder editor, scan debugger, I/O and wiring bench.' },
-  { path: 'process-control', label: 'Analog & Structured Text', detail: 'Tank level, PID tuning and a bounded ST runtime.' },
-  { path: 'starter', label: 'Star–delta starter', detail: 'Three-contactor sequencing and interlock faults.' },
-  { path: 'pneumatics', label: 'Pneumatic cylinder', detail: 'Double-acting cylinder commissioning and faults.' },
-  { path: 'workcell', label: 'Factory scene composer', detail: 'Place industrial devices and run normalized scans.' },
-  { path: 'electrical-bench', label: '24V wiring bench', detail: 'Patch circuits and probe with a virtual multimeter.' },
-  { path: 'dc-circuit', label: 'DC circuit engineering', detail: 'Resistor networks, nodal analysis and meter readings.' },
-  { path: 'assessments', label: 'Assessment suite', detail: 'Deterministic behavioral test harness.' },
-];
+
 
 function LegacyFrame({ children }: { children: React.ReactNode }) {
   return (
@@ -98,6 +92,8 @@ export function App() {
         <Route path="/trade/:tradeId" element={<TradeLadder />} />
         <Route path="/exercise/:exerciseId" element={<ExercisePage />} />
         <Route path="/scenario/:scenarioId" element={<ScenarioPage />} />
+        <Route path="/learn" element={<LearnPage />} />
+        <Route path="/assess" element={<AssessPage />} />
         <Route path="/employer" element={<EmployerPage />} />
         <Route path="/take" element={<CandidatePage />} />
 

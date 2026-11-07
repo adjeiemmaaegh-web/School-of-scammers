@@ -1,77 +1,41 @@
 import { Link } from 'react-router-dom';
 import { BRAND } from '../platform/config';
-import { allTrades, getLadder } from '../trades/registry';
 import { AppHeader } from '../ui/AppHeader';
 
-function Check() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path d="M5 10.5l3.2 3.2L15.5 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-const TRADE_ICON: Record<string, React.ReactNode> = {
-  plc: (
-    <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.8" /><path d="M7 4v16M3 9h4M3 14h4M11 8h7M11 12h7M11 16h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
-  ),
-  cctv: (
-    <svg viewBox="0 0 24 24" fill="none"><path d="M4 8h10l6-3v14l-6-3H4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><circle cx="9" cy="11" r="2.4" stroke="currentColor" strokeWidth="1.6" /></svg>
-  ),
-  bms: (
-    <svg viewBox="0 0 24 24" fill="none"><path d="M4 20V9l8-5 8 5v11" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><rect x="8" y="12" width="3" height="3" stroke="currentColor" strokeWidth="1.5" /><rect x="13" y="12" width="3" height="3" stroke="currentColor" strokeWidth="1.5" /></svg>
-  ),
-  'phone-pc': (
-    <svg viewBox="0 0 24 24" fill="none"><rect x="6" y="2.5" width="12" height="19" rx="2.5" stroke="currentColor" strokeWidth="1.8" /><path d="M10 5.5h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /><circle cx="12" cy="18" r="1.1" fill="currentColor" /></svg>
-  ),
-  electronics: (
-    <svg viewBox="0 0 24 24" fill="none"><rect x="7" y="7" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.8" /><path d="M10 7V3M14 7V3M10 21v-4M14 21v-4M7 10H3M7 14H3M21 10h-4M21 14h-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
-  ),
-};
-
+/**
+ * Home. The simulator is the product; learning and assessments are separate, secondary sections.
+ * Every claim on this page is something the simulator does today. Limits are stated, not hidden.
+ */
 export function FrontDoor() {
-  const trades = allTrades();
-  const plcLadder = getLadder('plc');
-
   return (
     <>
-      <AppHeader
-        right={
-          <nav className="front-nav">
-            <a href="#problem">Why</a>
-            <a href="#audiences">Who it's for</a>
-            <a href="#trades">Trades</a>
-          </nav>
-        }
-      />
+      <AppHeader />
 
       <main id="main" tabIndex={-1}>
-      {/* Hero */}
-      <section className="hero">
+      <section id="hero" className="hero">
         <div className="wrap wrap-wide hero-grid">
           <div>
-            <span className="eyebrow">Virtual trade simulator &amp; practical assessment</span>
+            <span className="eyebrow">Virtual industrial automation laboratory</span>
             <h1 className="hero-title">
-              Practice the trade.<br />
-              <span className="amber">Prove</span> you can do the job.
+              Build, wire, program<br />
+              and <span className="amber">run</span> a virtual factory.
             </h1>
-            <p className="lede">{BRAND.shortPitch} Think Cisco Packet Tracer, for the skilled trades.</p>
+            <p className="lede">{BRAND.shortPitch} Think Cisco Packet Tracer, for industrial automation.</p>
             <div className="cta-row">
-              <Link className="btn primary" to="/sandbox">Open PLC sandbox →</Link>
-              <Link className="btn ghost" to="/trades">Guided exercises →</Link>
-              <a className="btn ghost" href="#how">See how it works</a>
+              <Link className="btn primary" to="/sandbox" data-cta="simulator">Open the simulator →</Link>
+              <Link className="btn ghost" to="/learn">Learn &amp; practice</Link>
             </div>
             <div className="tagstrip">
-              <span className="chip">Wire it · it works or it doesn't</span>
-              <span className="chip">Diagnose real faults</span>
-              <span className="chip">10 ranked exercises</span>
-              <span className="chip">No hardware needed</span>
+              <span className="chip">Open 3D workspace</span>
+              <span className="chip">Several PLCs and panels</span>
+              <span className="chip">Faults and a virtual multimeter</span>
+              <span className="chip">Saved in your browser · no hardware</span>
             </div>
           </div>
 
           <figure className="schematic">
             <figcaption className="schematic-cap">
-              <span>WO-001 · Conveyor start fault</span>
+              <span>Start/stop rung · running in the simulator</span>
               <span className="dot"><span className="led" /> LIVE SCAN</span>
             </figcaption>
             <div className="rungbox">
@@ -102,145 +66,53 @@ export function FrontDoor() {
                 <rect className="scanline" x="20" y="16" width="2.5" height="118" fill="var(--accent)" opacity="0.5" />
               </svg>
             </div>
-            <p className="schematic-foot">Every control changes real simulated state — the picture shows the engine's truth, not a script.</p>
+            <p className="schematic-foot">Not a script: every lamp and motor in the simulator follows what the scan engine and the wiring actually do.</p>
           </figure>
         </div>
       </section>
 
-      {/* Problem */}
-      <section id="problem" className="band-ink">
+      <section id="simulator" className="band">
         <div className="wrap sec">
-          <span className="eyebrow">The problem</span>
-          <h2 className="sec-title">Trades are hard to practice — and harder to hire for.</h2>
-          <p className="sub">Hands-on skills can't be learned from a textbook or judged from a CV. The gap costs learners opportunity and costs employers bad hires.</p>
-          <div className="prob-grid">
-            <div className="prob">
-              <div className="n">01</div>
-              <h3>Hardware is a barrier</h3>
-              <p>PLC racks, licensed IDEs, wiring benches and lab machines cost money and space most learners don't have. So they never get to actually do the work.</p>
-            </div>
-            <div className="prob">
-              <div className="n">02</div>
-              <h3>Hiring tests the wrong thing</h3>
-              <p>Interviews and certificates don't reveal whether someone can wire a panel, find a fault or commission a line. Employers hire book-knowledge and find out on the job.</p>
-            </div>
-            <div className="prob">
-              <div className="n">03</div>
-              <h3>Existing tools miss the middle</h3>
-              <p>Quizzes are too shallow; full engineering simulators are powerful but intimidating. Nothing is both realistic and usable by a normal learner or a busy interviewer.</p>
-            </div>
+          <span className="eyebrow">The simulator</span>
+          <h2 className="sec-title">Start from an empty floor. Build whatever you can wire.</h2>
+          <p className="sub">You are not picking a scenario. You place equipment, connect it terminal by terminal, program the controllers and run it. What happens is what your wiring and your logic actually do.</p>
+          <div className="cap-grid">
+            <div className="cap"><h3>Open 3D workspace</h3><p>Place, move and remove devices on a 3D floor; add a ready-made starter panel when you want a head start.</p><span className="tag">drag · click · Delete · Undo</span></div>
+            <div className="cap"><h3>Terminal-level wiring</h3><p>Connect individual terminals of supplies, PLCs, buttons, contactors, sensors and loads. Separate supplies stay isolated until you tie their commons.</p><span className="tag">24 V DC · virtual multimeter</span></div>
+            <div className="cap"><h3>Several PLCs, each programmed</h3><p>Up to six controllers, each with its own Ladder or Structured Text program, I/O and scan. Wire one PLC's output into another's input.</p><span className="tag">Ladder · Structured Text</span></div>
+            <div className="cap"><h3>A real scan engine</h3><p>A deterministic scan runs your actual logic against a live plant: motors, a conveyor with parcels and a mark sensor, a tank with a pump, level switch and valve.</p><span className="tag">run · pause · step · breakpoints</span></div>
+            <div className="cap"><h3>Break it, measure it, fix it</h3><p>Inject open wires, dead coils, welded contacts and stuck sensors, read the alarms, measure with the meter and replace the faulty part.</p><span className="tag">faults · alarms · repair</span></div>
+            <div className="cap"><h3>Yours, in your browser</h3><p>Your project saves locally and exports as JSON. No account, no server, no install.</p><span className="tag">frontend-only</span></div>
+          </div>
+          <div className="limits">
+            <strong>Where it is today.</strong> This is a bounded, educational 24 V simulator, not a model of any vendor's PLC and never safety-rated. Today there is one conveyor, one tank and one protection set per project, the PLC has a fixed five-input, six-output layout, and there is no Function Block Diagram editor yet. Widening the equipment and the I/O is the current engineering priority.
+          </div>
+          <div className="cta-row" style={{ marginTop: 22 }}>
+            <Link className="btn primary" to="/sandbox">Open the simulator →</Link>
           </div>
         </div>
       </section>
 
-      {/* Audiences */}
-      <section id="audiences">
+      <section id="learn">
         <div className="wrap sec">
-          <span className="eyebrow">Who it's for</span>
-          <h2 className="sec-title">Two front doors. One simulation engine.</h2>
-          <p className="sub">The same realistic tasks that teach a learner are the ones an employer uses to test a candidate. Author an exercise once; use it to build skill and to prove it.</p>
-          <div className="doors">
-            <div className="door">
-              <span className="who">For learners &amp; students</span>
-              <h3>Build real skills, safely</h3>
-              <p>Open a guided simulation and learn by doing — from zero, without buying hardware, with room to make mistakes and see exactly what goes wrong.</p>
-              <ul>
-                <li><Check />Guided, step-by-step tasks with hints and instant feedback</li>
-                <li><Check />Reset and replay as often as you like — no stakes</li>
-                <li><Check />Climb a clear 1→10 difficulty ladder</li>
-              </ul>
-              <Link className="btn primary block door-cta" to="/trades">Start learning</Link>
-            </div>
-            <div className="door">
-              <span className="who">For employers &amp; interviewers</span>
-              <h3>Test the work, not the words</h3>
-              <p>Give a candidate a realistic, situation-based task at the difficulty you need. Get back an objective, evidence-backed result — what they did, how they diagnosed, whether they respected safety.</p>
-              <ul>
-                <li><Check />Pick a ranked, job-like exercise</li>
-                <li><Check />Send it to a candidate; they complete it under exam conditions</li>
-                <li><Check />Read a rubric result with a full, replayable action trail</li>
-              </ul>
-              <Link className="btn ghost block door-cta" to="/employer">Set up a test</Link>
-            </div>
+          <span className="eyebrow">Learn &amp; practice</span>
+          <h2 className="sec-title">Tutorials and scenarios that run on the same engine.</h2>
+          <p className="sub">Prefer a guided start? These run on the real simulation, and you can leave for the open simulator at any time.</p>
+          <div className="hub-cards">
+            <Link to="/trades" className="hub-card"><h3>Guided exercises</h3><p>A ranked 1&ndash;10 ladder of hands-on PLC tasks, from a first start/stop to a commissioned line.</p><span className="go">Open the ladder →</span></Link>
+            <Link to="/trade/plc" className="hub-card"><h3>Simulator scenarios</h3><p>Work orders you complete in the 3D simulator: build a starter, find a hidden fault, program a sorting line or a tank.</p><span className="go">See the scenarios →</span></Link>
+            <Link to="/labs" className="hub-card"><h3>Engineering labs</h3><p>Focused bench tools: star&ndash;delta, pneumatics, analog process control, a 24 V bench and a DC circuit lab.</p><span className="go">Open the labs →</span></Link>
           </div>
         </div>
       </section>
 
-      {/* How it works */}
-      <section id="how" className="band">
+      <section id="assessments" className="band secondary-band">
         <div className="wrap sec">
-          <span className="eyebrow">How it works</span>
-          <h2 className="sec-title">Realistic tasks with real cause and effect.</h2>
-          <p className="sub">Each exercise is a simulated environment, not a multiple-choice question. The difference is you can get it wrong — and figure out why.</p>
-          <div className="how">
-            <div className="step"><div className="k">01</div><h3>Read the brief</h3><p>A work-order-style scenario with clear objectives — "the conveyor won't start; diagnose and restore it."</p></div>
-            <div className="step"><div className="k">02</div><h3>Do the work</h3><p>Wire circuits, edit logic, measure signals, clear faults on an interactive canvas. The simulation responds truthfully.</p></div>
-            <div className="step"><div className="k">03</div><h3>See the evidence</h3><p>Learners get feedback and progress; employers get a rubric result and a replayable trail of every action.</p></div>
-          </div>
-
-          <div className="ladder-card">
-            <div className="ladder-cap">
-              <span>The 1–10 ranked ladder · PLC</span>
-              <span>Entry → Expert</span>
-            </div>
-            <div className="rungs">
-              {plcLadder.map((rung) => {
-                const h = 12 + ((rung.rank - 1) * (88 - 12)) / 9;
-                return (
-                  <div key={rung.rank} className={`rung ${rung.status}`} title={rung.title}>
-                    <span className="rung-fill" style={{ height: `${h}%` }} />
-                    <b>{rung.rank}</b>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="ladder-key">
-              <span><i className="k-fill" />Higher rung = more subsystems, faults &amp; safety stakes</span>
-              <span><i className="k-plain" />Same scale a learner climbs and an interviewer selects from</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Trades */}
-      <section id="trades">
-        <div className="wrap sec">
-          <span className="eyebrow">Built to expand</span>
-          <h2 className="sec-title">PLC first — then the whole trade.</h2>
-          <p className="sub">Each new trade plugs in as a module: its devices, its exercises, its assessment rubric. PLC &amp; industrial automation leads; more hands-on trades follow.</p>
-          <div className="trades-grid">
-            {trades.map((t) => {
-              const live = t.status === 'available';
-              const inner = (
-                <>
-                  <span className="trade-ic">{TRADE_ICON[t.id]}</span>
-                  <h3>{t.name}</h3>
-                  <span className={`trade-status ${live ? 'live' : 'soon'}`}>{live ? '● Available' : 'Coming soon'}</span>
-                </>
-              );
-              return live ? (
-                <Link key={t.id} to={`/trade/${t.id}`} className="trade-card is-live">{inner}</Link>
-              ) : (
-                <div key={t.id} className="trade-card">{inner}</div>
-              );
-            })}
-          </div>
-
-          <div className="honest-note">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3l9 16H3L12 3z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><path d="M12 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><circle cx="12" cy="16.6" r="1" fill="currentColor" /></svg>
-            <p>An educational simulator, honest about its limits. It models the real categories of work — programming, wiring, diagnosis, commissioning — but is never a safety-rated controller or a substitute for certified, live-work training. The limits are always stated, never hidden.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Closer */}
-      <section className="band-ink closer">
-        <div className="wrap">
-          <h2 className="sec-title">Stop guessing who can do the work.</h2>
-          <p className="sub closer-sub">Whether you're learning the trade or hiring for it, {BRAND.name} lets the work speak for itself.</p>
-          <div className="cta-row closer-cta">
-            <Link className="btn primary" to="/trades">I'm learning</Link>
-            <Link className="btn ghost ghost-on-ink" to="/employer">I'm hiring</Link>
+          <span className="eyebrow">Assessments &amp; interviews</span>
+          <h2 className="sec-title">Also here: practical tests for employers.</h2>
+          <p className="sub">An employer can pick a simulator task and send it to a candidate, who completes it under exam conditions and returns a result code. This is a separate, secondary module and does not affect the simulator.</p>
+          <div className="cta-row">
+            <Link className="btn ghost" to="/assess">About assessments</Link>
           </div>
         </div>
       </section>
@@ -249,7 +121,7 @@ export function FrontDoor() {
       <footer className="site-foot">
         <div className="wrap wrap-wide foot-inner">
           <span>{BRAND.name}</span>
-          <span>Virtual trade simulator &amp; practical assessment · Educational use</span>
+          <span>Virtual industrial automation laboratory · Educational simulation, not safety-rated</span>
         </div>
       </footer>
     </>

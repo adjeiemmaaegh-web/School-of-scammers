@@ -343,7 +343,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     { id: 'test' as const, label: 'Test', hint: 'Run and troubleshoot', count: snapshot?.tick ?? 0 },
   ];
   return <>
-    <AppHeader right={<div className="sandbox-header-links"><Link to="/trades">Exercises</Link><Link to="/employer">Assessment</Link></div>} />
+    <AppHeader />
     <main id="main" className="sandbox-page sandbox-ux wrap wrap-wide">
       <header className="sandbox-masthead">
         <div>
