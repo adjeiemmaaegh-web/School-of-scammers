@@ -22,8 +22,11 @@ const base = process.env.PLC_BASE_URL || 'http://127.0.0.1:4173';
     const search = await page.$('input[aria-label="Search component library"]');
     assert.ok(search, 'Component search is keyboard accessible');
     await search.type('motor');
-    await page.waitForFunction(() => document.querySelectorAll('.sandbox-palette-item').length === 1);
-    assert.match(await page.$eval('.sandbox-palette-item', el => el.textContent), /24V motor/);
+    await page.waitForFunction(() => [...document.querySelectorAll('.sandbox-palette-item')]
+      .some(el => el.textContent.includes('Reversible 24V motor')));
+    const motorResults=await page.$eval('.sandbox-palette-item', els=>els.map(el=>el.textContent));
+    assert.ok(motorResults.some(text=>text.includes('24V motor')),'Legacy motor still searchable');
+    assert.ok(motorResults.some(text=>text.includes('Reversible 24V motor')),'New reversing motor searchable');
     await search.focus();
     await search.evaluate(el => el.select());
     await page.keyboard.press('Backspace');
