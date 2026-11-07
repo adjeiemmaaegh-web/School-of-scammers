@@ -63,6 +63,10 @@ export type PlcView = {
   inputs: PlcInputs;
   coils: Record<string, boolean>;
   outputs: { 'Q0.0': boolean; 'Q0.1': boolean; 'Q0.2': boolean; 'Q0.3': boolean; 'Q0.4': boolean; 'Q0.5': boolean };
+  /** Live variables and rung results of this PLC's last scan, for the programming dock's monitor. */
+  tagValues: Record<string, STValue>;
+  ladderSteps: LadderStep[];
+  ladderMemory: LadderMemory;
 };
 export type ProjectFile = {
   formatVersion: 1;

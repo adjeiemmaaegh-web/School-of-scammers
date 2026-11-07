@@ -407,3 +407,11 @@
 .sandbox-ux .sandbox-scenario-reason { color:var(--muted); }
 .sandbox-ux .sandbox-scenario [data-scenario-result] { margin-top:16px; }
 @media(max-width:900px) { .sandbox-ux .sandbox-scenario-grid { grid-template-columns:minmax(0,1fr); } }
+
+/* P7 · several PLCs: choose which one to program */
+.sandbox-ux .sandbox-plc-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:0 0 10px; }
+.sandbox-ux .sandbox-plc-tabs button { display:inline-flex; flex-direction:column; align-items:flex-start; gap:1px; padding:6px 12px;
+  border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink); cursor:pointer; font:inherit; font-weight:700; }
+.sandbox-ux .sandbox-plc-tabs button small { font-weight:400; color:var(--muted); font-size:11px; }
+.sandbox-ux .sandbox-plc-tabs button.active { border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+.sandbox-ux .sandbox-plc-tabs .sandbox-help { flex-basis:100%; margin:0; }

@@ -8,7 +8,7 @@
  * only affect each other through the 24 V netlist (a wire from one PLC's output to another's input).
  * Pure and deterministic, like everything under src/sim.
  */
-import { executeLadder, type LadderDocument } from '../engineering/ladder';
+import { executeLadder, type LadderDocument, type LadderMemory, type LadderStep } from '../engineering/ladder';
 import { executeStructuredText, type STValue } from '../engineering/structured-text';
 import { compileSandboxST, DEFAULT_ST_SOURCE } from '../program/p2-contract';
 import type { PlacedComponent, PlcInputs, PlcProgram, PlcRuntime, PlcView, ProjectFile } from './signals';
@@ -104,10 +104,12 @@ export function scanExtraPlc(
 /** Publishable summary of one PLC from its inputs/coils/power. */
 export function plcView(
   language: 'ladder' | 'st', powered: boolean, inputs: PlcInputs, coils: Record<string, boolean>,
+  live: { tagValues: Record<string, STValue>; ladderSteps: LadderStep[]; ladderMemory: LadderMemory },
 ): PlcView {
   const on = (c: string) => coils[c] === true;
   return {
     powered, language, inputs: { ...inputs }, coils: Object.fromEntries(COIL_NAMES.map(c => [c, on(c)])),
     outputs: { 'Q0.0': on('Run'), 'Q0.1': on('Sort'), 'Q0.2': on('Fill'), 'Q0.3': on('Drain'), 'Q0.4': on('Forward'), 'Q0.5': on('Reverse') },
+    tagValues: { ...live.tagValues }, ladderSteps: [...live.ladderSteps], ladderMemory: { ...live.ladderMemory },
   };
 }

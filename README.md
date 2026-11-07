@@ -4,6 +4,10 @@
 
 **Current state:** PRD v4.2 direction approved; P0/P1 3D and UX review branches retain their own draft PRs; the subsequent P2 Ladder/ST programming continuation is in a separate draft branch, not merged or production-approved. The previously shipped guided exercises (PLC + CCTV) and local employer/candidate assessments remain intact. The new primary entry is `/sandbox`; existing exercises are under `/trades`.
 
+## Several PLCs and panels (in development)
+
+The sandbox can hold up to six PLCs and six 24V supplies. Each PLC has its own Ladder or Structured Text program, samples its own wired inputs and drives its own outputs; wire one PLC's output to another's input to make panels cooperate. Separate supplies are isolated unless you tie their commons together. Use *Place two-panel layout* to start. Plant devices (conveyor, tank, protection) are still one per project. [Design, evidence and limits](docs/product/SANDBOX_BREADTH_PROGRESS.md).
+
 ## P6 scenarios: exercises and assessments on the real simulator (draft, unmerged)
 
 `/trade/plc` now lists four **sandbox scenarios** (build a start/stop starter, find a hidden fault, program the sorting line, program the tank). You work in the same 3D workbench as `/sandbox` from a work order; the result is graded by **what your circuit actually does** when it is run through the same simulator (any correct wiring or logic passes, including Structured Text), not by matching a model answer. Employers can assign them from `/employer`; candidates get exam conditions and send back the same result code as before. Frontend-only: the result code is not tamper-proof. [Design, evidence and limits](docs/product/P6_SCENARIOS_PROGRESS.md).

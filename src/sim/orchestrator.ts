@@ -504,10 +504,13 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     voltages: { ...world.voltages }, contactorOn: world.contactorOn, motorOn: world.motorOn, motorAngleRad: world.motorAngleRad,
     plcs: Object.fromEntries(plcComponents(world.project).map(c => {
       const lang = programOf(world.project, c.id).language;
+      const idle: PlcInputs = { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false };
+      const rt = world.plcs[c.id];
       return [c.id, c.id === primaryPlcId(world.project)
-        ? plcView(lang, world.powered, world.inputs, world.coils)
-        : plcView(lang, world.plcs[c.id]?.powered ?? false, world.plcs[c.id]?.inputs ?? { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false },
-          world.plcs[c.id]?.coils ?? {})];
+        ? plcView(lang, world.powered, world.inputs, world.coils,
+          { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory })
+        : plcView(lang, rt?.powered ?? false, rt?.inputs ?? idle, rt?.coils ?? {},
+          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {} })];
     })),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
     forwardContactorOn: world.forwardContactorOn, reverseContactorOn: world.reverseContactorOn,
