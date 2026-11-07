@@ -114,6 +114,33 @@ describe('renaming tags', () => {
   });
 });
 
+describe('renaming the first terminals of a fresh controller', () => {
+  const first = { k: 'configureIo' as const, plc: 'p', io: { inputs: { 'I0.0': 'Go' }, outputs: { 'Q0.0': 'Ext' } } };
+  it('the untouched placeholder program follows the rename, so a new controller can be named straight away', () => {
+    const world = tick(bench(), [first]).world;
+    expect(world.lastError).toBeNull();
+    expect(world.project.program.rungs[0]).toMatchObject({ elements: [{ tag: 'Go' }], coil: 'Ext' });
+    expect(world.project.stSource).toContain('Ext := Go;');
+    expect(run(world).running).toBe(true); // and it still runs
+    // again, to different names, still following
+    const again = tick(world, [{ k: 'configureIo', plc: 'p', io: { inputs: { 'I0.0': 'Open' }, outputs: { 'Q0.0': 'Close' } } }]).world;
+    expect(again.project.program.rungs[0]).toMatchObject({ elements: [{ tag: 'Open' }], coil: 'Close' });
+  });
+  it('a program the user wrote is NOT rewritten, and still protects them', () => {
+    const written = bench([{ k: 'loadProgram', program: prog([['In0', 'Out0'], ['In3', 'Out5']]) }]);
+    const refused = tick(written, [first]).world;
+    expect(refused.lastError).toMatch(/Renaming would break the program/);
+    expect(refused.project.program.rungs).toHaveLength(2);
+  });
+  it('an extra 16/16 controller without a saved program also gets a placeholder in its own current names', () => {
+    let world = tick(createWorld(), [{ k: 'place', id: 'a', kind: 'plc', at: { x: 10, y: 10 } }, { k: 'place', id: 'z', kind: 'plc16', at: { x: 10, y: 300 } },
+      { k: 'configureIo', plc: 'z', io: { inputs: { 'I0.0': 'Sensor' }, outputs: { 'Q0.0': 'Valve' } } }]).world;
+    expect(world.lastError).toBeNull();
+    world = tick(world, [{ k: 'run' }]).world;
+    expect(world.running).toBe(true); // run validates the extra's generated placeholder against its renamed tags
+  });
+});
+
 describe('tag-name validation', () => {
   const bad = (io: unknown) => validateIoMap('plc16', io);
   it('rejects bad names, reserved words, duplicates (case-insensitive, across inputs and outputs) and foreign terminals', () => {

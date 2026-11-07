@@ -2,7 +2,7 @@
 import type { PlacedComponent, RenderSnapshot } from './signals';
 
 /**
- * Live state of components that exist in several copies (PLC, contactor, motor, lamp, conveyor, diverter, pump, valve, breaker, overload). Falls back to the
+ * Live state of components that exist in several copies (PLC, contactor, relay, motor, lamp, conveyor, diverter, pump, valve, cylinder, breaker, overload). Falls back to the
  * legacy first-device flags before the first scan has populated the per-device maps. Undefined for
  * every other kind: those have their own single-instance state.
  */
@@ -14,6 +14,9 @@ export function perDeviceLive(snapshot: RenderSnapshot, c: Pick<PlacedComponent,
     case 'contactor': return snapshot.deviceOn[c.id] ?? snapshot.contactorOn;
     case 'lamp': return snapshot.deviceOn[c.id] ?? snapshot.lampOn;
     case 'conveyor': return snapshot.deviceOn[c.id] ?? snapshot.conveyorOn;
+    case 'relay': return snapshot.deviceOn[c.id] ?? false;
+    // A cylinder reads as "live" while its rod is anywhere but fully retracted.
+    case 'cylinder': return (snapshot.cylinders[c.id]?.position ?? 0) > 0;
     case 'diverter': return snapshot.deviceOn[c.id] ?? snapshot.diverterOn;
     case 'pump': return snapshot.deviceOn[c.id] ?? snapshot.pumpOn;
     case 'drainvalve': return snapshot.deviceOn[c.id] ?? snapshot.drainOn;
