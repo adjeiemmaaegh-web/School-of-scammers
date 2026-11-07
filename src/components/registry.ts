@@ -1,5 +1,5 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
-export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'cylinder' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor';
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor';
 export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
@@ -13,6 +13,9 @@ const plc16Terminals = (): Terminal[] => [
   ...PLC16_OUTPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'right', y: 30 + i * 6.5, role: 'output' })),
 ];
 export const COMPONENTS: Record<ComponentKind, Definition> = {
+  stacklight: { kind: 'stacklight', label: 'Stack light (R/Y/G)', help: 'Three 24V signal lamps on one column: R, Y and G each to the common M-', terminals: [
+    { name: 'R', side: 'left', y: 32, role: 'load' }, { name: 'Y', side: 'left', y: 62, role: 'load' },
+    { name: 'G', side: 'left', y: 92, role: 'load' }, { name: 'M-', side: 'left', y: 122, role: 'load' }] },
   relay: { kind: 'relay', label: '24V control relay', help: 'Coil A1/A2 switches two NO contacts (13-14, 23-24) and one NC contact (21-22); hard-wired logic needs no PLC', terminals: [
     { name: 'A1', side: 'left', y: 24, role: 'load' }, { name: 'A2', side: 'left', y: 48, role: 'load' },
     { name: '13', side: 'left', y: 86, role: 'passive' }, { name: '14', side: 'right', y: 86, role: 'passive' },

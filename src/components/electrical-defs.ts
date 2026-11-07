@@ -35,6 +35,8 @@ const DEFS: Partial<Record<PlacedComponent['kind'], Def>> = {
       sw(`${c.id}-NC`, t(c.id, '21'), t(c.id, '22'), !energised),
     ];
   },
+  // Three signal lamps on one column, each its own load to the common return.
+  stacklight: c => ['R', 'Y', 'G'].map(lamp => load(`${c.id}-${lamp}`, t(c.id, lamp), t(c.id, 'M-'))),
   // Two solenoid coils to a common return, and two limit switches that close when the rod is at that end.
   cylinder: (c, ctx) => {
     const rod = ctx.cylinder;

@@ -21,11 +21,13 @@ const COLORS = {
   live: '#20d6a6', off: '#52677c', highlight: '#ffa633', cable: '#7793ad',
 };
 
-function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLevelMl, rod }: {
+function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLevelMl, rod, lamps }: {
   kind: ComponentKind; active: boolean; pressed: boolean; motorAngleRad: number;
   parcel?: Parcel | null; tankLevelMl?: number;
   /** Pneumatic cylinder rod position, 0 retracted to 1 extended. */
   rod?: number;
+  /** Which lamps of a stack light are lit. */
+  lamps?: { R: boolean; Y: boolean; G: boolean };
 }) {
   const status = active ? COLORS.live : COLORS.off;
   if (kind === 'tank') {
@@ -168,6 +170,16 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
     </mesh>
     <mesh position={[0, 0.36, 0]}><cylinderGeometry args={[0.32, 0.32, 0.08, 24]} /><meshStandardMaterial color={COLORS.steel} metalness={0.35} /></mesh>
   </group>;
+  if (kind === 'stacklight') {
+    const segments = [['G', '#27c46b', 0.42], ['Y', '#e8b923', 0.72], ['R', '#dd4b45', 1.02]] as const;
+    return <group>
+      <mesh position={[0, 0.12, 0]}><cylinderGeometry args={[0.34, 0.38, 0.14, 20]} /><meshStandardMaterial color={COLORS.panel} /></mesh>
+      <mesh position={[0, 0.5, 0]}><cylinderGeometry args={[0.06, 0.06, 0.8, 10]} /><meshStandardMaterial color={COLORS.steel} /></mesh>
+      {segments.map(([name, colour, y]) => { const lit = lamps?.[name] === true;
+        return <mesh key={name} position={[0, y, 0]}><cylinderGeometry args={[0.24, 0.24, 0.24, 20]} />
+          <meshStandardMaterial color={lit ? colour : '#3a4651'} emissive={lit ? colour : '#000000'} emissiveIntensity={lit ? 1.1 : 0} transparent opacity={lit ? 1 : 0.7} /></mesh>; })}
+    </group>;
+  }
   if (kind === 'cylinder') {
     const out = Math.max(0, Math.min(1, rod ?? 0));
     return <group>
@@ -204,8 +216,8 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
   </group>;
 }
 
-function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, rod, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
-  c: PlacedComponent; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number;
+function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
+  c: PlacedComponent; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean };
   editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void; onSelect: (id: string) => void;
 }) {
@@ -220,7 +232,7 @@ function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, ro
       <DeviceSculpture kind={c.kind} active={active} pressed={c.pressed} motorAngleRad={motorAngleRad}
         parcel={c.kind === 'conveyor' ? parcel : null}
         tankLevelMl={c.kind === 'tank' ? tankLevelMl : undefined}
-        rod={c.kind === 'cylinder' ? rod : undefined} />
+        rod={c.kind === 'cylinder' ? rod : undefined} lamps={c.kind === 'stacklight' ? lamps : undefined} />
     </group>
     <Html position={[0, 1.22, 0]} center distanceFactor={11}>
       <div className="sandbox-3d-label">
@@ -229,6 +241,7 @@ function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, ro
           c.kind === 'forwardcontactor' || c.kind === 'reversecontactor' ? (active ? 'CLOSED' : 'OPEN') :
           c.kind === 'motor' ? (active ? 'RUNNING' : 'STOPPED') :
           c.kind === 'contactor' || c.kind === 'relay' ? (active ? 'ENERGISED' : 'OFF') :
+          c.kind === 'stacklight' ? (['R', 'Y', 'G'].filter(l => lamps?.[l as 'R' | 'Y' | 'G']).join(' · ') || 'ALL OFF') :
           c.kind === 'cylinder' ? (rod === undefined ? 'RETRACTED' : rod >= 0.999 ? 'EXTENDED' : rod <= 0.001 ? 'RETRACTED' : `MOVING ${Math.round(rod * 100)}%`) :
           c.kind === 'plc' || c.kind === 'plc16' ? (active ? 'POWERED' : 'UNPOWERED') :
           c.kind === 'conveyor' ? (active ? 'BELT MOVING' : 'BELT STOPPED') :
@@ -315,6 +328,7 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
       direction={c.kind === 'revmotor' ? snapshot.motorDirection : undefined}
       parcel={c.kind === 'conveyor' ? snapshot.lanes[c.id]?.parcel ?? null : null} tankLevelMl={c.kind === 'tank' ? snapshot.vessels[c.id]?.levelMl ?? 0 : 0}
       rod={c.kind === 'cylinder' ? snapshot.cylinders[c.id]?.position ?? 0 : undefined}
+      lamps={c.kind === 'stacklight' ? { R: !!snapshot.deviceOn[`${c.id}-R`], Y: !!snapshot.deviceOn[`${c.id}-Y`], G: !!snapshot.deviceOn[`${c.id}-G`] } : undefined}
       selectedTerminal={selectedTerminal} moveTarget={moveTarget}
       active={perDeviceLive(snapshot, c) ?? (c.kind === 'revmotor' ? snapshot.motorDirection !== 'stopped' :
         c.kind === 'forwardcontactor' ? snapshot.forwardContactorOn :

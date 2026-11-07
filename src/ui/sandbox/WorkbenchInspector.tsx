@@ -95,7 +95,8 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'breaker' ? (isLive ? 'Closed' : 'Tripped open') :
     selectedDevice.kind === 'overload' ? (isLive ? '95-96 closed' : '95-96 tripped open') :
     selectedDevice.kind === 'lamp' ? (isLive ? 'Illuminated' : 'Off') :
-    selectedDevice.kind === 'cylinder' ? (() => { const r = snapshot.cylinders[selectedDevice.id]; return !r || r.retractLimit ? 'Retracted' : r.extendLimit ? 'Extended' : `Moving ${Math.round(r.position * 100)}%`; })() :
+    selectedDevice.kind === 'stacklight' ? (['R', 'Y', 'G'].filter(l => snapshot.deviceOn[`${selectedDevice.id}-${l}`]).join(' · ') || 'All lamps off') :
+    selectedDevice.kind === 'cylinder' ? (() => { const r = snapshot.cylinders[selectedDevice.id]; const base = !r || r.retractLimit ? 'Retracted' : r.extendLimit ? 'Extended' : `Moving ${Math.round(r.position * 100)}%`; return r?.alarm ? `${base} · ${r.alarm}` : base; })() :
     selectedDevice.kind === 'relay' ? (isLive ? 'Energised' : 'Released') :
     selectedDevice.kind === 'tank' ? `${Math.round(snapshot.vessels[selectedDevice.id]?.levelMl ?? 0)} / 1000 ml` :
     selectedDevice.kind === 'pump' ? (isLive ? 'Filling' : 'Off') :

@@ -15,6 +15,7 @@ export function perDeviceLive(snapshot: RenderSnapshot, c: Pick<PlacedComponent,
     case 'lamp': return snapshot.deviceOn[c.id] ?? snapshot.lampOn;
     case 'conveyor': return snapshot.deviceOn[c.id] ?? snapshot.conveyorOn;
     case 'relay': return snapshot.deviceOn[c.id] ?? false;
+    case 'stacklight': return ['R', 'Y', 'G'].some(l => snapshot.deviceOn[`${c.id}-${l}`] === true);
     // A cylinder reads as "live" while its rod is anywhere but fully retracted.
     case 'cylinder': return (snapshot.cylinders[c.id]?.position ?? 0) > 0;
     case 'diverter': return snapshot.deviceOn[c.id] ?? snapshot.diverterOn;
