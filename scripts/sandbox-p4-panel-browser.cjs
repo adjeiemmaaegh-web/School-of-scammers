@@ -83,6 +83,10 @@ const state=(page,id,value)=>page.waitForFunction((id,value)=>
 
     // A direct *downstream* short triggers the actual breaker on the next scan.
     await button(page,'Pause');
+    await page.waitForFunction(()=>[...document.querySelectorAll('.sandbox-toolbar button')]
+      .some(b=>b.textContent.trim()==='▶ Run'),{timeout:7000});
+    await page.waitForFunction(()=>!document.querySelector('[data-terminal-id="breaker-2.OUT"]')?.disabled,
+      {timeout:7000});
     await wire(page,'breaker-2.OUT','supply-1.M0');
     await page.waitForFunction(()=>document.querySelectorAll('.sandbox-wire-list > div').length===17);
     await button(page,'▶ Run');
