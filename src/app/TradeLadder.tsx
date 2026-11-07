@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getLadder, getTrade } from '../trades/registry';
+import { SCENARIO_META } from '../exercises/meta';
 import { loadProgress, type ProgressMap } from '../platform/persistence';
 import { AppHeader } from '../ui/AppHeader';
 
@@ -83,6 +84,39 @@ export function TradeLadder() {
             );
           })}
         </ol>
+        {(() => {
+          const scenarios = SCENARIO_META.filter(s => s.trade === trade.meta.id).sort((a, b) => a.rank - b.rank);
+          if (!scenarios.length) return null;
+          return (
+            <section aria-labelledby="sandbox-scenarios-h" className="ladder-scenarios">
+              <span className="eyebrow">On the real simulator</span>
+              <h2 id="sandbox-scenarios-h" className="page-title small">Sandbox scenarios</h2>
+              <p className="sub">The same 3D workbench, wiring, PLC editor and meter as the open sandbox — but you start from a work order, and the result is graded by what your circuit actually does, not by matching a model answer.</p>
+              <ol className="ladder-list">
+                {scenarios.map(sc => {
+                  const prog = progress[sc.id];
+                  return (
+                    <li key={sc.id} className="ladder-item playable" data-scenario-card={sc.id}>
+                      <Link to={`/scenario/${sc.id}`} className="ladder-link">
+                        <div className="ladder-rank">{sc.rank}</div>
+                        <div className="ladder-body">
+                          <div className="ladder-row-top">
+                            <h3>{sc.title}</h3>
+                            {prog?.passed ? <span className="status-pill is-ok">✓ Passed · {prog.bestScore}%</span>
+                              : prog ? <span className="status-pill is-idle">Best {prog.bestScore}%</span>
+                                : <span className="status-pill is-idle">Not started</span>}
+                          </div>
+                          <p>{sc.summary}</p>
+                          <div className="ladder-meta"><span>~{sc.estMinutes} min</span><span className="ladder-go">Open scenario →</span></div>
+                        </div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          );
+        })()}
       </main>
     </>
   );

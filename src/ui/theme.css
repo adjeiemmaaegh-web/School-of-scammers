@@ -14,6 +14,7 @@
   --muted: #5b6575;
   --line: #e6dfd3;
   --accent: #e8830d;
+  --accent-text: #935000; /* WCAG-readable orange on light surfaces; keep bright accent for buttons */
   --accent-ink: #1c1204;
   --band: #16202e;
   --band-ink: #ede8df;
@@ -59,6 +60,7 @@
     --muted: #9aa6b4;
     --line: #2a333f;
     --accent: #f59e1e;
+    --accent-text: #f59e1e;
     --accent-ink: #1c1204;
     --band: #0b1119;
     --band-ink: #ece7df;
@@ -87,6 +89,7 @@
 }
 
 :root[data-theme="dark"] {
+  --accent-text: #f59e1e;
   --bg: #10151c;
   --surface: #19212b;
   --surface-2: #141b24;
@@ -159,7 +162,7 @@ code, .mono { font-family: var(--mono); }
 
 .eyebrow {
   font-family: var(--mono); font-size: 12px; letter-spacing: 0.16em;
-  text-transform: uppercase; color: var(--accent); font-weight: 600;
+  text-transform: uppercase; color: var(--accent-text); font-weight: 600;
 }
 
 /* buttons */

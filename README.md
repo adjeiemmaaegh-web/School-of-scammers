@@ -1,51 +1,88 @@
 # EFO Skill Lab
 
-**A browser-based virtual simulator and practical-assessment platform for the skilled trades — "Cisco Packet Tracer for the trades."** Learners build real hands-on skills in simulation; employers test candidates on realistic, job-like tasks instead of book knowledge. It launches with **PLC & industrial automation** and is architected to expand to CCTV, BMS, phone & PC repair, and electronics.
+**Open, browser-based industrial automation sandbox** — build a system from components, wire it, edit real Ladder logic, then Run, Step and troubleshoot. Inspired by the workflow of Cisco Packet Tracer/GNS3, PLC programming engineering tools, and Factory I/O; this is an original educational simulator, not a vendor clone.
 
-> **Status:** active rebuild. The product was reset from the previous developer's PLC-only "simulation-first" codebase to the two-audience vision in [`docs/product/PRD.md`](docs/product/PRD.md). The deterministic simulation **engine was kept**; the product shell around it was rebuilt.
->
-> **This is an educational simulation.** It models the *categories* of trade work (programming, wiring, diagnosis, commissioning). It is **not** a safety-rated controller, not certified instruction, and not a substitute for live-work training. Limits are stated, not hidden.
+**Current state:** PRD v4.2 direction approved; P0/P1 3D and UX review branches retain their own draft PRs; the subsequent P2 Ladder/ST programming continuation is in a separate draft branch, not merged or production-approved. The previously shipped guided exercises (PLC + CCTV) and local employer/candidate assessments remain intact. The new primary entry is `/sandbox`; existing exercises are under `/trades`.
 
-## What's here
+## P6 scenarios: exercises and assessments on the real simulator (draft, unmerged)
 
-Two experiences over one simulation engine:
+`/trade/plc` now lists four **sandbox scenarios** (build a start/stop starter, find a hidden fault, program the sorting line, program the tank). You work in the same 3D workbench as `/sandbox` from a work order; the result is graded by **what your circuit actually does** when it is run through the same simulator (any correct wiring or logic passes, including Structured Text), not by matching a model answer. Employers can assign them from `/employer`; candidates get exam conditions and send back the same result code as before. Frontend-only: the result code is not tamper-proof. [Design, evidence and limits](docs/product/P6_SCENARIOS_PROGRESS.md).
 
-- **Learner lab** — pick a trade, climb a **1–10 ranked exercise ladder**, and learn by doing: guided briefs, live objectives, hints, instant feedback, reset & replay.
-- **Employer ↔ candidate assessment** — an employer builds a ranked practical test and shares it (link/code); a candidate completes it under exam conditions; the employer gets back an evidence-backed rubric result. *(Local-only in this version — no accounts yet; a backend is a later phase.)*
+## P5 troubleshooting: faults and alarms (draft, unmerged)
 
-The flagship **PLC** trade ships with a fully playable rank-1 exercise ("conveyor will not start") built on the salvaged engine, and ranks 2–10 designed on the ladder. The original engine lab tools remain reachable under `/labs/*`.
+In `/sandbox`, an instructor can inject a fault (open conductor, open contactor coil, welded contacts, open motor winding, stuck pushbutton, stuck sensor output), optionally **hidden**, or a seeded "mystery fault" that is the same every time for the same seed and circuit. The fault changes what the real 24V solver sees, so the symptom is genuine: for example a dead coil still reads 24V across its terminals and a dead motor still reads 24V at its terminals. The learner sees only the symptom and a supervisory alarm that never names the cause, diagnoses it with the on-screen multimeter and I/O lamps, and replaces a part with the simulation paused. Replacing a healthy part changes nothing. This is an idealised 24V teaching model, not failure physics or safety-rated behaviour. [Design, evidence and what is still open](docs/product/P5_FAULTS_PROGRESS.md).
 
-## Architecture (short version)
+## P4 forward/reverse motor workcell (draft PR #18)
 
-```
-Experience layer (src/app, src/ui)  →  front door, trade picker, ladder, ExercisePlayer
-Platform layer   (src/platform)     →  exercise runtime, types, persistence boundary
-Trade modules    (src/trades)       →  registry + plc (pluggable; CCTV/BMS/… later)
-Simulation engine(src/engine, core, engineering)  →  salvaged, deterministic, tested
-```
+The open `/sandbox` scene now includes **Place reversing DOL layout**: ten original 3D devices with an idealized 24V reversible motor, dedicated forward/reverse contactors, cross-connected NC 21–22 interlocks, start/reverse/stop pushbuttons, source breaker and latching training E-stop. The user wires **21 real terminal connections** (nothing is prewired), loads **Load forward/reverse example** in the editable Ladder editor, and switches Forward → STOP → Reverse. The worker—not 3D animation—determines direction from powered F+/R+ motor terminals and rotates the shaft accordingly. Correct logic blocks simultaneous requests; a deliberately wrong PLC program demanding both contactors raises a modeled mechanical-interlock conflict and inhibits movement. Missing NC wiring or contradictory motor feeds changes the actual result. [Exact wiring, engineering evidence and limitations](docs/product/P4_ELECTRICAL_PROGRESS.md).
 
-Full design: [`docs/product/ARCHITECTURE.md`](docs/product/ARCHITECTURE.md). Adding a trade is adding a module in `src/trades/` and registering it — no shell or engine changes.
+This 24V double-input *teaching abstraction* is **not a real three-phase reversing starter**, a certified interlock, calibrated power model or safety-rated emergency stop. The original P1–P4 scenarios remain accessible. The `/sandbox` page is separately lazy-loaded so it does not increase the landing-page JavaScript transfer budget.
 
-## Local development
+## P4 protected electrical-panel preview (draft PR #18)
+
+Start from an empty `/sandbox` workspace and choose **Place protected DOL layout**. This places ten original 3D parts, including a branch breaker, latching NC **training E-stop**, overload auxiliary 95/96 and pilot lamp — **no connections are prewired**. Wire the [16-wire protected DOL circuit](docs/product/P4_ELECTRICAL_PROGRESS.md), load the editable latch Ladder program, press Run and START: only the correctly wired contactor drives the motor and pilot lamp. Test the training E-stop and overload via their manual controls. The overload opens its real coil circuit without silently modifying PLC memory: **reset may restart the motor under a poorly designed Run latch**, an important lesson. Inject a downstream direct short on breaker OUT, Run or Step to trip, then remove the fault before reset (reset into a remaining short is refused). The two-probe DC meter reads signed 24/0/−24V, floating/short conditions from the real Worker netlist without stepping the paused PLC. No server or account required.
+
+This is an educational *idealized 24V circuit*, not certified overload/short protection, industrial mains wiring, calibrated current measurement, E-stop or a complete P4 delivery. See [P4 electrical progress](docs/product/P4_ELECTRICAL_PROGRESS.md) and the [PRD](docs/product/PRD.md) for remaining P4 requirements and acceptance blockers.
+
+## P3 3D tank and fluid-control preview (draft PR #17)
+
+In the same `/sandbox` 3D workbench, choose **Place 3D tank layout** from an empty workspace. This adds an educational vessel, pump, high-level switch and drain valve; the devices are **not prewired**. Connect the 11 real terminals listed in [P3 plant progress](docs/product/P3_PLANT_PROGRESS.md), select **Load tank control example** in Ladder, then Run. With correct wiring, Q0.2 powers the fill pump, a real powered I0.3 level switch trips at 750 ml and clears below 600 ml, and Q0.3 energizes the drain. The worker advances the bounded liquid level and the original Three.js tank shows that actual state. Users can edit Ladder or bounded Structured Text, disconnect a wire, or move components to observe genuine faulty outcomes. This is a teaching model, not calibrated hydraulics, real analog sensing or certified machinery. No backend/cloud service has been introduced.
+
+## P3 3D sorting development preview (draft PR #17)
+
+The open 3D workbench now includes a **conveyor load, powered mark-sensitive optical sensor and wired reject diverter**. From an empty project, select **Place 3D sorting layout** (equipment only, not prewired), patch the 16 terminals using the keyboard-accessible panel or 3D pins, select **Load sorting program example** in the Ladder editor, Run, press START, and feed **marked** or **plain** parcels from the new station panel. With correct wiring and logic, marked parcels are rejected by Q0.1 and plain parcels pass; moving the sensor, editing Sort or disconnecting the conveyor or sensor changes the actual worker-computed outcome. All 3D moving cartons are driven by immutable Worker snapshots. The same simulator supports optional bounded Structured Text Sort output. Exact wiring and QA limits: [P3 plant progress](docs/product/P3_PLANT_PROGRESS.md).
+
+This is a limited **single-parcel, idealized 24V educational model**, not a physically realistic Factory I/O equivalent. P2's unfinished requirements and P3 device breadth remain open. No backend, user accounts, cloud or production deployment is authorized.
+
+## P0/P1 3D sandbox and P2 programming development preview
+
+- **Real 3D workbench:** place a 24V source, virtual PLC, START/STOP pushbuttons, contactor and simplified DC motor onto an orbitable, zoomable Three.js scene. Drag from the palette or click to place. Connect terminals in 3D or through the accessible patch panel.
+- Click any two terminal buttons to connect a wire; remove wires to test failures. See electrical voltage probes and energized wire overlays.
+- Edit up to eight actual Ladder rungs with local BOOL tags and supported TON/TOF/RTO/TP timers, CTU/CTD counters with editable reset/load conditions and edge instructions; or use the new editable Structured Text (ST) tab. The salvaged `src/engineering/ladder.ts` and bounded `src/engineering/structured-text.ts` engines execute the active program while `src/engineering/electrical.ts` resolves circuit wiring.
+- Run, Pause, Step, reset the simulated scan, inspect live tags/timer/counter memory, use future-scan or Boolean edge breakpoints, export the latest 300 simulated scan records as CSV, and operate buttons to see the contactor and motor follow the actual program.
+- Save locally in browser storage and import/export project JSON files. **No backend, login, SaaS, payment, cloud database, or server** is required for this version.
+
+For a full start/stop demonstration, connect the supply and PLC power pins, route START and STOP through the PLC inputs, route output Q0.0 into contactor coil A1/A2, and place contactor NO 13/14 in series with the motor. The sandbox UI includes the wiring map.
+
+This development preview intentionally supports **one PLC, one supply, up to eight bounded Ladder rungs (local BOOL/INT/DINT/REAL tags, numeric compare/MOV/arithmetic) or bounded ST, and an idealized 24V DC circuit**. It is *not* a general circuit solver, vendor PLC runtime, real motor physics simulator, or safety-rated E-stop system. More PLC programming functions, physical analog I/O mapping, additional devices, and industrial-grade electrical realism are later roadmap phases; real 3D rendering now starts in P1. Never substitute this simulator for physical equipment acceptance or safety training.
+
+## Existing app retained
+
+The guided exercise ladders and local employer → candidate assignment/result-code workflow still work through the existing routes. These are **not** converted into the sandbox until P6; no separate backend account system is planned for this version.
+
+## Engineering layout
+
+- `src/components/registry.ts` — P1 device terminal definitions.
+- `src/sim/signals.ts` — serializable commands, state, project and immutable render snapshot types.
+- `src/sim/orchestrator.ts` — authoritative phase order: commands → electrical → PLC input sampling → selected Ladder/ST scan → output image → contactor → ideal motor → sensors → events → snapshot.
+- `src/sim/worker.ts` — fixed 50ms simulation timestep in a Web Worker, with commands queued at a clock boundary.
+- `src/program/LadderEditor.tsx`, `StructuredTextEditor.tsx`, `ProgrammingDock.tsx`, `LiveMonitor.tsx` — bounded multi-rung LD/ST programming and live instrumentation within the approved UX.
+- `src/program/p2-contract.ts` — P2 validation/compilation limits; `src/program/scan-trace.ts` — bounded worker trace and safe CSV export; `src/app/SandboxPage.tsx` — frontend workbench.
+- `src/render/Sandbox3D.tsx` — original low-poly 3D meshes, cables, orbit controls and interactive scene. Its UI reads snapshots; no electrical or PLC logic is executed inside the renderer.
+- `src/engineering`, `src/core`, `src/engine` — original salvaged engineering engine; **preserved**.
+- `src/app`, `src/ui`, `src/trades`, `src/platform` — original guided exercise and local assessment app; **preserved**.
+
+## Run locally
 
 Requires Node.js 22.
 
 ```bash
 npm ci
-npm run dev        # Vite dev server
-npm test           # Vitest engine suite (536 tests)
-npm run build      # tsc + Vite + offline precache
+npm run dev
+npm run typecheck
+npm test
+npm run build
 npm run verify:full
 ```
 
-Deploys to Vercel.
+The P1/P2 regressions are in `tests/sandbox-integration.test.ts` and `tests/sandbox-p2-programming.test.ts`. GitHub CI runs `scripts/sandbox-browser-acceptance.cjs`, `scripts/sandbox-ux-acceptance.cjs` and `scripts/sandbox-p2-browser-acceptance.cjs` to exercise the real browser paths. The project must pass the full repository verification suite before merge or any production rollout. A real browser play-through of place → wire → edit → run → wrong wiring/logic must also be recorded. **Do not assume code presence equals acceptance.**
 
-## Project docs
+## Product documents
 
-- [Product requirements (PRD v3)](docs/product/PRD.md) — vision, audiences, exercise model, roadmap
-- [Architecture](docs/product/ARCHITECTURE.md)
-- [Handover & checklist](docs/product/HANDOVER_CHECKLIST.md) — current state and what's next
-- [Competitor benchmark](docs/product/COMPETITOR_AND_MIT_REVIEW.md)
-- [Archived legacy docs & reports](docs/archive/) — the previous developer's PRD, roadmap, and ~70 build reports (kept for history)
-
-The repository contains **no** backend, authentication, database, or payment features yet; those are a later phase, designed for behind the persistence boundary.
+- [PRD v4.2](docs/product/PRD.md)
+- [Architecture v4](docs/product/ARCHITECTURE.md)
+- [UX-first workspace blueprint](docs/product/UX_WORKBENCH_V1.md)
+- [P2 programming scope, evidence and open gates](docs/product/P2_PROGRAMMING_PROGRESS.md)
+- [Developer workflow skill](.claude/skills/automation-platform/SKILL.md)
+- [Handover and outstanding gates](docs/product/HANDOVER_CHECKLIST.md)
+- [Previous v3 product requirements](docs/product/archive/PRD_v3_exercise-assessment.md)

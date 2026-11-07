@@ -4,9 +4,11 @@ import { FrontDoor } from './FrontDoor';
 import { TradePicker } from './TradePicker';
 import { TradeLadder } from './TradeLadder';
 import { ExercisePage } from './ExercisePage';
+import { ScenarioPage } from './ScenarioPage';
 import { EmployerPage } from './EmployerPage';
 import { CandidatePage } from './CandidatePage';
 import { AppHeader } from '../ui/AppHeader';
+const SandboxPage = React.lazy(() => import('./SandboxPage').then(m => ({ default: m.SandboxPage })));
 
 /* Legacy engine lab surfaces — kept reachable under /labs/* so the salvaged
    simulation engine stays exercised and nothing is orphaned during the rebuild. */
@@ -82,12 +84,20 @@ function NotFound() {
 export function App() {
   return (
     <BrowserRouter>
-      <a className="skip-link" href="#main">Skip to main content</a>
+      <a className="skip-link" href="#main" onClick={() => {
+        // Main landmarks are not natively focusable; support keyboard skip navigation.
+        const main = document.getElementById('main');
+        if (main) { main.setAttribute('tabindex', '-1'); main.focus(); }
+      }}>Skip to main content</a>
       <Routes>
         <Route path="/" element={<FrontDoor />} />
+        <Route path="/sandbox" element={<Suspense fallback={<main id="main" className="wrap wrap-wide page">
+          <p role="status">Loading the 3D engineering workbench…</p>
+        </main>}><SandboxPage /></Suspense>} />
         <Route path="/trades" element={<TradePicker />} />
         <Route path="/trade/:tradeId" element={<TradeLadder />} />
         <Route path="/exercise/:exerciseId" element={<ExercisePage />} />
+        <Route path="/scenario/:scenarioId" element={<ScenarioPage />} />
         <Route path="/employer" element={<EmployerPage />} />
         <Route path="/take" element={<CandidatePage />} />
 
@@ -103,7 +113,14 @@ export function App() {
 
         {/* redirects from old top-level engine paths */}
         <Route path="/engineering" element={<Navigate to="/labs/engineering" replace />} />
+        <Route path="/simulation" element={<Navigate to="/exercise/plc-conveyor-start" replace />} />
+        <Route path="/assessments" element={<Navigate to="/labs/assessments" replace />} />
+        <Route path="/process-control" element={<Navigate to="/labs/process-control" replace />} />
+        <Route path="/starter-lab" element={<Navigate to="/labs/starter" replace />} />
+        <Route path="/pneumatics" element={<Navigate to="/labs/pneumatics" replace />} />
+        <Route path="/workcell-composer" element={<Navigate to="/labs/workcell" replace />} />
         <Route path="/electrical-bench" element={<Navigate to="/labs/electrical-bench" replace />} />
+        <Route path="/dc-circuit" element={<Navigate to="/labs/dc-circuit" replace />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>

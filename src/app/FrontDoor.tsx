@@ -45,6 +45,7 @@ export function FrontDoor() {
         }
       />
 
+      <main id="main" tabIndex={-1}>
       {/* Hero */}
       <section className="hero">
         <div className="wrap wrap-wide hero-grid">
@@ -56,7 +57,8 @@ export function FrontDoor() {
             </h1>
             <p className="lede">{BRAND.shortPitch} Think Cisco Packet Tracer, for the skilled trades.</p>
             <div className="cta-row">
-              <Link className="btn primary" to="/trades">Enter the lab →</Link>
+              <Link className="btn primary" to="/sandbox">Open PLC sandbox →</Link>
+              <Link className="btn ghost" to="/trades">Guided exercises →</Link>
               <a className="btn ghost" href="#how">See how it works</a>
             </div>
             <div className="tagstrip">
@@ -243,6 +245,7 @@ export function FrontDoor() {
         </div>
       </section>
 
+      </main>
       <footer className="site-foot">
         <div className="wrap wrap-wide foot-inner">
           <span>{BRAND.name}</span>

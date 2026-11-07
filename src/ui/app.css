@@ -27,11 +27,14 @@ body::before {
 .theme-btn:hover { border-color: var(--accent); }
 @media (max-width: 720px) { .front-nav { display: none; } }
 
+/* Keep bright orange where the surface is dark, but readable darker orange on light. */
+.band-ink .eyebrow { color: var(--accent); }
+
 /* ---- generic page ---- */
 .page { padding-block: 30px 72px; }
 .page.narrow { max-width: 760px; }
 .crumbs { display: flex; gap: 9px; align-items: center; font-size: 13px; color: var(--muted); margin-bottom: 18px; }
-.crumbs a:hover { color: var(--accent); }
+.crumbs a:hover { color: var(--accent-text); }
 .crumbs strong { color: var(--ink); }
 .page-title { font-size: clamp(30px, 4vw, 46px); margin: 12px 0 0; }
 .sub { color: var(--muted); margin-top: 14px; max-width: 52ch; font-size: 17px; }
@@ -41,7 +44,7 @@ body::before {
 /* ---- hero ---- */
 .hero-grid { padding-block: 60px 50px; display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 50px; align-items: center; }
 .hero-title { font-size: clamp(38px, 6vw, 66px); margin-top: 16px; }
-.hero-title .amber, .amber { color: var(--accent); }
+.hero-title .amber, .amber { color: var(--accent-text); }
 .lede { margin-top: 22px; font-size: clamp(17px, 2.2vw, 20px); color: var(--muted); max-width: 36ch; }
 .cta-row { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 12px; }
 .tagstrip { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 8px; }
@@ -68,7 +71,7 @@ body::before {
 .doors { margin-top: 38px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .door { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 30px; display: flex; flex-direction: column; position: relative; overflow: hidden; }
 .door::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--accent); }
-.door .who { font-family: var(--mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.door .who { font-family: var(--mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-text); }
 .door h3 { font-size: 24px; margin: 12px 0 10px; }
 .door > p { color: var(--muted); font-size: 15px; }
 .door ul { list-style: none; padding: 0; margin: 18px 0 0; display: flex; flex-direction: column; gap: 10px; }
@@ -80,7 +83,7 @@ body::before {
 /* ---- how it works ---- */
 .how { margin-top: 38px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
 .step { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
-.step .k { font-family: var(--mono); font-size: 30px; font-weight: 600; color: var(--accent); line-height: 1; }
+.step .k { font-family: var(--mono); font-size: 30px; font-weight: 600; color: var(--accent-text); line-height: 1; }
 .step h3 { font-size: 18px; margin: 14px 0 8px; }
 .step p { color: var(--muted); font-size: 14.5px; }
 @media (max-width: 820px) { .how { grid-template-columns: 1fr; } }
@@ -109,6 +112,9 @@ body::before {
 .trade-card h3 { font-size: 15.5px; }
 .trade-status { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; }
 .trade-status.live { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+/* Small availability labels need a stronger foreground than the indicator green. */
+:root:not([data-theme="dark"]) .trade-status.live { color: #155c3f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .trade-status.live { color: #8be6b8; } }
 .trade-status.soon { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
 @media (max-width: 900px) { .trades-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 420px) { .trades-grid { grid-template-columns: 1fr; } }
@@ -134,7 +140,7 @@ body::before {
 .picker-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .picker-top h2 { font-size: 20px; }
 .picker-card p { color: var(--muted); font-size: 14.5px; flex: 1; }
-.picker-go { color: var(--accent); font-weight: 600; font-size: 14px; }
+.picker-go { color: var(--accent-text); font-weight: 600; font-size: 14px; }
 @media (max-width: 860px) { .picker-grid { grid-template-columns: 1fr; } }
 
 .ladder-progress { display: flex; align-items: center; gap: 14px; margin-top: 20px; max-width: 460px; }
@@ -148,13 +154,13 @@ body::before {
 .ladder-item.planned { opacity: 0.72; }
 .ladder-item.playable:hover { border-color: var(--accent); }
 .ladder-link { display: flex; gap: 20px; align-items: stretch; padding: 18px 20px; }
-.ladder-rank { font-family: var(--mono); font-size: 26px; font-weight: 600; color: var(--accent); min-width: 42px; display: flex; align-items: center; justify-content: center; }
+.ladder-rank { font-family: var(--mono); font-size: 26px; font-weight: 600; color: var(--accent-text); min-width: 42px; display: flex; align-items: center; justify-content: center; }
 .ladder-body { flex: 1; min-width: 0; }
 .ladder-row-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .ladder-row-top h3 { font-size: 18px; }
 .ladder-body p { color: var(--muted); font-size: 14.5px; margin-top: 6px; }
 .ladder-meta { display: flex; gap: 16px; margin-top: 10px; font-size: 13px; color: var(--muted); font-family: var(--mono); }
-.ladder-go { color: var(--accent); font-weight: 600; }
+.ladder-go { color: var(--accent-text); font-weight: 600; }
 
 /* ---- exercise shell ---- */
 .exercise-shell { display: flex; flex-direction: column; gap: 18px; }
@@ -258,7 +264,7 @@ body::before {
 .poe-row { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
 .poe-row.on { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
 .poe-name { flex: 1; font-size: 14px; }
-.poe-name em { font-style: normal; font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-left: 8px; }
+.poe-name em { font-style: normal; font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-text); margin-left: 8px; }
 .poe-name em.opt { color: var(--muted); }
 .poe-watts { font-family: var(--mono); font-size: 13px; color: var(--muted); min-width: 48px; text-align: right; }
 
@@ -290,12 +296,12 @@ body::before {
 .copy-field { margin-bottom: 14px; }
 .copy-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .copy-label { font-size: 13px; font-weight: 600; color: var(--muted); }
-.assign-label { margin-top: 8px; color: var(--accent); font-weight: 600; }
+.assign-label { margin-top: 8px; color: var(--accent-text); font-weight: 600; }
 .exam-notes { margin: 14px 0 20px; padding-left: 20px; color: var(--muted); font-size: 14px; display: flex; flex-direction: column; gap: 8px; }
 .return-code { width: 100%; }
 
 /* ---- legacy engine tools ---- */
-.legacy-frame { display: flex; flex-direction: column; gap: 16px; }
+.legacy-frame { display: flex; flex-direction: column; gap: 16px; min-width: 0; max-width: 100%; overflow-x: auto; }
 .legacy-banner { font-family: var(--mono); font-size: 12px; color: var(--muted); background: var(--surface-2); border: 1px dashed var(--line); border-radius: 10px; padding: 12px 16px; }
 
 /* ---- animations (scene + hero) ---- */

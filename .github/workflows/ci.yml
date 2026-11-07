@@ -28,7 +28,7 @@ jobs:
         run: |
           npm install --no-save --no-audit --no-fund puppeteer@24.31.0 axe-core@4.10.3
           npx puppeteer browsers install chrome
-      - name: Browser smoke - routes, machine control, meter, assessment and mobile
+      - name: Start local Vite preview for browser acceptance
         run: |
           npx vite preview --host 127.0.0.1 --port 4173 > /tmp/plc-vite-preview.log 2>&1 &
           for i in $(seq 1 40); do
@@ -36,7 +36,30 @@ jobs:
             sleep 1
           done
           curl --silent --fail http://127.0.0.1:4173/ > /dev/null
-          PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
+      - name: Open sandbox P1 - place, wire, program, run and test failures
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-browser-acceptance.cjs
+      - name: UX-first workbench - workflow, device inspector and responsive design
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux-acceptance.cjs
+      - name: P2 PLC programming - real multi-rung timers and Structured Text E2E
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-browser-acceptance.cjs
+      - name: P2 typed numeric PLC - INT, ADD and comparator 3D motor browser E2E
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-numeric-browser.cjs
+      - name: P3 3D sorting - powered conveyor, photoeye, diverter and wrong PLC logic
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-sorting-browser.cjs
+      - name: P3 3D tank - wired pump, high-level switch and drain valve browser E2E
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-tank-browser.cjs
+      - name: P4 electrical panel - breaker, overload, pilot lamp and 24V multimeter browser E2E
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-panel-browser.cjs
+      - name: P4 3D reversing - physical dual NC interlocks and motor direction browser E2E
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-reversing-browser.cjs
+      - name: P5 troubleshooting - hidden fault, symptom-only alarm, multimeter diagnosis and part replacement
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-faults-browser.cjs
+      - name: P5 sensor troubleshooting - stuck photoeye lies to the PLC on the running sorting line
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-sensor-browser.cjs
+      - name: P6 scenarios - graded by outcome on the real sandbox, employer to candidate to review
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p6-scenario-browser.cjs
+      - name: Browser smoke - routes, machine control, meter, assessment and mobile
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
       - name: Offline deep-link and lazy-lab cache acceptance
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/offline-acceptance.cjs
       - name: Automated WCAG accessibility and keyboard skip-navigation audit

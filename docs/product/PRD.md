@@ -1,7 +1,7 @@
 # EFO Skill Lab — Product Requirements Document (v4)
 
 > **Product:** a comprehensive, browser-based **virtual industrial-automation laboratory** — the industrial-automation equivalent of Cisco Packet Tracer, with the programming depth of Siemens TIA Portal and the interactive 3D plant simulation of Factory I/O.
-> **Version:** 4.0 · **Date:** 6 November 2026 · **Status:** Active product direction. Supersedes PRD v3 (exercise/assessment), archived at `docs/product/archive/PRD_v3_exercise-assessment.md` and **retained** as the spec for the assessment layer.
+> **Version:** 4.2 · **Date:** 6 November 2026 · **Status:** Owner-approved direction; P0/P1 implementation in development branch. Supersedes PRD v3 (exercise/assessment), archived at `docs/product/archive/PRD_v3_exercise-assessment.md` and **retained** as the spec for the assessment layer.
 > **Owner:** product owner. **Builders:** Claude + co-developers (read this, then `ARCHITECTURE.md`, then the `automation-platform` skill).
 
 ---
@@ -16,7 +16,7 @@ But it is **not a simulation environment** for students. Packet Tracer and GNS3 
 
 This PRD specifies that platform. The v3 exercise/assessment product becomes a **mode layered on top** of this sandbox (a saved scenario + objectives + rubric), not a separate app.
 
-**Crucial, money-saving fact:** the hardest part of this vision — a deterministic PLC **scan engine**, ladder & Structured Text execution, an electrical netlist solver, fault models, deterministic replay — **already exists** in this repo's salvaged engine (`src/engine`, `src/core`, `src/engineering`). The problem was never the engine; it was the absence of the open, integrated, visual sandbox around it. This PRD builds that sandbox on the existing engine. See §11 for the salvage map.
+**Crucial engineering fact:** reusable bounded educational pieces — a deterministic PLC **scan engine**, Ladder and Structured Text interpreters, a simplified 24V electrical solver, fault models, and replay helpers — **already exist** in this repo's salvaged engine (`src/engine`, `src/core`, `src/engineering`). The problem was never the engine; it was the absence of the open, integrated, visual sandbox around it. This PRD builds that sandbox on the existing engine. See §11 for the salvage map.
 
 ---
 
@@ -63,7 +63,7 @@ v3 satisfies none of 1–3 for the student (each exercise is a bespoke state mac
 1. **The Workspace** — an open visual canvas: a component library, drag-and-drop placement, terminal-level wiring, properties, and Run/Pause/Step controls. The Packet-Tracer-style home base.
 2. **The PLC Programming Environment** — LD, FBD and ST editors with IEC 61131-3 elements, a tag/variable table, compile/validate, and online monitoring. The TIA-Portal-style depth.
 3. **The PLC Engine** — a deterministic scan-cycle runtime that executes the user's compiled program (read inputs → solve logic → timers/counters/memory → write outputs), with run/pause/single-scan/breakpoints.
-4. **The Plant** — a 2.5D/3D industrial environment of original device models (conveyors, sensors, motors, contactors, cylinders, valves, tanks, pumps, diverters, robotic mechanisms) whose state is driven by the engine, never scripted.
+4. **The Plant** — an interactive 3D industrial environment of original device models (conveyors, sensors, motors, contactors, cylinders, valves, tanks, pumps, diverters, robotic mechanisms) whose state is driven by the engine, never scripted.
 5. **The Integration Loop** — the single simulation clock and signal/event bus that ties plant ⇄ wiring ⇄ PLC together every tick. **This is the core of the product.**
 6. **Electrical & Wiring** — a control-panel/wiring layer (supplies, contactors, overloads, relays, push buttons, PLC terminals) with validated connections and propagated signals; DOL, forward/reverse, star-delta, interlocks, E-stop logic.
 7. **Faults & Diagnostics** — injectable faults (disconnected sensor, miswire, failed motor, stuck contactor, broken mechanism, stuck input, logic error) plus diagnostic tools (live variable monitor, I/O indicators, execution trace, virtual multimeter, signal inspection, alarm history).
@@ -75,7 +75,7 @@ v3 satisfies none of 1–3 for the student (each exercise is a bespoke state mac
 ## 5. Core concepts (the vocabulary the whole team shares)
 
 - **Project / Workspace** — the document: a set of placed **Components**, their **Wiring**, one or more **PLC Programs**, the **Tag table**, plant layout, and (optional) exercise metadata. Serializable to a versioned JSON **project file**.
-- **Component** — a library item instance (PLC, sensor, motor, contactor, button, conveyor, cylinder, valve, tank, …). Declares **terminals** (electrical) and a **device behaviour** (how it reacts to signals / advances physics) and a **visual** (2.5D/3D model).
+- **Component** — a library item instance (PLC, sensor, motor, contactor, button, conveyor, cylinder, valve, tank, …). Declares **terminals** (electrical) and a **device behaviour** (how it reacts to signals / advances physics) and a **visual** (original 3D model).
 - **Terminal / Wire** — components expose typed terminals (24V, 0V, DI, DO, signal). A **Wire** connects two terminals. The **netlist** resolves wires into propagated signal values each tick.
 - **PLC Program** — user logic in LD/FBD/ST, compiled to a common **program IR** the engine executes. Bound to **Tags** mapped to PLC I/O addresses, which are in turn wired to component terminals.
 - **Scan** — one PLC cycle: sample inputs → execute IR → update timers/counters/memory → commit outputs.
@@ -114,7 +114,7 @@ v3 satisfies none of 1–3 for the student (each exercise is a bespoke state mac
 ### 6.5 Plant simulation (Factory-I/O-like, original models)
 - Reusable typed device models: conveyor, roller, motor/VFD abstraction, photoeye, inductive/proximity sensor, cylinder, solenoid valve, pneumatic supply, tank, pump, diverter, pusher, lift, robotic mechanism, indicators.
 - Device state, kinematics, simple collisions, material flow, and sensor geometry driven by the simulation clock. Physics is per-scene and **never** defines PLC state except through explicitly modelled sensors.
-- 2.5D first (clean isometric/plan canvas, performant, approachable), with targeted real 3D (Three.js/Babylon.js) where it adds value; graphics tiers, LOD, WebGL capability check and a usable no-WebGL fallback.
+- **3D first starting in P1.** A real, orbitable low-poly WebGL workbench with 3D models, ports, cables, device placement and active-state rendering using the existing Three.js/React Three Fiber stack. Use low-cost geometry and device-detail tiers for low-spec machines, a WebGL capability check, and an accessible text-based wiring/control fallback when GPU/WebGL is unavailable. Do not equate 3D presentation with full mechanical/electrical fidelity.
 
 ### 6.6 The integration loop — see §7. (The product's heart.)
 
@@ -151,7 +151,7 @@ A single **simulation clock** advances the system in deterministic, explicitly o
 7. advance plant physics          (kinematics, material flow, collisions)
 8. sample sensor geometry         (positions → sensor terminal states for next tick)
 9. append ordered events          (for trace, alarms, evidence, replay)
-10. publish immutable render snapshot   (3D/2.5D renders THIS, never its own truth)
+10. publish immutable render snapshot   (3D renders THIS; never creates its own physics/electrical truth)
 ```
 
 Rules that are non-negotiable:
@@ -165,7 +165,7 @@ Rules that are non-negotiable:
 ## 8. Non-goals / honest limits (initial release)
 
 - Not a safety-rated controller; not certified instruction; not a substitute for live-work training. Always stated.
-- No cloud, accounts, or server dependency for the core (assessment accounts are a later, optional layer).
+- **No backend for this version.** No authentication, cloud database, server, SaaS infrastructure, employer accounts, or remote assessment storage. Sandbox projects are stored in the browser and import/export as local files; the existing employer assignment code flow remains local-only. Backend additions require a separate explicit scope decision.
 - Not a clone of TIA Portal / Factory I/O / Packet Tracer UI or assets; no claimed vendor compatibility without verification.
 - No full IEC 61131-3 coverage at first — a **documented supported subset**; unsupported constructs fail explicitly, never silently.
 - No photoreal physics for every machine; fidelity is "faithful category of behaviour," tiered and labelled.
@@ -177,12 +177,26 @@ Rules that are non-negotiable:
 
 Each phase ends with something runnable end-to-end. The **vertical slice first** principle (one complete sandbox scenario working through the whole loop) beats building modules in isolation.
 
+**P6 scenarios continuation:** The first four scenario exercises run on the real sandbox on branch `engineering/p5-faults-diagnostics` (draft, unmerged): build a start/stop starter, find a seeded hidden fault with the multimeter, program the sorting conveyor, program the tank. Each is a starter project plus outcome checks graded headlessly through the same `tick()` the worker uses (multi-solution: Ladder and Structured Text both pass), hosted in the sandbox workbench as practice (`/scenario/:id`) or as an employer-assigned assessment with the existing local result code. Answer-revealing helpers are hidden in scenarios. A frontend-only result code is **not tamper-proof**. A ten-rank catalogue per trade, other trades on the sandbox, retiring the v3 state machines and owner review remain OPEN. See [P6_SCENARIOS_PROGRESS.md](P6_SCENARIOS_PROGRESS.md).
+
+**P5 faults continuation:** A first troubleshooting slice is on branch `engineering/p5-faults-diagnostics` (draft, stacked on PR #18): seeded and optionally hidden fault injection (open conductor, open contactor coil, welded contacts, open motor winding, stuck pushbutton, stuck photoeye or level-probe output) that changes real solver inputs, symptom-only supervisory alarms with a history, and a paused-only *replace a part* repair, exercised end-to-end against the multimeter. This addresses the PRD P5 exit criterion for the 24V start/stop circuit, plus stuck-sensor faults on the sorting and tank workcells. Faults on the diverter, drain valve and pneumatics, intermittent faults, alarms for sensor and tank symptoms and other alarm rules, execution-trace export for a fault session and scoring remain OPEN. See [P5_FAULTS_PROGRESS.md](P5_FAULTS_PROGRESS.md).
+
+**P4 reversing continuation:** A bounded 24V *dual-direction teaching motor* with two physically cross-NC-wired NO contactors, separate I0.4/Q0.4/Q0.5 tags, real motor direction, simple mechanical contention lockout and a 21-wire editable Ladder/ST example has been implemented on PR #18. This addresses a limited **forward/reverse learning slice**, not 3-phase industrial parity. True electrical reversing, star-delta, current-rated protection, qualified emergency stopping and physical validation remain OPEN. See [P4_ELECTRICAL_PROGRESS.md](P4_ELECTRICAL_PROGRESS.md).
+
+**P4 electrical panel source development:** The next authorized increment implements a true educational 24V protected DOL workbench with original breaker, NC overload auxiliary, pilot lamp, and worker-derived virtual two-probe multimeter on draft PR #18. Correctly wired equipment runs the same real PLC motor latch; an isolated downstream direct short trips the breaker; overload trip opens the actual contactor coil. The **P4 full exit remains open**: forward/reverse, star-delta, rated thermal/overcurrent behavior, broad panel library, virtual instruments and certified safety-rated E-stop behavior are NOT yet delivered. A **latching NC training E-stop** now physically interrupts the educational 24V circuit; this does not confer real safety-system correctness. See [P4_ELECTRICAL_PROGRESS.md](P4_ELECTRICAL_PROGRESS.md) for circuit and evidence. No backend.
+
+**P3 fluid handling continuation:** An independent programmable 3D tank, 24V inlet pump, hysteretic level switch and 24V drain valve is under development and automated verification on P3 draft PR #17. Users wire actual I0.3/Q0.2/Q0.3 circuits and author Ladder/ST; true worker tank level controls the 3D liquid. See [P3_PLANT_PROGRESS.md](P3_PLANT_PROGRESS.md) for evidence and limits. Industrial-grade hydraulics, pneumatic cylinders, real analog instrumentation and multiple workcells are not yet complete.
+
+**P3 active engineering:** The first functional 3D conveyor, mark-sensitive photoeye and wired diverter sorting slice is on draft PR #17 (stacked on PRs #14–16). See [P3_PLANT_PROGRESS.md](P3_PLANT_PROGRESS.md) for the scenario, evidence and still-open P3 device/physics scope. This does not establish full P3 acceptance, Factory I/O parity or release readiness.
+
+**Owner-approved UX-first gate:** after the first P1 3D vertical slice, prepare a dedicated UX/UI workbench design review **before P2 programming depth or P3 plant expansion**. The design blueprint lives at [UX_WORKBENCH_V1.md](UX_WORKBENCH_V1.md): project navigation, device library, 3D canvas, contextual inspector, wiring panel, programming dock, diagnostics, mobile and keyboard/no-WebGL states. The owner subsequently authorized proceeding into P2 development from that prototype. This authorizes engineering continuation **not** production acceptance or merge. The current bounded P2 implementation and remaining gaps are tracked in [P2_PROGRAMMING_PROGRESS.md](P2_PROGRAMMING_PROGRESS.md); existing engine and employer assessments are preserved.
+
 | Phase | Theme | Exit (runnable) |
 |---|---|---|
 | **P0 — Foundations & contracts** | Project model, signal/event interface, tick orchestrator skeleton, component & program IR contracts, engine-salvage audit, worker harness | Contracts documented; an empty workspace loads; the orchestrator ticks a trivial component wired to the salvaged scan engine |
-| **P1 — First vertical slice** | Workspace canvas + a handful of components (PLC, start/stop, contactor, motor) + terminal wiring + LD editor + scan engine + 2.5D render, all through the §7 loop | A user places a start/stop motor circuit, wires it, writes the latch rung, presses Run, and the motor responds to their logic; wrong logic → wrong behaviour |
+| **P1 — First vertical slice** | Workspace canvas + a handful of components (PLC, start/stop, contactor, motor) + terminal wiring + LD editor + scan engine + interactive 3D workbench, all through the §7 loop | A user places a start/stop motor circuit, wires it, writes the latch rung, presses Run, and the motor responds to their logic; wrong logic → wrong behaviour |
 | **P2 — Programming depth** | Full LD instruction set, ST editor + engine, tag table, online monitoring, run/pause/step/breakpoints/watch/force | A learner programs timers/counters/comparators and monitors live values |
-| **P3 — Plant & devices** | Device library breadth (conveyor, photoeye, cylinder, valve, tank, pump, diverter…), kinematics, sensor geometry, material flow; targeted 3D | The classic conveyor-sorting scene runs from the user's program |
+| **P3 — Plant & devices** | Device library breadth (conveyor, photoeye, cylinder, valve, tank, pump, diverter…), kinematics, sensor geometry, material flow; deeper plant-specific 3D animation and device realism | The classic conveyor-sorting scene runs from the user's program |
 | **P4 — Electrical & panel** | Control-panel wiring depth, multimeter, DOL/forward-reverse/star-delta/interlock/E-stop, overcurrent/short approximations | Wiring faults propagate to measurements and PLC inputs |
 | **P5 — Faults & diagnostics** | Seeded fault injection + full diagnostic toolset + alarm/event history + execution trace export | Instructor injects a fault; learner diagnoses with the tools and restores operation |
 | **P6 — Learning & assessment on the sandbox** | Exercise framework (problem/components/conditions/expected-results, multi-solution outcome checks) + re-host the v3 assessment mode on the real simulator | Progressive catalogue; employer assessment runs on real scenarios |
@@ -218,19 +232,19 @@ Measured by **how accurately and consistently the integrated system behaves**, n
 
 ---
 
-## 12. Open decisions (owner input, non-blocking)
+## 12. Owner-approved decisions for P0/P1
 
-1. **2.5D-first vs full-3D-first for the plant.** Recommendation: 2.5D-first for the vertical slice (fast, approachable, Packet-Tracer-like), add targeted 3D in P3. (Factory I/O is full 3D; matching that from day one is far heavier.)
-2. **3D engine when we get there:** Three.js (already a dependency) vs Babylon.js. Recommendation: Three.js unless a Babylon feature is needed.
-3. **First editor:** Ladder first (most used in training), FBD later. Agree?
-4. **Scope of the P1 slice:** confirm "start/stop motor latch" as the first end-to-end scenario (smallest thing that exercises the whole §7 loop).
-5. **Relationship of the two products in the UI:** one app with a "Sandbox" home and an "Exercises/Assessment" section, or kept as separate entries? (Recommend one app, two entry modes.)
+1. **Revised owner approval: true 3D from P1.** Replace the primary 2.5D view with a real orbitable, zoomable 3D workbench. All equipment and cables reflect the engine's authoritative state. Keep a functional text-based fallback for no-WebGL accessibility, not a competing 2.5D sandbox.
+2. **Approved 3D engine for P1:** reuse the existing Three.js + React Three Fiber stack and original lightweight geometry; P3 adds plant complexity, sensors, physical equipment movement, and richer materials, rather than introducing 3D for the first time.
+3. **Approved: Ladder first.** P1 starts with an editable single-rung LD subset; expand LD/ST in P2 and introduce FBD in P7+.
+4. **Approved: start/stop latch.** First real circuit: user-placed 24V source, PLC, START/STOP, contactor, motor; user-wired terminals; editable seal-in rung; correctly and incorrectly behaving outputs, tested across the full scan loop.
+5. **UI implementation decision:** one browser application with an open Sandbox entry and retained Exercises/Assessment routes. The v3 assessment capability is not removed; deeper integration occurs at P6.
 
 ---
 
 ## 13. Assets
 
-Original component artwork is code-drawn SVG for 2.5D (a device-art library already exists at `src/ui/device-art.tsx`) and original glTF/low-poly models for 3D (to be produced). No proprietary vendor models, icons, or branding. Reference *photos* (for accuracy only, not shipping) of a PLC rack, wired 24V panel, conveyor sorter, and a control cabinet are welcome from the owner. Where any third-party asset or standard is used, provenance and licence are recorded (continue the repo's provenance discipline).
+Current P1 3D assets are original code-generated low-poly component meshes, with no proprietary art or model downloads. The existing `src/ui/device-art.tsx` SVGs remain for retained assessment screens; later phases may add original licensed glTF models. No proprietary vendor models, icons, or branding. Reference *photos* (for accuracy only, not shipping) of a PLC rack, wired 24V panel, conveyor sorter, and a control cabinet are welcome from the owner. Where any third-party asset or standard is used, provenance and licence are recorded (continue the repo's provenance discipline).
 
 ---
 

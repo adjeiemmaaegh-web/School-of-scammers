@@ -1,0 +1,377 @@
+/**
+ * Three-dimensional sandbox workbench. This is a renderer/controller only.
+ * The Web Worker owns the electrical/PLC state; all colors and device motion derive
+ * exclusively from RenderSnapshot, never from local simulated physics.
+ *
+ * Original low-poly equipment geometry, no proprietary meshes or trademarks.
+ */
+import { useMemo, useRef, type DragEvent } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { Grid, Html, OrbitControls, GizmoHelper, GizmoViewport } from '@react-three/drei';
+import { CatmullRomCurve3, Plane, Raycaster, Vector2, Vector3, type Camera } from 'three';
+import { COMPONENTS, type ComponentKind } from '../components/registry';
+import type { PlacedComponent, ProjectFile, RenderSnapshot, XY } from '../sim/signals';
+import type { Parcel } from '../plant/sorting-conveyor';
+import { supportsWebGL } from '../components/SceneShell';
+import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-coordinates';
+
+const COLORS = {
+  chassis: '#35546b', steel: '#829bb0', panel: '#192b3c', light: '#d3e4ef',
+  live: '#20d6a6', off: '#52677c', highlight: '#ffa633', cable: '#7793ad',
+};
+
+function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLevelMl }: {
+  kind: ComponentKind; active: boolean; pressed: boolean; motorAngleRad: number;
+  parcel?: Parcel | null; tankLevelMl?: number;
+}) {
+  const status = active ? COLORS.live : COLORS.off;
+  if (kind === 'tank') {
+    const fraction = Math.max(0, Math.min(1, (tankLevelMl ?? 0)/1000));
+    return <group>
+      <mesh position={[0,0.16,0]}><cylinderGeometry args={[0.79,0.82,0.18,24]} />
+        <meshStandardMaterial color={COLORS.chassis} metalness={0.55} /></mesh>
+      <mesh position={[0,0.92,0]}><cylinderGeometry args={[0.74,0.74,1.42,24,1,true]} />
+        <meshStandardMaterial color="#a7d8e5" transparent opacity={0.24} side={2} roughness={0.25} metalness={0.22} depthWrite={false} /></mesh>
+      <mesh position={[0,0.20,0]}><torusGeometry args={[0.76,0.07,8,24]} />
+        <meshStandardMaterial color={COLORS.steel} /></mesh>
+      <mesh position={[0,1.62,0]} rotation={[Math.PI/2,0,0]}>
+        <torusGeometry args={[0.74,0.07,8,24]} /><meshStandardMaterial color={COLORS.steel} /></mesh>
+      {fraction > 0 && <mesh position={[0,0.24+fraction*0.66,0]}>
+        <cylinderGeometry args={[0.70,0.70,1.31*fraction,24]} />
+        <meshStandardMaterial color="#1e9ec8" transparent opacity={0.72} roughness={0.2} /></mesh>}
+      <mesh position={[0,0.78,-0.72]}><boxGeometry args={[0.12,0.9,0.06]} />
+        <meshStandardMaterial color="#c6e2e8" /></mesh>
+    </group>;
+  }
+  if (kind === 'pump') return <group>
+    <mesh position={[0,0.46,0]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[0.36,0.36,0.8,18]} />
+      <meshStandardMaterial color={active ? '#287f78' : COLORS.chassis} metalness={0.45} /></mesh>
+    <mesh position={[0.5,0.45,0]}><boxGeometry args={[0.28,0.31,0.29]} />
+      <meshStandardMaterial color={COLORS.steel} /></mesh>
+    <mesh position={[-0.55,0.45,0]}><boxGeometry args={[0.25,0.26,0.27]} />
+      <meshStandardMaterial color={COLORS.steel} /></mesh>
+    <mesh position={[0,0.16,0]}><boxGeometry args={[0.92,0.12,0.68]} />
+      <meshStandardMaterial color={COLORS.panel} /></mesh>
+    <mesh position={[0,0.91,0]}><sphereGeometry args={[0.075,10,8]} />
+      <meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.7} /></mesh>
+  </group>;
+  if (kind === 'levelprobe') return <group>
+    <mesh position={[0,0.47,0]}><boxGeometry args={[0.42,0.62,0.42]} />
+      <meshStandardMaterial color={COLORS.chassis} metalness={0.25} /></mesh>
+    <mesh position={[0,1.11,0]}><cylinderGeometry args={[0.06,0.06,0.79,10]} />
+      <meshStandardMaterial color={COLORS.steel} metalness={0.6} /></mesh>
+    <mesh position={[0,0.58,-0.23]}><sphereGeometry args={[0.11,12,8]} />
+      <meshStandardMaterial color={status} emissive={status} emissiveIntensity={active?0.9:0.1} /></mesh>
+  </group>;
+  if (kind === 'drainvalve') return <group>
+    <mesh position={[0,0.46,0]}><boxGeometry args={[0.94,0.43,0.49]} />
+      <meshStandardMaterial color={COLORS.chassis} metalness={0.4} /></mesh>
+    <mesh position={[-0.54,0.45,0]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[0.16,0.16,0.34,12]} />
+      <meshStandardMaterial color={COLORS.steel} /></mesh>
+    <mesh position={[0.54,0.45,0]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[0.16,0.16,0.34,12]} />
+      <meshStandardMaterial color={COLORS.steel} /></mesh>
+    <mesh position={[0,0.77,0]} rotation={[0,0,active?Math.PI/2:0]}>
+      <mesh><boxGeometry args={[0.77,0.1,0.14]} />
+        <meshStandardMaterial color={active?'#f0a75a':COLORS.steel} /></mesh>
+    </mesh>
+    <mesh position={[0,0.94,0.25]}><sphereGeometry args={[0.06,10,8]} />
+      <meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.7} /></mesh>
+  </group>;
+  if (kind === 'conveyor') return <group>
+    <mesh position={[0,0.46,0]}><boxGeometry args={[4.0,0.24,0.95]} />
+      <meshStandardMaterial color="#243d4c" metalness={0.4} roughness={0.6} /></mesh>
+    <mesh position={[0,0.60,0]}><boxGeometry args={[3.95,0.045,0.78]} />
+      <meshStandardMaterial color={active ? '#347181' : '#243847'} roughness={0.85} /></mesh>
+    {[-0.55,0.55].map(z => <mesh key={z} position={[0,0.66,z]}>
+      <boxGeometry args={[4.1,0.2,0.055]} /><meshStandardMaterial color={COLORS.steel} metalness={0.6} /></mesh>)}
+    {[-1.72,-1.17,-0.62,-0.07,0.48,1.03,1.58].map(x => <mesh key={x}
+      position={[x,0.33,0]} rotation={[Math.PI/2,0,0]}>
+      <cylinderGeometry args={[0.14,0.14,0.79,12]} />
+      <meshStandardMaterial color="#607b8f" metalness={0.5} /></mesh>)}
+    {[-1.45,1.45].map(x => [-0.4,0.4].map(z => <mesh key={`${x}-${z}`} position={[x,0.17,z]}>
+      <boxGeometry args={[0.08,0.46,0.08]} /><meshStandardMaterial color={COLORS.steel} /></mesh>))}
+    {parcel && <group position={[-1.9 + parcel.position*3.8, 0.87,
+      parcel.route === 'reject' ? 0.9 : 0]}>
+      <mesh><boxGeometry args={[0.42,0.40,0.40]} />
+        <meshStandardMaterial color={parcel.kind === 'marked' ? '#f0a75a' : '#7cb4c9'} /></mesh>
+      <mesh position={[0,0.205,0]}><boxGeometry args={[0.26,0.015,0.26]} />
+        <meshStandardMaterial color={parcel.kind === 'marked' ? '#602c28' : '#d3e4ef'} /></mesh>
+    </group>}
+    <mesh position={[0,0.15,-0.57]}><boxGeometry args={[0.52,0.24,0.23]} />
+      <meshStandardMaterial color={status} emissive={active ? COLORS.live : '#000000'} emissiveIntensity={0.22} /></mesh>
+  </group>;
+  if (kind === 'photoeye') return <group>
+    <mesh position={[0,0.44,0]}><boxGeometry args={[0.48,0.60,0.48]} />
+      <meshStandardMaterial color={COLORS.chassis} metalness={0.45} /></mesh>
+    <mesh position={[0,0.55,-0.26]}><boxGeometry args={[0.28,0.28,0.045]} />
+      <meshStandardMaterial color={COLORS.panel} /></mesh>
+    <mesh position={[0,0.58,-0.29]}><sphereGeometry args={[0.105,16,10]} />
+      <meshStandardMaterial color={status} emissive={status} emissiveIntensity={active ? 0.8 : 0.1} /></mesh>
+    <mesh position={[0,0.1,0]}><boxGeometry args={[0.12,0.28,0.12]} />
+      <meshStandardMaterial color={COLORS.steel} /></mesh>
+  </group>;
+  if (kind === 'diverter') return <group>
+    <mesh position={[0,0.29,0]}><boxGeometry args={[0.9,0.54,0.75]} />
+      <meshStandardMaterial color={COLORS.chassis} metalness={0.3} /></mesh>
+    <group rotation={[0, active ? 0.65 : 0, 0]}>
+      <mesh position={[0.35,0.55,0]}><boxGeometry args={[1.04,0.12,0.18]} />
+        <meshStandardMaterial color={active ? '#f0a75a' : COLORS.steel} metalness={0.4} /></mesh>
+    </group>
+    <mesh position={[-0.28,0.65,-0.3]}><sphereGeometry args={[0.06,8,8]} />
+      <meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.5} /></mesh>
+  </group>;
+  if (kind === 'breaker' || kind === 'overload') return <group>
+    <mesh position={[0, 0.47, 0]}><boxGeometry args={[0.84,0.83,0.68]} />
+      <meshStandardMaterial color={COLORS.chassis} metalness={0.22} /></mesh>
+    <mesh position={[0,0.53,-0.355]}><boxGeometry args={[0.56,0.48,0.04]} />
+      <meshStandardMaterial color={COLORS.panel} /></mesh>
+    <group rotation={[0,0,active ? 0 : -0.75]}>
+      <mesh position={[0,0.62,-0.41]}><boxGeometry args={[0.12,0.43,0.12]} />
+        <meshStandardMaterial color={active ? COLORS.live : '#e76c66'} metalness={0.3} /></mesh>
+    </group>
+    <mesh position={[0.29,0.84,-0.38]}><sphereGeometry args={[0.06,10,8]} />
+      <meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.48} /></mesh>
+  </group>;
+  if (kind === 'lamp') return <group>
+    <mesh position={[0,0.20,0]}><cylinderGeometry args={[0.40,0.40,0.18,18]} />
+      <meshStandardMaterial color={COLORS.panel} metalness={0.5} /></mesh>
+    <mesh position={[0,0.53,0]}><sphereGeometry args={[0.33,18,14]} />
+      <meshStandardMaterial color={active ? '#f4bc65' : '#637382'}
+        emissive={active ? '#e8a438' : '#000000'} emissiveIntensity={active ? 0.9 : 0} /></mesh>
+  </group>;
+  if (kind === 'motor' || kind === 'revmotor') return <group>
+    <mesh position={[0, 0.46, 0]} rotation={[0, 0, Math.PI / 2]}>
+      <cylinderGeometry args={[0.34, 0.34, 0.84, 18]} /><meshStandardMaterial color={active ? '#247f72' : COLORS.chassis} metalness={0.35} roughness={0.5} />
+    </mesh>
+    {[-0.34, -0.2, -0.06, 0.08, 0.22, 0.36].map(x => <mesh key={x} position={[x, 0.46, 0]} rotation={[0, 0, Math.PI / 2]}>
+      <torusGeometry args={[0.35, 0.018, 5, 20]} /><meshStandardMaterial color={COLORS.steel} />
+    </mesh>)}
+    <mesh position={[0.58, 0.46, 0]} rotation={[0, 0, Math.PI / 2]}>
+      <cylinderGeometry args={[0.09, 0.09, 0.5, 12]} /><meshStandardMaterial color={COLORS.light} metalness={0.65} />
+    </mesh>
+    <mesh position={[0, 0.17, 0]}><boxGeometry args={[0.9, 0.12, 0.68]} /><meshStandardMaterial color={COLORS.panel} /></mesh>
+    <mesh position={[0, 0.9, 0.05]}><sphereGeometry args={[0.07, 10, 8]} /><meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.5} /></mesh>
+    <group position={[0.90, 0.46, 0]} rotation={[motorAngleRad, 0, 0]}>
+      {[0, 1, 2].map(i => <mesh key={i} position={[0, Math.cos(i * Math.PI * 2 / 3) * 0.18, Math.sin(i * Math.PI * 2 / 3) * 0.18]} rotation={[i * Math.PI * 2 / 3, 0, 0]}>
+        <boxGeometry args={[0.04, 0.26, 0.1]} />
+        <meshStandardMaterial color={COLORS.light} metalness={0.55} />
+      </mesh>)}
+    </group>
+  </group>;
+  if (kind === 'start' || kind === 'stop' || kind === 'estop' || kind === 'reversebutton') return <group>
+    <mesh position={[0, 0.22, 0]}><boxGeometry args={[0.86, 0.38, 0.76]} /><meshStandardMaterial color={COLORS.chassis} metalness={0.2} /></mesh>
+    <mesh position={[0, pressed ? 0.39 : 0.47, 0]}><cylinderGeometry args={[0.23, 0.26, 0.15, 24]} />
+      <meshStandardMaterial color={kind === 'start' ? '#16a77b' : kind === 'reversebutton' ? '#e3a14c' : '#d84e4a'} metalness={0.15} />
+    </mesh>
+    <mesh position={[0, 0.36, 0]}><cylinderGeometry args={[0.32, 0.32, 0.08, 24]} /><meshStandardMaterial color={COLORS.steel} metalness={0.35} /></mesh>
+  </group>;
+  if (kind === 'contactor' || kind === 'forwardcontactor' || kind === 'reversecontactor') return <group>
+    <mesh position={[0, 0.5, 0]}><boxGeometry args={[1, 0.89, 0.78]} /><meshStandardMaterial color={COLORS.chassis} /></mesh>
+    <mesh position={[0, 0.75, -0.4]}><boxGeometry args={[0.72, 0.3, 0.04]} /><meshStandardMaterial color={COLORS.panel} /></mesh>
+    {[-0.27, 0, 0.27].map(x => <mesh key={x} position={[x, 0.51, -0.405]}>
+      <boxGeometry args={[0.16, 0.16, 0.05]} /><meshStandardMaterial color={COLORS.steel} />
+    </mesh>)}
+    <mesh position={[0, 0.96, 0]}><boxGeometry args={[0.8, 0.09, 0.68]} /><meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.26} /></mesh>
+  </group>;
+  if (kind === 'supply') return <group>
+    <mesh position={[0, 0.43, 0]}><boxGeometry args={[1.04, 0.76, 0.74]} /><meshStandardMaterial color={COLORS.chassis} /></mesh>
+    <mesh position={[0, 0.56, -0.38]}><boxGeometry args={[0.73, 0.19, 0.04]} /><meshStandardMaterial color={COLORS.panel} /></mesh>
+    {[-0.2, 0, 0.2].map(x => <mesh key={x} position={[x, 0.75, 0.0]}>
+      <boxGeometry args={[0.095, 0.04, 0.48]} /><meshStandardMaterial color={COLORS.steel} /></mesh>)}
+    <mesh position={[0.34, 0.24, -0.39]}><sphereGeometry args={[0.05, 10, 10]} /><meshStandardMaterial color={COLORS.live} emissive={COLORS.live} emissiveIntensity={0.5} /></mesh>
+  </group>;
+  return <group>
+    <mesh position={[0, 0.46, 0]}><boxGeometry args={[1.15, 0.82, 0.68]} /><meshStandardMaterial color={COLORS.chassis} metalness={0.2} /></mesh>
+    <mesh position={[0, 0.60, -0.35]}><boxGeometry args={[0.94, 0.35, 0.05]} /><meshStandardMaterial color={COLORS.panel} /></mesh>
+    {[-0.28, -0.08, 0.12, 0.32].map((x, i) => <mesh key={i} position={[x, 0.69, -0.385]}>
+      <boxGeometry args={[0.12, 0.07, 0.02]} /><meshStandardMaterial color={active ? COLORS.live : COLORS.steel} emissive={active ? COLORS.live : '#000000'} emissiveIntensity={0.24} /></mesh>)}
+    <mesh position={[0, 0.25, -0.355]}><boxGeometry args={[0.82, 0.1, 0.04]} /><meshStandardMaterial color={COLORS.steel} /></mesh>
+  </group>;
+}
+
+function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
+  c: PlacedComponent; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number;
+  editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
+  onTerminal: (id: string) => void; onOperate: (id: string) => void; onSelect: (id: string) => void;
+}) {
+  const [x, y, z] = worldPosition(c);
+  const def = COMPONENTS[c.kind];
+  return <group position={[x, y, z]}>
+    <mesh position={[0, 0.035, 0]} onClick={e => { e.stopPropagation(); onSelect(c.id); }}>
+      <boxGeometry args={[1.5, 0.08, 1.2]} />
+      <meshStandardMaterial color={moveTarget === c.id ? COLORS.highlight : COLORS.panel} />
+    </mesh>
+    <group onClick={e => { e.stopPropagation(); onSelect(c.id); }}>
+      <DeviceSculpture kind={c.kind} active={active} pressed={c.pressed} motorAngleRad={motorAngleRad}
+        parcel={c.kind === 'conveyor' ? parcel : null}
+        tankLevelMl={c.kind === 'tank' ? tankLevelMl : undefined} />
+    </group>
+    <Html position={[0, 1.22, 0]} center distanceFactor={11}>
+      <div className="sandbox-3d-label">
+        <strong>{def.label}</strong>
+        <small>{c.kind === 'revmotor' ? (direction ?? 'stopped').toUpperCase() :
+          c.kind === 'forwardcontactor' || c.kind === 'reversecontactor' ? (active ? 'CLOSED' : 'OPEN') :
+          c.kind === 'motor' ? (active ? 'RUNNING' : 'STOPPED') :
+          c.kind === 'contactor' ? (active ? 'ENERGISED' : 'OFF') :
+          c.kind === 'plc' ? (active ? 'POWERED' : 'UNPOWERED') :
+          c.kind === 'conveyor' ? (active ? 'BELT MOVING' : 'BELT STOPPED') :
+          c.kind === 'photoeye' ? (active ? 'MARK DETECTED' : 'NO MARK') :
+          c.kind === 'diverter' ? (active ? 'REJECT ACTIVE' : 'PASS') :
+          c.kind === 'tank' ? `${Math.round(tankLevelMl ?? 0)} / 1000 ml` :
+          c.kind === 'pump' ? (active ? 'PUMPING' : 'STOPPED') :
+          c.kind === 'levelprobe' ? (active ? 'HIGH LEVEL' : 'LOW LEVEL') :
+          c.kind === 'drainvalve' ? (active ? 'DRAIN OPEN' : 'CLOSED') :
+          c.kind === 'breaker' ? (active ? 'CLOSED' : 'TRIPPED') :
+          c.kind === 'overload' ? (active ? '95-96 CLOSED' : 'TRIPPED') :
+          c.kind === 'lamp' ? (active ? 'ILLUMINATED' : 'OFF') :
+          c.kind === 'supply' ? '24 V DC' : c.kind === 'estop' ?
+          (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') : c.pressed ? 'PRESSED' : 'RELEASED'}</small>
+        {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') && <button type="button"
+          disabled={false} onPointerDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); onOperate(c.id); }}>{c.pressed ? 'Release' : 'Press'}</button>}
+      </div>
+    </Html>
+    {def.terminals.map(t => {
+      const fullId = `${c.id}.${t.name}`;
+      const selected = selectedTerminal === fullId;
+      const position: [number, number, number] = [t.side === 'left' ? -0.64 : 0.64, 0.35, (t.y - 65) / 120];
+      return <group key={t.name} position={position}>
+        <mesh onClick={e => { e.stopPropagation(); if (editable) onTerminal(fullId); }}>
+          <sphereGeometry args={[0.105, 12, 8]} />
+          <meshStandardMaterial color={selected ? COLORS.highlight : COLORS.light}
+            emissive={selected ? COLORS.highlight : '#000000'} emissiveIntensity={0.35} />
+        </mesh>
+        <Html position={[t.side === 'left' ? -0.14 : 0.14, 0.09, 0]} center distanceFactor={12}>
+          <button type="button" className={`sandbox-3d-terminal ${selected ? 'selected' : ''}`}
+            data-scene-terminal-id={fullId} disabled={!editable}
+            aria-label={`Connect ${fullId} in 3D`}
+            onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onTerminal(fullId); }}>{t.name}</button>
+        </Html>
+      </group>;
+    })}
+  </group>;
+}
+
+function Cable3D({ project, from, to, live }: { project: ProjectFile; from: string; to: string; live: boolean }) {
+  const curve = useMemo(() => {
+    const p1 = terminalPoint(project, from);
+    const p2 = terminalPoint(project, to);
+    if (!p1 || !p2) return null;
+    const distance = p1.distanceTo(p2);
+    const rise = clamp(0.25 + distance * 0.09, 0.26, 0.78);
+    const a = p1.clone().add(new Vector3(0, rise, 0));
+    const b = p2.clone().add(new Vector3(0, rise, 0));
+    const middle = p1.clone().add(p2).multiplyScalar(0.5).add(new Vector3(0, rise + 0.1, 0));
+    return new CatmullRomCurve3([p1, a, middle, b, p2]);
+  }, [project, from, to]);
+  if (!curve) return null;
+  return <mesh>
+    <tubeGeometry args={[curve, 20, 0.025, 5, false]} />
+    <meshStandardMaterial color={live ? COLORS.live : COLORS.cable} emissive={live ? COLORS.live : '#000000'} emissiveIntensity={live ? 0.2 : 0} />
+  </mesh>;
+}
+
+function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPlaceAt }: {
+  project: ProjectFile; snapshot: RenderSnapshot; editable: boolean;
+  selectedTerminal: string | null; moveTarget: string | null;
+  onTerminal: (id: string) => void; onOperate: (id: string) => void;
+  onSelect: (id: string) => void; onPlaceAt: (at: XY) => void;
+}) {
+  return <>
+    <color attach="background" args={['#0c1927']} />
+    <ambientLight intensity={1.1} />
+    <directionalLight position={[-4, 9, 6]} intensity={1.7} />
+    <directionalLight position={[8, 4, -5]} intensity={0.6} color="#a5d5ff" />
+    <mesh position={[0, -0.09, 0]} rotation={[-Math.PI / 2, 0, 0]}
+      onClick={event => { if (moveTarget && editable) { event.stopPropagation(); onPlaceAt(projectPlacement(event.point)); } }}>
+      <planeGeometry args={[11.3, 6.3]} />
+      <meshStandardMaterial color="#152a3d" />
+    </mesh>
+    <Grid position={[0, -0.075, 0]} args={[11, 6]} cellSize={0.5}
+      cellColor="#28465c" sectionColor="#46718d" cellThickness={0.6} sectionThickness={1}
+      fadeDistance={35} infiniteGrid={false} />
+    {project.wires.map(w => <Cable3D key={w.id} project={project} from={w.from} to={w.to}
+      live={snapshot.voltages[w.from] === 24 && snapshot.voltages[w.to] === 24} />)}
+    {project.components.map(c => <Device3D key={c.id} c={c} editable={editable}
+      motorAngleRad={c.kind === 'revmotor' ? snapshot.reverseMotorAngleRad : snapshot.motorAngleRad}
+      direction={c.kind === 'revmotor' ? snapshot.motorDirection : undefined}
+      parcel={snapshot.plant.parcel} tankLevelMl={snapshot.tank.levelMl}
+      selectedTerminal={selectedTerminal} moveTarget={moveTarget}
+      active={c.kind === 'revmotor' ? snapshot.motorDirection !== 'stopped' :
+        c.kind === 'forwardcontactor' ? snapshot.forwardContactorOn :
+        c.kind === 'reversecontactor' ? snapshot.reverseContactorOn :
+        c.kind === 'motor' ? snapshot.motorOn : c.kind === 'contactor' ? snapshot.contactorOn :
+        c.kind === 'plc' ? snapshot.io.PlcPowered :
+        c.kind === 'conveyor' ? snapshot.conveyorOn :
+        c.kind === 'diverter' ? snapshot.diverterOn :
+        c.kind === 'photoeye' ? snapshot.io.Photoeye :
+        c.kind === 'pump' ? snapshot.pumpOn :
+        c.kind === 'drainvalve' ? snapshot.drainOn :
+        c.kind === 'levelprobe' ? snapshot.io.TankHigh :
+        c.kind === 'breaker' ? !snapshot.breakerTripped :
+        c.kind === 'overload' ? !snapshot.overloadTripped :
+        c.kind === 'lamp' ? snapshot.lampOn :
+        c.kind === 'estop' ? !c.pressed :
+        c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false}
+      onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect} />)}
+    <OrbitControls makeDefault enablePan enableZoom enableRotate
+      minDistance={4.4} maxDistance={23} minPolarAngle={0.1} maxPolarAngle={Math.PI / 2.05}
+      target={[0, 0, 0]} />
+    <GizmoHelper alignment="bottom-right" margin={[76, 76]}><GizmoViewport axisColors={['#d45b59', '#4db987', '#549fea']} labelColor="#ffffff" /></GizmoHelper>
+  </>;
+}
+
+export type Sandbox3DProps = {
+  project: ProjectFile; snapshot: RenderSnapshot;
+  editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
+  selectedDeviceId: string | null; onSelectDevice: (id: string) => void;
+  onTerminal: (id: string) => void;
+  onOperate: (id: string) => void;
+  onPlace: (kind: ComponentKind, at: XY) => void;
+  onMove: (id: string, at: XY) => void;
+  onMoveFinished: () => void;
+};
+export function Sandbox3D(props: Sandbox3DProps) {
+  const available = useMemo(supportsWebGL, []);
+  const camera = useRef<Camera | null>(null);
+  const onPlaceAt = (at: XY) => {
+    if (!props.moveTarget) return;
+    props.onMove(props.moveTarget, at);
+    props.onMoveFinished();
+  };
+  const drop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!props.editable || !available) return;
+    const kind = event.dataTransfer.getData('text/plain').replace(/^add:/, '') as ComponentKind;
+    if (!Object.hasOwn(COMPONENTS, kind) || !camera.current) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const mouse = new Vector2((event.clientX - rect.left) / rect.width * 2 - 1,
+      -((event.clientY - rect.top) / rect.height * 2 - 1));
+    const ray = new Raycaster();
+    ray.setFromCamera(mouse, camera.current);
+    const point = new Vector3();
+    if (ray.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), 0), point)) {
+      props.onPlace(kind, projectPlacement(point));
+    }
+  };
+  return <div className="sandbox-3d-shell" aria-label="Interactive 3D industrial automation workspace"
+    onDragOver={event => { if (props.editable && available) event.preventDefault(); }} onDrop={drop}>
+    {available ? <Canvas className="sandbox-three-canvas" dpr={[1, 1.5]}
+      gl={{ antialias: true, powerPreference: 'low-power' }}
+      camera={{ position: [7, 8.5, 10], fov: 42, near: 0.1, far: 120 }}
+      onCreated={state => { camera.current = state.camera; state.camera.lookAt(0, 0, 0); }}>
+      <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
+        selectedTerminal={props.selectedTerminal} moveTarget={props.moveTarget}
+        onTerminal={props.onTerminal} onOperate={props.onOperate}
+        onSelect={props.onSelectDevice} onPlaceAt={onPlaceAt} />
+    </Canvas> : <div className="sandbox-3d-fallback" role="status">
+      <strong>3D renderer unavailable on this device</strong>
+      <p>The PLC simulator still runs. Use the component patch panel below to wire, operate and inspect devices without WebGL.</p>
+    </div>}
+    <div className="sandbox-3d-hud">
+      <span>3D WORKBENCH · Orbit: drag · Pan: right-drag · Zoom: wheel</span>
+      <span>{props.moveTarget ? 'Move selected: click the workbench floor' : props.selectedDeviceId ? `Selected: ${props.selectedDeviceId}` : 'Select a device or terminal'}</span>
+    </div>
+  </div>;
+}

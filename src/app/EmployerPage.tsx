@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getTrade } from '../trades/registry';
+import { SCENARIO_META } from '../exercises/meta';
 import {
   assignmentLink,
   decodeResult,
@@ -15,11 +16,12 @@ export function EmployerPage() {
   const plc = getTrade('plc');
   const playable = useMemo(() => plc?.exercises ?? [], [plc]);
   const [exerciseId, setExerciseId] = useState(playable[0]?.id ?? '');
+  const scenarios = useMemo(() => SCENARIO_META.filter(s => s.trade === 'plc'), []);
   const [label, setLabel] = useState('');
   const [assignment, setAssignment] = useState<Assignment | null>(null);
 
   const createAssignment = () => {
-    const def = playable.find((e) => e.id === exerciseId);
+    const def = playable.find((e) => e.id === exerciseId) ?? scenarios.find((e) => e.id === exerciseId);
     if (!def) return;
     const a: Assignment = {
       kind: 'skills-lab-assignment',
@@ -50,9 +52,16 @@ export function EmployerPage() {
             <label className="field">
               <span>Exercise</span>
               <select value={exerciseId} onChange={(e) => setExerciseId(e.target.value)}>
-                {playable.map((e) => (
-                  <option key={e.id} value={e.id}>Rank {e.rank} — {e.title}</option>
-                ))}
+                <optgroup label="Guided exercises">
+                  {playable.map((e) => (
+                    <option key={e.id} value={e.id}>Rank {e.rank} — {e.title}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Sandbox scenarios (real 3D simulator)">
+                  {scenarios.map((e) => (
+                    <option key={e.id} value={e.id}>Rank {e.rank} — {e.title}</option>
+                  ))}
+                </optgroup>
               </select>
             </label>
             <label className="field">

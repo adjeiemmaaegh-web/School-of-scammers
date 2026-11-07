@@ -293,8 +293,8 @@ async function run(){
   await page.waitForSelector('section[aria-label="Instructor and learner field validation evidence"]');
   assert.ok(await page.$('input[aria-label="Trial duration"]'),'Human evidence form must render without uploading personal data');
   await visit(page,'/simulation');
-  for(const b of ['Record visual inspection','Read PLC I/O','Reconnect sensor circuit','START MOTOR','Verify operation','Submit task'])await click(page,b);
-  assert.ok((await page.$eval('body',e=>e.innerText)).includes('Assessment report'));
+  for(const b of ['Record visual inspection','Read PLC I/O','Stop / isolate motor','Reconnect sensor circuit','Start motor','Verify operation','Submit attempt'])await click(page,b);
+  assert.ok(!!(await page.$('.result-panel')),'Retained guided exercise must show practice rubric result');
   console.log('ASSESSMENT PASS');
   await page.setViewport({width:390,height:780});
   for(const route of ['/','/labs','/starter-lab','/electrical-bench','/pneumatics','/workcell-composer','/dc-circuit']){
