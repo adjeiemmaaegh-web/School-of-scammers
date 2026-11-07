@@ -7,7 +7,7 @@ import { ExercisePage } from './ExercisePage';
 import { EmployerPage } from './EmployerPage';
 import { CandidatePage } from './CandidatePage';
 import { AppHeader } from '../ui/AppHeader';
-import { SandboxPage } from './SandboxPage';
+const SandboxPage = React.lazy(() => import('./SandboxPage').then(m => ({ default: m.SandboxPage })));
 
 /* Legacy engine lab surfaces — kept reachable under /labs/* so the salvaged
    simulation engine stays exercised and nothing is orphaned during the rebuild. */
@@ -90,7 +90,9 @@ export function App() {
       }}>Skip to main content</a>
       <Routes>
         <Route path="/" element={<FrontDoor />} />
-        <Route path="/sandbox" element={<SandboxPage />} />
+        <Route path="/sandbox" element={<Suspense fallback={<main id="main" className="wrap wrap-wide page">
+          <p role="status">Loading the 3D engineering workbench…</p>
+        </main>}><SandboxPage /></Suspense>} />
         <Route path="/trades" element={<TradePicker />} />
         <Route path="/trade/:tradeId" element={<TradeLadder />} />
         <Route path="/exercise/:exerciseId" element={<ExercisePage />} />
