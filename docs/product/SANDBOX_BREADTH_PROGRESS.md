@@ -34,12 +34,27 @@ The goal this serves: a learner builds a *plant*, not one fixed circuit: several
 - **Supervisory alarms, the scan trace and scan/tag breakpoints follow the first PLC only** (the I/O lamps, tag monitor and ladder highlights follow the selected PLC). A `START_FAILURE`-style alarm for a second panel does not exist yet.
 - **No communication between PLCs other than wiring** (no Ethernet/Modbus/Profinet, no HMI).
 - With 12 or more devices the 3D floor's labels overlap (the floor has a fixed size and the camera a fixed range); the keyboard/phone wiring panel stays fully usable. A larger floor and zoom-to-fit belong with the canvas work.
-- Placement is still by hand: no remove-component command, no copy/paste of a panel, no free-form canvas yet. Layout is the existing 40-device-class 3D floor.
+- Placement is by hand or by the starter-panel template (see slice 2); no copy/paste or free-form canvas yet.
 - It remains an idealised, bounded 24 V DC teaching model, not safety-rated and not general electrical simulation.
+
+## Slice 2 — editing a plant like a bench (branch `engineering/p8-edit-plant`)
+
+Until now a device could be placed but never removed, and a second panel meant 22 manual wires.
+
+- **`remove {id}`** deletes a device and everything that depended on it: the wires on its terminals, faults on it or on those wires, its PLC program, its meter probes, and its per-device runtime (the runtime is rebuilt). Removing the **first PLC promotes the next**: its program and language become the legacy top-level fields, because those always belong to the first PLC. Removing the only PLC keeps the program. Paused only.
+- **`addPanel {template: 'motor-starter', at?}`** drops in a six-part, eleven-wire, already-programmed starter panel at a free slot on the floor (2 x 2 slots sized to the real 170 x 130 footprint) or at `at`, with fresh ids that cannot collide with the user's own, honouring the 6-PLC, 6-supply, 60-component and 250-wire limits. Paused only.
+- **UI**: *Add starter panel*, a **Remove** button on every device card, the **Delete** key on the selected device (never while typing in a field), and **Undo** for remove/add (an undo point is kept only if the worker actually changed the project, so a refused edit leaves none). The pre-wired panel is hidden in graded scenarios because it would hand over the answer.
+- **A pre-existing usability bug found and fixed**: the sticky toolbar slid *behind* the sticky app header after scrolling, so Run, Pause and every other toolbar button could not be clicked once the page was scrolled. The toolbar now sits below the header's measured height, and the E2E fails if any toolbar button is covered after scrolling (verified by putting the bug back).
+
+Evidence: `tests/edit-plant.test.ts` (19, mutation-checked: wires surviving removal, no promotion of the next PLC, faults not cleaned, overlapping panels, id collisions, runtime not rebuilt, meter probes kept, program entry kept, PLC limit not enforced: nine mutants, all caught) and `scripts/sandbox-p8-edit-plant-browser.cjs` (real Chrome: one-click working panel, add four panels, refused fifth, undo, remove a motor and see its two wires go, delete the first PLC and see the next take over, Delete key, reload, no overflow at 390 px).
+
+Two regressions in my own earlier work surfaced while verifying this slice, and are fixed: (1) the new Remove button made the device-card action row too wide on a phone (the row now wraps; the multi-PLC E2E's 390 px check caught it, and now names the offending elements); (2) with the toolbar correctly below the header it covers a band of the viewport, so three older E2E scripts that clicked an element already partly visible behind it now scroll the target to the centre first, as a person would. `sandbox-browser-acceptance.cjs` also had a latent race (it dropped onto the 3D floor before the canvas had measured itself, still 300x150) that appeared in back-to-back runs; it now waits for the real canvas size and passed 6 of 6 standalone and 3 of 3 after another script.
+
+Limits: no copy/paste of arbitrary selections, no multi-select, no undo for ordinary edits (placing, wiring, moving), only for remove/add panel; one panel template; undo history lives in the page, not in the saved project.
 
 ## Next slices (proposed, not started)
 
-1. A remove/duplicate-panel command and a templates menu, so a second panel is one action.
+1. Undo/redo for every edit, copy/paste and more panel templates (forward/reverse, protected starter).
 2. Per-panel alarms and a per-PLC scan trace.
 3. Multi-instance plant devices (two conveyors, two tanks) with a generic device model.
 4. Pneumatic cylinders and valves in the sandbox.

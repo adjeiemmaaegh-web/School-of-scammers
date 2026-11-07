@@ -143,7 +143,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     // 7. A phone-width screen keeps the PLC tabs usable with no horizontal scroll.
     await page.setViewport({ width: 390, height: 900, deviceScaleFactor: 1 });
     await sleep(400);
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1), false, 'no horizontal overflow at 390px');
+    const overflow = await page.evaluate(() => {
+      if (document.documentElement.scrollWidth <= window.innerWidth + 1) return null;
+      return [...document.querySelectorAll('body *')].filter(el => el.getBoundingClientRect().right > window.innerWidth + 1 && !el.closest('[class*="sandbox-3d"]') && !el.closest('canvas'))
+        .slice(0, 8).map(el => `${el.tagName}.${String(el.className).slice(0, 40)}`);
+    });
+    assert.equal(overflow, null, `no horizontal overflow at 390px: ${JSON.stringify(overflow)}`);
     assert.ok(await page.$('[data-plc-tab="plc-2"]'));
     assert.deepEqual(errors.filter(e => !/favicon|WebGL|GPU stall|swiftshader/i.test(e)), [], 'No page errors');
     console.log('P7 multi-PLC browser E2E PASS');
