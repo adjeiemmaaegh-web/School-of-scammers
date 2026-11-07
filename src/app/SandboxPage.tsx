@@ -205,7 +205,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     if (project?.components.length) return;
     setMoveTarget(null);
     const columns = [10, 185, 360];
-    const rows = [25, 215];
+    const rows = [10, 150];
     const panel = (n: number, dx: number): Command[] => ([
       ['supply', 0, 0], ['plc', 1, 0], ['contactor', 2, 0], ['start', 0, 1], ['stop', 1, 1], ['motor', 2, 1],
     ] as const).map(([kind, col, row]): Command => ({

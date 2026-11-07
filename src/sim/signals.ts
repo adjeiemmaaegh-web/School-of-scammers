@@ -148,6 +148,10 @@ export type Command =
   | { k: 'revealFault'; id: string }
   /** Replace a component or re-terminate a wire. Needs the simulation paused (isolated). */
   | { k: 'repair'; target: string }
+  /** Delete a device and everything that depended on it (its wires, faults, PLC program). Paused only. */
+  | { k: 'remove'; id: string }
+  /** Drop in a ready-made, pre-wired start/stop starter panel at a free spot (or `at`). Paused only. */
+  | { k: 'addPanel'; template: 'motor-starter'; at?: XY }
   | { k: 'feedParcel'; kind: ParcelKind }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }

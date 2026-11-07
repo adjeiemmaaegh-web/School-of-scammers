@@ -13,6 +13,8 @@ import {
 } from './plcs';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
+import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
+export { MAX_COMPONENTS, MAX_WIRES };
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
   describeFault, effectivePressed, effectiveSensor, faultsOf, hasFault, nextFaultId, pickSeededFault,
@@ -133,8 +135,6 @@ const validPos = (value: unknown): value is { x: number; y: number } =>
   typeof value.x === 'number' && Number.isFinite(value.x) && value.x >= 0 && value.x <= 3000 &&
   typeof value.y === 'number' && Number.isFinite(value.y) && value.y >= 0 && value.y <= 3000;
 
-export const MAX_COMPONENTS = 60;
-export const MAX_WIRES = 250;
 export function validateProject(raw: unknown): ProjectFile {
   if (!raw || typeof raw !== 'object') throw new Error('Project must be an object');
   const p = raw as Partial<ProjectFile>;
@@ -185,7 +185,6 @@ export function validateProject(raw: unknown): ProjectFile {
     ...(plcPrograms ? { plcPrograms } : {}),
   };
 }
-const MAX_SUPPLIES = 6;
 /** Programs of the additional PLCs. Keys must name a PLC after the first; omitted when there are none. */
 function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[]): Record<string, PlcProgram> | undefined {
   if (raw === undefined) return undefined;
@@ -349,6 +348,28 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       else {
         world = withFaults(world, faultsOf(world.project).filter(f => f.target !== cmd.target));
         commandEvents.push({ tick: world.tick, kind: 'repair', detail: repairDetail(cmd.target) });
+      }
+    }
+    else if (cmd.k === 'remove') {
+      const without = removeComponent(world.project, cmd.id);
+      if (!without) world = setError(world, 'Unknown component');
+      else {
+        // Rebuild the runtime: per-device and per-PLC state for the removed part must not linger.
+        const probe = (t: string | null) => (t && terminalExists(t, without.components) ? t : null);
+        const kept = { ...world.meter, positive: probe(world.meter.positive), negative: probe(world.meter.negative),
+          volts: null, status: 'select' as const };
+        world = { ...createWorld(without), meter: kept, breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
+        commandEvents.push({ tick: world.tick, kind: 'edit', detail: `Removed ${cmd.id} and everything wired to it` });
+      }
+    } else if (cmd.k === 'addPanel') {
+      if (cmd.template !== 'motor-starter' || (cmd.at !== undefined && !validPos(cmd.at))) world = setError(world, 'Unknown panel template or position');
+      else {
+        const plan = planStarterPanel(world.project, cmd.at);
+        if (!plan.ok) world = setError(world, plan.error);
+        else {
+          world = { ...world, project: withStarterPanel(world.project, plan, latchProgram()) };
+          commandEvents.push({ tick: world.tick, kind: 'edit', detail: `Added a pre-wired starter panel (${plan.plcId})` });
+        }
       }
     }
     else if (cmd.k === 'place') {
