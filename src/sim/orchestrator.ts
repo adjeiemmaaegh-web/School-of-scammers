@@ -17,7 +17,7 @@ import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
 import { laneOf, lanesOf, vesselOf, vesselsOf } from './stations';
 import { electricalDevices } from '../components/electrical-defs';
-import { freshCylinder, stepCylinder } from '../plant/cylinder';
+import { clearedAlarm, engineFault, freshCylinder, stepCylinder } from '../plant/cylinder';
 export { MAX_COMPONENTS, MAX_WIRES };
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
@@ -253,6 +253,9 @@ function syncLegacy(w: WorldState): WorldState {
     breakerTripped: !!breaker && w.tripped[breaker.id] === true,
     overloadTripped: !!overload && w.tripped[overload.id] === true };
 }
+/** A cylinder latches its alarm until it is reset; repairing it (or clearing its fault) resets it. */
+const resetCylinderAlarm = (w: WorldState, id: string): WorldState =>
+  w.cylinders[id] ? { ...w, cylinders: { ...w.cylinders, [id]: clearedAlarm(w.cylinders[id]) } } : w;
 const quietLanes = (lanes: Record<string, SortingPlant>): Record<string, SortingPlant> =>
   Object.fromEntries(Object.entries(lanes).map(([id, lane]) => [id, { ...lane, photoeyeActive: false }]));
 /** Truth a photoeye reports: the lane (conveyor) it is positioned along. No lane, no detection. */
@@ -392,6 +395,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (!fault) world = setError(world, 'Unknown fault');
       else if (cmd.k === 'clearFault') {
         world = withFaults(world, faultsOf(world.project).filter(f => f.id !== cmd.id));
+        world = resetCylinderAlarm(world, fault.target);
         commandEvents.push({ tick: world.tick, kind: 'fault', detail: fault.hidden
           ? 'A hidden fault was cleared' : `Fault cleared: ${describeFault(fault)}` });
       } else if (fault.hidden) {
@@ -406,6 +410,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         world = setError(world, 'Nothing to repair: unknown component or wire');
       else {
         world = withFaults(world, faultsOf(world.project).filter(f => f.target !== cmd.target));
+        world = resetCylinderAlarm(world, cmd.target);
         commandEvents.push({ tick: world.tick, kind: 'repair', detail: repairDetail(cmd.target) });
       }
     }
@@ -897,9 +902,11 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const deviceOn: Record<string, boolean> = {};
   const motorAngles: Record<string, number> = {};
   for (const c of w.project.components) {
-    if (!['contactor', 'motor', 'lamp', 'conveyor', 'diverter', 'pump', 'drainvalve', 'relay'].includes(c.kind)) continue;
+    if (!['contactor', 'motor', 'lamp', 'conveyor', 'diverter', 'pump', 'drainvalve', 'relay', 'stacklight'].includes(c.kind)) continue;
     const on = circuit.energizedLoads.includes(c.id);
     deviceOn[c.id] = on;
+    // A stack light has three lamps, each its own load: record every lamp by `<id>-R`, `-Y` and `-G`.
+    if (c.kind === 'stacklight') for (const lamp of ['R', 'Y', 'G']) deviceOn[`${c.id}-${lamp}`] = circuit.energizedLoads.includes(`${c.id}-${lamp}`);
     if (c.kind === 'motor') {
       const prev = w.motorAngles[c.id] ?? (c.id === motor?.id ? w.motorAngleRad : 0);
       motorAngles[c.id] = on ? (prev + dtMs * 0.02) % (2 * Math.PI) : prev;
@@ -913,7 +920,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // Every pneumatic cylinder moves from its two solenoid coils, as solved from the wiring.
   const nextCylinders: Record<string, CylinderState> = {};
   for (const c of w.project.components.filter(x => x.kind === 'cylinder')) {
-    const step = stepCylinder(w.cylinders[c.id] ?? freshCylinder(), circuit.energizedLoads.includes(`${c.id}-E`), circuit.energizedLoads.includes(`${c.id}-R`), dtMs);
+    const fault = engineFault(faultsOf(w.project).find(f => f.target === c.id && f.kind.startsWith('cylinder-'))?.kind);
+    const step = stepCylinder(w.cylinders[c.id] ?? freshCylinder(), circuit.energizedLoads.includes(`${c.id}-E`), circuit.energizedLoads.includes(`${c.id}-R`), dtMs, fault);
     nextCylinders[c.id] = step.state;
     for (const detail of step.events) events.push({ tick: w.tick + 1, kind: 'cylinder', detail: `${c.id}: ${detail}` });
   }

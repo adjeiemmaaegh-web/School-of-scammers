@@ -11,7 +11,8 @@ export type XY = { x: number; y: number };
 export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean };
 export type Wire = { id: string; from: string; to: string };
 /** Component/wire failures that alter what the circuit solver sees (P5). */
-export type FaultKind = 'wire-open' | 'contactor-coil-open' | 'contactor-welded' | 'motor-open-winding' | 'button-stuck' | 'sensor-stuck';
+export type FaultKind = 'wire-open' | 'contactor-coil-open' | 'contactor-welded' | 'motor-open-winding' | 'button-stuck' | 'sensor-stuck'
+  | 'cylinder-no-air' | 'cylinder-jammed' | 'cylinder-ext-switch-dead' | 'cylinder-ret-switch-dead';
 export type FaultSpec = {
   id: string;
   kind: FaultKind;

@@ -20,6 +20,7 @@ import type { FaultKind, FaultSpec, PlacedComponent, ProjectFile, Wire } from '.
 export const MAX_FAULTS = 8;
 export const FAULT_KINDS: readonly FaultKind[] = [
   'wire-open', 'contactor-coil-open', 'contactor-welded', 'motor-open-winding', 'button-stuck', 'sensor-stuck',
+  'cylinder-no-air', 'cylinder-jammed', 'cylinder-ext-switch-dead', 'cylinder-ret-switch-dead',
 ];
 const COMPONENT_TARGETS: Record<Exclude<FaultKind, 'wire-open'>, readonly ComponentKind[]> = {
   'contactor-coil-open': ['contactor', 'forwardcontactor', 'reversecontactor', 'relay'],
@@ -28,6 +29,11 @@ const COMPONENT_TARGETS: Record<Exclude<FaultKind, 'wire-open'>, readonly Compon
   // The training E-stop is deliberately not fault-injectable here.
   'button-stuck': ['start', 'stop', 'reversebutton'],
   'sensor-stuck': ['photoeye', 'levelprobe'],
+  // Cylinder faults map onto the cylinder engine's own faults (no air, jammed rod, dead limit switches).
+  'cylinder-no-air': ['cylinder'],
+  'cylinder-jammed': ['cylinder'],
+  'cylinder-ext-switch-dead': ['cylinder'],
+  'cylinder-ret-switch-dead': ['cylinder'],
 };
 export const FAULT_LABEL: Record<FaultKind, string> = {
   'wire-open': 'Open conductor (broken wire)',
@@ -36,6 +42,10 @@ export const FAULT_LABEL: Record<FaultKind, string> = {
   'motor-open-winding': 'Motor winding open',
   'button-stuck': 'Pushbutton contact stuck',
   'sensor-stuck': 'Sensor output stuck',
+  'cylinder-no-air': 'Cylinder: no air supply',
+  'cylinder-jammed': 'Cylinder: rod jammed',
+  'cylinder-ext-switch-dead': 'Cylinder: EXTENDED limit switch dead',
+  'cylinder-ret-switch-dead': 'Cylinder: RETRACTED limit switch dead',
 };
 const ID = /^[A-Za-z0-9_-]{1,45}$/;
 
@@ -107,6 +117,10 @@ export function describeFault(f: FaultSpec): string {
     case 'motor-open-winding': return `Open winding in ${f.target}`;
     case 'button-stuck': return `Pushbutton ${f.target} contact stuck as if ${f.stuckPressed ? 'pressed' : 'released'}`;
     case 'sensor-stuck': return `Sensor ${f.target} output stuck ${f.stuckActive ? 'ON' : 'OFF'}`;
+    case 'cylinder-no-air': return `No air supply to cylinder ${f.target}`;
+    case 'cylinder-jammed': return `Rod of cylinder ${f.target} jammed`;
+    case 'cylinder-ext-switch-dead': return `EXTENDED limit switch of cylinder ${f.target} dead`;
+    case 'cylinder-ret-switch-dead': return `RETRACTED limit switch of cylinder ${f.target} dead`;
   }
 }
 
