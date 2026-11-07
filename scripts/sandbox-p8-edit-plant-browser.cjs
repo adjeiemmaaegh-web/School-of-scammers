@@ -14,6 +14,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  // The ready-made starters live in a menu: open it, then choose, as a person would.
+  const starter = async selector => { await page.click('[data-starters] > summary'); await page.waitForSelector(`${selector}`, { visible: true }); await page.click(selector); };
   const clickText = async text => {
     const ok = await page.evaluate(label => {
       const b = [...document.querySelectorAll('button')].find(el => el.textContent.trim() === label);
@@ -46,13 +48,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   try {
     await page.setViewport({ width: 1440, height: 940, deviceScaleFactor: 1 });
     await page.goto(base + '/sandbox', { waitUntil: 'networkidle0', timeout: 20000 });
-    await page.waitForSelector('[data-add-panel]');
+    await page.waitForSelector('[data-starters]');
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle0' });
-    await page.waitForSelector('[data-add-panel]');
+    await page.waitForSelector('[data-starters]');
 
     // 1. One click gives a complete, wired, programmed starter. No manual wiring or programming.
-    await page.click('[data-add-panel]');
+    await starter('[data-add-panel]');
     await waitCounts(6, 11);
     assert.equal((await counts()).tabs, 0, 'A single PLC shows no PLC tabs');
     await clickText('▶ Run');
@@ -64,20 +66,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     // The sticky toolbar must stay clickable after scrolling (it once slid behind the sticky app header).
     assert.ok(await page.evaluate(() => scrollY) > 100, 'The page scrolled when a device button was pressed');
     assert.equal(await page.evaluate(() => {
-      const hidden = [...document.querySelectorAll('.sandbox-toolbar button')].filter(b => {
+      const hidden = [...document.querySelectorAll('.sandbox-toolbar button')].filter(b => !b.closest('details:not([open])')).filter(b => {
         const r = b.getBoundingClientRect();
         const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
         return top !== b && !b.contains(top);
       });
       return hidden.map(b => b.textContent.trim());
     }).then(list => list.join('|')), '', 'No toolbar button may be covered by the app header');
+    // The sticky toolbar stays a single short row now that the presets are in the Starters menu.
+    assert.ok(await page.$eval('.sandbox-toolbar', e => e.getBoundingClientRect().height) < 80, 'The toolbar fits one row at 1440 px');
     // Edits are blocked while running, including Remove and Add.
     assert.equal(await page.$eval('[data-device-id="motor-1"] [data-remove-device]', b => b.disabled), true);
     assert.equal(await page.$eval('[data-add-panel]', b => b.disabled), true);
     await clickText('Pause'); await paused();
 
     // 2. A second panel is a second PLC with its own program; the two run independently.
-    await page.click('[data-add-panel]');
+    await starter('[data-add-panel]');
     await waitCounts(12, 22);
     await page.waitForSelector('[data-plc-tab="plc-2"]');
     await clickText('Reset scan state');
@@ -88,15 +92,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await clickText('Pause'); await paused();
 
     // 3. The floor holds four panels; the fifth is refused with a clear message.
-    await page.click('[data-add-panel]'); await waitCounts(18, 33);
-    await page.click('[data-add-panel]'); await waitCounts(24, 44);
-    await page.click('[data-add-panel]');
+    await starter('[data-add-panel]'); await waitCounts(18, 33);
+    await starter('[data-add-panel]'); await waitCounts(24, 44);
+    await starter('[data-add-panel]');
     await page.waitForFunction(() => /No free space/.test(document.querySelector('[role="alert"].sandbox-alert')?.textContent ?? ''), { timeout: 5000 });
     assert.deepEqual(await counts(), { devices: 24, wires: 44, tabs: 4 });
     // A refused add leaves no undo point behind: undo goes back to three panels, not to a no-op.
     await page.click('[data-undo]'); await waitCounts(18, 33);
     await page.click('[data-undo]'); await waitCounts(12, 22);
-    await page.click('[data-add-panel]'); await waitCounts(18, 33);
+    await starter('[data-add-panel]'); await waitCounts(18, 33);
     await page.click('[data-undo]'); await waitCounts(12, 22);
 
     // 4. Remove a motor: it goes, with exactly its two wires. The rest of the plant still works.

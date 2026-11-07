@@ -379,19 +379,26 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       <div className="sandbox-toolbar">
         {!scenario && <>
         <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setActiveStage('build'); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
-        <button className="btn ghost small" onClick={layout} disabled={!editable || !!project?.components.length}>Place starter layout</button>
-        <button className="btn ghost small" onClick={layoutSorting}
-          disabled={!editable || !!project?.components.length}>Place 3D sorting layout</button>
-        <button className="btn ghost small" data-add-panel onClick={() => send([{ k: 'addPanel', template: 'motor-starter' }])}
-          disabled={!editable}>Add starter panel</button>
-        <button className="btn ghost small" onClick={layoutTwoPanels} data-layout-two-panels
-          disabled={!editable || !!project?.components.length}>Place two-panel layout</button>
-        <button className="btn ghost small" onClick={layoutTank}
-          disabled={!editable || !!project?.components.length}>Place 3D tank layout</button>
-        <button className="btn ghost small" onClick={layoutProtectedDOL}
-          disabled={!editable || !!project?.components.length}>Place protected DOL layout</button>
-        <button className="btn ghost small" onClick={layoutReverser}
-          disabled={!editable || !!project?.components.length}>Place reversing DOL layout</button>
+        {/* The ready-made starters live in one menu so the sticky toolbar stays a single short row. */}
+        <details className="sandbox-starters" data-starters>
+          <summary className="btn ghost small">Starters</summary>
+          <div className="sandbox-starters-menu" role="group" aria-label="Ready-made starters"
+            onClick={e => { if ((e.target as HTMLElement).closest('button')) (e.currentTarget.closest('details') as HTMLDetailsElement).open = false; }}>
+            <button className="btn ghost small" data-add-panel onClick={() => send([{ k: 'addPanel', template: 'motor-starter' }])}
+              disabled={!editable}>Add starter panel</button>
+            <button className="btn ghost small" onClick={layout} disabled={!editable || !!project?.components.length}>Place starter layout</button>
+            <button className="btn ghost small" onClick={layoutTwoPanels} data-layout-two-panels
+              disabled={!editable || !!project?.components.length}>Place two-panel layout</button>
+            <button className="btn ghost small" onClick={layoutSorting}
+              disabled={!editable || !!project?.components.length}>Place 3D sorting layout</button>
+            <button className="btn ghost small" onClick={layoutTank}
+              disabled={!editable || !!project?.components.length}>Place 3D tank layout</button>
+            <button className="btn ghost small" onClick={layoutProtectedDOL}
+              disabled={!editable || !!project?.components.length}>Place protected DOL layout</button>
+            <button className="btn ghost small" onClick={layoutReverser}
+              disabled={!editable || !!project?.components.length}>Place reversing DOL layout</button>
+          </div>
+        </details>
         </>}
         <button className="btn ghost small" data-undo onClick={undo}
           disabled={!editable || !undoStack.length}>Undo</button>
