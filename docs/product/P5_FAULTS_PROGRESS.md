@@ -41,6 +41,7 @@ Not injectable: the training E-stop (deliberately), PLC internals, the diverter 
 - `scripts/sandbox-p5-sensor-browser.cjs` — real UI on the running sorting line: healthy plain parcel accepted → hidden stuck-ON photoeye injected while running → input lamp lit with no part present → plain parcel wrongly rejected → multimeter shows 24 V at I0.2 → reveal → replace sensor → correct sorting restored. Passed 10/10 consecutive runs.
 - Whole suite at the sensor-fault commit: 672/672 unit tests; all ten sandbox browser scenarios pass locally. CI runs both P5 scripts after the P4 reversing step.
 - **CI (before sensor faults):** `ci.yml` was dispatched manually on the branch (CI does not run on plain branch pushes): [run 42334198337](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/42334198337) on `f60ce7f` succeeded end to end, including the first P5 E2E, the P4 reversing E2E, bundle budgets, offline, accessibility, no-WebGL and the Linux Firefox/WebKit smoke. The Windows Edge workflow, low-spec Windows and real-GPU 3D runs were not performed.
+- **CI (with sensor faults):** [run 42362095139](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/42362095139), also a manual dispatch, on `2162117` succeeded end to end, including both P5 E2Es, the P4 reversing E2E, accessibility and the Linux Firefox/WebKit smoke. Later commits on the branch are documentation only.
 
 ## Still open
 
