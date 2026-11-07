@@ -139,7 +139,7 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
       <meshStandardMaterial color={active ? '#f4bc65' : '#637382'}
         emissive={active ? '#e8a438' : '#000000'} emissiveIntensity={active ? 0.9 : 0} /></mesh>
   </group>;
-  if (kind === 'motor') return <group>
+  if (kind === 'motor' || kind === 'revmotor') return <group>
     <mesh position={[0, 0.46, 0]} rotation={[0, 0, Math.PI / 2]}>
       <cylinderGeometry args={[0.34, 0.34, 0.84, 18]} /><meshStandardMaterial color={active ? '#247f72' : COLORS.chassis} metalness={0.35} roughness={0.5} />
     </mesh>
@@ -158,14 +158,14 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
       </mesh>)}
     </group>
   </group>;
-  if (kind === 'start' || kind === 'stop' || kind === 'estop') return <group>
+  if (kind === 'start' || kind === 'stop' || kind === 'estop' || kind === 'reversebutton') return <group>
     <mesh position={[0, 0.22, 0]}><boxGeometry args={[0.86, 0.38, 0.76]} /><meshStandardMaterial color={COLORS.chassis} metalness={0.2} /></mesh>
     <mesh position={[0, pressed ? 0.39 : 0.47, 0]}><cylinderGeometry args={[0.23, 0.26, 0.15, 24]} />
-      <meshStandardMaterial color={kind === 'start' ? '#16a77b' : '#d84e4a'} metalness={0.15} />
+      <meshStandardMaterial color={kind === 'start' ? '#16a77b' : kind === 'reversebutton' ? '#e3a14c' : '#d84e4a'} metalness={0.15} />
     </mesh>
     <mesh position={[0, 0.36, 0]}><cylinderGeometry args={[0.32, 0.32, 0.08, 24]} /><meshStandardMaterial color={COLORS.steel} metalness={0.35} /></mesh>
   </group>;
-  if (kind === 'contactor') return <group>
+  if (kind === 'contactor' || kind === 'forwardcontactor' || kind === 'reversecontactor') return <group>
     <mesh position={[0, 0.5, 0]}><boxGeometry args={[1, 0.89, 0.78]} /><meshStandardMaterial color={COLORS.chassis} /></mesh>
     <mesh position={[0, 0.75, -0.4]}><boxGeometry args={[0.72, 0.3, 0.04]} /><meshStandardMaterial color={COLORS.panel} /></mesh>
     {[-0.27, 0, 0.27].map(x => <mesh key={x} position={[x, 0.51, -0.405]}>
@@ -189,8 +189,8 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
   </group>;
 }
 
-function Device3D({ c, active, motorAngleRad, parcel, tankLevelMl, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
-  c: PlacedComponent; active: boolean; motorAngleRad: number; parcel?: Parcel | null; tankLevelMl?: number;
+function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
+  c: PlacedComponent; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number;
   editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string, pressed: boolean) => void; onSelect: (id: string) => void;
 }) {
@@ -209,7 +209,9 @@ function Device3D({ c, active, motorAngleRad, parcel, tankLevelMl, editable, sel
     <Html position={[0, 1.22, 0]} center distanceFactor={11}>
       <div className="sandbox-3d-label">
         <strong>{def.label}</strong>
-        <small>{c.kind === 'motor' ? (active ? 'RUNNING' : 'STOPPED') :
+        <small>{c.kind === 'revmotor' ? (direction ?? 'stopped').toUpperCase() :
+          c.kind === 'forwardcontactor' || c.kind === 'reversecontactor' ? (active ? 'CLOSED' : 'OPEN') :
+          c.kind === 'motor' ? (active ? 'RUNNING' : 'STOPPED') :
           c.kind === 'contactor' ? (active ? 'ENERGISED' : 'OFF') :
           c.kind === 'plc' ? (active ? 'POWERED' : 'UNPOWERED') :
           c.kind === 'conveyor' ? (active ? 'BELT MOVING' : 'BELT STOPPED') :
@@ -224,7 +226,7 @@ function Device3D({ c, active, motorAngleRad, parcel, tankLevelMl, editable, sel
           c.kind === 'lamp' ? (active ? 'ILLUMINATED' : 'OFF') :
           c.kind === 'supply' ? '24 V DC' : c.kind === 'estop' ?
           (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') : c.pressed ? 'PRESSED' : 'RELEASED'}</small>
-        {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop') && <button type="button"
+        {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') && <button type="button"
           disabled={false} onPointerDown={e => e.stopPropagation()}
           onClick={e => { e.stopPropagation(); onOperate(c.id, !c.pressed); }}>{c.pressed ? 'Release' : 'Press'}</button>}
       </div>
@@ -291,10 +293,15 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
       fadeDistance={35} infiniteGrid={false} />
     {project.wires.map(w => <Cable3D key={w.id} project={project} from={w.from} to={w.to}
       live={snapshot.voltages[w.from] === 24 && snapshot.voltages[w.to] === 24} />)}
-    {project.components.map(c => <Device3D key={c.id} c={c} editable={editable} motorAngleRad={snapshot.motorAngleRad}
+    {project.components.map(c => <Device3D key={c.id} c={c} editable={editable}
+      motorAngleRad={c.kind === 'revmotor' ? snapshot.reverseMotorAngleRad : snapshot.motorAngleRad}
+      direction={c.kind === 'revmotor' ? snapshot.motorDirection : undefined}
       parcel={snapshot.plant.parcel} tankLevelMl={snapshot.tank.levelMl}
       selectedTerminal={selectedTerminal} moveTarget={moveTarget}
-      active={c.kind === 'motor' ? snapshot.motorOn : c.kind === 'contactor' ? snapshot.contactorOn :
+      active={c.kind === 'revmotor' ? snapshot.motorDirection !== 'stopped' :
+        c.kind === 'forwardcontactor' ? snapshot.forwardContactorOn :
+        c.kind === 'reversecontactor' ? snapshot.reverseContactorOn :
+        c.kind === 'motor' ? snapshot.motorOn : c.kind === 'contactor' ? snapshot.contactorOn :
         c.kind === 'plc' ? snapshot.io.PlcPowered :
         c.kind === 'conveyor' ? snapshot.conveyorOn :
         c.kind === 'diverter' ? snapshot.diverterOn :
@@ -306,7 +313,7 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
         c.kind === 'overload' ? !snapshot.overloadTripped :
         c.kind === 'lamp' ? snapshot.lampOn :
         c.kind === 'estop' ? !c.pressed :
-        c.kind === 'start' || c.kind === 'stop' ? c.pressed : false}
+        c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect} />)}
     <OrbitControls makeDefault enablePan enableZoom enableRotate
       minDistance={4.4} maxDistance={23} minPolarAngle={0.1} maxPolarAngle={Math.PI / 2.05}
