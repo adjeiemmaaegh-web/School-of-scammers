@@ -198,6 +198,10 @@ describe('P4 actual interlocked forward / reverse drive',()=>{
       expect(dup.lastError).toMatch(/one of each station/);
     }
     expect(COMPONENTS.revmotor.terminals.map(t=>t.name)).toEqual(['F+','R+','M-']);
+    const importedDuplicate={...w.project,components:[...w.project.components,
+      {...w.project.components.find(c=>c.kind==='forwardcontactor')!,id:'extra-forward'}]};
+    expect(()=>validateProject(importedDuplicate)).toThrow(/Only one forwardcontactor/);
+    expect(tick(w,[{k:'loadProject',project:importedDuplicate}]).world.project).toEqual(w.project);
     const reset=tick(scan(press(run(w),'start'),5),[{k:'reset'}]).world;
     expect(reset.motorDirection).toBe('stopped');
     expect(reset.forwardContactorOn).toBe(false);
