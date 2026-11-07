@@ -141,7 +141,7 @@ export function validateProject(raw: unknown): ProjectFile {
   }
   // One of each protective branch device per educational circuit: state is
   // explicitly maintained per role, not silently shared among duplicates.
-  for (const kind of ['breaker', 'overload', 'estop'] as const)
+  for (const kind of ['breaker', 'overload', 'estop', 'reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor'] as const)
     if (components.filter(c => c.kind === kind).length > 1)
       throw new Error(`Only one ${kind} protection device is supported`);
   const wireIds = new Set<string>();
