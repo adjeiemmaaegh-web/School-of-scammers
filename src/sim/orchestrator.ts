@@ -184,11 +184,9 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           world = component.kind === 'breaker'
             ? { ...world, breakerTripped: cmd.action === 'trip' }
             : { ...world, overloadTripped: cmd.action === 'trip' };
-          // A manual protective trip cancels the retained motor Run latch.
-          // Merely resetting a protective device cannot by itself restart Run.
-          if (cmd.action === 'trip') world = { ...world,
-            coils: { ...world.coils, Run: false },
-            tagValues: { ...world.tagValues, Run: false } };
+          // The overload contact is hardwired to the contactor, not to PLC
+          // memory: do not silently rewrite the learner's Run latch.
+          // A deliberately unsafe program may restart when 95-96 is reset.
           commandEvents.push({ tick: world.tick, kind: 'protection',
             detail: `${component.kind} ${cmd.action === 'trip' ? 'opened (manual training trip)' : 'reset by learner'}` });
         }
