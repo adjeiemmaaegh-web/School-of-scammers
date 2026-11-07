@@ -158,7 +158,7 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
       </mesh>)}
     </group>
   </group>;
-  if (kind === 'start' || kind === 'stop') return <group>
+  if (kind === 'start' || kind === 'stop' || kind === 'estop') return <group>
     <mesh position={[0, 0.22, 0]}><boxGeometry args={[0.86, 0.38, 0.76]} /><meshStandardMaterial color={COLORS.chassis} metalness={0.2} /></mesh>
     <mesh position={[0, pressed ? 0.39 : 0.47, 0]}><cylinderGeometry args={[0.23, 0.26, 0.15, 24]} />
       <meshStandardMaterial color={kind === 'start' ? '#16a77b' : '#d84e4a'} metalness={0.15} />
@@ -222,8 +222,9 @@ function Device3D({ c, active, motorAngleRad, parcel, tankLevelMl, editable, sel
           c.kind === 'breaker' ? (active ? 'CLOSED' : 'TRIPPED') :
           c.kind === 'overload' ? (active ? '95-96 CLOSED' : 'TRIPPED') :
           c.kind === 'lamp' ? (active ? 'ILLUMINATED' : 'OFF') :
-          c.kind === 'supply' ? '24 V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</small>
-        {(c.kind === 'start' || c.kind === 'stop') && <button type="button"
+          c.kind === 'supply' ? '24 V DC' : c.kind === 'estop' ?
+          (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') : c.pressed ? 'PRESSED' : 'RELEASED'}</small>
+        {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop') && <button type="button"
           disabled={false} onPointerDown={e => e.stopPropagation()}
           onClick={e => { e.stopPropagation(); onOperate(c.id, !c.pressed); }}>{c.pressed ? 'Release' : 'Press'}</button>}
       </div>
@@ -304,7 +305,7 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
         c.kind === 'breaker' ? !snapshot.breakerTripped :
         c.kind === 'overload' ? !snapshot.overloadTripped :
         c.kind === 'lamp' ? snapshot.lampOn :
-        c.kind === 'start' || c.kind === 'stop' ? c.pressed : false}
+        c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' ? c.pressed : false}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect} />)}
     <OrbitControls makeDefault enablePan enableZoom enableRotate
       minDistance={4.4} maxDistance={23} minPolarAngle={0.1} maxPolarAngle={Math.PI / 2.05}
