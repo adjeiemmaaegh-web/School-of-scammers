@@ -92,6 +92,13 @@ export function solverWires(project: ProjectFile): ReadonlyArray<readonly [strin
   return project.wires.filter(w => !open.has(w.id)).map(w => [w.from, w.to] as const);
 }
 
+/** The one place the repair log line is spelled, shared by the worker and the P6 grader. */
+export const repairDetail = (target: string): string => `Replaced ${target} with the simulation isolated`;
+export function parseRepairDetail(detail: string): string | null {
+  const m = /^Replaced (\S+) with the simulation isolated$/.exec(detail);
+  return m ? m[1] : null;
+}
+
 export function describeFault(f: FaultSpec): string {
   switch (f.kind) {
     case 'wire-open': return `Open conductor in wire ${f.target}`;

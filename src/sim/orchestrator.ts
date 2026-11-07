@@ -11,7 +11,7 @@ import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
   describeFault, effectivePressed, effectiveSensor, faultsOf, hasFault, nextFaultId, pickSeededFault,
-  solverWires, validateFaults, type FaultCandidate,
+  repairDetail, solverWires, validateFaults, type FaultCandidate,
 } from './faults';
 export { validateSandboxProgram } from '../program/p2-contract';
 import type { Command, FaultSpec, PlacedComponent, ProjectFile, RenderSnapshot, SimEvent, WorldState } from './signals';
@@ -307,7 +307,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         world = setError(world, 'Nothing to repair: unknown component or wire');
       else {
         world = withFaults(world, faultsOf(world.project).filter(f => f.target !== cmd.target));
-        commandEvents.push({ tick: world.tick, kind: 'repair', detail: `Replaced ${cmd.target} with the simulation isolated` });
+        commandEvents.push({ tick: world.tick, kind: 'repair', detail: repairDetail(cmd.target) });
       }
     }
     else if (cmd.k === 'place') {
