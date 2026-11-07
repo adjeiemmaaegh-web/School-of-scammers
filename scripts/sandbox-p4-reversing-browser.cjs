@@ -61,6 +61,11 @@ async function direction(page,value) {
   assert.equal(await page.$eval('[data-forward-contactor]',e=>e.textContent),'CLOSED');
   assert.equal(await page.$eval('[data-reverse-contactor]',e=>e.textContent),'OPEN');
   await clickDevice(page,'start-5'); // release
+  // The opposite command alone cannot reverse an active latched drive.
+  await clickDevice(page,'reversebutton-6');
+  await new Promise(resolve=>setTimeout(resolve,300));
+  assert.equal(await page.$eval('[data-direction]',e=>e.textContent),'FORWARD');
+  await clickDevice(page,'reversebutton-6');
   await clickDevice(page,'stop-7'); // stop NC opens
   await direction(page,'STOPPED');
   await clickDevice(page,'stop-7'); // restore NC
@@ -68,6 +73,10 @@ async function direction(page,value) {
   await direction(page,'REVERSE');
   assert.equal(await page.$eval('[data-reverse-contactor]',e=>e.textContent),'CLOSED');
   await clickDevice(page,'reversebutton-6'); // release
+  await clickDevice(page,'start-5'); // opposite command while reverse latched
+  await new Promise(resolve=>setTimeout(resolve,300));
+  assert.equal(await page.$eval('[data-direction]',e=>e.textContent),'REVERSE');
+  await clickDevice(page,'start-5'); // release
   await clickDevice(page,'stop-7'); await direction(page,'STOPPED'); await clickDevice(page,'stop-7');
   // Simultaneous requests from stopped condition are blocked in user Ladder.
   await clickDevice(page,'start-5');await clickDevice(page,'reversebutton-6');
