@@ -16,7 +16,7 @@ export const DEFAULT_ST_SOURCE = [
   'Run := StopOK AND (Start OR Run);',
 ].join('\n');
 
-const builtIns = new Set(['Start', 'StopOK', 'Photoeye', 'TankHigh', 'Run', 'Sort', 'Fill', 'Drain', 'Forward', 'Reverse', 'Unused']);
+const builtIns = new Set(['Start', 'StopOK', 'Photoeye', 'TankHigh', 'ReverseRequest', 'Run', 'Sort', 'Fill', 'Drain', 'Forward', 'Reverse', 'Unused']);
 const safeTag = (tag: string) => /^[A-Za-z][A-Za-z0-9_.]{0,39}$/.test(tag) &&
   !['__proto__', 'constructor', 'prototype'].includes(tag.toLowerCase());
 
