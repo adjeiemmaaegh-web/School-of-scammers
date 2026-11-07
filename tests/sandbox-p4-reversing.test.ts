@@ -144,10 +144,10 @@ describe('P4 actual interlocked forward / reverse drive',()=>{
     expect(w.motorDirection).toBe('stopped');
     expect(w.forwardContactorOn).toBe(false);
     expect(w.reverseContactorOn).toBe(false);
+    // Release the momentary START command before resetting the supply path.
+    // The prior PLC Run memory has been lost during E-stop isolation.
+    w=scan(release(w,'start'),2);
     w=scan(release(w,'estop'),5);
-    // Since the pressed start button is still held, a new request can start.
-    // Release it first to test that a restored supply alone does not restart.
-    w=scan(release(w,'start'),5);
     expect(w.motorDirection).toBe('stopped');
   });
   it('typed ST Forward/Reverse BOOL outputs use the SAME physical interlock and motor loads',()=>{
