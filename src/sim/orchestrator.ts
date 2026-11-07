@@ -526,6 +526,31 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const pump = w.project.components.find(c => c.kind === 'pump');
   const drain = w.project.components.find(c => c.kind === 'drainvalve');
   const lamp = w.project.components.find(c => c.kind === 'lamp');
+  const forwardContactor = w.project.components.find(c => c.kind === 'forwardcontactor');
+  const reverseContactor = w.project.components.find(c => c.kind === 'reversecontactor');
+  const reversibleMotor = w.project.components.find(c => c.kind === 'revmotor');
+  // Coil currents come only from the resolved electrical graph, including
+  // the opposite contactor's physically wired NC auxiliary. The simplified
+  // mechanical interlock also inhibits both when simultaneous energized coils
+  // are detected (e.g. user bypasses both NC auxiliaries).
+  const forwardCoilOn = !!forwardContactor && circuit.energizedLoads.includes(forwardContactor.id);
+  const reverseCoilOn = !!reverseContactor && circuit.energizedLoads.includes(reverseContactor.id);
+  const interlockConflict = forwardCoilOn && reverseCoilOn;
+  const forwardContactorOn = forwardCoilOn && !interlockConflict;
+  const reverseContactorOn = reverseCoilOn && !interlockConflict;
+  const forwardMotorPowered = !!reversibleMotor &&
+    circuit.energizedLoads.includes(`${reversibleMotor.id}-F`);
+  const reverseMotorPowered = !!reversibleMotor &&
+    circuit.energizedLoads.includes(`${reversibleMotor.id}-R`);
+  const opposingDrives = forwardMotorPowered && reverseMotorPowered;
+  const motorDirection: 'stopped' | 'forward' | 'reverse' =
+    interlockConflict || opposingDrives ? 'stopped' :
+      forwardMotorPowered ? 'forward' : reverseMotorPowered ? 'reverse' : 'stopped';
+  // The simple modeled shaft follows only worker-owned scan time and observed
+  // 24V motor terminal energization. Reverse rotates in the negative direction.
+  const reverseMotorAngleRad = motorDirection === 'stopped' ? w.reverseMotorAngleRad :
+    (w.reverseMotorAngleRad + (motorDirection === 'forward' ? 1 : -1) * dtMs * 0.02 +
+      2 * Math.PI * 100) % (2 * Math.PI);
   const contactorOn = !!contactor && circuit.energizedLoads.includes(contactor.id);
   // 7. Advance P1 plant: ideal DC motor load, no fake animation or invented motion physics.
   const motorOn = !!motor && circuit.energizedLoads.includes(motor.id);
@@ -546,6 +571,12 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
   if (motorOn !== w.motorOn) events.push({ tick: w.tick + 1, kind: 'motor', detail: motorOn ? 'Motor running' : 'Motor stopped' });
+  if (motorDirection !== w.motorDirection) events.push({ tick: w.tick + 1,
+    kind: 'direction', detail: `Reversible motor ${motorDirection}` });
+  if (interlockConflict && !w.interlockConflict) events.push({ tick: w.tick + 1,
+    kind: 'interlock', detail: 'Simultaneous contactor-coil demand: modeled mechanical interlock prevents both from closing' });
+  if (opposingDrives) events.push({ tick: w.tick + 1,
+    kind: 'wiring', detail: 'Both forward and reverse motor feeds energized; reversible motor inhibited' });
   const nextTick = w.tick + 1;
   const scanHit = w.breakpointScan === nextTick ? `Paused at scan ${nextTick}` : null;
   const edgeHit = w.breakpointTag && tagEdge(w.tagValues[w.breakpointTag.tag],
@@ -566,6 +597,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     ladderSteps: [...(ladderResult?.steps ?? [])],
     stMemory: stResult?.memory ?? {},
     tagValues, powered, inputs, contactorOn, motorOn, motorAngleRad,
+    forwardContactorOn, reverseContactorOn, motorDirection,
+    reverseMotorAngleRad, interlockConflict,
     conveyorOn, diverterOn, plant: nextPlant.plant,
     pumpOn, drainOn, tank: nextTank.tank, lampOn,
     voltages: circuit.voltage,
@@ -573,6 +606,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     diagnostics: [...circuit.diagnostics,
       ...(w.breakerTripped ? ['Branch breaker open: reset only after removing downstream short'] : []),
       ...(w.overloadTripped ? ['Motor overload auxiliary 95-96 open (manual test trip)'] : []),
+      ...(interlockConflict ? ['Reversing contactors demand simultaneous engagement: mechanical interlock active'] : []),
+      ...(opposingDrives ? ['Both direction terminals energized: reversible motor inhibited'] : []),
       ...(!powered && plc ? ['PLC is not powered (wire L+ and M to the 24V supply)'] : [])],
     breakpointHit,
     running: change.forceStep || !!breakpointHit ? false : w.running,
