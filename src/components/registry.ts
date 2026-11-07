@@ -1,8 +1,19 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
-export type ComponentKind = 'supply' | 'plc' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor';
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor';
 export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
+/** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
+export const isPlcKind = (kind: string): boolean => kind === 'plc' || kind === 'plc16';
+/** Terminals of the 16-in/16-out controller: L+ and M, 16 digital inputs on the left, 16 outputs on the right. */
+export const PLC16_INPUT_TERMINALS = Array.from({ length: 16 }, (_, i) => `I${Math.floor(i / 8)}.${i % 8}`);
+export const PLC16_OUTPUT_TERMINALS = Array.from({ length: 16 }, (_, i) => `Q${Math.floor(i / 8)}.${i % 8}`);
+const plc16Terminals = (): Terminal[] => [
+  { name: 'L+', side: 'left', y: 8, role: 'supply' }, { name: 'M', side: 'left', y: 18, role: 'return' },
+  ...PLC16_INPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'left', y: 30 + i * 6.5, role: 'input' })),
+  ...PLC16_OUTPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'right', y: 30 + i * 6.5, role: 'output' })),
+];
 export const COMPONENTS: Record<ComponentKind, Definition> = {
+  plc16: { kind: 'plc16', label: 'Virtual PLC 16/16', help: '24V PLC, 16 digital inputs and 16 high-side outputs with names you choose', terminals: plc16Terminals() },
   supply: { kind: 'supply', label: '24V supply', help: 'Educational DC source', terminals: [
     { name: 'P24', side: 'right', y: 45, role: 'supply' }, { name: 'M0', side: 'right', y: 92, role: 'return' }] },
   plc: { kind: 'plc', label: 'Virtual PLC', help: '24V PLC, five digital inputs and six high-side outputs', terminals: [

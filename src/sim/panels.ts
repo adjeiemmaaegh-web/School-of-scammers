@@ -3,6 +3,7 @@
  * Pure functions over a `ProjectFile`; the orchestrator applies them (paused only) and resets runtime.
  */
 import type { LadderDocument } from '../engineering/ladder';
+import { isPlcKind } from '../components/registry';
 import { MAX_PLCS, extraPlcs, plcComponents, primaryPlcId, programOf, withProgramOf } from './plcs';
 import type { PlacedComponent, ProjectFile, Wire, XY } from './signals';
 
@@ -32,7 +33,7 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     const { faults: _old, ...rest } = next;
     next = faults.length ? { ...rest, faults } : rest;
   }
-  if (target.kind === 'plc') {
+  if (isPlcKind(target.kind)) {
     const wasFirst = primaryPlcId(project) === id;
     const promoted = wasFirst ? extraPlcs(project)[0] : undefined;
     const remaining = { ...(project.plcPrograms ?? {}) };
@@ -42,8 +43,10 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
       delete remaining[promoted.id];
       next = { ...next, program: cfg.program, language: cfg.language, stSource: cfg.stSource };
     }
-    const { plcPrograms: _old, ...rest } = next;
-    next = Object.keys(remaining).length ? { ...rest, plcPrograms: remaining } : rest;
+    const { plcPrograms: _old, plcIo: _oldIo, ...rest } = next;
+    const io = { ...(project.plcIo ?? {}) };
+    delete io[id];
+    next = { ...rest, ...(Object.keys(remaining).length ? { plcPrograms: remaining } : {}), ...(Object.keys(io).length ? { plcIo: io } : {}) };
   }
   return next;
 }

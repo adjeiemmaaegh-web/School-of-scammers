@@ -1,5 +1,5 @@
 /** P0/P1 authoritative deterministic sandbox. Pure simulation: no DOM, timers or wall clock. */
-import { COMPONENTS, terminalExists, type ComponentKind } from '../components/registry';
+import { COMPONENTS, isPlcKind, terminalExists, type ComponentKind } from '../components/registry';
 import { solveNetAware, type Device } from '../engineering/electrical';
 import { executeLadder, type LadderDocument, type LadderResult } from '../engineering/ladder';
 import { executeStructuredText, type STResult, type STValue } from '../engineering/structured-text';
@@ -8,9 +8,10 @@ import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from 
 import { feedPlant, freshPlant, stepPlant } from '../plant/sorting-conveyor';
 import { freshTank, stepTank } from '../plant/tank-process';
 import {
-  MAX_PLCS, PLC_OUTPUTS, blankProgram, extraPlcs, freshPlcRuntime, plcComponents, plcView, primaryPlcId, programOf,
-  scanExtraPlc, withProgramOf,
+  MAX_PLCS, blankProgram, defaultProgramFor, extraPlcs, freshPlcRuntime, legacyPrimaryId, namesFor, plcComponents, plcView,
+  primaryPlcId, programOf, runtimePlcs, scanPlc, withProgramOf,
 } from './plcs';
+import { LEGACY_IO, defaultIo, ioOf, isConfigurableIo, validateIoMap } from './plc-io';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
@@ -112,13 +113,15 @@ export const newProject = (): ProjectFile => ({
 export function createWorld(project: ProjectFile = newProject()): WorldState {
   return {
     project, running: false, tick: 0, coils: {}, ladderMemory: {}, ladderNumeric: {},
-    stCompiled: project.language === 'st' ? compileSandboxST(project.stSource ?? '') : null,
+    // Only a classic first PLC (or no PLC at all) uses the legacy compiled-program field; every other PLC compiles in its runtime.
+    stCompiled: project.language === 'st' && (legacyPrimaryId(project) !== undefined || plcComponents(project).length === 0)
+      ? compileSandboxST(project.stSource ?? '', namesFor(project, undefined)) : null,
     stMemory: {},
     tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
       Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false }, ladderSteps: [],
     breakpointScan: null, breakpointHit: null, breakpointTag: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
-    plcs: Object.fromEntries(extraPlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id))])),
+    plcs: Object.fromEntries(runtimePlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id), namesFor(project, c.id))])),
     lanes: {}, vessels: {}, tripped: {},
     deviceOn: {}, motorAngles: {},
     forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
@@ -155,7 +158,7 @@ export function validateProject(raw: unknown): ProjectFile {
   }
   // One of each protective branch device per educational circuit: state is
   // explicitly maintained per role, not silently shared among duplicates.
-  if (components.filter(c => c.kind === 'plc').length > MAX_PLCS) throw new Error(`At most ${MAX_PLCS} PLCs are supported`);
+  if (plcComponents({ components }).length > MAX_PLCS) throw new Error(`At most ${MAX_PLCS} PLCs are supported`);
   if (components.filter(c => c.kind === 'supply').length > MAX_SUPPLIES) throw new Error(`At most ${MAX_SUPPLIES} 24V supplies are supported`);
   for (const kind of ['reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor'] as const)
     if (components.filter(c => c.kind === kind).length > 1)
@@ -167,7 +170,9 @@ export function validateProject(raw: unknown): ProjectFile {
         !terminalExists(wire.from, components) || !terminalExists(wire.to, components)) throw new Error('Invalid wire in project');
     wireIds.add(wire.id);
   }
-  const programErrors = validateSandboxProgram(p.program);
+  const plcIo = validatePlcIo(p.plcIo, components);
+  const names = namesFor({ components, plcIo } as ProjectFile, undefined);
+  const programErrors = validateSandboxProgram(p.program, names);
   if (programErrors.length) throw new Error(programErrors.join('; '));
   if (p.language !== undefined && p.language !== 'ladder' && p.language !== 'st')
     throw new Error('Unknown PLC programming language');
@@ -175,11 +180,11 @@ export function validateProject(raw: unknown): ProjectFile {
     throw new Error('Invalid Structured Text source');
   if (p.language === 'st' || p.stSource !== undefined) {
     if (p.language === 'st' && !p.stSource) throw new Error('ST mode requires a compiled source');
-    if (p.stSource) compileSandboxST(p.stSource);
+    if (p.stSource) compileSandboxST(p.stSource, names);
   }
   const wires = p.wires.map(w => ({ id: w.id, from: w.from, to: w.to }));
   const faults = validateFaults(p.faults, components, wires);
-  const plcPrograms = validatePlcPrograms(p.plcPrograms, components);
+  const plcPrograms = validatePlcPrograms(p.plcPrograms, components, plcIo);
   return {
     formatVersion: 1, components, wires, program: p.program,
     ...(p.language !== undefined ? { language: p.language } : {}),
@@ -187,10 +192,26 @@ export function validateProject(raw: unknown): ProjectFile {
     // Omitted when empty so legacy and fault-free projects keep their exact v1 shape.
     ...(faults.length ? { faults } : {}),
     ...(plcPrograms ? { plcPrograms } : {}),
+    ...(plcIo ? { plcIo } : {}),
   };
 }
 /** Programs of the additional PLCs. Keys must name a PLC after the first; omitted when there are none. */
-function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[]): Record<string, PlcProgram> | undefined {
+/** Tag names of the configurable controllers. Keys must be 16/16 PLCs; omitted when there are none. */
+function validatePlcIo(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['plcIo'] | undefined {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid PLC I/O configuration');
+  const out: NonNullable<ProjectFile['plcIo']> = {};
+  for (const [id, map] of Object.entries(raw as Record<string, unknown>)) {
+    const plc = components.find(c => c.id === id);
+    if (!plc || !isConfigurableIo(plc.kind)) throw new Error(`I/O configuration for ${id}: not a configurable PLC in this project`);
+    const errors = validateIoMap(plc.kind, map);
+    if (errors.length) throw new Error(`PLC ${id} I/O: ${errors.join('; ')}`);
+    const m = map as { inputs: Record<string, string>; outputs: Record<string, string> };
+    out[id] = { inputs: { ...m.inputs }, outputs: { ...m.outputs } };
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[], plcIo: ProjectFile['plcIo']): Record<string, PlcProgram> | undefined {
   if (raw === undefined) return undefined;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid PLC programs');
   const extras = new Set(extraPlcs({ components }).map(c => c.id));
@@ -199,12 +220,13 @@ function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[
     if (!extras.has(id)) throw new Error(`PLC program for ${id}: not an additional PLC in this project`);
     const e = entry as Partial<PlcProgram> | null;
     if (!e || typeof e !== 'object' || !e.program) throw new Error(`Invalid program for PLC ${id}`);
-    const issues = validateSandboxProgram(e.program);
+    const names = namesFor({ components, plcIo } as ProjectFile, id);
+    const issues = validateSandboxProgram(e.program, names);
     if (issues.length) throw new Error(`PLC ${id}: ${issues.join('; ')}`);
     if (e.language !== undefined && e.language !== 'ladder' && e.language !== 'st') throw new Error(`PLC ${id}: unknown language`);
     if (e.stSource !== undefined && typeof e.stSource !== 'string') throw new Error(`PLC ${id}: invalid Structured Text source`);
     if (e.language === 'st' && !e.stSource) throw new Error(`PLC ${id}: ST mode requires a source`);
-    if (e.stSource) compileSandboxST(e.stSource);
+    if (e.stSource) compileSandboxST(e.stSource, names);
     out[id] = { program: e.program,
       ...(e.language !== undefined ? { language: e.language } : {}),
       ...(e.stSource !== undefined ? { stSource: e.stSource } : {}) };
@@ -264,9 +286,10 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           const cfg = programOf(world.project, id);
           const label = id !== undefined && id !== primaryPlcId(world.project) ? `PLC ${id}: ` : '';
           try {
-            if (cfg.language === 'st') compileSandboxST(id === undefined || id === primaryPlcId(world.project) ? world.project.stSource ?? '' : cfg.stSource);
+            const names = namesFor(world.project, id);
+            if (cfg.language === 'st') compileSandboxST(id === undefined || id === primaryPlcId(world.project) ? world.project.stSource ?? '' : cfg.stSource, names);
             else {
-              const issues = validateSandboxProgram(cfg.program);
+              const issues = validateSandboxProgram(cfg.program, names);
               if (issues.length) throw new Error(issues.join('; '));
             }
           } catch (error) { throw new Error(`${label}${error instanceof Error ? error.message : 'Program validation failed'}`); }
@@ -405,17 +428,53 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         }
       }
     }
+    else if (cmd.k === 'configureIo') {
+      const plc = plcComponents(world.project).find(c => c.id === cmd.plc);
+      const errors = plc ? validateIoMap(plc.kind, cmd.io) : ['Unknown PLC'];
+      if (!plc || errors.length) world = setError(world, errors.join('; '));
+      else {
+        const merged = { inputs: { ...defaultIo(plc.kind).inputs, ...cmd.io.inputs }, outputs: { ...defaultIo(plc.kind).outputs, ...cmd.io.outputs } };
+        const isDefault = JSON.stringify(merged) === JSON.stringify(defaultIo(plc.kind));
+        const { plcIo: previous, ...rest } = world.project;
+        const nextIo = { ...(previous ?? {}) };
+        if (isDefault) delete nextIo[plc.id]; else nextIo[plc.id] = merged;
+        const candidate: ProjectFile = Object.keys(nextIo).length ? { ...rest, plcIo: nextIo } : rest;
+        // Renaming must not silently break the program that is active on this PLC.
+        const cfg = programOf(candidate, plc.id);
+        const names = namesFor(candidate, plc.id);
+        let problem: string | null = null;
+        try {
+          if (cfg.language === 'st') compileSandboxST(cfg.stSource, names);
+          else { const issues = validateSandboxProgram(cfg.program, names); if (issues.length) problem = issues.join('; '); }
+        } catch (error) { problem = error instanceof Error ? error.message : 'Program no longer compiles'; }
+        if (problem) world = setError(world, `Renaming would break the program on ${plc.id}: ${problem}`);
+        else {
+          world = createWorld(candidate);
+          commandEvents.push({ tick: world.tick, kind: 'edit', detail: `Changed the I/O tags of ${plc.id}` });
+        }
+      }
+    }
     else if (cmd.k === 'place') {
       if (!validId(cmd.id) || !Object.hasOwn(COMPONENTS, cmd.kind) || !validPos(cmd.at) ||
           world.project.components.some(c => c.id === cmd.id) || world.project.components.length >= MAX_COMPONENTS) world = setError(world, 'Invalid component placement');
-      else if (cmd.kind === 'plc' && plcComponents(world.project).length >= MAX_PLCS)
+      else if (isPlcKind(cmd.kind) && plcComponents(world.project).length >= MAX_PLCS)
         world = setError(world, `At most ${MAX_PLCS} PLCs fit on this workbench`);
       else if (cmd.kind === 'supply' && world.project.components.filter(c => c.kind === 'supply').length >= MAX_SUPPLIES)
         world = setError(world, `At most ${MAX_SUPPLIES} 24V supplies fit on this workbench`);
       else if (['reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor'].includes(cmd.kind) &&
         world.project.components.some(c => c.kind === cmd.kind))
         world = setError(world, 'This educational workbench supports one of each station component');
-      else world = { ...world, project: { ...world.project, components: [...world.project.components, { id: cmd.id, kind: cmd.kind, x: cmd.at.x, y: cmd.at.y, pressed: false }] } };
+      else {
+        const firstPlc = isPlcKind(cmd.kind) && plcComponents(world.project).length === 0;
+        let project: ProjectFile = { ...world.project, components: [...world.project.components, { id: cmd.id, kind: cmd.kind, x: cmd.at.x, y: cmd.at.y, pressed: false }] };
+        // The top-level program belongs to the first PLC. A pristine classic placeholder would not compile for a
+        // 16/16 controller (it names Start and Run), so the first controller of that type gets its own placeholder.
+        if (firstPlc && cmd.kind === 'plc16' && JSON.stringify(project.program) === JSON.stringify(blankProgram())) {
+          const fresh = defaultProgramFor('plc16');
+          project = { ...project, program: fresh.program, stSource: fresh.stSource };
+        }
+        world = { ...world, project };
+      }
     } else if (cmd.k === 'move') {
       if (!validPos(cmd.to) || !world.project.components.some(c => c.id === cmd.id)) world = setError(world, 'Invalid movement');
       else world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, ...cmd.to } : c) } };
@@ -435,20 +494,21 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (cmd.plc !== undefined && !plcComponents(world.project).some(c => c.id === cmd.plc)) {
         world = setError(world, 'Unknown PLC');
       } else if (cmd.k === 'loadProgram') {
-        const errors = validateSandboxProgram(cmd.program);
+        const errors = validateSandboxProgram(cmd.program, namesFor(world.project, cmd.plc));
         if (errors.length) world = setError(world, errors.join('; '));
         else world = createWorld(withProgramOf(world.project, cmd.plc, { program: cmd.program, language: 'ladder' }));
       } else if (cmd.k === 'loadST') {
         try {
-          compileSandboxST(cmd.source);
+          compileSandboxST(cmd.source, namesFor(world.project, cmd.plc));
           world = createWorld(withProgramOf(world.project, cmd.plc, { language: 'st', stSource: cmd.source }));
         } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Invalid Structured Text'); }
       } else {
         try {
           const cfg = programOf(world.project, cmd.plc);
-          if (cmd.language === 'st') compileSandboxST(cfg.stSource);
+          const names = namesFor(world.project, cmd.plc);
+          if (cmd.language === 'st') compileSandboxST(cfg.stSource, names);
           if (cmd.language === 'ladder') {
-            const errors = validateSandboxProgram(cfg.program);
+            const errors = validateSandboxProgram(cfg.program, names);
             if (errors.length) throw new Error(errors.join('; '));
           }
           world = createWorld(withProgramOf(world.project, cmd.plc, { language: cmd.language, stSource: cfg.stSource }));
@@ -475,7 +535,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
 }
 function buildCircuit(world: WorldState): Device[] {
   const devices: Device[] = [];
-  const primary = primaryPlcId(world.project);
+  const primary = legacyPrimaryId(world.project);
   for (const c of world.project.components) {
     if (c.kind === 'supply') devices.push({ id: c.id, kind: 'supply', positive: terminal(c.id, 'P24'), negative: terminal(c.id, 'M0'), volts: 24 });
     if (c.kind === 'breaker') devices.push({
@@ -494,11 +554,12 @@ function buildCircuit(world: WorldState): Device[] {
         closed: c.kind === 'start' || c.kind === 'reversebutton' ? pressed : !pressed,
       });
     }
-    if (c.kind === 'plc') {
-      // Each PLC drives only its own output terminals from its own scan state.
+    if (isPlcKind(c.kind)) {
+      // Each PLC drives only its own output terminals, through its I/O map, from its own scan state.
       const coils = c.id === primary ? world.coils : world.plcs[c.id]?.coils ?? {};
-      PLC_OUTPUTS.forEach(([coil, pin], i) => devices.push({ id: i === 0 ? `${c.id}-Q` : `${c.id}-Q${i}`, kind: 'switch',
-        a: terminal(c.id, 'L+'), b: terminal(c.id, pin), closed: coils[coil] === true }));
+      Object.entries(ioOf(world.project, c).outputs).forEach(([pin, tag], i) => devices.push({
+        id: c.kind === 'plc' ? (i === 0 ? `${c.id}-Q` : `${c.id}-Q${i}`) : `${c.id}-${pin}`, kind: 'switch',
+        a: terminal(c.id, 'L+'), b: terminal(c.id, pin), closed: coils[tag] === true }));
     }
     // A stuck-output sensor lies to the PLC: only its electrical output changes. The plant truth
     // (world.plant.photoeyeActive / world.tank.highLevel) keeps computing from real geometry and level.
@@ -558,12 +619,12 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     voltages: { ...world.voltages }, contactorOn: world.contactorOn, motorOn: world.motorOn, motorAngleRad: world.motorAngleRad,
     plcs: Object.fromEntries(plcComponents(world.project).map(c => {
       const lang = programOf(world.project, c.id).language;
-      const idle: PlcInputs = { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false };
+      const idle: Record<string, boolean> = {};
       const rt = world.plcs[c.id];
-      return [c.id, c.id === primaryPlcId(world.project)
-        ? plcView(lang, world.powered, world.inputs, world.coils,
+      return [c.id, c.id === legacyPrimaryId(world.project)
+        ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
           { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory })
-        : plcView(lang, rt?.powered ?? false, rt?.inputs ?? idle, rt?.coils ?? {},
+        : plcView(c.kind, lang, rt?.powered ?? false, ioOf(world.project, c), rt?.tagInputs ?? idle, rt?.coils ?? {},
           { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {} })];
     })),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
@@ -633,15 +694,13 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     }
   }
   const shorted = circuit.diagnostics.some(d => d.startsWith('Supply short'));
-  const plc = w.project.components.find(c => c.kind === 'plc');
+  const plc = plcComponents(w.project)[0];
   // "24 V" always means 24 V relative to the device's OWN reference, so isolated supplies cannot leak.
   const powered = !!plc && !shorted && circuit.reads24(terminal(plc.id, 'L+'), terminal(plc.id, 'M'));
   // 3. Sample actual wired 24V input image, including powered mark photoeye.
   // The photoeye's optical state was determined by the PRIOR plant scan.
-  const eye = w.project.components.find(c => c.kind === 'photoeye');
-  const eyePowered = !!eye && !shorted && circuit.reads24(terminal(eye.id, 'L+'), terminal(eye.id, 'M'));
-  const probe = w.project.components.find(c => c.kind === 'levelprobe');
-  const probePowered = !!probe && !shorted && circuit.reads24(terminal(probe.id, 'L+'), terminal(probe.id, 'M'));
+  const eyePowered = !shorted && w.project.components.some(c => c.kind === 'photoeye' && circuit.reads24(terminal(c.id, 'L+'), terminal(c.id, 'M')));
+  const probePowered = !shorted && w.project.components.some(c => c.kind === 'levelprobe' && circuit.reads24(terminal(c.id, 'L+'), terminal(c.id, 'M')));
   const inputs = {
     Start: powered && circuit.reads24(terminal(plc!.id, 'I0.0'), terminal(plc!.id, 'M')),
     StopOK: powered && circuit.reads24(terminal(plc!.id, 'I0.1'), terminal(plc!.id, 'M')),
@@ -653,7 +712,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   let ladderResult: LadderResult | null = null;
   let stResult: STResult | null = null;
   try {
-    if (powered) {
+    // Only a classic first PLC runs through this original fixed-name path; every other PLC takes the generic path below.
+    if (powered && plc?.kind === 'plc') {
       if (w.project.language === 'st') {
         const compiled = w.stCompiled ?? compileSandboxST(w.project.stSource ?? '');
         stResult = executeStructuredText(compiled, inputs, w.stMemory);
@@ -732,17 +792,16 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // only through the 24V netlist (e.g. one PLC's output wired to another's input).
   const nextPlcs: Record<string, PlcRuntime> = {};
   const unpoweredExtras: string[] = [];
-  for (const extra of extraPlcs(w.project)) {
+  for (const extra of runtimePlcs(w.project)) {
     const extraPowered = !shorted && circuit.reads24(terminal(extra.id, 'L+'), terminal(extra.id, 'M'));
-    const at24 = (pin: string) => circuit.reads24(terminal(extra.id, pin), terminal(extra.id, 'M'));
-    const extraInputs: PlcInputs = {
-      Start: extraPowered && at24('I0.0'), StopOK: extraPowered && at24('I0.1'),
-      Photoeye: extraPowered && eyePowered && at24('I0.2'),
-      TankHigh: extraPowered && probePowered && at24('I0.3'), ReverseRequest: extraPowered && at24('I0.4'),
-    };
+    const io = ioOf(w.project, extra);
+    // A sensor-named input only reads high if some powered sensor of that kind exists (guards a wire straight to P24).
+    const tagInputs = Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => [tag, extraPowered &&
+      (tag === 'Photoeye' ? eyePowered : tag === 'TankHigh' ? probePowered : true) &&
+      circuit.reads24(terminal(extra.id, pin), terminal(extra.id, 'M'))]));
     const cfg = programOf(w.project, extra.id);
     try {
-      nextPlcs[extra.id] = scanExtraPlc(cfg, w.plcs[extra.id] ?? freshPlcRuntime(cfg), extraInputs, extraPowered, dtMs);
+      nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)), tagInputs, extraPowered, dtMs);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PLC runtime failed';
       const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
@@ -758,7 +817,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       };
       return { world: paused, snapshot: renderSnapshot(paused), events: [{ tick: w.tick, kind: 'error', detail: `PLC ${extra.id}: ${message}` }] };
     }
-    if (!extraPowered) unpoweredExtras.push(extra.id);
+    if (!extraPowered && extra.id !== plc?.id) unpoweredExtras.push(extra.id);
   }
   // 5. Publish output image (Q0.0 follows coil Run, only when PLC is powered).
   // 6. Apply outputs to actuators via circuit on the NEXT tick; contactor coil is sampled here.

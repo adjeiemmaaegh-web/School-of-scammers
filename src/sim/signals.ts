@@ -48,6 +48,8 @@ export type PlcInputs = { Start: boolean; StopOK: boolean; Photoeye: boolean; Ta
 export type PlcRuntime = {
   powered: boolean;
   inputs: PlcInputs;
+  /** The sampled input image by tag name, for any I/O map (the classic five-tag `inputs` is derived from it). */
+  tagInputs: Record<string, boolean>;
   coils: Record<string, boolean>;
   tagValues: Record<string, STValue>;
   ladderMemory: LadderMemory;
@@ -57,12 +59,18 @@ export type PlcRuntime = {
   stMemory: Record<string, STValue>;
 };
 /** What the UI may show about any one PLC (first or additional). */
+export type PlcIoPoint = { terminal: string; tag: string; on: boolean };
 export type PlcView = {
   powered: boolean;
   language: 'ladder' | 'st';
+  /** Component kind: `plc` (fixed 5/6 I/O) or `plc16` (16/16 with nameable tags). */
+  kind: string;
+  /** Every input and output terminal with the tag bound to it and its live state, whatever the I/O map. */
+  io: { inputs: PlcIoPoint[]; outputs: PlcIoPoint[] };
   inputs: PlcInputs;
   coils: Record<string, boolean>;
-  outputs: { 'Q0.0': boolean; 'Q0.1': boolean; 'Q0.2': boolean; 'Q0.3': boolean; 'Q0.4': boolean; 'Q0.5': boolean };
+  /** Every output terminal (for example `Q0.0`) -> on. */
+  outputs: Record<string, boolean>;
   /** Live variables and rung results of this PLC's last scan, for the programming dock's monitor. */
   tagValues: Record<string, STValue>;
   ladderSteps: LadderStep[];
@@ -80,6 +88,8 @@ export type ProjectFile = {
   faults?: FaultSpec[];
   /** Programs of PLCs beyond the first, keyed by PLC component id. Omitted for single-PLC projects. */
   plcPrograms?: Record<string, PlcProgram>;
+  /** Tag names of the configurable (16/16) controllers, by PLC id. Omitted when every name is the default. */
+  plcIo?: Record<string, { inputs: Record<string, string>; outputs: Record<string, string> }>;
 };
 export type WorldState = {
   project: ProjectFile;
@@ -163,6 +173,8 @@ export type Command =
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
   /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
+  /** Rename the tags of a configurable (16/16) PLC. Refused if it would break that PLC's program. Paused only. */
+  | { k: 'configureIo'; plc: string; io: { inputs: Record<string, string>; outputs: Record<string, string> } }
   | { k: 'loadProgram'; program: LadderDocument; plc?: string }
   | { k: 'loadST'; source: string; plc?: string }
   | { k: 'activateLanguage'; language: 'ladder' | 'st'; plc?: string }
