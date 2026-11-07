@@ -16,6 +16,8 @@ export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
 import { laneOf, lanesOf, vesselOf, vesselsOf } from './stations';
+import { electricalDevices } from '../components/electrical-defs';
+import { freshCylinder, stepCylinder } from '../plant/cylinder';
 export { MAX_COMPONENTS, MAX_WIRES };
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
@@ -25,6 +27,7 @@ import {
 export { validateSandboxProgram } from '../program/p2-contract';
 import type { Command, FaultSpec, PlacedComponent, PlcInputs, PlcProgram, PlcRuntime, ProjectFile, RenderSnapshot, SimEvent, WorldState } from './signals';
 import type { SortingPlant } from '../plant/sorting-conveyor';
+import type { CylinderState } from '../plant/cylinder';
 import type { TankProcess } from '../plant/tank-process';
 
 export const SCAN_MS = 50;
@@ -122,7 +125,7 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     breakpointScan: null, breakpointHit: null, breakpointTag: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     plcs: Object.fromEntries(runtimePlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id), namesFor(project, c.id))])),
-    lanes: {}, vessels: {}, tripped: {},
+    lanes: {}, vessels: {}, tripped: {}, cylinders: {},
     deviceOn: {}, motorAngles: {},
     forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
     reverseMotorAngleRad: 0, interlockConflict: false,
@@ -439,9 +442,19 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         const nextIo = { ...(previous ?? {}) };
         if (isDefault) delete nextIo[plc.id]; else nextIo[plc.id] = merged;
         const candidate: ProjectFile = Object.keys(nextIo).length ? { ...rest, plcIo: nextIo } : rest;
+        // A program the user never changed (the generated placeholder) follows the rename; a program they wrote is protected.
+        const before = programOf(world.project, plc.id);
+        const oldPlaceholder = defaultProgramFor(plc.kind, ioOf(world.project, plc));
+        const newPlaceholder = defaultProgramFor(plc.kind, ioOf(candidate, plc));
+        const pristineLadder = JSON.stringify(before.program) === JSON.stringify(oldPlaceholder.program);
+        const pristineSt = before.stSource === oldPlaceholder.stSource;
+        let renamed = candidate;
+        if (pristineLadder) renamed = withProgramOf(renamed, plc.id, { program: newPlaceholder.program });
+        if (pristineSt) renamed = withProgramOf(renamed, plc.id, { stSource: newPlaceholder.stSource });
+        const finalCandidate = renamed;
         // Renaming must not silently break the program that is active on this PLC.
-        const cfg = programOf(candidate, plc.id);
-        const names = namesFor(candidate, plc.id);
+        const cfg = programOf(finalCandidate, plc.id);
+        const names = namesFor(finalCandidate, plc.id);
         let problem: string | null = null;
         try {
           if (cfg.language === 'st') compileSandboxST(cfg.stSource, names);
@@ -449,7 +462,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         } catch (error) { problem = error instanceof Error ? error.message : 'Program no longer compiles'; }
         if (problem) world = setError(world, `Renaming would break the program on ${plc.id}: ${problem}`);
         else {
-          world = createWorld(candidate);
+          world = createWorld(finalCandidate);
           commandEvents.push({ tick: world.tick, kind: 'edit', detail: `Changed the I/O tags of ${plc.id}` });
         }
       }
@@ -537,6 +550,9 @@ function buildCircuit(world: WorldState): Device[] {
   const devices: Device[] = [];
   const primary = legacyPrimaryId(world.project);
   for (const c of world.project.components) {
+    // Equipment described as data (relay, cylinder): the definition says which loads and switches it contributes.
+    const described = electricalDevices(c, { on: world.deviceOn[c.id] === true, hasFault: kind => hasFault(world.project, kind, c.id), cylinder: world.cylinders[c.id] });
+    if (described) { devices.push(...described); continue; }
     if (c.kind === 'supply') devices.push({ id: c.id, kind: 'supply', positive: terminal(c.id, 'P24'), negative: terminal(c.id, 'M0'), volts: 24 });
     if (c.kind === 'breaker') devices.push({
       id: c.id, kind: 'switch', a: terminal(c.id,'IN'), b: terminal(c.id,'OUT'),
@@ -631,6 +647,8 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     lanes: Object.fromEntries(Object.entries(world.lanes).map(([id, l]) => [id, { ...l, parcel: l.parcel ? { ...l.parcel } : null }])),
     vessels: Object.fromEntries(Object.entries(world.vessels).map(([id, v]) => [id, { ...v }])),
     tripped: { ...world.tripped },
+    cylinders: Object.fromEntries(Object.entries(world.cylinders).map(([id, c]) => [id, {
+      position: c.position, extendLimit: c.extendLimit, retractLimit: c.retractLimit, command: c.command, alarm: c.alarm, conflict: c.conflict }])),
     forwardContactorOn: world.forwardContactorOn, reverseContactorOn: world.reverseContactorOn,
     motorDirection: world.motorDirection, reverseMotorAngleRad: world.reverseMotorAngleRad,
     interlockConflict: world.interlockConflict,
@@ -879,7 +897,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const deviceOn: Record<string, boolean> = {};
   const motorAngles: Record<string, number> = {};
   for (const c of w.project.components) {
-    if (!['contactor', 'motor', 'lamp', 'conveyor', 'diverter', 'pump', 'drainvalve'].includes(c.kind)) continue;
+    if (!['contactor', 'motor', 'lamp', 'conveyor', 'diverter', 'pump', 'drainvalve', 'relay'].includes(c.kind)) continue;
     const on = circuit.energizedLoads.includes(c.id);
     deviceOn[c.id] = on;
     if (c.kind === 'motor') {
@@ -892,6 +910,13 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     }
   }
   // Every tank is its own vessel: the pumps, drain valves and level switches mounted beside it.
+  // Every pneumatic cylinder moves from its two solenoid coils, as solved from the wiring.
+  const nextCylinders: Record<string, CylinderState> = {};
+  for (const c of w.project.components.filter(x => x.kind === 'cylinder')) {
+    const step = stepCylinder(w.cylinders[c.id] ?? freshCylinder(), circuit.energizedLoads.includes(`${c.id}-E`), circuit.energizedLoads.includes(`${c.id}-R`), dtMs);
+    nextCylinders[c.id] = step.state;
+    for (const detail of step.events) events.push({ tick: w.tick + 1, kind: 'cylinder', detail: `${c.id}: ${detail}` });
+  }
   const nextVessels: Record<string, TankProcess> = {};
   for (const vessel of vesselsOf(w.project.components)) {
     const live = (parts: PlacedComponent[]) => parts.some(p => circuit.energizedLoads.includes(p.id));
@@ -943,7 +968,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     alarms: alarmUpdate.alarms, alarmWatch: alarmUpdate.watch,
     forwardContactorOn, reverseContactorOn, motorDirection,
     reverseMotorAngleRad, interlockConflict,
-    conveyorOn, diverterOn, lanes: nextLanes, vessels: nextVessels,
+    conveyorOn, diverterOn, lanes: nextLanes, vessels: nextVessels, cylinders: nextCylinders,
     pumpOn, drainOn, lampOn,
     voltages: circuit.voltage,
     meter: measureDC24(circuit.voltage,circuit.diagnostics,w.meter.positive,w.meter.negative,circuit.sameSupply),

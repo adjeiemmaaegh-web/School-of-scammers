@@ -4,6 +4,7 @@ import type { ComponentKind } from '../components/registry';
 import type { ScanTrace, TagBreakpoint } from '../program/scan-trace';
 import type { SortingPlant, ParcelKind } from '../plant/sorting-conveyor';
 import type { TankProcess } from '../plant/tank-process';
+import type { CylinderState } from '../plant/cylinder';
 import type { MeterReading } from '../electrical/panel-meter';
 
 export type XY = { x: number; y: number };
@@ -117,6 +118,8 @@ export type WorldState = {
   vessels: Record<string, TankProcess>;
   /** Trip state of every breaker and overload, by component id (the legacy flags mirror the first of each). */
   tripped: Record<string, boolean>;
+  /** Rod position, limit switches and valve state of every pneumatic cylinder, by component id. */
+  cylinders: Record<string, CylinderState>;
   /** Scan state of every PLC after the first, by component id. */
   plcs: Record<string, PlcRuntime>;
   /** Energised state of every contactor, motor and lamp by component id (the legacy booleans mirror the first). */
@@ -203,6 +206,8 @@ export type RenderSnapshot = {
   vessels: Record<string, TankProcess>;
   /** Trip state of every breaker and overload by component id. */
   tripped: Record<string, boolean>;
+  /** Every pneumatic cylinder by component id: rod position 0 (retracted)..1 (extended) and its limit switches. */
+  cylinders: Record<string, { position: number; extendLimit: boolean; retractLimit: boolean; command: string; alarm: string | null; conflict: boolean }>;
   /** Energised state of every contactor, motor and lamp by component id. */
   deviceOn: Record<string, boolean>;
   /** Shaft angle of every motor by component id. */

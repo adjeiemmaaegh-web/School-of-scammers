@@ -1,5 +1,5 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
-export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor';
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'cylinder' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor';
 export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
@@ -13,6 +13,15 @@ const plc16Terminals = (): Terminal[] => [
   ...PLC16_OUTPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'right', y: 30 + i * 6.5, role: 'output' })),
 ];
 export const COMPONENTS: Record<ComponentKind, Definition> = {
+  relay: { kind: 'relay', label: '24V control relay', help: 'Coil A1/A2 switches two NO contacts (13-14, 23-24) and one NC contact (21-22); hard-wired logic needs no PLC', terminals: [
+    { name: 'A1', side: 'left', y: 24, role: 'load' }, { name: 'A2', side: 'left', y: 48, role: 'load' },
+    { name: '13', side: 'left', y: 86, role: 'passive' }, { name: '14', side: 'right', y: 86, role: 'passive' },
+    { name: '23', side: 'left', y: 112, role: 'passive' }, { name: '24', side: 'right', y: 112, role: 'passive' },
+    { name: '21', side: 'left', y: 138, role: 'passive' }, { name: '22', side: 'right', y: 138, role: 'passive' }] },
+  cylinder: { kind: 'cylinder', label: 'Pneumatic cylinder', help: 'Double-acting cylinder: EXT+ / RET+ solenoids to M- (energising both holds it), limit switches EXT_LS / RET_LS powered from L+. Air is assumed available.', terminals: [
+    { name: 'EXT+', side: 'left', y: 28, role: 'load' }, { name: 'RET+', side: 'left', y: 54, role: 'load' },
+    { name: 'M-', side: 'left', y: 80, role: 'load' }, { name: 'L+', side: 'left', y: 106, role: 'supply' },
+    { name: 'EXT_LS', side: 'right', y: 54, role: 'output' }, { name: 'RET_LS', side: 'right', y: 90, role: 'output' }] },
   plc16: { kind: 'plc16', label: 'Virtual PLC 16/16', help: '24V PLC, 16 digital inputs and 16 high-side outputs with names you choose', terminals: plc16Terminals() },
   supply: { kind: 'supply', label: '24V supply', help: 'Educational DC source', terminals: [
     { name: 'P24', side: 'right', y: 45, role: 'supply' }, { name: 'M0', side: 'right', y: 92, role: 'return' }] },

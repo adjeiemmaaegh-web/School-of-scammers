@@ -657,7 +657,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               'Q0.0': false, 'Q0.1': false, 'Q0.2': false, 'Q0.3': false,
               'Q0.4': false, 'Q0.5': false, PlcPowered: false },
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
-            plcs: {}, deviceOn: {}, motorAngles: {}, lanes: {}, vessels: {}, tripped: {},
+            plcs: {}, deviceOn: {}, motorAngles: {}, lanes: {}, vessels: {}, tripped: {}, cylinders: {},
             forwardContactorOn: false, reverseContactorOn: false,
             motorDirection: 'stopped', reverseMotorAngleRad: 0, interlockConflict: false,
             conveyorOn: false, diverterOn: false,

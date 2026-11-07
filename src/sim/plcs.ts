@@ -12,7 +12,7 @@ import { executeLadder, type LadderDocument, type LadderMemory, type LadderStep 
 import { executeStructuredText, type STValue } from '../engineering/structured-text';
 import { compileSandboxST, DEFAULT_ST_SOURCE } from '../program/p2-contract';
 import { isPlcKind } from '../components/registry';
-import { ioOf, namesOf, type IoNames, type PlcIoMap } from './plc-io';
+import { defaultIo, ioOf, namesOf, type IoNames, type PlcIoMap } from './plc-io';
 import type { PlacedComponent, PlcInputs, PlcIoPoint, PlcProgram, PlcRuntime, PlcView, ProjectFile } from './signals';
 
 export const MAX_PLCS = 6;
@@ -49,11 +49,16 @@ export const runtimePlcs = (project: HasComponents): PlacedComponent[] =>
   plcComponents(project).filter(c => c.id !== legacyPrimaryId(project));
 
 /** The idle placeholder program for a controller type: a legacy PLC's references tags a 16/16 PLC does not have. */
-export function defaultProgramFor(kind: string | undefined): ResolvedProgram {
-  if (kind === 'plc16') return {
-    program: { id: 'sandbox-program', version: '1.0', rungs: [{ id: 'rung-1', elements: [{ type: 'contact', tag: 'In0' }], coil: 'Out0' }] },
-    language: 'ladder', stSource: ['VAR_INPUT', '  In0 : BOOL;', 'END_VAR', 'VAR_OUTPUT', '  Out0 : BOOL;', 'END_VAR', 'Out0 := In0;'].join('\n'),
-  };
+export function defaultProgramFor(kind: string | undefined, io?: PlcIoMap): ResolvedProgram {
+  if (kind === 'plc16') {
+    // The placeholder passes the first input to the first output, in whatever those are currently called.
+    const names = namesOf(io ?? defaultIo('plc16'));
+    const [input, output] = [names.inputs[0], names.outputs[0]];
+    return {
+      program: { id: 'sandbox-program', version: '1.0', rungs: [{ id: 'rung-1', elements: [{ type: 'contact', tag: input }], coil: output }] },
+      language: 'ladder', stSource: ['VAR_INPUT', `  ${input} : BOOL;`, 'END_VAR', 'VAR_OUTPUT', `  ${output} : BOOL;`, 'END_VAR', `${output} := ${input};`].join('\n'),
+    };
+  }
   return { program: blankProgram(), language: 'ladder', stSource: DEFAULT_ST_SOURCE };
 }
 
@@ -64,7 +69,8 @@ export function programOf(project: ProjectFile, plcId: string | undefined): Reso
   if (plcId === undefined || plcId === primaryPlcId(project) || plcComponents(project).length === 0)
     return { program: project.program, language: project.language ?? 'ladder', stSource: project.stSource ?? DEFAULT_ST_SOURCE };
   const own = project.plcPrograms?.[plcId];
-  const fallback = defaultProgramFor(project.components.find(c => c.id === plcId)?.kind);
+  const comp = project.components.find(c => c.id === plcId);
+  const fallback = defaultProgramFor(comp?.kind, comp ? ioOf(project, comp) : undefined);
   return { program: own?.program ?? fallback.program, language: own?.language ?? 'ladder', stSource: own?.stSource ?? fallback.stSource };
 }
 
