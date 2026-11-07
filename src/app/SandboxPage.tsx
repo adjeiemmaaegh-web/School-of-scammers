@@ -662,6 +662,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           selectedDevice={selectedDevice} selectedTerminal={selectedTerminal} editable={editable}
           onTerminal={connect} onCancelWire={() => setSelectedTerminal(null)}
           onMove={id => setMoveTarget(id)}
+          onMoveTo={(id, at) => move(id, at)}
           onOperate={id => send([{ k: 'operateToggle', id }])}
           onClearSelection={() => setSelectedDeviceId(null)} />
       </div>

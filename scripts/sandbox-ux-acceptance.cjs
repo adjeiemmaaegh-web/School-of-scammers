@@ -10,6 +10,13 @@ const base = process.env.PLC_BASE_URL || 'http://127.0.0.1:4173';
     args: ['--no-sandbox', '--enable-webgl', '--use-gl=angle',
       '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const page = await browser.newPage();
+  // The sticky toolbar covers a band of the viewport. Like a person, scroll the target to the centre
+  // before clicking (Puppeteer only scrolls elements that are entirely off-screen).
+  { const original = page.click.bind(page);
+    page.click = async (selector, options) => {
+      await page.$eval(selector, el => el.scrollIntoView({ block: 'center', inline: 'center' }));
+      return original(selector, options);
+    }; }
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   try {

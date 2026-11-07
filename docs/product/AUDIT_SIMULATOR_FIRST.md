@@ -46,4 +46,6 @@ Automated and passing: 768 unit tests (many mutation-checked), 14 real-browser s
 
 Step 3 (part): plant devices are now per-instance (several conveyor lanes, tanks and breakers; slice 3 in `SANDBOX_BREADTH_PROGRESS.md`). Still open in step 3: configurable PLC I/O and tag mapping, I/O modules, and a data-driven device definition registry. The reversing drive set is the last single-instance device.
 
+Step 5 (first version): a complete user-authored two-station plant (17 devices, 32 wires, two PLCs and programs) is built from an empty project, commissioned, troubleshot, saved and reloaded by automated tests, including a real-browser run through the UI (slice 4 in `SANDBOX_BREADTH_PROGRESS.md`). Exact X/Y positioning was added to the inspector to make precise, accessible placement possible.
+
 Each step lands as its own verified, documented PR. Existing working functionality (exercises, assessments, `/labs`, scenario grading) is preserved throughout.
