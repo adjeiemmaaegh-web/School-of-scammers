@@ -10,7 +10,8 @@ type Props = {
   onTerminal: (pin: string) => void;
   onCancelWire: () => void;
   onMove: (id: string) => void;
-  onOperate: (id: string, pressed: boolean) => void;
+  /** Toggle a pushbutton/E-stop. The worker resolves the new state (see Command `operateToggle`). */
+  onOperate: (id: string) => void;
   onClearSelection: () => void;
 };
 
@@ -105,7 +106,7 @@ export function WorkbenchInspector({
       onClick={() => onMove(selectedDevice.id)}>Move on 3D floor</button>
     {(selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' || selectedDevice.kind === 'reversebutton') &&
       <button type="button" className="btn primary small sandbox-inspector-operate"
-        onClick={() => onOperate(selectedDevice.id, !isPressed)}>
+        onClick={() => onOperate(selectedDevice.id)}>
         {selectedDevice.kind === 'estop' ?
           (isPressed ? 'Reset training E-stop' : 'Press training E-stop') :
           isPressed ? 'Release pushbutton' : 'Press pushbutton'}

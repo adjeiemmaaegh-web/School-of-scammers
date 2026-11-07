@@ -192,7 +192,7 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
 function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
   c: PlacedComponent; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number;
   editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
-  onTerminal: (id: string) => void; onOperate: (id: string, pressed: boolean) => void; onSelect: (id: string) => void;
+  onTerminal: (id: string) => void; onOperate: (id: string) => void; onSelect: (id: string) => void;
 }) {
   const [x, y, z] = worldPosition(c);
   const def = COMPONENTS[c.kind];
@@ -228,7 +228,7 @@ function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, ed
           (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') : c.pressed ? 'PRESSED' : 'RELEASED'}</small>
         {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') && <button type="button"
           disabled={false} onPointerDown={e => e.stopPropagation()}
-          onClick={e => { e.stopPropagation(); onOperate(c.id, !c.pressed); }}>{c.pressed ? 'Release' : 'Press'}</button>}
+          onClick={e => { e.stopPropagation(); onOperate(c.id); }}>{c.pressed ? 'Release' : 'Press'}</button>}
       </div>
     </Html>
     {def.terminals.map(t => {
@@ -275,7 +275,7 @@ function Cable3D({ project, from, to, live }: { project: ProjectFile; from: stri
 function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPlaceAt }: {
   project: ProjectFile; snapshot: RenderSnapshot; editable: boolean;
   selectedTerminal: string | null; moveTarget: string | null;
-  onTerminal: (id: string) => void; onOperate: (id: string, pressed: boolean) => void;
+  onTerminal: (id: string) => void; onOperate: (id: string) => void;
   onSelect: (id: string) => void; onPlaceAt: (at: XY) => void;
 }) {
   return <>
@@ -327,7 +327,7 @@ export type Sandbox3DProps = {
   editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
   selectedDeviceId: string | null; onSelectDevice: (id: string) => void;
   onTerminal: (id: string) => void;
-  onOperate: (id: string, pressed: boolean) => void;
+  onOperate: (id: string) => void;
   onPlace: (kind: ComponentKind, at: XY) => void;
   onMove: (id: string, at: XY) => void;
   onMoveFinished: () => void;

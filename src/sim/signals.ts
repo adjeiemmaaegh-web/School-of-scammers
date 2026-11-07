@@ -65,6 +65,9 @@ export type Command =
   | { k: 'wire'; id: string; from: string; to: string }
   | { k: 'unwire'; id: string }
   | { k: 'operate'; id: string; pressed: boolean }
+  /** Flip a pushbutton/E-stop using the worker's authoritative state. UIs must use this
+   *  rather than `operate` with `!pressed` from a snapshot, which is stale between scans. */
+  | { k: 'operateToggle'; id: string }
   | { k: 'feedParcel'; kind: ParcelKind }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }

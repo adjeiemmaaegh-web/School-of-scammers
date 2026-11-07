@@ -273,7 +273,7 @@ export function SandboxPage() {
               selectedTerminal={selectedTerminal} moveTarget={moveTarget}
               selectedDeviceId={selectedDeviceId} onSelectDevice={setSelectedDeviceId}
               onTerminal={connect}
-              onOperate={(id, pressed) => send([{ k: 'operate', id, pressed }])}
+              onOperate={id => send([{ k: 'operateToggle', id }])}
               onPlace={(kind, at) => place(kind, at.x, at.y)}
               onMove={move} onMoveFinished={() => setMoveTarget(null)}
             />}
@@ -332,7 +332,7 @@ export function SandboxPage() {
                   <div className="sandbox-patch-actions">
                     {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') && <button
                       className={`sandbox-operate ${c.pressed ? 'pressed' : ''}`}
-                      onClick={() => send([{ k: 'operate', id: c.id, pressed: !c.pressed }])}>
+                      onClick={() => send([{ k: 'operateToggle', id: c.id }])}>
                         {c.kind === 'estop' ? (c.pressed ? 'Reset E-stop (training)' : 'Press E-stop (training)') :
                           c.pressed ? 'Release' : 'Press'}</button>}
                     {(c.kind === 'breaker' || c.kind === 'overload') && <button
@@ -490,7 +490,7 @@ export function SandboxPage() {
           selectedDevice={selectedDevice} selectedTerminal={selectedTerminal} editable={editable}
           onTerminal={connect} onCancelWire={() => setSelectedTerminal(null)}
           onMove={id => setMoveTarget(id)}
-          onOperate={(id, pressed) => send([{ k: 'operate', id, pressed }])}
+          onOperate={id => send([{ k: 'operateToggle', id }])}
           onClearSelection={() => setSelectedDeviceId(null)} />
       </div>
       <div className="sandbox-bottom">

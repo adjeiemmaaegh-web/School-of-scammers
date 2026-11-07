@@ -240,11 +240,16 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       else world = { ...world, meter: {
         ...world.meter, [cmd.lead]: cmd.terminal, volts: null, status: 'select',
       } };
-    } else if (cmd.k === 'operate') {
-      if (!world.project.components.some(c => c.id === cmd.id &&
-        (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton')))
-        world = setError(world, 'Only pushbuttons and training E-stop can be operated');
-      else world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, pressed: cmd.pressed } : c) } };
+    } else if (cmd.k === 'operate' || cmd.k === 'operateToggle') {
+      const target = world.project.components.find(c => c.id === cmd.id &&
+        (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton'));
+      if (!target) world = setError(world, 'Only pushbuttons and training E-stop can be operated');
+      else {
+        // A toggle is resolved here, against authoritative state, in command order. Resolving it in
+        // the UI from a snapshot loses presses when clicks land between scans.
+        const pressed = cmd.k === 'operate' ? cmd.pressed : !target.pressed;
+        world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, pressed } : c) } };
+      }
     } else if (!canEdit(world)) world = setError(world, 'Pause simulation before modifying the project');
     else if (cmd.k === 'place') {
       if (!validId(cmd.id) || !Object.hasOwn(COMPONENTS, cmd.kind) || !validPos(cmd.at) ||
