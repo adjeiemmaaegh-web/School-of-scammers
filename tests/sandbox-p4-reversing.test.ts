@@ -74,6 +74,26 @@ describe('P4 actual interlocked forward / reverse drive',()=>{
     expect(w.reverseMotorAngleRad).not.toBe(held);
     expect(renderSnapshot(w).motorDirection).toBe('reverse');
   });
+  it('requires a real STOP cycle before opposite request can reverse an already latched motor',()=>{
+    let w=scan(press(run(build()),'start'),7);
+    w=scan(release(w,'start'),2);
+    expect(w.motorDirection).toBe('forward');
+    w=scan(press(w,'reversebutton'),7);
+    expect(w.motorDirection).toBe('forward');
+    expect(w.coils.Forward).toBe(true);
+    expect(w.coils.Reverse).toBe(false);
+    w=scan(release(w,'reversebutton'),2);
+    w=scan(press(w,'stop'),5);
+    expect(w.motorDirection).toBe('stopped');
+    w=scan(release(w,'stop'),2);
+    w=scan(press(w,'reversebutton'),7);
+    expect(w.motorDirection).toBe('reverse');
+    w=scan(release(w,'reversebutton'),2);
+    w=scan(press(w,'start'),6);
+    expect(w.motorDirection).toBe('reverse');
+    expect(w.coils.Forward).toBe(false);
+    expect(w.coils.Reverse).toBe(true);
+  });
   it('rejected simultaneous start/reverse requests cannot energize opposing output coils in safe example',()=>{
     let w=run(build());
     w=tick(w,[{k:'operate',id:'start',pressed:true},
