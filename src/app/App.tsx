@@ -4,6 +4,7 @@ import { FrontDoor } from './FrontDoor';
 import { TradePicker } from './TradePicker';
 import { TradeLadder } from './TradeLadder';
 import { ExercisePage } from './ExercisePage';
+import { ScenarioPage } from './ScenarioPage';
 import { EmployerPage } from './EmployerPage';
 import { CandidatePage } from './CandidatePage';
 import { AppHeader } from '../ui/AppHeader';
@@ -96,6 +97,7 @@ export function App() {
         <Route path="/trades" element={<TradePicker />} />
         <Route path="/trade/:tradeId" element={<TradeLadder />} />
         <Route path="/exercise/:exerciseId" element={<ExercisePage />} />
+        <Route path="/scenario/:scenarioId" element={<ScenarioPage />} />
         <Route path="/employer" element={<EmployerPage />} />
         <Route path="/take" element={<CandidatePage />} />
 

@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { compileSandboxST, DEFAULT_ST_SOURCE } from './p2-contract';
 import type { RenderSnapshot } from '../sim/signals';
 
-export function StructuredTextEditor({ source, disabled, snapshot, onActivate }: {
+export function StructuredTextEditor({ source, disabled, snapshot, onActivate, showSamples = true }: {
   source: string; disabled: boolean; snapshot: RenderSnapshot; onActivate: (source: string) => void;
+  /** The start/stop sample and worked example line. Off in graded scenarios. */
+  showSamples?: boolean;
 }) {
   const [draft, setDraft] = useState(source || DEFAULT_ST_SOURCE);
   useEffect(() => { setDraft(source || DEFAULT_ST_SOURCE); }, [source]);
@@ -31,12 +33,12 @@ export function StructuredTextEditor({ source, disabled, snapshot, onActivate }:
     <div className="sandbox-actions">
       <button type="button" className="btn primary small" disabled={disabled || !validation.ok || draft === source}
         onClick={() => onActivate(draft)}>Compile &amp; activate ST</button>
-      <button type="button" className="btn ghost small" disabled={disabled}
-        onClick={() => setDraft(DEFAULT_ST_SOURCE)}>Use start/stop sample</button>
+      {showSamples && <button type="button" className="btn ghost small" disabled={disabled}
+        onClick={() => setDraft(DEFAULT_ST_SOURCE)}>Use start/stop sample</button>}
       <button type="button" className="btn ghost small" disabled={disabled || draft === source}
         onClick={() => setDraft(source)}>Discard edits</button>
     </div>
-    <p className="sandbox-help">Example latch: <code>Run := StopOK AND (Start OR Run);</code>. Unsupported vendor syntax is rejected rather than guessed. ST and Ladder are alternative modes, not concurrent programs.</p>
+    <p className="sandbox-help">{showSamples && <>Example latch: <code>Run := StopOK AND (Start OR Run);</code>. </>}Unsupported vendor syntax is rejected rather than guessed. ST and Ladder are alternative modes, not concurrent programs.</p>
     <div className="sandbox-st-monitor">
       <h3>Simulated variables · scan {snapshot.tick}</h3>
       <div>{Object.entries(snapshot.tagValues).map(([name,value]) =>

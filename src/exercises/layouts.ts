@@ -6,6 +6,11 @@ import { blankProgram, createWorld, latchProgram, tick } from '../sim/orchestrat
 import type { Command, ProjectFile } from '../sim/signals';
 import type { LadderDocument } from '../engineering/ladder';
 
+/** Mirrors the blank Ladder placeholder (Run follows Start), so switching language gives no answer. */
+const PLACEHOLDER_ST = [
+  'VAR_INPUT', '  Start : BOOL;', '  StopOK : BOOL;', 'END_VAR', 'VAR_OUTPUT', '  Run : BOOL;', 'END_VAR', 'Run := Start;',
+].join('\n');
+
 type Place = [kind: Extract<Command, { k: 'place' }>['kind'], id: string, x: number, y: number];
 type Link = [from: string, to: string];
 
@@ -16,7 +21,8 @@ export function projectFrom(places: Place[], links: Link[], program: LadderDocum
     { k: 'loadProgram', program },
   ]).world;
   if (world.lastError) throw new Error(`Scenario starter is invalid: ${world.lastError}`);
-  return world.project;
+  // The sandbox default ST source is the finished latch; a starter must not hand that over.
+  return { ...world.project, stSource: PLACEHOLDER_ST };
 }
 
 /* ---- 24V start/stop motor: PLC, two pushbuttons, contactor, motor ---- */

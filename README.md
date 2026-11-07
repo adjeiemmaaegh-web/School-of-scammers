@@ -4,6 +4,10 @@
 
 **Current state:** PRD v4.2 direction approved; P0/P1 3D and UX review branches retain their own draft PRs; the subsequent P2 Ladder/ST programming continuation is in a separate draft branch, not merged or production-approved. The previously shipped guided exercises (PLC + CCTV) and local employer/candidate assessments remain intact. The new primary entry is `/sandbox`; existing exercises are under `/trades`.
 
+## P6 scenarios: exercises and assessments on the real simulator (draft, unmerged)
+
+`/trade/plc` now lists four **sandbox scenarios** (build a start/stop starter, find a hidden fault, program the sorting line, program the tank). You work in the same 3D workbench as `/sandbox` from a work order; the result is graded by **what your circuit actually does** when it is run through the same simulator (any correct wiring or logic passes, including Structured Text), not by matching a model answer. Employers can assign them from `/employer`; candidates get exam conditions and send back the same result code as before. Frontend-only: the result code is not tamper-proof. [Design, evidence and limits](docs/product/P6_SCENARIOS_PROGRESS.md).
+
 ## P5 troubleshooting: faults and alarms (draft, unmerged)
 
 In `/sandbox`, an instructor can inject a fault (open conductor, open contactor coil, welded contacts, open motor winding, stuck pushbutton, stuck sensor output), optionally **hidden**, or a seeded "mystery fault" that is the same every time for the same seed and circuit. The fault changes what the real 24V solver sees, so the symptom is genuine: for example a dead coil still reads 24V across its terminals and a dead motor still reads 24V at its terminals. The learner sees only the symptom and a supervisory alarm that never names the cause, diagnoses it with the on-screen multimeter and I/O lamps, and replaces a part with the simulation paused. Replacing a healthy part changes nothing. This is an idealised 24V teaching model, not failure physics or safety-rated behaviour. [Design, evidence and what is still open](docs/product/P5_FAULTS_PROGRESS.md).

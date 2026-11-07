@@ -7,9 +7,18 @@ import type { Command, ProjectFile, WorldState } from '../sim/signals';
 
 export interface Bench { world: WorldState; loadError: string | null }
 
-/** Fresh world holding `project`. A project the worker would reject yields `loadError`. */
+/**
+ * Fresh world holding `project`, with every operator control released: a learner who leaves STOP held
+ * or the E-stop latched when they submit must be graded on their circuit, not on that leftover state.
+ * A project the worker would reject yields `loadError`.
+ */
 export function loadBench(project: ProjectFile): Bench {
-  const world = tick(createWorld(), [{ k: 'loadProject', project }]).world;
+  const released: ProjectFile = {
+    ...project,
+    components: Array.isArray(project.components)
+      ? project.components.map(c => (c && c.pressed ? { ...c, pressed: false } : c)) : project.components,
+  };
+  const world = tick(createWorld(), [{ k: 'loadProject', project: released }]).world;
   return { world, loadError: world.lastError };
 }
 

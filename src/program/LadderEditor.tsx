@@ -5,7 +5,11 @@ import type { RenderSnapshot } from '../sim/signals';
 import { blankProgram, latchProgram, sortingProgram, tankProgram, reversingProgram } from '../sim/orchestrator';
 import { MAX_SANDBOX_RUNGS, MAX_SANDBOX_SYMBOLS } from './p2-contract';
 
-type Props = { document: LadderDocument; snapshot: RenderSnapshot; disabled: boolean; onChange: (doc: LadderDocument) => void };
+type Props = {
+  document: LadderDocument; snapshot: RenderSnapshot; disabled: boolean; onChange: (doc: LadderDocument) => void;
+  /** One-click solved example programs. Off in graded scenarios, where they would be the answer. */
+  showExamples?: boolean;
+};
 const BUILT_INS = ['Start', 'StopOK', 'Photoeye', 'TankHigh', 'ReverseRequest', 'Run', 'Sort', 'Fill', 'Drain', 'Forward', 'Reverse', 'Unused'];
 const operationFor = (kind: string, target: string): RungOperation | undefined => {
   if (kind === 'coil') return undefined;
@@ -33,7 +37,7 @@ function ContactControl({ value, onChange, onRemove, active, tags }: {
     {onRemove && <button type="button" className="sandbox-remove" onClick={onRemove} aria-label="Remove contact">×</button>}
   </div>;
 }
-export function LadderEditor({ document, snapshot, disabled, onChange }: Props) {
+export function LadderEditor({ document, snapshot, disabled, onChange, showExamples = true }: Props) {
   const [newTag, setNewTag] = useState('');
   const [newTagType, setNewTagType] = useState<'BOOL' | NumericTagType>('BOOL');
   const [newInitial, setNewInitial] = useState('0');
@@ -229,10 +233,12 @@ export function LadderEditor({ document, snapshot, disabled, onChange }: Props) 
         <button type="button" className="btn ghost small"
           disabled={document.rungs.length >= MAX_SANDBOX_RUNGS || symbols.length >= MAX_SANDBOX_SYMBOLS}
           onClick={addRung}>+ Add rung</button>
-        <button type="button" className="btn ghost small" onClick={() => onChange(latchProgram())}>Load editable latch example</button>
-        <button type="button" className="btn ghost small" onClick={() => onChange(sortingProgram())}>Load sorting program example</button>
-        <button type="button" className="btn ghost small" onClick={() => onChange(tankProgram())}>Load tank control example</button>
-        <button type="button" className="btn ghost small" onClick={() => onChange(reversingProgram())}>Load forward/reverse example</button>
+        {showExamples && <>
+          <button type="button" className="btn ghost small" onClick={() => onChange(latchProgram())}>Load editable latch example</button>
+          <button type="button" className="btn ghost small" onClick={() => onChange(sortingProgram())}>Load sorting program example</button>
+          <button type="button" className="btn ghost small" onClick={() => onChange(tankProgram())}>Load tank control example</button>
+          <button type="button" className="btn ghost small" onClick={() => onChange(reversingProgram())}>Load forward/reverse example</button>
+        </>}
         <button type="button" className="btn ghost small" onClick={reset}>Reset to one contact</button>
       </div>
       <div className="sandbox-tag-editor">

@@ -8,7 +8,7 @@ const assert=require('node:assert/strict');
 const puppeteer=require('puppeteer');
 const axePath=require.resolve('axe-core/axe.min.js');
 const base=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173').replace(/\/+$/,'');
-const routes=['/','/sandbox','/labs','/pathway','/workspaces','/engineering','/simulation','/process-control','/starter-lab','/pneumatics','/workcell-composer','/electrical-bench','/dc-circuit','/assessments','/reference','/settings','/about'];
+const routes=['/','/sandbox','/scenario/plc-sbx-find-fault?seed=1','/trade/plc','/labs','/pathway','/workspaces','/engineering','/simulation','/process-control','/starter-lab','/pneumatics','/workcell-composer','/electrical-bench','/dc-circuit','/assessments','/reference','/settings','/about'];
 const tags=['wcag2a','wcag2aa','wcag21a','wcag21aa'];
 async function run(){
  const browser=await puppeteer.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']});

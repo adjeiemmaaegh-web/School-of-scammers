@@ -24,6 +24,10 @@ After reviewing the shipped product against **Cisco Packet Tracer / GNS3** (the 
 
 ---
 
+## P6 scenarios on the sandbox — first slice (7 November 2026, DRAFT)
+
+Continues on `engineering/p5-faults-diagnostics` (unmerged, `main` still `6bf6fdd`). Delivered (details and limits in [P6_SCENARIOS_PROGRESS.md](P6_SCENARIOS_PROGRESS.md)): `src/exercises/` (scenario type, headless outcome grader built on the real `tick()`, evidence helpers, four-scenario catalogue), the **Work order** panel and scenario hosting in `SandboxPage` (starter load, resume after reload, evidence trail, answer-revealing helpers hidden), `/scenario/:id` practice route, sandbox scenarios on `/trade/plc`, employer assignment of scenarios, and candidate exam conditions returning the existing result code. Evidence: 36 mutation-checked unit tests (`tests/p6-scenarios.test.ts`) and a three-part real-browser E2E (`scripts/sandbox-p6-scenario-browser.cjs`, wired into CI after the P5 sensor step). **Honest limits:** the result code is unsigned and frontend-only, so assessment integrity is honour-system; four scenarios, not a ten-rank catalogue; the v3 exercise state machines are untouched; no owner visual review of the Work order panel; no Windows Edge, low-spec or real-GPU run. P6 full exit is INCOMPLETE.
+
 ## P5 faults & diagnostics — branch review and first slice (7 November 2026, DRAFT)
 
 **Where the work stood.** `main` is still the v3 app plus docs (`6bf6fdd`); none of the sandbox work is merged. It lives on a **stacked chain of unmerged draft branches**, each based on the previous: `feat/p0-p1-sandbox-foundation` (#14) → `design/ux-first-3d-workbench` (#15) → `engineering/p2-plc-programming` (#16) → `engineering/p3-3d-conveyor-sorting` (#17) → `engineering/p4-electrical-panel` (#18, the tip). P5 continues from the P4 tip on **`engineering/p5-faults-diagnostics`** (also draft and unmerged). The older `feat/*-2026110x` branches are the previous developer's and are not part of this chain.

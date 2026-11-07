@@ -6,6 +6,10 @@ import { ProgrammingDock } from '../program/ProgrammingDock';
 import { LiveMonitor } from '../program/LiveMonitor';
 import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
 import { TroubleshootingPanel } from '../ui/sandbox/TroubleshootingPanel';
+import { ScenarioPanel } from '../ui/sandbox/ScenarioPanel';
+import { appendEvidence, evidenceFromCommand } from '../exercises/evidence';
+import { scenarioStorageKey, type ScenarioSession } from '../exercises/session';
+import type { AttemptResult, EvidenceEvent, RubricResult } from '../platform/types';
 import type { Command, ProjectFile, RenderSnapshot, WorkerResponse } from '../sim/signals';
 import './sandbox.css';
 
@@ -17,7 +21,12 @@ const sortingWireGuide = 'For 3D sorting: supply P24 → PLC L+, START A, STOP A
 const tankWireGuide = 'For tank process: P24 to PLC L+, STOP A and level probe L+. M0 to PLC M, pump M-, level probe M and drain valve A2. STOP B to PLC I0.1; level probe OUT to PLC I0.3; PLC Q0.2 to pump L+; PLC Q0.3 to drain valve A1. Mount the pump, probe and valve near the tank. Load the tank control Ladder example, Run and observe filling to 750 ml, switching and drainage until 600 ml. Wrong PLC logic, miswiring or moving equipment alters the real result.';
 const protectedDOLGuide = 'Protected DOL training circuit (16 wires): supply P24 → breaker IN; breaker OUT → E-stop A; E-stop B → PLC L+, START A, STOP A and contactor 13. Supply M0 → PLC M, contactor A2, motor M- and pilot lamp M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → overload 95; overload 96 → contactor A1; contactor 14 → motor L+ and lamp L+. Load editable latch program. Press E-stop to open the upstream NC supply path (training demonstration, NOT a certified safety function), reset it manually. Trip overload to open coil path. For a breaker short demo, wire breaker OUT directly to supply M0, Run or Step to trip; remove that wire before reset. Use meter probes to compare actual net potentials.';
 const reverseWireGuide = 'P4 forward/reverse (21 wires): supply P24 → breaker IN; breaker OUT → E-stop A; E-stop B → PLC L+, START A, REVERSE A, STOP A, forward contactor 13, reverse contactor 13. Supply M0 → PLC M, both contactor A2 and reversible motor M-. START B → PLC I0.0; REVERSE B → PLC I0.4; STOP B → PLC I0.1. PLC Q0.4 → reverse contactor NC 21; reverse NC 22 → forward A1. PLC Q0.5 → forward NC 21; forward NC 22 → reverse A1. Forward contactor 14 → motor F+; reverse contactor 14 → motor R+. Load forward/reverse Ladder example and Run; press/release START to latch forward, STOP then press/release REVERSE to latch reverse. Pressing both requests together is rejected by example logic. Miswire or bypass NC contacts to observe actual electrical/mechanical interlock warnings. Educational 24V direction-input model, NOT three-phase reversing wiring or safety-certified machinery.';
-export function SandboxPage() {
+/**
+ * The open sandbox. With a `scenario` it becomes the P6 exercise/assessment workbench: the same
+ * worker, the same 3D scene and the same tools, plus a work order, the scenario's starter project,
+ * an evidence trail and a headless outcome grader. Answer-revealing helpers are hidden.
+ */
+export function SandboxPage({ scenario }: { scenario?: ScenarioSession } = {}) {
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
   const [project, setProject] = useState<ProjectFile | null>(null);
   const [selectedTerminal, setSelectedTerminal] = useState<string | null>(null);
@@ -31,9 +40,23 @@ export function SandboxPage() {
   const worker = useRef<Worker | null>(null);
   const nextId = useRef(1);
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const storageKey = scenario ? scenarioStorageKey(scenario) : STORAGE_KEY;
+  const attemptKey = `${storageKey}:attempt`;
+  const [evidence, setEvidence] = useState<EvidenceEvent[]>([]);
+  const [result, setResult] = useState<AttemptResult | null>(null);
+  const resultRef = useRef<AttemptResult | null>(null);
+  const startedAt = useRef(0);
   const send = useCallback((commands: Command[]) => {
+    if (scenario && resultRef.current) return; // a submitted attempt is frozen
+    if (scenario) {
+      const at = Date.now() - startedAt.current;
+      setEvidence(prev => commands.reduce((log, c) => {
+        const e = evidenceFromCommand(c);
+        return e ? appendEvidence(log, at, e.action, e.detail) : log;
+      }, prev));
+    }
     worker.current?.postMessage({ kind: 'commands', commands });
-  }, []);
+  }, [scenario]);
   useEffect(() => {
     const engine = new Worker(new URL('../sim/worker.ts', import.meta.url), { type: 'module' });
     worker.current = engine;
@@ -41,26 +64,84 @@ export function SandboxPage() {
       if (ev.data?.kind !== 'snapshot') return;
       setSnapshot(ev.data.snapshot);
       if (ev.data.project) setProject(ev.data.project);
+      if (scenario) {
+        // Repairs are recorded from the worker's own events, so a rejected attempt is never counted.
+        const repairs = ev.data.events.filter(e => e.kind === 'repair');
+        if (repairs.length) setEvidence(prev => repairs.reduce(
+          (log, e) => appendEvidence(log, Date.now() - startedAt.current, 'repair', e.detail), prev));
+      }
       if (ev.data.events.length) setEvents(prev =>
         [...prev, ...ev.data.events.map(e => `Scan ${e.tick}: ${e.detail}`)].slice(-24));
     };
     engine.onerror = () => setClientError('Simulation worker failed. Reload the page to restart the sandbox.');
+    startedAt.current = Date.now();
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(storageKey);
       if (saved) engine.postMessage({ kind: 'commands', commands: [{ k: 'loadProject', project: JSON.parse(saved) }] });
+      else if (scenario) engine.postMessage({ kind: 'commands', commands: [
+        { k: 'loadProject', project: scenario.def.starter(scenario.seed) }] });
+      if (scenario) {
+        const attempt = localStorage.getItem(attemptKey);
+        if (attempt) {
+          const parsed = JSON.parse(attempt) as { startedAt: number; evidence: EvidenceEvent[]; result: AttemptResult | null };
+          startedAt.current = parsed.startedAt;
+          setEvidence(parsed.evidence);
+          resultRef.current = parsed.result;
+          setResult(parsed.result);
+        }
+      }
     } catch { setClientError('Saved project could not be read; starting with a blank workspace.'); }
     return () => { engine.terminate(); worker.current = null; };
   }, []);
   useEffect(() => {
     if (!project) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
+      localStorage.setItem(storageKey, JSON.stringify(project));
       setLocalSave('saved');
     } catch {
       setLocalSave('failed');
       setClientError('Local browser storage is full. Export your project as JSON to keep it.');
     }
-  }, [project]);
+  }, [project, storageKey]);
+  useEffect(() => {
+    if (!scenario || !project) return;
+    try { localStorage.setItem(attemptKey, JSON.stringify({ startedAt: startedAt.current, evidence, result })); }
+    catch { /* the attempt just will not survive a reload */ }
+  }, [scenario, project, evidence, result, attemptKey]);
+  const submitScenario = (rubric: RubricResult) => {
+    if (!scenario || resultRef.current || !project) return;
+    const finishedAt = Date.now();
+    worker.current?.postMessage({ kind: 'commands', commands: [{ k: 'pause' }] });
+    const attempt: AttemptResult = {
+      kind: 'skills-lab-result', formatVersion: 1,
+      assignment: scenario.assignment ?? {
+        kind: 'skills-lab-assignment', formatVersion: 1, trade: scenario.def.trade, exerciseId: scenario.def.id,
+        exerciseVersion: scenario.def.version, mode: scenario.mode, seed: scenario.seed,
+        createdAt: new Date(startedAt.current).toISOString(),
+      },
+      startedAt: new Date(startedAt.current).toISOString(), finishedAt: new Date(finishedAt).toISOString(),
+      durationMs: finishedAt - startedAt.current, evidence, rubric,
+    };
+    resultRef.current = attempt;
+    setResult(attempt);
+    scenario.onSubmitted?.(attempt);
+  };
+  const restartScenario = () => {
+    if (!scenario || !scenario.allowRestart) return;
+    if (scenario.onRestart) {
+      // Start a brand-new attempt: forget this one and let the page remount with a fresh seed.
+      try { localStorage.removeItem(storageKey); localStorage.removeItem(attemptKey); } catch { /* nothing stored */ }
+      scenario.onRestart();
+      return;
+    }
+    resultRef.current = null;
+    setResult(null);
+    setEvidence([]);
+    startedAt.current = Date.now();
+    setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setEvents([]); setClientError(null);
+    worker.current?.postMessage({ kind: 'commands', commands: [
+      { k: 'loadProject', project: scenario.def.starter(scenario.seed) }, { k: 'reset' }] });
+  };
   const goToStage = (stage: 'build' | 'wire' | 'program' | 'test') => {
     setActiveStage(stage);
     document.getElementById(`sandbox-stage-${stage}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -184,16 +265,16 @@ export function SandboxPage() {
     <main id="main" className="sandbox-page sandbox-ux wrap wrap-wide">
       <header className="sandbox-masthead">
         <div>
-          <p className="sandbox-breadcrumb"><Link to="/">Skills Lab</Link><span>/</span> Simulator <span>/</span> Open workspace</p>
-          <span className="eyebrow">3D engineering workbench · UX preview</span>
+          <p className="sandbox-breadcrumb"><Link to="/">Skills Lab</Link><span>/</span> {scenario ? 'Scenario' : 'Simulator'} <span>/</span> {scenario ? scenario.def.title : 'Open workspace'}</p>
+          <span className="eyebrow">{scenario ? 'Scenario workbench · same simulator as the open sandbox' : '3D engineering workbench · UX preview'}</span>
           <h1>Design. Wire. Program. Run.</h1>
-          <p className="sandbox-masthead-lede">Create an industrial control circuit in 3D, program its PLC, and see exactly what your logic does.</p>
+          <p className="sandbox-masthead-lede">{scenario ? 'Build, wire, program, run and troubleshoot on the real simulator. The result is graded by what your circuit does.' : 'Create an industrial control circuit in 3D, program its PLC, and see exactly what your logic does.'}</p>
         </div>
         <div className="sandbox-project-meta" role="status" aria-live="polite">
           <span className={`sandbox-work-status ${snapshot?.running ? 'is-running' : ''}`}>
             <i aria-hidden="true" />{snapshot?.running ? 'SIMULATION RUNNING' : 'EDIT MODE'}
           </span>
-          <strong>{project?.components.some(c => c.kind === 'revmotor') ? 'Untitled forward/reverse motor panel' :
+          <strong>{scenario ? scenario.def.title : project?.components.some(c => c.kind === 'revmotor') ? 'Untitled forward/reverse motor panel' :
             project?.components.some(c => c.kind === 'breaker') ? 'Untitled protected 24V DOL panel' :
             project?.components.some(c => c.kind === 'tank') ? 'Untitled tank process project' :
             project?.components.some(c => c.kind === 'conveyor') ?
@@ -212,6 +293,7 @@ export function SandboxPage() {
         </button>)}
       </nav>
       <div className="sandbox-toolbar">
+        {!scenario && <>
         <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setActiveStage('build'); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
         <button className="btn ghost small" onClick={layout} disabled={!editable || !!project?.components.length}>Place starter layout</button>
         <button className="btn ghost small" onClick={layoutSorting}
@@ -222,8 +304,9 @@ export function SandboxPage() {
           disabled={!editable || !!project?.components.length}>Place protected DOL layout</button>
         <button className="btn ghost small" onClick={layoutReverser}
           disabled={!editable || !!project?.components.length}>Place reversing DOL layout</button>
+        </>}
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
-        <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>
+        {!scenario && <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>}
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
         <span className="sandbox-toolbar-spacer" />
         <button className="btn ghost small" onClick={() => send([{ k: 'reset' }])}>Reset scan state</button>
@@ -233,6 +316,8 @@ export function SandboxPage() {
         <span className="sandbox-scan" aria-live="off">Scan {snapshot?.tick ?? 0}</span>
       </div>
       {(clientError || snapshot?.lastError) && <div role="alert" className="sandbox-alert">{clientError || snapshot?.lastError}</div>}
+      {scenario && <ScenarioPanel session={scenario} project={project} evidence={evidence} result={result}
+        onSubmit={submitScenario} onRestart={restartScenario} />}
       <div className="sandbox-layout">
         <aside className="sandbox-palette panel" aria-label="Component library">
           <div className="sandbox-rail-heading"><span className="eyebrow">Device library</span><h2>Components</h2>
@@ -404,8 +489,8 @@ export function SandboxPage() {
               <span>Accepted: <strong data-sort-accepted>{snapshot.plant.accepted}</strong></span>
               <span>Rejected: <strong data-sort-rejected>{snapshot.plant.rejected}</strong></span>
             </div>
-            <details><summary>Wiring and logic for the sorting exercise</summary>
-              <p className="sandbox-help">{sortingWireGuide}</p></details>
+            {!scenario && <details><summary>Wiring and logic for the sorting exercise</summary>
+              <p className="sandbox-help">{sortingWireGuide}</p></details>}
           </section>}
           {project?.components.some(c => c.kind === 'tank') && snapshot && <section
             className="sandbox-tank-panel panel" aria-label="Tank process controls">
@@ -426,8 +511,8 @@ export function SandboxPage() {
               <span>Pump: <strong data-tank-pump>{snapshot.pumpOn ? 'ON' : 'OFF'}</strong></span>
               <span>Drain: <strong data-tank-drain>{snapshot.drainOn ? 'OPEN' : 'CLOSED'}</strong></span>
             </div>
-            <details><summary>Tank wiring and editable PLC example</summary>
-              <p className="sandbox-help">{tankWireGuide}</p></details>
+            {!scenario && <details><summary>Tank wiring and editable PLC example</summary>
+              <p className="sandbox-help">{tankWireGuide}</p></details>}
           </section>}
           {project?.components.some(c => c.kind === 'revmotor') && snapshot && <section
             className="sandbox-protection-panel panel" aria-label="Forward reverse motor interlock">
@@ -444,8 +529,8 @@ export function SandboxPage() {
               <span>Reverse contactor: <strong data-reverse-contactor>{snapshot.reverseContactorOn ? 'CLOSED' : 'OPEN'}</strong></span>
               <span>Interlock: <strong data-interlock>{snapshot.interlockConflict ? 'CONFLICT · BOTH INHIBITED' : 'NORMAL'}</strong></span>
             </div>
-            <details><summary>21-wire reversing motor circuit</summary>
-              <p className="sandbox-help">{reverseWireGuide}</p></details>
+            {!scenario && <details><summary>21-wire reversing motor circuit</summary>
+              <p className="sandbox-help">{reverseWireGuide}</p></details>}
           </section>}
           {project?.components.some(c => c.kind === 'overload') && <section
             className="sandbox-protection-panel panel" aria-label="Protected motor control panel">
@@ -464,8 +549,8 @@ export function SandboxPage() {
               <span>Motor: <strong data-panel-motor>{snapshot?.motorOn ? 'RUNNING' : 'STOPPED'}</strong></span>
               <span>Lamp: <strong data-panel-lamp>{snapshot?.lampOn ? 'ON' : 'OFF'}</strong></span>
             </div>
-            <details><summary>16-wire protected DOL circuit</summary>
-              <p className="sandbox-help">{protectedDOLGuide}</p></details>
+            {!scenario && <details><summary>16-wire protected DOL circuit</summary>
+              <p className="sandbox-help">{protectedDOLGuide}</p></details>}
           </section>}
         </div>
         <WorkbenchInspector project={project ?? { formatVersion: 1, components: [], wires: [], program: { id: 'pending', version: '1', rungs: [] } }}
@@ -497,6 +582,7 @@ export function SandboxPage() {
       <div className="sandbox-bottom">
         <div id="sandbox-stage-program" className="sandbox-program-dock">
           {project && snapshot && <ProgrammingDock project={project} snapshot={snapshot} disabled={!editable}
+            showExamples={!scenario}
             onLadder={program => send([{ k: 'loadProgram', program }])}
             onST={source => send([{ k: 'loadST', source }])}
             onLanguage={language => send([{ k: 'activateLanguage', language }])} />}
@@ -507,11 +593,11 @@ export function SandboxPage() {
             onTagBreakpoint={breakpoint => send([{ k: 'breakOnTag', breakpoint }])} />}
           <span className="eyebrow">Diagnostics</span><h2>Electrical &amp; event trace</h2>
           <p className="sandbox-help">Click a wire's remove button to break a connection and observe what changes. All values come from the simulator.</p>
-          <details><summary>Example wiring map</summary><p>{wireGuide}</p>
+          {!scenario && <details><summary>Example wiring map</summary><p>{wireGuide}</p>
             {project?.components.some(c => c.kind === 'conveyor') && <p>{sortingWireGuide}</p>}
             {project?.components.some(c => c.kind === 'tank') && <p>{tankWireGuide}</p>}
             {project?.components.some(c => c.kind === 'overload') && <p>{protectedDOLGuide}</p>}
-            {project?.components.some(c => c.kind === 'revmotor') && <p>{reverseWireGuide}</p>}</details>
+            {project?.components.some(c => c.kind === 'revmotor') && <p>{reverseWireGuide}</p>}</details>}
           <h3>Wires ({project?.wires.length ?? 0})</h3>
           <div className="sandbox-wire-list">{project?.wires.map(w =>
             <div key={w.id}><code>{w.from} → {w.to}</code>
@@ -542,7 +628,7 @@ export function SandboxPage() {
             </output>
           </section>
           {project && snapshot && <TroubleshootingPanel project={project} snapshot={snapshot}
-            editable={editable} send={send} />}
+            editable={editable} send={send} instructor={!scenario} />}
           <h3>Voltage probes (V)</h3>
           <div className="sandbox-volts">{Object.entries(snapshot?.voltages ?? {}).filter(([name]) =>
             name.includes('I0.') || name.includes('Q0.') || name.endsWith('A1')).map(([name, value]) =>

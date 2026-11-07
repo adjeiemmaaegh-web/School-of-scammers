@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { decodeAssignment, encodeResult } from '../platform/persistence';
 import { getExercise } from '../trades/registry';
+import { getScenario } from '../exercises';
+import type { ScenarioSession } from '../exercises/session';
 import type { Assignment, AttemptResult } from '../platform/types';
 import { AppHeader } from '../ui/AppHeader';
 import { CopyField } from '../ui/CopyField';
 import { ExercisePlayer } from '../ui/ExercisePlayer';
+const SandboxPage = lazy(() => import('./SandboxPage').then(m => ({ default: m.SandboxPage })));
 
 function readAssignmentFromHash(): { assignment?: Assignment; error?: string } {
   if (typeof window === 'undefined') return {};
@@ -31,7 +34,13 @@ export function CandidatePage() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  const def = useMemo(() => (assignment ? getExercise(assignment.exerciseId) : undefined), [assignment]);
+  const exerciseDef = useMemo(() => (assignment ? getExercise(assignment.exerciseId) : undefined), [assignment]);
+  const scenarioDef = useMemo(() => (assignment ? getScenario(assignment.exerciseId) : undefined), [assignment]);
+  const def = exerciseDef ?? scenarioDef;
+  const session = useMemo<ScenarioSession | null>(() => (assignment && scenarioDef ? {
+    def: scenarioDef, mode: 'assessment', seed: assignment.seed, allowRestart: false, assignment,
+    resultActions: (result: AttemptResult) => <ReturnCode result={result} />,
+  } : null), [assignment, scenarioDef]);
 
   const loadManual = () => {
     try {
@@ -101,12 +110,16 @@ export function CandidatePage() {
     );
   }
 
+  if (session) return <Suspense fallback={<main id="main" className="wrap wrap-wide page">
+    <p role="status">Loading the 3D engineering workbench…</p></main>}>
+    <SandboxPage key={`${session.def.id}:${session.seed}`} scenario={session} /></Suspense>;
+
   return (
     <>
       <AppHeader />
       <main id="main" className="wrap wrap-wide page">
         <ExercisePlayer
-          def={def}
+          def={exerciseDef!}
           initialMode="assessment"
           seed={assignment.seed}
           allowModeSwitch={false}

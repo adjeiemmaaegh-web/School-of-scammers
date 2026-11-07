@@ -58,6 +58,12 @@ describe('plc-sbx-startstop', () => {
     expect(failed(g)).toEqual([]);
     expect(g.rubric).toMatchObject({ score: g.rubric.max, passed: true, safetyHold: false });
   });
+  it('leftover operator state does not matter: a held STOP at submit time is not graded as a wiring fault', () => {
+    const p = solved();
+    const held: ProjectFile = { ...p, components: p.components.map(c => c.id === 'stop' || c.id === 'start' ? { ...c, pressed: true } : c) };
+    expect(held.components.filter(c => c.pressed)).toHaveLength(2);
+    expect(failed(grade('plc-sbx-startstop', held))).toEqual([]);
+  });
   it('a different correct solution (Structured Text) also passes: grading is by outcome', () => {
     const st = [
       'VAR_INPUT', ' Start : BOOL;', ' StopOK : BOOL;', 'END_VAR', 'VAR_OUTPUT', ' Run : BOOL;', 'END_VAR',
@@ -292,5 +298,19 @@ describe('evidence helpers', () => {
     expect(usedMultimeter([red, off])).toBe(false);
     expect(usedMultimeter([red, black])).toBe(true);
     expect(usedMultimeter([red, black], 2)).toBe(false);
+  });
+});
+
+describe('answer hygiene and E2E pins', () => {
+  it('no starter hands over the finished logic in its Structured Text source', () => {
+    for (const s of SCENARIOS) {
+      for (const seed of [1, 2, 3]) {
+        expect(s.starter(seed).stSource ?? '', `${s.id}`).not.toMatch(/StopOK\s+AND/);
+      }
+    }
+  });
+  it('seed 1 hides an open contactor coil — scripts/sandbox-p6-scenario-browser.cjs depends on it', () => {
+    const f = def('plc-sbx-find-fault').starter(1).faults![0];
+    expect([f.kind, f.target]).toEqual(['contactor-coil-open', 'con']);
   });
 });

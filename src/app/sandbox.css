@@ -394,3 +394,16 @@
 .sandbox-ux .sandbox-alarm code { font-size:11px; color:var(--muted); }
 .sandbox-ux .sandbox-alarm small { color:var(--muted); }
 @media(max-width:570px) { .sandbox-ux .sandbox-fault-form { grid-template-columns:minmax(0,1fr); } }
+
+/* P6 · scenario work order */
+.sandbox-ux .sandbox-scenario { margin:12px 0 16px; }
+.sandbox-ux .sandbox-scenario-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:16px 32px; align-items:start; }
+.sandbox-ux .sandbox-scenario-brief { white-space:pre-line; max-width:72ch; margin:0 0 12px; line-height:1.55; }
+.sandbox-ux .sandbox-scenario h3 { margin:0 0 8px; }
+.sandbox-ux .sandbox-scenario .hint-list { margin:10px 0 0; padding-left:20px; line-height:1.5; }
+.sandbox-ux .sandbox-scenario .exam-notes { margin:0 0 12px; padding-left:20px; line-height:1.5; }
+.sandbox-ux .sandbox-scenario .objective-list { list-style:none; margin:0 0 12px; padding:0; display:grid; gap:6px; }
+.sandbox-ux .sandbox-scenario .objective-list li { display:flex; gap:10px; align-items:flex-start; }
+.sandbox-ux .sandbox-scenario-reason { color:var(--muted); }
+.sandbox-ux .sandbox-scenario [data-scenario-result] { margin-top:16px; }
+@media(max-width:900px) { .sandbox-ux .sandbox-scenario-grid { grid-template-columns:minmax(0,1fr); } }

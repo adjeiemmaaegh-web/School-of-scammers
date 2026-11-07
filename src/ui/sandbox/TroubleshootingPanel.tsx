@@ -10,6 +10,8 @@ type Props = {
   /** True while the simulation is paused (isolated). Parts can only be replaced then. */
   editable: boolean;
   send: (commands: Command[]) => void;
+  /** Show the instructor controls (inject / reveal / clear). Off in graded scenarios. */
+  instructor?: boolean;
 };
 
 /**
@@ -17,7 +19,7 @@ type Props = {
  * I/O lamps and scan trace, then replaces the faulty part. Every action is a Command; nothing here
  * decides what a fault does. Alarms are read from the worker snapshot.
  */
-export function TroubleshootingPanel({ project, snapshot, editable, send }: Props) {
+export function TroubleshootingPanel({ project, snapshot, editable, send, instructor = true }: Props) {
   const [kind, setKind] = useState<FaultKind>('contactor-coil-open');
   const [target, setTarget] = useState('');
   const [stuckPressed, setStuckPressed] = useState(true);
@@ -40,7 +42,7 @@ export function TroubleshootingPanel({ project, snapshot, editable, send }: Prop
       lamps and the scan trace, then replace the faulty part. Faults are educational abstractions of
       idealised 24 V parts.</p>
 
-    <details className="sandbox-fault-instructor" open>
+    {instructor && <details className="sandbox-fault-instructor" open>
       <summary>Instructor: inject or clear a fault</summary>
       <div className="sandbox-fault-form stack">
         <label>Fault type
@@ -95,7 +97,7 @@ export function TroubleshootingPanel({ project, snapshot, editable, send }: Prop
           </span>
         </li>)}
       </ul>
-    </details>
+    </details>}
 
     <div className="sandbox-repair">
       <label>Replace a part
