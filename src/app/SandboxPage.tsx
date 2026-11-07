@@ -377,7 +377,7 @@ export function SandboxPage() {
                 Direction: <strong data-reverse-direction>{snapshot?.motorDirection ?? 'stopped'}</strong> ·
                 Forward: <strong>{snapshot?.forwardContactorOn ? 'on' : 'off'}</strong> ·
                 Reverse: <strong>{snapshot?.reverseContactorOn ? 'on' : 'off'}</strong></p>}
-              {project?.components.some(c => c.kind === 'breaker') && <p>
+              {project?.components.some(c => c.kind === 'overload') && <p>
                 Breaker: <strong data-breaker-status>{snapshot?.breakerTripped ? 'TRIPPED' : 'CLOSED'}</strong> ·
                 Overload: <strong data-overload-status>{snapshot?.overloadTripped ? 'TRIPPED' : 'CLOSED'}</strong> ·
                 Pilot: <strong data-lamp-status>{snapshot?.lampOn ? 'ON' : 'OFF'}</strong></p>}</div>
@@ -446,7 +446,7 @@ export function SandboxPage() {
             <details><summary>21-wire reversing motor circuit</summary>
               <p className="sandbox-help">{reverseWireGuide}</p></details>
           </section>}
-          {project?.components.some(c => c.kind === 'breaker') && <section
+          {project?.components.some(c => c.kind === 'overload') && <section
             className="sandbox-protection-panel panel" aria-label="Protected motor control panel">
             <div className="sandbox-section-head"><div>
               <span className="eyebrow">P4 · electrical panel</span>
@@ -509,7 +509,7 @@ export function SandboxPage() {
           <details><summary>Example wiring map</summary><p>{wireGuide}</p>
             {project?.components.some(c => c.kind === 'conveyor') && <p>{sortingWireGuide}</p>}
             {project?.components.some(c => c.kind === 'tank') && <p>{tankWireGuide}</p>}
-            {project?.components.some(c => c.kind === 'breaker') && <p>{protectedDOLGuide}</p>}
+            {project?.components.some(c => c.kind === 'overload') && <p>{protectedDOLGuide}</p>}
             {project?.components.some(c => c.kind === 'revmotor') && <p>{reverseWireGuide}</p>}</details>
           <h3>Wires ({project?.wires.length ?? 0})</h3>
           <div className="sandbox-wire-list">{project?.wires.map(w =>
