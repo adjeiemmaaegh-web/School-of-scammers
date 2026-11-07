@@ -431,7 +431,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               onClick={() => place(kind)} disabled={!editable}
               className="sandbox-palette-item">
               <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
-                {kind === 'plc' ? 'PLC' : kind === 'plc16' ? '16/16' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
+                {kind === 'plc' ? 'PLC' : kind === 'plc16' ? '16/16' : kind === 'relay' ? 'RLY' : kind === 'cylinder' ? 'CYL' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
                   kind === 'conveyor' ? 'BELT' : kind === 'photoeye' ? 'EYE' :
                   kind === 'diverter' ? 'DIV' : kind === 'tank' ? 'TANK' :
                   kind === 'pump' ? 'PUMP' : kind === 'levelprobe' ? 'LVL' :
@@ -487,7 +487,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                     <button type="button" className="sandbox-inspect-link" onClick={() => selectDevice(c.id)}
                       aria-label={`Inspect ${def.label}`}>{def.label}</button>
                     <span className="sandbox-device-status">{c.kind === 'motor' ? (live ? 'RUNNING' : 'STOPPED') :
-                      c.kind === 'contactor' ? (live ? 'COIL ON' : 'COIL OFF') :
+                      c.kind === 'contactor' || c.kind === 'relay' ? (live ? 'COIL ON' : 'COIL OFF') :
+                      c.kind === 'cylinder' ? (() => { const r = snapshot?.cylinders[c.id]; return !r || r.retractLimit ? 'RETRACTED' : r.extendLimit ? 'EXTENDED' : `MOVING ${Math.round(r.position * 100)}%`; })() :
                       isPlcKind(c.kind) ? (live ? 'POWER OK' : 'NO POWER') :
                       c.kind === 'conveyor' ? (live ? 'BELT MOVING' : 'BELT STOPPED') :
                       c.kind === 'photoeye' ? (live ? 'MARK DETECTED' : 'NO MARK') :

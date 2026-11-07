@@ -95,6 +95,8 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'breaker' ? (isLive ? 'Closed' : 'Tripped open') :
     selectedDevice.kind === 'overload' ? (isLive ? '95-96 closed' : '95-96 tripped open') :
     selectedDevice.kind === 'lamp' ? (isLive ? 'Illuminated' : 'Off') :
+    selectedDevice.kind === 'cylinder' ? (() => { const r = snapshot.cylinders[selectedDevice.id]; return !r || r.retractLimit ? 'Retracted' : r.extendLimit ? 'Extended' : `Moving ${Math.round(r.position * 100)}%`; })() :
+    selectedDevice.kind === 'relay' ? (isLive ? 'Energised' : 'Released') :
     selectedDevice.kind === 'tank' ? `${Math.round(snapshot.vessels[selectedDevice.id]?.levelMl ?? 0)} / 1000 ml` :
     selectedDevice.kind === 'pump' ? (isLive ? 'Filling' : 'Off') :
     selectedDevice.kind === 'levelprobe' ? (isLive ? 'High level' : 'Below level switch') :
