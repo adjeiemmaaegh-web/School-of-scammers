@@ -64,7 +64,7 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'motor' ? snapshot.motorOn :
     selectedDevice.kind === 'contactor' ? snapshot.contactorOn :
     selectedDevice.kind === 'plc' ? snapshot.io.PlcPowered :
-    selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' ? isPressed : true;
+    selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' ? !isPressed : true;
   const state = selectedDevice.kind === 'breaker' ? (isLive ? 'Closed' : 'Tripped open') :
     selectedDevice.kind === 'overload' ? (isLive ? '95-96 closed' : '95-96 tripped open') :
     selectedDevice.kind === 'lamp' ? (isLive ? 'Illuminated' : 'Off') :
