@@ -24,7 +24,7 @@ const base = process.env.PLC_BASE_URL || 'http://127.0.0.1:4173';
     await search.type('motor');
     await page.waitForFunction(() => [...document.querySelectorAll('.sandbox-palette-item')]
       .some(el => el.textContent.includes('Reversible 24V motor')));
-    const motorResults=await page.$eval('.sandbox-palette-item', els=>els.map(el=>el.textContent));
+    const motorResults=await page.$$eval('.sandbox-palette-item', els=>els.map(el=>el.textContent));
     assert.ok(motorResults.some(text=>text.includes('24V motor')),'Legacy motor still searchable');
     assert.ok(motorResults.some(text=>text.includes('Reversible 24V motor')),'New reversing motor searchable');
     await search.focus();
