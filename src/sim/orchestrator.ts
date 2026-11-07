@@ -355,13 +355,18 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
   return { tick: world.tick, running: world.running, components: world.project.components.map(c => ({ ...c })),
     wires: world.project.wires.map(w => ({ ...w })),
     io: { Start: world.inputs.Start, StopOK: world.inputs.StopOK,
-      Photoeye: world.inputs.Photoeye, TankHigh: world.inputs.TankHigh,
+      Photoeye: world.inputs.Photoeye, TankHigh: world.inputs.TankHigh, ReverseRequest: world.inputs.ReverseRequest,
       Run: world.coils.Run === true, Sort: world.coils.Sort === true,
       Fill: world.coils.Fill === true, Drain: world.coils.Drain === true,
+      Forward: world.coils.Forward === true, Reverse: world.coils.Reverse === true,
       'Q0.0': world.coils.Run === true, 'Q0.1': world.coils.Sort === true,
       'Q0.2': world.coils.Fill === true, 'Q0.3': world.coils.Drain === true,
+      'Q0.4': world.coils.Forward === true, 'Q0.5': world.coils.Reverse === true,
       PlcPowered: world.powered },
     voltages: { ...world.voltages }, contactorOn: world.contactorOn, motorOn: world.motorOn, motorAngleRad: world.motorAngleRad,
+    forwardContactorOn: world.forwardContactorOn, reverseContactorOn: world.reverseContactorOn,
+    motorDirection: world.motorDirection, reverseMotorAngleRad: world.reverseMotorAngleRad,
+    interlockConflict: world.interlockConflict,
     conveyorOn: world.conveyorOn, diverterOn: world.diverterOn,
     plant: { ...world.plant, parcel: world.plant.parcel ? { ...world.plant.parcel } : null },
     tank: { ...world.tank }, pumpOn: world.pumpOn, drainOn: world.drainOn,
@@ -433,6 +438,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     StopOK: powered && circuit.voltage[terminal(plc!.id, 'I0.1')] === 24,
     Photoeye: powered && eyePowered && circuit.voltage[terminal(plc!.id, 'I0.2')] === 24,
     TankHigh: powered && probePowered && circuit.voltage[terminal(plc!.id, 'I0.3')] === 24,
+    ReverseRequest: powered && circuit.voltage[terminal(plc!.id, 'I0.4')] === 24,
   };
   // 4. Execute the learner's exact document in the salvaged bounded LD or ST engine.
   let ladderResult: LadderResult | null = null;
@@ -451,10 +457,12 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     // Fail closed in the *simulated* plant. Do not publish stale energized outputs
     // after an arithmetic fault (overflow, division by zero, invalid typed write).
     const paused: WorldState = {
-      ...w, running: false, coils: { ...w.coils, Run: false, Sort: false, Fill: false, Drain: false },
-      tagValues: { ...w.tagValues, Run: false, Sort: false, Fill: false, Drain: false },
+      ...w, running: false, coils: { ...w.coils, Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
+      tagValues: { ...w.tagValues, Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
       contactorOn: false, motorOn: false, conveyorOn: false, diverterOn: false,
       pumpOn: false, drainOn: false, lampOn: false,
+      forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
+      interlockConflict: false,
       plant: { ...w.plant, photoeyeActive: false }, voltages: {},
       diagnostics: [...w.diagnostics, 'PLC scan interrupted; simulated outputs deenergized'],
       lastError: `PLC runtime error: ${message}`,
@@ -474,28 +482,40 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const stDrain = stResult
     ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'drain')?.[1]
     : undefined;
+  const stForward = stResult
+    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'forward')?.[1]
+    : undefined;
+  const stReverse = stResult
+    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'reverse')?.[1]
+    : undefined;
   if ((stSort !== undefined && typeof stSort !== 'boolean') ||
       (stFill !== undefined && typeof stFill !== 'boolean') ||
-      (stDrain !== undefined && typeof stDrain !== 'boolean')) {
+      (stDrain !== undefined && typeof stDrain !== 'boolean') ||
+      (stForward !== undefined && typeof stForward !== 'boolean') ||
+      (stReverse !== undefined && typeof stReverse !== 'boolean')) {
     const paused: WorldState = {
       ...w, running: false, coils: { ...w.coils, Run: false, Sort: false },
       tagValues: { ...w.tagValues, Run: false, Sort: false },
       motorOn: false, conveyorOn: false, diverterOn: false, contactorOn: false,
       pumpOn: false, drainOn: false, lampOn: false,
-      lastError: 'PLC Sort/Fill/Drain outputs must be BOOL',
+      forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
+      interlockConflict: false,
+      lastError: 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL',
     };
     return { world: paused, snapshot: renderSnapshot(paused),
-      events: [{ tick: w.tick, kind: 'error', detail: 'PLC Sort/Fill/Drain outputs must be BOOL' }] };
+      events: [{ tick: w.tick, kind: 'error', detail: 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL' }] };
   }
   // Structured Text is case-insensitive; the physical Q0.0 binding is always canonical "Run".
   const coils: Record<string, boolean> = stResult
     ? { ...Object.fromEntries(Object.entries(stResult.outputs).filter(([, value]) => typeof value === 'boolean')),
-        Run: stRun === true, Sort: stSort === true, Fill: stFill === true, Drain: stDrain === true }
+        Run: stRun === true, Sort: stSort === true, Fill: stFill === true, Drain: stDrain === true,
+        Forward: stForward === true, Reverse: stReverse === true }
     : ladderResult?.outputs ?? {};
   const tagValues: Record<string, STValue> = {
     ...inputs, ...(stResult?.signals ?? {}), ...(ladderResult?.numericValues ?? {}), ...coils,
     Run: coils.Run === true, Sort: coils.Sort === true,
-    Fill: coils.Fill === true, Drain: coils.Drain === true, Unused: false,
+    Fill: coils.Fill === true, Drain: coils.Drain === true,
+    Forward: coils.Forward === true, Reverse: coils.Reverse === true, Unused: false,
   };
   // 5. Publish output image (Q0.0 follows coil Run, only when PLC is powered).
   // 6. Apply outputs to actuators via circuit on the NEXT tick; contactor coil is sampled here.
