@@ -14,7 +14,7 @@ const CANVAS_W = 1080, CANVAS_H = 580, BOX_W = 170;
 const wireGuide = 'Supply P24 → PLC L+, START A, STOP A, contactor 13. Supply M0 → PLC M, contactor A2, motor M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → contactor A1; contactor 14 → motor L+.';
 const sortingWireGuide = 'For 3D sorting: supply P24 → PLC L+, START A, STOP A, contactor 13, photoeye L+. Supply M0 → PLC M, contactor A2, conveyor M-, photoeye M, diverter A2. START B → I0.0; STOP B → I0.1; PLC Q0.0 → contactor A1; contactor 14 → conveyor L+. Photoeye OUT → PLC I0.2; PLC Q0.1 → diverter A1. Load the sorting Ladder example, Run, press START, and feed marked or plain parcels. Photoeye and diverter must be positioned alongside the conveyor in sensor→diverter order.';
 const tankWireGuide = 'For tank process: P24 to PLC L+, STOP A and level probe L+. M0 to PLC M, pump M-, level probe M and drain valve A2. STOP B to PLC I0.1; level probe OUT to PLC I0.3; PLC Q0.2 to pump L+; PLC Q0.3 to drain valve A1. Mount the pump, probe and valve near the tank. Load the tank control Ladder example, Run and observe filling to 750 ml, switching and drainage until 600 ml. Wrong PLC logic, miswiring or moving equipment alters the real result.';
-const protectedDOLGuide = 'P4 protected direct-on-line (24V educational model): supply P24 → breaker IN; breaker OUT → PLC L+, START A, STOP A, contactor 13; supply M0 → PLC M, contactor A2, motor M-, lamp M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → overload 95; overload 96 → contactor A1; contactor 14 → motor L+ and lamp L+. Load the editable latch example. To test protection, trip the overload (95-96 opens) or connect breaker OUT directly to supply M0 (downstream short); the branch breaker should isolate the short on the next scan. Remove the short wire before resetting. Measure across pins with the two-probe virtual DC meter.';
+const protectedDOLGuide = 'Protected DOL training circuit (16 wires): supply P24 → breaker IN; breaker OUT → E-stop A; E-stop B → PLC L+, START A, STOP A and contactor 13. Supply M0 → PLC M, contactor A2, motor M- and pilot lamp M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → overload 95; overload 96 → contactor A1; contactor 14 → motor L+ and lamp L+. Load editable latch program. Press E-stop to open the upstream NC supply path (training demonstration, NOT a certified safety function), reset it manually. Trip overload to open coil path. For a breaker short demo, wire breaker OUT directly to supply M0, Run or Step to trip; remove that wire before reset. Use meter probes to compare actual net potentials.';
 export function SandboxPage() {
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
   const [project, setProject] = useState<ProjectFile | null>(null);
@@ -123,10 +123,10 @@ export function SandboxPage() {
     setMoveTarget(null);
     const devices: { kind: ComponentKind; x: number; y: number }[] = [
       {kind:'supply',x:25,y:25}, {kind:'breaker',x:175,y:25},
-      {kind:'plc',x:340,y:25}, {kind:'start',x:40,y:245},
-      {kind:'stop',x:240,y:245}, {kind:'overload',x:450,y:245},
-      {kind:'contactor',x:600,y:25}, {kind:'motor',x:830,y:25},
-      {kind:'lamp',x:810,y:245},
+      {kind:'estop',x:160,y:245}, {kind:'plc',x:345,y:25},
+      {kind:'start',x:35,y:400}, {kind:'stop',x:285,y:245},
+      {kind:'overload',x:510,y:245}, {kind:'contactor',x:605,y:25},
+      {kind:'motor',x:855,y:25}, {kind:'lamp',x:815,y:245},
     ];
     send(devices.map((d,i):Command=>({k:'place',id:`${d.kind}-${i+1}`,kind:d.kind,
       at:{x:d.x,y:d.y}})));
@@ -235,7 +235,7 @@ export function SandboxPage() {
                   kind === 'conveyor' ? 'BELT' : kind === 'photoeye' ? 'EYE' :
                   kind === 'diverter' ? 'DIV' : kind === 'tank' ? 'TANK' :
                   kind === 'pump' ? 'PUMP' : kind === 'levelprobe' ? 'LVL' :
-                  kind === 'drainvalve' ? 'VAL' : kind === 'breaker' ? 'CB' :
+                  kind === 'drainvalve' ? 'VAL' : kind === 'estop' ? 'E-STOP' : kind === 'breaker' ? 'CB' :
                   kind === 'overload' ? 'OL' : kind === 'lamp' ? 'LED' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
               </span>
               <span><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
@@ -272,6 +272,7 @@ export function SandboxPage() {
                 const def = COMPONENTS[c.kind];
                 const live = c.kind === 'breaker' ? !snapshot?.breakerTripped :
                   c.kind === 'overload' ? !snapshot?.overloadTripped :
+                  c.kind === 'estop' ? !c.pressed :
                   c.kind === 'lamp' ? snapshot?.lampOn :
                   c.kind === 'pump' ? snapshot?.pumpOn :
                   c.kind === 'levelprobe' ? snapshot?.io.TankHigh :
@@ -297,14 +298,16 @@ export function SandboxPage() {
                       c.kind === 'drainvalve' ? (live ? 'DRAIN OPEN' : 'CLOSED') :
                       c.kind === 'breaker' ? (live ? 'CLOSED' : 'TRIPPED') :
                       c.kind === 'overload' ? (live ? '95-96 CLOSED' : 'TRIPPED') :
+                      c.kind === 'estop' ? (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') :
                       c.kind === 'lamp' ? (live ? 'ILLUMINATED' : 'OFF') :
                       c.kind === 'supply' ? '24V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</span>
                   </div>
                   <div className="sandbox-patch-actions">
-                    {(c.kind === 'start' || c.kind === 'stop') && <button
+                    {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop') && <button
                       className={`sandbox-operate ${c.pressed ? 'pressed' : ''}`}
                       onClick={() => send([{ k: 'operate', id: c.id, pressed: !c.pressed }])}>
-                        {c.pressed ? 'Release' : 'Press'}</button>}
+                        {c.kind === 'estop' ? (c.pressed ? 'Reset E-stop (training)' : 'Press E-stop (training)') :
+                          c.pressed ? 'Release' : 'Press'}</button>}
                     {(c.kind === 'breaker' || c.kind === 'overload') && <button
                       type="button" className="sandbox-operate"
                       onClick={() => send([{k:'operateProtection',id:c.id,
@@ -404,7 +407,14 @@ export function SandboxPage() {
               A downstream direct short trips the latched breaker; a manual overload trip
               opens contact 95–96 and drops the contactor. These are bounded educational
               behaviors, not thermal ratings or certified fault clearing.</p>
-            <details><summary>15-wire protected DOL circuit</summary>
+            <div className="sandbox-sort-metrics" aria-live="off">
+              <span>Breaker: <strong data-breaker-state>{snapshot?.breakerTripped ? 'TRIPPED' : 'CLOSED'}</strong></span>
+              <span>Overload: <strong data-overload-state>{snapshot?.overloadTripped ? 'TRIPPED' : 'CLOSED'}</strong></span>
+              <span>E-stop: <strong data-estop-state>{project?.components.find(c => c.kind === 'estop')?.pressed ? 'OPEN' : 'RESET'}</strong></span>
+              <span>Motor: <strong data-panel-motor>{snapshot?.motorOn ? 'RUNNING' : 'STOPPED'}</strong></span>
+              <span>Lamp: <strong data-panel-lamp>{snapshot?.lampOn ? 'ON' : 'OFF'}</strong></span>
+            </div>
+            <details><summary>16-wire protected DOL circuit</summary>
               <p className="sandbox-help">{protectedDOLGuide}</p></details>
           </section>}
         </div>
@@ -487,7 +497,7 @@ export function SandboxPage() {
             <p className="sandbox-help">No changes recorded yet.</p>}</div>
         </aside>
       </div>
-      <p className="sandbox-disclaimer">Educational, simplified 24V DC simulation only. Not safety-rated or a substitute for commissioning. This P3 preview includes deterministic 3D sorting and a bounded tank with wired pump, high-level switch and drain valve. The underlying Ladder/ST and 24V circuit models remain educational and bounded; no factory-grade mechanics, automatic object recognition, hardware PLC, certified safety, full IEC coverage or real machinery are claimed.</p>
+      <p className="sandbox-disclaimer">Educational, simplified 24V DC simulation only. Not safety-rated or a substitute for commissioning. This P4 development preview adds a simplified 24V breaker, overload contact, latching NC training E-stop, pilot lamp and virtual DC voltmeter, alongside P3 sorting and tank scenarios. It does not simulate real-world rated fault clearing, certified E-stop circuits or thermal motor protection. The underlying Ladder/ST and 24V circuit models remain educational and bounded; no factory-grade mechanics, automatic object recognition, hardware PLC, certified safety, full IEC coverage or real machinery are claimed.</p>
     </main>
   </>;
 }
