@@ -100,7 +100,7 @@ export function validateProject(raw: unknown): ProjectFile {
   }
   // One of each protective branch device per educational circuit: state is
   // explicitly maintained per role, not silently shared among duplicates.
-  for (const kind of ['breaker', 'overload'] as const)
+  for (const kind of ['breaker', 'overload', 'estop'] as const)
     if (components.filter(c => c.kind === kind).length > 1)
       throw new Error(`Only one ${kind} protection device is supported`);
   const wireIds = new Set<string>();
@@ -183,13 +183,15 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         ...world.meter, [cmd.lead]: cmd.terminal, volts: null, status: 'select',
       } };
     } else if (cmd.k === 'operate') {
-      if (!world.project.components.some(c => c.id === cmd.id && (c.kind === 'start' || c.kind === 'stop'))) world = setError(world, 'Only pushbuttons can be operated');
+      if (!world.project.components.some(c => c.id === cmd.id &&
+        (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop')))
+        world = setError(world, 'Only pushbuttons and training E-stop can be operated');
       else world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, pressed: cmd.pressed } : c) } };
     } else if (!canEdit(world)) world = setError(world, 'Pause simulation before modifying the project');
     else if (cmd.k === 'place') {
       if (!validId(cmd.id) || !Object.hasOwn(COMPONENTS, cmd.kind) || !validPos(cmd.at) ||
           world.project.components.some(c => c.id === cmd.id) || world.project.components.length >= 40) world = setError(world, 'Invalid component placement');
-      else if (['plc', 'supply', 'conveyor', 'photoeye', 'diverter', 'tank', 'pump', 'levelprobe', 'drainvalve', 'breaker', 'overload'].includes(cmd.kind) &&
+      else if (['plc', 'supply', 'conveyor', 'photoeye', 'diverter', 'tank', 'pump', 'levelprobe', 'drainvalve', 'breaker', 'overload', 'estop'].includes(cmd.kind) &&
         world.project.components.some(c => c.kind === cmd.kind))
         world = setError(world, 'This educational workbench supports one of each station component');
       else world = { ...world, project: { ...world.project, components: [...world.project.components, { id: cmd.id, kind: cmd.kind, x: cmd.at.x, y: cmd.at.y, pressed: false }] } };
@@ -254,7 +256,7 @@ function buildCircuit(world: WorldState): Device[] {
       id: c.id, kind: 'switch', a: terminal(c.id,'95'), b: terminal(c.id,'96'),
       closed: !world.overloadTripped,
     });
-    if (c.kind === 'start' || c.kind === 'stop') devices.push({
+    if (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop') devices.push({
       id: c.id, kind: 'switch', a: terminal(c.id, 'A'), b: terminal(c.id, 'B'),
       closed: c.kind === 'start' ? c.pressed : !c.pressed,
     });
