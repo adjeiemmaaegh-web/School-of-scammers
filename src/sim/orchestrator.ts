@@ -168,11 +168,30 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           (cmd.action !== 'trip' && cmd.action !== 'reset'))
         world = setError(world, 'Invalid breaker/overload control');
       else {
-        world = component.kind === 'breaker'
-          ? { ...world, breakerTripped: cmd.action === 'trip' }
-          : { ...world, overloadTripped: cmd.action === 'trip' };
-        commandEvents.push({ tick: world.tick, kind: 'protection',
-          detail: `${component.kind} ${cmd.action === 'trip' ? 'opened (manual training trip)' : 'reset by learner'}` });
+        // Do not permit resetting the idealized breaker into a still-present
+        // direct supply short. It must be removed from the user's netlist first.
+        const resettingBreaker = component.kind === 'breaker' && cmd.action === 'reset';
+        const candidate = resettingBreaker ? { ...world, breakerTripped: false } : world;
+        const circuit = resettingBreaker ? solveDiscrete24V({
+          devices: buildCircuit(candidate),
+          wires: candidate.project.wires.map(wire => [wire.from, wire.to] as const),
+        }) : null;
+        if (circuit?.diagnostics.some(d => d.startsWith('Supply short'))) {
+          world = setError(world, 'Remove the short circuit before resetting the branch breaker');
+          commandEvents.push({ tick: world.tick, kind: 'protection',
+            detail: 'Breaker reset refused: direct short remains' });
+        } else {
+          world = component.kind === 'breaker'
+            ? { ...world, breakerTripped: cmd.action === 'trip' }
+            : { ...world, overloadTripped: cmd.action === 'trip' };
+          // A manual protective trip cancels the retained motor Run latch.
+          // Merely resetting a protective device cannot by itself restart Run.
+          if (cmd.action === 'trip') world = { ...world,
+            coils: { ...world.coils, Run: false },
+            tagValues: { ...world.tagValues, Run: false } };
+          commandEvents.push({ tick: world.tick, kind: 'protection',
+            detail: `${component.kind} ${cmd.action === 'trip' ? 'opened (manual training trip)' : 'reset by learner'}` });
+        }
       }
     } else if (cmd.k === 'setMeterProbe') {
       if ((cmd.lead !== 'positive' && cmd.lead !== 'negative') ||
