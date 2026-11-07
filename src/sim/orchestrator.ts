@@ -17,6 +17,7 @@ import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
 import { laneOf, lanesOf, vesselOf, vesselsOf } from './stations';
 import { electricalDevices } from '../components/electrical-defs';
+import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { clearedAlarm, engineFault, freshCylinder, stepCylinder } from '../plant/cylinder';
 export { MAX_COMPONENTS, MAX_WIRES };
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
@@ -125,7 +126,7 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     breakpointScan: null, breakpointHit: null, breakpointTag: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     plcs: Object.fromEntries(runtimePlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id), namesFor(project, c.id))])),
-    lanes: {}, vessels: {}, tripped: {}, cylinders: {},
+    lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
     deviceOn: {}, motorAngles: {},
     forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
     reverseMotorAngleRad: 0, interlockConflict: false,
@@ -188,6 +189,7 @@ export function validateProject(raw: unknown): ProjectFile {
   const wires = p.wires.map(w => ({ id: w.id, from: w.from, to: w.to }));
   const faults = validateFaults(p.faults, components, wires);
   const plcPrograms = validatePlcPrograms(p.plcPrograms, components, plcIo);
+  const params = validateParams(p.params, components);
   return {
     formatVersion: 1, components, wires, program: p.program,
     ...(p.language !== undefined ? { language: p.language } : {}),
@@ -196,7 +198,29 @@ export function validateProject(raw: unknown): ProjectFile {
     ...(faults.length ? { faults } : {}),
     ...(plcPrograms ? { plcPrograms } : {}),
     ...(plcIo ? { plcIo } : {}),
+    ...(params ? { params } : {}),
   };
+}
+/** Device settings: each key must be a setting its device kind defines, with an allowed value that differs from the default. */
+function validateParams(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['params'] | undefined {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid device settings');
+  const out: NonNullable<ProjectFile['params']> = {};
+  for (const [id, values] of Object.entries(raw as Record<string, unknown>)) {
+    const part = components.find(c => c.id === id);
+    if (!part || !paramSpecsOf(part.kind).length) throw new Error(`Settings for ${id}: not a configurable device in this project`);
+    if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error(`Invalid settings for ${id}`);
+    const kept: Record<string, number> = {};
+    for (const [key, value] of Object.entries(values as Record<string, unknown>)) {
+      const spec = paramSpecsOf(part.kind).find(s => s.key === key);
+      if (!spec) throw new Error(`Settings for ${id}: unknown setting ${key}`);
+      const error = paramError(spec, value);
+      if (error) throw new Error(`${id}: ${error}`);
+      if (value !== spec.default) kept[key] = value as number;
+    }
+    if (Object.keys(kept).length) out[id] = kept;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 /** Programs of the additional PLCs. Keys must name a PLC after the first; omitted when there are none. */
 /** Tag names of the configurable controllers. Keys must be 16/16 PLCs; omitted when there are none. */
@@ -412,6 +436,20 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         world = withFaults(world, faultsOf(world.project).filter(f => f.target !== cmd.target));
         world = resetCylinderAlarm(world, cmd.target);
         commandEvents.push({ tick: world.tick, kind: 'repair', detail: repairDetail(cmd.target) });
+      }
+    }
+    else if (cmd.k === 'setParam') {
+      const part = world.project.components.find(c => c.id === cmd.id);
+      const spec = part ? paramSpecsOf(part.kind).find(s => s.key === cmd.key) : undefined;
+      const error = !part ? 'Unknown component' : !spec ? 'This device has no such setting' : paramError(spec, cmd.value);
+      if (error || !part || !spec) world = setError(world, error ?? 'Invalid setting');
+      else {
+        const { params: previous, ...rest } = world.project;
+        const nextParams = { ...(previous ?? {}) };
+        const mine = { ...(nextParams[part.id] ?? {}) };
+        if (cmd.value === spec.default) delete mine[spec.key]; else mine[spec.key] = cmd.value;
+        if (Object.keys(mine).length) nextParams[part.id] = mine; else delete nextParams[part.id];
+        world = { ...world, project: Object.keys(nextParams).length ? { ...rest, params: nextParams } : rest, lastError: null };
       }
     }
     else if (cmd.k === 'remove') {
@@ -652,6 +690,11 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     lanes: Object.fromEntries(Object.entries(world.lanes).map(([id, l]) => [id, { ...l, parcel: l.parcel ? { ...l.parcel } : null }])),
     vessels: Object.fromEntries(Object.entries(world.vessels).map(([id, v]) => [id, { ...v }])),
     tripped: { ...world.tripped },
+    timers: Object.fromEntries(world.project.components.filter(c => c.kind === 'timerelay').map(c => {
+      const delayMs = paramValue(world.project.params, c.id, paramSpecsOf('timerelay')[0]);
+      const elapsedMs = world.timers[c.id] ?? 0;
+      return [c.id, { elapsedMs, delayMs, done: elapsedMs >= delayMs }];
+    })),
     cylinders: Object.fromEntries(Object.entries(world.cylinders).map(([id, c]) => [id, {
       position: c.position, extendLimit: c.extendLimit, retractLimit: c.retractLimit, command: c.command, alarm: c.alarm, conflict: c.conflict }])),
     forwardContactorOn: world.forwardContactorOn, reverseContactorOn: world.reverseContactorOn,
@@ -753,7 +796,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       tagValues: { ...w.tagValues, Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
       contactorOn: false, motorOn: false, conveyorOn: false, diverterOn: false,
       pumpOn: false, drainOn: false, lampOn: false,
-      plcs: deenergisedPlcs(w.plcs), deviceOn: {},
+      plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {},
       forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
       interlockConflict: false,
       plant: { ...w.plant, photoeyeActive: false }, lanes: quietLanes(w.lanes), voltages: {},
@@ -791,7 +834,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       tagValues: { ...w.tagValues, Run: false, Sort: false },
       motorOn: false, conveyorOn: false, diverterOn: false, contactorOn: false,
       pumpOn: false, drainOn: false, lampOn: false,
-      plcs: deenergisedPlcs(w.plcs), deviceOn: {},
+      plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {},
       forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
       interlockConflict: false,
       lastError: 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL',
@@ -830,7 +873,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
       const paused: WorldState = {
         ...w, running: false, coils: { ...w.coils, ...quiet }, tagValues: { ...w.tagValues, ...quiet },
-        plcs: deenergisedPlcs(w.plcs), deviceOn: {},
+        plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {},
         contactorOn: false, motorOn: false, conveyorOn: false, diverterOn: false,
         pumpOn: false, drainOn: false, lampOn: false,
         forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped', interlockConflict: false,
@@ -916,6 +959,19 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       events.push({ tick: w.tick + 1, kind: 'contactor', detail: `Contactor ${c.id} ${on ? 'energised' : 'released'}` });
     }
   }
+  // Every on-delay relay times its own coil: elapsed grows while the coil is energised and resets the moment it drops.
+  // `deviceOn` for these means "contacts transferred", which the circuit reads on the next scan (the usual one-scan delay).
+  const nextTimers: Record<string, number> = {};
+  for (const c of w.project.components.filter(x => x.kind === 'timerelay')) {
+    const delayMs = paramValue(w.project.params, c.id, paramSpecsOf('timerelay')[0]);
+    const coil = circuit.energizedLoads.includes(c.id);
+    const elapsed = coil ? Math.min((w.timers[c.id] ?? 0) + dtMs, delayMs) : 0;
+    nextTimers[c.id] = elapsed;
+    const done = elapsed >= delayMs;
+    deviceOn[c.id] = done;
+    if (done !== (w.deviceOn[c.id] === true))
+      events.push({ tick: w.tick + 1, kind: 'relay', detail: `${c.id}: ${done ? 'delay elapsed, contacts transferred' : 'released'}` });
+  }
   // Every tank is its own vessel: the pumps, drain valves and level switches mounted beside it.
   // Every pneumatic cylinder moves from its two solenoid coils, as solved from the wiring.
   const nextCylinders: Record<string, CylinderState> = {};
@@ -976,7 +1032,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     alarms: alarmUpdate.alarms, alarmWatch: alarmUpdate.watch,
     forwardContactorOn, reverseContactorOn, motorDirection,
     reverseMotorAngleRad, interlockConflict,
-    conveyorOn, diverterOn, lanes: nextLanes, vessels: nextVessels, cylinders: nextCylinders,
+    conveyorOn, diverterOn, lanes: nextLanes, vessels: nextVessels, cylinders: nextCylinders, timers: nextTimers,
     pumpOn, drainOn, lampOn,
     voltages: circuit.voltage,
     meter: measureDC24(circuit.voltage,circuit.diagnostics,w.meter.positive,w.meter.negative,circuit.sameSupply),

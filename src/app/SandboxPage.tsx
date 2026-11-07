@@ -431,7 +431,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               onClick={() => place(kind)} disabled={!editable}
               className="sandbox-palette-item">
               <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
-                {kind === 'plc' ? 'PLC' : kind === 'plc16' ? '16/16' : kind === 'relay' ? 'RLY' : kind === 'cylinder' ? 'CYL' : kind === 'stacklight' ? 'STK' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
+                {kind === 'plc' ? 'PLC' : kind === 'plc16' ? '16/16' : kind === 'relay' ? 'RLY' : kind === 'timerelay' ? 'TDR' : kind === 'cylinder' ? 'CYL' : kind === 'stacklight' ? 'STK' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
                   kind === 'conveyor' ? 'BELT' : kind === 'photoeye' ? 'EYE' :
                   kind === 'diverter' ? 'DIV' : kind === 'tank' ? 'TANK' :
                   kind === 'pump' ? 'PUMP' : kind === 'levelprobe' ? 'LVL' :
@@ -488,6 +488,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                       aria-label={`Inspect ${def.label}`}>{def.label}</button>
                     <span className="sandbox-device-status">{c.kind === 'motor' ? (live ? 'RUNNING' : 'STOPPED') :
                       c.kind === 'contactor' || c.kind === 'relay' ? (live ? 'COIL ON' : 'COIL OFF') :
+                      c.kind === 'timerelay' ? (() => { const t = snapshot?.timers[c.id]; return !t || t.elapsedMs === 0 ? 'COIL OFF' : t.done ? 'CONTACTS ON' : `TIMING ${Math.round(t.elapsedMs / t.delayMs * 100)}%`; })() :
                       c.kind === 'stacklight' ? (['R', 'Y', 'G'].filter(l => snapshot?.deviceOn[`${c.id}-${l}`]).join(' · ') || 'ALL OFF') :
                       c.kind === 'cylinder' ? (() => { const r = snapshot?.cylinders[c.id]; const base = !r || r.retractLimit ? 'RETRACTED' : r.extendLimit ? 'EXTENDED' : `MOVING ${Math.round(r.position * 100)}%`; return r?.alarm ? `${base} · ${r.alarm}` : base; })() :
                       isPlcKind(c.kind) ? (live ? 'POWER OK' : 'NO POWER') :
@@ -659,7 +660,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               'Q0.0': false, 'Q0.1': false, 'Q0.2': false, 'Q0.3': false,
               'Q0.4': false, 'Q0.5': false, PlcPowered: false },
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
-            plcs: {}, deviceOn: {}, motorAngles: {}, lanes: {}, vessels: {}, tripped: {}, cylinders: {},
+            plcs: {}, deviceOn: {}, motorAngles: {}, lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
             forwardContactorOn: false, reverseContactorOn: false,
             motorDirection: 'stopped', reverseMotorAngleRad: 0, interlockConflict: false,
             conveyorOn: false, diverterOn: false,
@@ -677,6 +678,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onTerminal={connect} onCancelWire={() => setSelectedTerminal(null)}
           onMove={id => setMoveTarget(id)}
           onMoveTo={(id, at) => move(id, at)}
+          onSetParam={(id, key, value) => send([{ k: 'setParam', id, key, value }])}
           onOperate={id => send([{ k: 'operateToggle', id }])}
           onClearSelection={() => setSelectedDeviceId(null)} />
       </div>

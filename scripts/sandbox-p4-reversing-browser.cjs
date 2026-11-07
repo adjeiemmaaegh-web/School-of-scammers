@@ -126,9 +126,21 @@ async function direction(page,value) {
   assert.ok(removed,'Should be able to disconnect actual reverse NC interlock wire');
   await page.waitForFunction(()=>document.querySelectorAll('.sandbox-wire-list > div').length===20);
   await clickText(page,'▶ Run');
+  const startStatusBefore=await page.$eval('[data-device-id="start-5"] .sandbox-device-status',e=>e.textContent.trim());
   await clickDevice(page,'start-5');
-  await page.waitForFunction(()=>[...document.querySelectorAll('.sandbox-lamps span')].some(e=>
-    e.textContent.trim()==='Forward'&&e.classList.contains('lit')));
+  try{await page.waitForFunction(()=>[...document.querySelectorAll('.sandbox-lamps span')].some(e=>
+    e.textContent.trim()==='Forward'&&e.classList.contains('lit')));}
+  catch(error){
+    // Diagnostics for CI: what did the page actually look like when the Forward lamp never lit?
+    const state=await page.evaluate(()=>({
+      lamps:[...document.querySelectorAll('.sandbox-lamps span')].map(e=>`${e.textContent.trim()}:${e.classList.contains('lit')}`),
+      start:document.querySelector('[data-device-id="start-5"] .sandbox-device-status')?.textContent.trim(),
+      toolbar:[...document.querySelectorAll('.sandbox-toolbar button')].map(b=>`${b.textContent.trim()}${b.disabled?'(disabled)':''}`),
+      alert:document.querySelector('[role="alert"]')?.textContent.trim()??null,
+      direction:document.querySelector('[data-direction]')?.textContent}));
+    console.error('DIAGNOSTIC start-before-click=',startStatusBefore,JSON.stringify(state));
+    throw error;
+  }
   await new Promise(resolve=>setTimeout(resolve,400));
   assert.equal(await page.$eval('[data-forward-contactor]',e=>e.textContent),'OPEN');
   assert.equal(await page.$eval('[data-direction]',e=>e.textContent),'STOPPED');

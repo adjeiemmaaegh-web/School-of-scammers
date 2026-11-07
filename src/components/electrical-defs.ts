@@ -35,6 +35,16 @@ const DEFS: Partial<Record<PlacedComponent['kind'], Def>> = {
       sw(`${c.id}-NC`, t(c.id, '21'), t(c.id, '22'), !energised),
     ];
   },
+  // An on-delay relay: the coil is a load like any relay's, but the contacts follow the timer (`on` = contacts transferred),
+  // not the coil. An open coil never starts the timer; welded contacts stay transferred.
+  timerelay: (c, ctx) => {
+    const transferred = ctx.on || ctx.hasFault('contactor-welded');
+    return [
+      ...(ctx.hasFault('contactor-coil-open') ? [] : [load(c.id, t(c.id, 'A1'), t(c.id, 'A2'))]),
+      sw(`${c.id}-NO`, t(c.id, '13'), t(c.id, '14'), transferred),
+      sw(`${c.id}-NC`, t(c.id, '21'), t(c.id, '22'), !transferred),
+    ];
+  },
   // Three signal lamps on one column, each its own load to the common return.
   stacklight: c => ['R', 'Y', 'G'].map(lamp => load(`${c.id}-${lamp}`, t(c.id, lamp), t(c.id, 'M-'))),
   // Two solenoid coils to a common return, and two limit switches that close when the rod is at that end.
