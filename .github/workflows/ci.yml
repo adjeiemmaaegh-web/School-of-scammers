@@ -58,6 +58,12 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-sensor-browser.cjs
       - name: Multi-PLC - two panels, per-PLC Ladder/ST programs, PLC-to-PLC signalling over a shared common
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-multiplc-browser.cjs
+      - name: Authored plant - build a two-station plant from an empty floor through the UI, commission, troubleshoot, reload
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p11-authored-plant-browser.cjs
+      - name: Per-instance plant - two conveyor lanes and two tanks, each with its own PLC, devices and counters
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p10-multiplant-browser.cjs
+      - name: Product structure - simulator-first home, primary navigation, separate Learn and Assessments sections
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/simulator-first-browser.cjs
       - name: Edit plant - one-click panels, remove with cleanup, undo, first-PLC promotion, Delete key
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-edit-plant-browser.cjs
       - name: P6 scenarios - graded by outcome on the real sandbox, employer to candidate to review

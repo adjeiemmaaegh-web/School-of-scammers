@@ -9,6 +9,7 @@ import { TroubleshootingPanel } from '../ui/sandbox/TroubleshootingPanel';
 import { ScenarioPanel } from '../ui/sandbox/ScenarioPanel';
 import { perDeviceLive } from '../sim/device-state';
 import { plcComponents, programOf } from '../sim/plcs';
+import { vesselsOf } from '../sim/stations';
 import { appendEvidence, evidenceFromCommand } from '../exercises/evidence';
 import { scenarioStorageKey, type ScenarioRequest, type ScenarioSession } from '../exercises/session';
 import { getScenario } from '../exercises/catalogue';
@@ -343,7 +344,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     { id: 'test' as const, label: 'Test', hint: 'Run and troubleshoot', count: snapshot?.tick ?? 0 },
   ];
   return <>
-    <AppHeader right={<div className="sandbox-header-links"><Link to="/trades">Exercises</Link><Link to="/employer">Assessment</Link></div>} />
+    <AppHeader />
     <main id="main" className="sandbox-page sandbox-ux wrap wrap-wide">
       <header className="sandbox-masthead">
         <div>
@@ -469,15 +470,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                   c.kind === 'forwardcontactor' ? snapshot?.forwardContactorOn :
                   c.kind === 'reversecontactor' ? snapshot?.reverseContactorOn :
                   c.kind === 'reversebutton' ? c.pressed :
-                  c.kind === 'breaker' ? !snapshot?.breakerTripped :
-                  c.kind === 'overload' ? !snapshot?.overloadTripped :
                   c.kind === 'estop' ? !c.pressed :
-                  c.kind === 'pump' ? snapshot?.pumpOn :
                   c.kind === 'levelprobe' ? snapshot?.io.TankHigh :
-                  c.kind === 'drainvalve' ? snapshot?.drainOn :
-                  c.kind === 'conveyor' ? snapshot?.conveyorOn :
                   c.kind === 'photoeye' ? snapshot?.io.Photoeye :
-                  c.kind === 'diverter' ? snapshot?.diverterOn :
                   c.kind === 'start' || c.kind === 'stop' ? c.pressed : false;
                 return <section className={`sandbox-device ${live ? 'active' : ''}`} key={c.id} data-device-id={c.id}>
                   <div className="sandbox-patch-head">
@@ -489,7 +484,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                       c.kind === 'conveyor' ? (live ? 'BELT MOVING' : 'BELT STOPPED') :
                       c.kind === 'photoeye' ? (live ? 'MARK DETECTED' : 'NO MARK') :
                       c.kind === 'diverter' ? (live ? 'REJECT ACTIVE' : 'PASS') :
-                      c.kind === 'tank' ? `${Math.round(snapshot?.tank.levelMl ?? 0)} ml` :
+                      c.kind === 'tank' ? `${Math.round(snapshot?.vessels[c.id]?.levelMl ?? 0)} ml` :
                       c.kind === 'pump' ? (live ? 'PUMPING' : 'STOPPED') :
                       c.kind === 'levelprobe' ? (live ? 'HIGH LEVEL' : 'LOW LEVEL') :
                       c.kind === 'drainvalve' ? (live ? 'DRAIN OPEN' : 'CLOSED') :
@@ -558,52 +553,52 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                 Overload: <strong data-overload-status>{snapshot?.overloadTripped ? 'TRIPPED' : 'CLOSED'}</strong> ·
                 Pilot: <strong data-lamp-status>{snapshot?.lampOn ? 'ON' : 'OFF'}</strong></p>}</div>
           </div>
-          {project?.components.some(c => c.kind === 'conveyor') && snapshot && <section
-            className="sandbox-sorting-panel panel" aria-label="Conveyor sorting controls">
+          {snapshot && project?.components.filter(c => c.kind === 'conveyor').map(conv => { const lane = snapshot.lanes[conv.id] ?? snapshot.plant; return <section key={conv.id}
+            className="sandbox-sorting-panel panel" aria-label={`Conveyor sorting controls ${conv.id}`} data-lane={conv.id}>
             <div className="sandbox-section-head"><div>
               <span className="eyebrow">P3 · material handling</span>
-              <h2>Conveyor sorting station</h2></div>
+              <h2>Conveyor sorting station{(project?.components.filter(c => c.kind === 'conveyor').length ?? 0) > 1 ? ` · ${conv.id}` : ''}</h2></div>
               <span className="status-pill is-idle">Single lane · bounded teaching model</span></div>
             <p className="sandbox-help">Feed one parcel at a time. Marked parcels activate the positioned optical detector;
               plain parcels do not. Your wired Q0.1 diverter determines the actual route.</p>
             <div className="sandbox-actions">
-              <button type="button" className="btn ghost small" disabled={!!snapshot.plant.parcel}
-                onClick={() => send([{ k:'feedParcel', kind:'marked' }])}>Feed marked parcel</button>
-              <button type="button" className="btn ghost small" disabled={!!snapshot.plant.parcel}
-                onClick={() => send([{ k:'feedParcel', kind:'plain' }])}>Feed plain parcel</button>
+              <button type="button" className="btn ghost small" disabled={!!lane.parcel}
+                onClick={() => send([{ k:'feedParcel', kind:'marked', conveyor: conv.id }])}>Feed marked parcel</button>
+              <button type="button" className="btn ghost small" disabled={!!lane.parcel}
+                onClick={() => send([{ k:'feedParcel', kind:'plain', conveyor: conv.id }])}>Feed plain parcel</button>
             </div>
             <div className="sandbox-sort-metrics" aria-live="off">
-              <span>Current: <strong>{snapshot.plant.parcel ?
-                `${snapshot.plant.parcel.kind} · ${Math.round(snapshot.plant.parcel.position * 100)}% · ${snapshot.plant.parcel.route}` :
+              <span>Current: <strong>{lane.parcel ?
+                `${lane.parcel.kind} · ${Math.round(lane.parcel.position * 100)}% · ${lane.parcel.route}` :
                 'empty'}</strong></span>
-              <span>Accepted: <strong data-sort-accepted>{snapshot.plant.accepted}</strong></span>
-              <span>Rejected: <strong data-sort-rejected>{snapshot.plant.rejected}</strong></span>
+              <span>Accepted: <strong data-sort-accepted>{lane.accepted}</strong></span>
+              <span>Rejected: <strong data-sort-rejected>{lane.rejected}</strong></span>
             </div>
             {!scenario && <details><summary>Wiring and logic for the sorting exercise</summary>
               <p className="sandbox-help">{sortingWireGuide}</p></details>}
-          </section>}
-          {project?.components.some(c => c.kind === 'tank') && snapshot && <section
-            className="sandbox-tank-panel panel" aria-label="Tank process controls">
+          </section>; })}
+          {snapshot && project && vesselsOf(project.components).map(v => { const level = snapshot.vessels[v.tank.id] ?? snapshot.tank; const pumpOn = v.pumps.some(p => snapshot.deviceOn[p.id]); const drainOn = v.valves.some(x => snapshot.deviceOn[x.id]); return <section key={v.tank.id}
+            className="sandbox-tank-panel panel" aria-label={`Tank process controls ${v.tank.id}`} data-vessel={v.tank.id}>
             <div className="sandbox-section-head"><div>
               <span className="eyebrow">P3 · fluid handling</span>
-              <h2>Programmable tank process</h2></div>
+              <h2>Programmable tank process{vesselsOf(project.components).length > 1 ? ` · ${v.tank.id}` : ''}</h2></div>
               <span className="status-pill is-idle">1000 ml · bounded process model</span></div>
             <p className="sandbox-help">The real wired Q0.2 inlet pump fills the positioned vessel.
               The level switch reports HIGH through I0.3 at 750 ml and clears below 600 ml.
               Q0.3 operates the wired drain valve. All changes come from the worker scan.</p>
             <div className="sandbox-tank-meter" role="progressbar" aria-label="Tank fill level"
-              aria-valuemin={0} aria-valuemax={1000} aria-valuenow={Math.round(snapshot.tank.levelMl)}>
-              <div className="sandbox-tank-meter-fill" style={{width: `${snapshot.tank.levelMl/10}%`}} />
+              aria-valuemin={0} aria-valuemax={1000} aria-valuenow={Math.round(level.levelMl)}>
+              <div className="sandbox-tank-meter-fill" style={{width: `${level.levelMl/10}%`}} />
             </div>
             <div className="sandbox-sort-metrics" aria-live="off">
-              <span>Level: <strong data-tank-level>{Math.round(snapshot.tank.levelMl)} ml</strong></span>
-              <span>High switch: <strong data-tank-high>{snapshot.io.TankHigh ? 'HIGH' : 'CLEAR'}</strong></span>
-              <span>Pump: <strong data-tank-pump>{snapshot.pumpOn ? 'ON' : 'OFF'}</strong></span>
-              <span>Drain: <strong data-tank-drain>{snapshot.drainOn ? 'OPEN' : 'CLOSED'}</strong></span>
+              <span>Level: <strong data-tank-level>{Math.round(level.levelMl)} ml</strong></span>
+              <span>High switch: <strong data-tank-high>{level.highLevel ? 'HIGH' : 'CLEAR'}</strong></span>
+              <span>Pump: <strong data-tank-pump>{pumpOn ? 'ON' : 'OFF'}</strong></span>
+              <span>Drain: <strong data-tank-drain>{drainOn ? 'OPEN' : 'CLOSED'}</strong></span>
             </div>
             {!scenario && <details><summary>Tank wiring and editable PLC example</summary>
               <p className="sandbox-help">{tankWireGuide}</p></details>}
-          </section>}
+          </section>; })}
           {project?.components.some(c => c.kind === 'revmotor') && snapshot && <section
             className="sandbox-protection-panel panel" aria-label="Forward reverse motor interlock">
             <div className="sandbox-section-head"><div><span className="eyebrow">P4 · electrical interlocks</span>
@@ -650,7 +645,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               'Q0.0': false, 'Q0.1': false, 'Q0.2': false, 'Q0.3': false,
               'Q0.4': false, 'Q0.5': false, PlcPowered: false },
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
-            plcs: {}, deviceOn: {}, motorAngles: {},
+            plcs: {}, deviceOn: {}, motorAngles: {}, lanes: {}, vessels: {}, tripped: {},
             forwardContactorOn: false, reverseContactorOn: false,
             motorDirection: 'stopped', reverseMotorAngleRad: 0, interlockConflict: false,
             conveyorOn: false, diverterOn: false,
@@ -667,6 +662,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           selectedDevice={selectedDevice} selectedTerminal={selectedTerminal} editable={editable}
           onTerminal={connect} onCancelWire={() => setSelectedTerminal(null)}
           onMove={id => setMoveTarget(id)}
+          onMoveTo={(id, at) => move(id, at)}
           onOperate={id => send([{ k: 'operateToggle', id }])}
           onClearSelection={() => setSelectedDeviceId(null)} />
       </div>

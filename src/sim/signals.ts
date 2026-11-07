@@ -101,6 +101,12 @@ export type WorldState = {
   contactorOn: boolean;
   motorOn: boolean;
   motorAngleRad: number;
+  /** Material-handling state of every conveyor lane, by conveyor id (the legacy `plant` mirrors the first). */
+  lanes: Record<string, SortingPlant>;
+  /** Process state of every tank, by tank id (the legacy `tank` mirrors the first). */
+  vessels: Record<string, TankProcess>;
+  /** Trip state of every breaker and overload, by component id (the legacy flags mirror the first of each). */
+  tripped: Record<string, boolean>;
   /** Scan state of every PLC after the first, by component id. */
   plcs: Record<string, PlcRuntime>;
   /** Energised state of every contactor, motor and lamp by component id (the legacy booleans mirror the first). */
@@ -152,7 +158,8 @@ export type Command =
   | { k: 'remove'; id: string }
   /** Drop in a ready-made, pre-wired start/stop starter panel at a free spot (or `at`). Paused only. */
   | { k: 'addPanel'; template: 'motor-starter'; at?: XY }
-  | { k: 'feedParcel'; kind: ParcelKind }
+  /** `conveyor` names the lane; omitted means the first conveyor (the single-conveyor behaviour). */
+  | { k: 'feedParcel'; kind: ParcelKind; conveyor?: string }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
   /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
@@ -178,6 +185,12 @@ export type RenderSnapshot = {
   motorAngleRad: number;
   /** Every PLC (first and additional) by component id. */
   plcs: Record<string, PlcView>;
+  /** Every conveyor lane (parcel and counters) by conveyor id. */
+  lanes: Record<string, SortingPlant>;
+  /** Every tank by tank id. */
+  vessels: Record<string, TankProcess>;
+  /** Trip state of every breaker and overload by component id. */
+  tripped: Record<string, boolean>;
   /** Energised state of every contactor, motor and lamp by component id. */
   deviceOn: Record<string, boolean>;
   /** Shaft angle of every motor by component id. */

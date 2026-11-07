@@ -420,3 +420,11 @@
 /* P8 · editing a plant: remove */
 .sandbox-ux .sandbox-remove { color:var(--ink); }
 .sandbox-ux .sandbox-remove:hover:not(:disabled), .sandbox-ux .sandbox-remove:focus-visible { border-color:#b3412f; color:#b3412f; }
+
+/* exact device position */
+.sandbox-ux .sandbox-inspector-position { display:flex; gap:10px; margin:8px 0 4px; }
+.sandbox-ux .sandbox-inspector-position label { display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--muted); flex:1; min-width:0; }
+.sandbox-ux .sandbox-inspector-position input { width:100%; min-width:0; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--ink); font:13px var(--mono); }
+
+/* Sticky app header + sticky toolbar must not hide what the user scrolls or tabs to (WCAG 2.4.11 focus not obscured). */
+html:has(.sandbox-ux) { scroll-padding-top: calc(var(--app-header-h, 64px) + 110px); }

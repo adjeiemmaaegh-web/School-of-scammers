@@ -14,6 +14,7 @@ import {
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
+import { laneOf, lanesOf, vesselOf, vesselsOf } from './stations';
 export { MAX_COMPONENTS, MAX_WIRES };
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
@@ -22,6 +23,8 @@ import {
 } from './faults';
 export { validateSandboxProgram } from '../program/p2-contract';
 import type { Command, FaultSpec, PlacedComponent, PlcInputs, PlcProgram, PlcRuntime, ProjectFile, RenderSnapshot, SimEvent, WorldState } from './signals';
+import type { SortingPlant } from '../plant/sorting-conveyor';
+import type { TankProcess } from '../plant/tank-process';
 
 export const SCAN_MS = 50;
 export const latchProgram = (): LadderDocument => ({
@@ -116,6 +119,7 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     breakpointScan: null, breakpointHit: null, breakpointTag: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     plcs: Object.fromEntries(extraPlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id))])),
+    lanes: {}, vessels: {}, tripped: {},
     deviceOn: {}, motorAngles: {},
     forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
     reverseMotorAngleRad: 0, interlockConflict: false,
@@ -153,7 +157,7 @@ export function validateProject(raw: unknown): ProjectFile {
   // explicitly maintained per role, not silently shared among duplicates.
   if (components.filter(c => c.kind === 'plc').length > MAX_PLCS) throw new Error(`At most ${MAX_PLCS} PLCs are supported`);
   if (components.filter(c => c.kind === 'supply').length > MAX_SUPPLIES) throw new Error(`At most ${MAX_SUPPLIES} 24V supplies are supported`);
-  for (const kind of ['breaker', 'overload', 'reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor'] as const)
+  for (const kind of ['reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor'] as const)
     if (components.filter(c => c.kind === kind).length > 1)
       throw new Error(`Only one ${kind} protection device is supported`);
   const wireIds = new Set<string>();
@@ -208,6 +212,34 @@ function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[
   return Object.keys(out).length ? out : undefined;
 }
 const setError = (world: WorldState, message: string): WorldState => ({ ...world, lastError: message });
+/**
+ * Recompute the legacy single-device fields (plant, tank, breaker/overload flags) from the per-instance
+ * state. Every conveyor lane, tank and protection device has its own state keyed by component id; the legacy
+ * fields mirror the FIRST of each kind so single-device projects behave exactly as before. This is the only
+ * place the mirror is maintained.
+ */
+function syncLegacy(w: WorldState): WorldState {
+  const comps = w.project.components;
+  const conveyor = comps.find(c => c.kind === 'conveyor'), tank = comps.find(c => c.kind === 'tank');
+  const breaker = comps.find(c => c.kind === 'breaker'), overload = comps.find(c => c.kind === 'overload');
+  return { ...w,
+    plant: conveyor ? w.lanes[conveyor.id] ?? freshPlant() : w.plant,
+    tank: tank ? w.vessels[tank.id] ?? freshTank() : w.tank,
+    breakerTripped: !!breaker && w.tripped[breaker.id] === true,
+    overloadTripped: !!overload && w.tripped[overload.id] === true };
+}
+const quietLanes = (lanes: Record<string, SortingPlant>): Record<string, SortingPlant> =>
+  Object.fromEntries(Object.entries(lanes).map(([id, lane]) => [id, { ...lane, photoeyeActive: false }]));
+/** Truth a photoeye reports: the lane (conveyor) it is positioned along. No lane, no detection. */
+const eyeActive = (w: WorldState, eye: PlacedComponent): boolean => {
+  const lane = laneOf(w.project.components, eye);
+  return !!lane && w.lanes[lane.id]?.photoeyeActive === true;
+};
+/** Truth a level switch reports: the tank it is mounted beside. Not mounted, no output. */
+const probeHigh = (w: WorldState, probe: PlacedComponent): boolean => {
+  const vessel = vesselOf(w.project.components, probe);
+  return !!vessel && w.vessels[vessel.id]?.highLevel === true;
+};
 /** Every additional PLC with its outputs off (fail-closed after a runtime fault). */
 const deenergisedPlcs = (plcs: Record<string, PlcRuntime>): Record<string, PlcRuntime> =>
   Object.fromEntries(Object.entries(plcs).map(([id, rt]) => [id, { ...rt, coils: {} }]));
@@ -246,14 +278,17 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
     else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
     else if (cmd.k === 'clear') world = createWorld();
     else if (cmd.k === 'feedParcel') {
-      if (!world.project.components.some(c => c.kind === 'conveyor'))
-        world = setError(world, 'Place a conveyor before feeding a parcel');
+      const lane = cmd.conveyor !== undefined
+        ? world.project.components.find(c => c.id === cmd.conveyor && c.kind === 'conveyor')
+        : world.project.components.find(c => c.kind === 'conveyor');
+      if (!lane) world = setError(world, cmd.conveyor !== undefined ? 'Unknown conveyor' : 'Place a conveyor before feeding a parcel');
       else if (cmd.kind !== 'plain' && cmd.kind !== 'marked')
         world = setError(world, 'Unknown parcel type');
       else {
-        const fed = feedPlant(world.plant, cmd.kind);
-        const succeeded = fed.plant !== world.plant;
-        world = { ...world, plant: fed.plant };
+        const prior = world.lanes[lane.id] ?? freshPlant();
+        const fed = feedPlant(prior, cmd.kind);
+        const succeeded = fed.plant !== prior;
+        world = syncLegacy({ ...world, lanes: { ...world.lanes, [lane.id]: fed.plant } });
         if (!succeeded) world = setError(world, fed.events[0] ?? 'Unable to feed parcel');
         else for (const detail of fed.events) commandEvents.push({ tick: world.tick, kind: 'plant', detail });
       }
@@ -266,7 +301,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         // Do not permit resetting the idealized breaker into a still-present
         // direct supply short. It must be removed from the user's netlist first.
         const resettingBreaker = component.kind === 'breaker' && cmd.action === 'reset';
-        const candidate = resettingBreaker ? { ...world, breakerTripped: false } : world;
+        const candidate = resettingBreaker ? { ...world, tripped: { ...world.tripped, [component.id]: false } } : world;
         const circuit = resettingBreaker ? solveNetAware({
           devices: buildCircuit(candidate),
           wires: solverWires(candidate.project),
@@ -276,9 +311,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           commandEvents.push({ tick: world.tick, kind: 'protection',
             detail: 'Breaker reset refused: direct short remains' });
         } else {
-          world = component.kind === 'breaker'
-            ? { ...world, breakerTripped: cmd.action === 'trip' }
-            : { ...world, overloadTripped: cmd.action === 'trip' };
+          world = syncLegacy({ ...world, tripped: { ...world.tripped, [component.id]: cmd.action === 'trip' } });
           // The overload contact is hardwired to the contactor, not to PLC
           // memory: do not silently rewrite the learner's Run latch.
           // A deliberately unsafe program may restart when 95-96 is reset.
@@ -379,7 +412,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         world = setError(world, `At most ${MAX_PLCS} PLCs fit on this workbench`);
       else if (cmd.kind === 'supply' && world.project.components.filter(c => c.kind === 'supply').length >= MAX_SUPPLIES)
         world = setError(world, `At most ${MAX_SUPPLIES} 24V supplies fit on this workbench`);
-      else if (['conveyor', 'photoeye', 'diverter', 'tank', 'pump', 'levelprobe', 'drainvalve', 'breaker', 'overload', 'reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor'].includes(cmd.kind) &&
+      else if (['reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor'].includes(cmd.kind) &&
         world.project.components.some(c => c.kind === cmd.kind))
         world = setError(world, 'This educational workbench supports one of each station component');
       else world = { ...world, project: { ...world.project, components: [...world.project.components, { id: cmd.id, kind: cmd.kind, x: cmd.at.x, y: cmd.at.y, pressed: false }] } };
@@ -447,11 +480,11 @@ function buildCircuit(world: WorldState): Device[] {
     if (c.kind === 'supply') devices.push({ id: c.id, kind: 'supply', positive: terminal(c.id, 'P24'), negative: terminal(c.id, 'M0'), volts: 24 });
     if (c.kind === 'breaker') devices.push({
       id: c.id, kind: 'switch', a: terminal(c.id,'IN'), b: terminal(c.id,'OUT'),
-      closed: !world.breakerTripped,
+      closed: world.tripped[c.id] !== true,
     });
     if (c.kind === 'overload') devices.push({
       id: c.id, kind: 'switch', a: terminal(c.id,'95'), b: terminal(c.id,'96'),
-      closed: !world.overloadTripped,
+      closed: world.tripped[c.id] !== true,
     });
     if (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') {
       // A stuck-button fault overrides what the operator did; the circuit sees the stuck contact.
@@ -471,10 +504,10 @@ function buildCircuit(world: WorldState): Device[] {
     // (world.plant.photoeyeActive / world.tank.highLevel) keeps computing from real geometry and level.
     if (c.kind === 'photoeye') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
       a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'),
-      closed: effectiveSensor(world.project, c, world.plant.photoeyeActive) });
+      closed: effectiveSensor(world.project, c, eyeActive(world, c)) });
     if (c.kind === 'levelprobe') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
       a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'),
-      closed: effectiveSensor(world.project, c, world.tank.highLevel) });
+      closed: effectiveSensor(world.project, c, probeHigh(world, c)) });
     if (c.kind === 'contactor') {
       // Open coil: not part of the circuit, so it never pulls in (A1-A2 still measures 24 V).
       if (!hasFault(world.project, 'contactor-coil-open', c.id))
@@ -534,6 +567,9 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
           { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {} })];
     })),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
+    lanes: Object.fromEntries(Object.entries(world.lanes).map(([id, l]) => [id, { ...l, parcel: l.parcel ? { ...l.parcel } : null }])),
+    vessels: Object.fromEntries(Object.entries(world.vessels).map(([id, v]) => [id, { ...v }])),
+    tripped: { ...world.tripped },
     forwardContactorOn: world.forwardContactorOn, reverseContactorOn: world.reverseContactorOn,
     motorDirection: world.motorDirection, reverseMotorAngleRad: world.reverseMotorAngleRad,
     interlockConflict: world.interlockConflict,
@@ -580,16 +616,20 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // An ideal direct short downstream of the CLOSED breaker trips its latched
   // protective contact. An unfused upstream short does NOT get false protection.
   const shortedAtStart = circuit.diagnostics.some(d => d.startsWith('Supply short'));
-  const breaker = w.project.components.find(c => c.kind === 'breaker');
-  if (shortedAtStart && breaker && !w.breakerTripped) {
-    const opened = buildCircuit(w).map(d =>
-      d.id === breaker.id && d.kind === 'switch' ? { ...d, closed: false } : d);
-    const isolated = solveNetAware({ devices: opened, wires });
-    if (!isolated.diagnostics.some(d => d.startsWith('Supply short'))) {
-      w = { ...w, breakerTripped: true };
-      circuit = isolated;
-      events.push({ tick: w.tick + 1, kind: 'protection',
-        detail: 'Branch breaker tripped: downstream direct short isolated' });
+  if (shortedAtStart) {
+    // The first closed breaker whose opening isolates the short trips. An upstream short that no breaker
+    // can isolate is NOT given false protection.
+    for (const breaker of w.project.components.filter(c => c.kind === 'breaker' && w.tripped[c.id] !== true)) {
+      const opened = buildCircuit(w).map(d =>
+        d.id === breaker.id && d.kind === 'switch' ? { ...d, closed: false } : d);
+      const isolated = solveNetAware({ devices: opened, wires });
+      if (!isolated.diagnostics.some(d => d.startsWith('Supply short'))) {
+        w = syncLegacy({ ...w, tripped: { ...w.tripped, [breaker.id]: true } });
+        circuit = isolated;
+        events.push({ tick: w.tick + 1, kind: 'protection',
+          detail: 'Branch breaker tripped: downstream direct short isolated' });
+        break;
+      }
     }
   }
   const shorted = circuit.diagnostics.some(d => d.startsWith('Supply short'));
@@ -633,7 +673,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       plcs: deenergisedPlcs(w.plcs), deviceOn: {},
       forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
       interlockConflict: false,
-      plant: { ...w.plant, photoeyeActive: false }, voltages: {},
+      plant: { ...w.plant, photoeyeActive: false }, lanes: quietLanes(w.lanes), voltages: {},
       diagnostics: [...w.diagnostics, 'PLC scan interrupted; simulated outputs deenergized'],
       lastError: `PLC runtime error: ${message}`,
     };
@@ -712,7 +752,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
         contactorOn: false, motorOn: false, conveyorOn: false, diverterOn: false,
         pumpOn: false, drainOn: false, lampOn: false,
         forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped', interlockConflict: false,
-        plant: { ...w.plant, photoeyeActive: false }, voltages: {},
+        plant: { ...w.plant, photoeyeActive: false }, lanes: quietLanes(w.lanes), voltages: {},
         diagnostics: [...w.diagnostics, 'PLC scan interrupted; simulated outputs deenergized'],
         lastError: `PLC ${extra.id} runtime error: ${message}`,
       };
@@ -763,8 +803,16 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // P3 plant movement derives from the actual powered conveyor, never Run/3D animation.
   const conveyorOn = !!conveyor && circuit.energizedLoads.includes(conveyor.id);
   const diverterOn = !!diverter && circuit.energizedLoads.includes(diverter.id);
-  const nextPlant = stepPlant(w.plant, w.project.components, conveyorOn, diverterOn, dtMs);
-  for (const detail of nextPlant.events) events.push({ tick: w.tick + 1, kind: 'plant', detail });
+  // Every conveyor is its own lane: the photoeye and diverter positioned along it, and its own parcel.
+  const nextLanes: Record<string, SortingPlant> = {};
+  for (const lane of lanesOf(w.project.components)) {
+    const belt = circuit.energizedLoads.includes(lane.conveyor.id);
+    const gate = lane.diverters.some(d => circuit.energizedLoads.includes(d.id));
+    const parts = [lane.conveyor, ...lane.eyes.slice(0, 1), ...lane.diverters.slice(0, 1)];
+    const change = stepPlant(w.lanes[lane.conveyor.id] ?? freshPlant(), parts, belt, gate, dtMs);
+    nextLanes[lane.conveyor.id] = change.plant;
+    for (const detail of change.events) events.push({ tick: w.tick + 1, kind: 'plant', detail });
+  }
   const pumpOn = !!pump && circuit.energizedLoads.includes(pump.id);
   const drainOn = !!drain && circuit.energizedLoads.includes(drain.id);
   const lampOn = !!lamp && circuit.energizedLoads.includes(lamp.id);
@@ -772,7 +820,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const deviceOn: Record<string, boolean> = {};
   const motorAngles: Record<string, number> = {};
   for (const c of w.project.components) {
-    if (c.kind !== 'contactor' && c.kind !== 'motor' && c.kind !== 'lamp') continue;
+    if (!['contactor', 'motor', 'lamp', 'conveyor', 'diverter', 'pump', 'drainvalve'].includes(c.kind)) continue;
     const on = circuit.energizedLoads.includes(c.id);
     deviceOn[c.id] = on;
     if (c.kind === 'motor') {
@@ -784,8 +832,15 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       events.push({ tick: w.tick + 1, kind: 'contactor', detail: `Contactor ${c.id} ${on ? 'energised' : 'released'}` });
     }
   }
-  const nextTank = stepTank(w.tank, w.project.components, pumpOn, drainOn, dtMs);
-  for (const detail of nextTank.events) events.push({ tick: w.tick + 1, kind: 'tank', detail });
+  // Every tank is its own vessel: the pumps, drain valves and level switches mounted beside it.
+  const nextVessels: Record<string, TankProcess> = {};
+  for (const vessel of vesselsOf(w.project.components)) {
+    const live = (parts: PlacedComponent[]) => parts.some(p => circuit.energizedLoads.includes(p.id));
+    const parts = [vessel.tank, ...vessel.pumps.slice(0, 1), ...vessel.valves.slice(0, 1), ...vessel.probes.slice(0, 1)];
+    const change = stepTank(w.vessels[vessel.tank.id] ?? freshTank(), parts, live(vessel.pumps), live(vessel.valves), dtMs);
+    nextVessels[vessel.tank.id] = change.tank;
+    for (const detail of change.events) events.push({ tick: w.tick + 1, kind: 'tank', detail });
+  }
   // 8. Photoeye state from geometry is sampled by the circuit on NEXT scan.
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
@@ -829,13 +884,13 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     alarms: alarmUpdate.alarms, alarmWatch: alarmUpdate.watch,
     forwardContactorOn, reverseContactorOn, motorDirection,
     reverseMotorAngleRad, interlockConflict,
-    conveyorOn, diverterOn, plant: nextPlant.plant,
-    pumpOn, drainOn, tank: nextTank.tank, lampOn,
+    conveyorOn, diverterOn, lanes: nextLanes, vessels: nextVessels,
+    pumpOn, drainOn, lampOn,
     voltages: circuit.voltage,
     meter: measureDC24(circuit.voltage,circuit.diagnostics,w.meter.positive,w.meter.negative,circuit.sameSupply),
     diagnostics: [...circuit.diagnostics,
-      ...(w.breakerTripped ? ['Branch breaker open: reset only after removing downstream short'] : []),
-      ...(w.overloadTripped ? ['Motor overload auxiliary 95-96 open (manual test trip)'] : []),
+      ...(w.project.components.some(c => c.kind === 'breaker' && w.tripped[c.id] === true) ? ['Branch breaker open: reset only after removing downstream short'] : []),
+      ...(w.project.components.some(c => c.kind === 'overload' && w.tripped[c.id] === true) ? ['Motor overload auxiliary 95-96 open (manual test trip)'] : []),
       ...(interlockConflict ? ['Reversing contactors demand simultaneous engagement: mechanical interlock active'] : []),
       ...(opposingDrives ? ['Both direction terminals energized: reversible motor inhibited'] : []),
       ...(!powered && plc ? ['PLC is not powered (wire L+ and M to the 24V supply)'] : []),
@@ -844,5 +899,6 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     running: change.forceStep || !!breakpointHit ? false : w.running,
   };
   // 10. Immutable render data: visuals never drive the simulation.
+  w = syncLegacy(w);
   return { world: w, snapshot: renderSnapshot(w), events };
 }

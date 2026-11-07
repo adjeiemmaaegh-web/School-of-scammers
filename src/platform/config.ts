@@ -5,7 +5,7 @@
  */
 export const BRAND = {
   name: 'EFO Skill Lab',
-  tagline: 'Practice the trade. Prove you can do the job.',
+  tagline: 'Build, wire, program and run a virtual factory.',
   shortPitch:
-    'A browser-based simulator where learners build real hands-on skills and employers test candidates on realistic, job-like tasks. Starting with PLC & industrial automation.',
+    'A browser-based virtual industrial automation laboratory: place equipment in 3D, wire it terminal by terminal, program one or more PLCs, run a deterministic scan engine against a live plant, then break it, measure it and fix it.',
 } as const;

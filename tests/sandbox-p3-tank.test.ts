@@ -166,12 +166,12 @@ describe('P3 3D tank loop driven by electrically wired PLC outputs',()=>{
     expect(w.tick).toBe(0);
     expect(validateProject(w.project).components).toHaveLength(7);
   });
-  it('rejects duplicate devices and preserves old motor/sorting project contracts',()=>{
+  it('allows several tanks, pumps, probes and valves (each tank is its own vessel) and preserves old project contracts',()=>{
     const w=setup();
     for(const kind of ['tank','pump','levelprobe','drainvalve'] as const){
-      const result=tick(w,[{k:'place',kind,id:`duplicate-${kind}`,at:{x:700,y:490}}]).world;
-      expect(result.project.components).toHaveLength(7);
-      expect(result.lastError).toMatch(/one of each station component/);
+      const result=tick(w,[{k:'place',kind,id:`second-${kind}`,at:{x:700,y:490}}]).world;
+      expect(result.project.components).toHaveLength(8);
+      expect(result.lastError).toBeNull();
     }
     expect(tick(createWorld(),[{k:'step'}]).snapshot.tank).toEqual(freshTank());
   });

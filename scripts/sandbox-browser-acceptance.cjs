@@ -15,6 +15,13 @@ const pairs = [
   const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const errors = [];
   const page = await browser.newPage();
+  // The sticky toolbar covers a band of the viewport. Like a person, scroll the target to the centre
+  // before clicking (Puppeteer only scrolls elements that are entirely off-screen).
+  { const original = page.click.bind(page);
+    page.click = async (selector, options) => {
+      await page.$eval(selector, el => el.scrollIntoView({ block: 'center', inline: 'center' }));
+      return original(selector, options);
+    }; }
   page.on('pageerror', error => errors.push(String(error)));
   page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
   const clickText = async text => {

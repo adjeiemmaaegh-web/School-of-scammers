@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { COMPONENTS } from '../../components/registry';
 import type { PlacedComponent, ProjectFile, RenderSnapshot } from '../../sim/signals';
 import { perDeviceLive } from '../../sim/device-state';
@@ -11,15 +12,40 @@ type Props = {
   onTerminal: (pin: string) => void;
   onCancelWire: () => void;
   onMove: (id: string) => void;
+  /** Place a device at exact floor coordinates (precise, keyboard-friendly alternative to dragging). */
+  onMoveTo: (id: string, at: { x: number; y: number }) => void;
   /** Toggle a pushbutton/E-stop. The worker resolves the new state (see Command `operateToggle`). */
   onOperate: (id: string) => void;
   onClearSelection: () => void;
 };
 
+/** Largest top-left coordinates that keep a device (170 x 130) on the 1080 x 580 floor. */
+const FLOOR_MAX_X = 910, FLOOR_MAX_Y = 450;
+
+/** A number field that edits a draft and commits on Enter or blur, so typing is never overwritten by a stale snapshot. */
+function PositionField({ label, attr, max, value, disabled, onCommit }: {
+  label: string; attr: string; max: number; value: number; disabled: boolean; onCommit: (n: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(Math.round(value)));
+  useEffect(() => { setDraft(String(Math.round(value))); }, [value]);
+  const commit = () => {
+    const n = Number(draft);
+    if (draft.trim() === '' || !Number.isFinite(n)) { setDraft(String(Math.round(value))); return; }
+    const next = Math.max(0, Math.min(max, Math.round(n)));
+    setDraft(String(next));
+    if (next !== Math.round(value)) onCommit(next);
+  };
+  return <label>{label}
+    <input type="number" {...{ [attr]: '' }} min={0} max={max} step={5} value={draft} disabled={disabled}
+      onChange={e => setDraft(e.target.value)} onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }} />
+  </label>;
+}
+
 /** Read-only contextual view of the worker snapshot. Actions emit existing Commands. */
 export function WorkbenchInspector({
   project, snapshot, selectedDevice, selectedTerminal, editable,
-  onTerminal, onCancelWire, onMove, onOperate, onClearSelection,
+  onTerminal, onCancelWire, onMove, onMoveTo, onOperate, onClearSelection,
 }: Props) {
   const hasLatchBranch = project.program.rungs.some(rung =>
     rung.elements.some(element => element.type === 'branch'));
@@ -58,15 +84,9 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'forwardcontactor' ? snapshot.forwardContactorOn :
     selectedDevice.kind === 'reversecontactor' ? snapshot.reverseContactorOn :
     selectedDevice.kind === 'reversebutton' ? isPressed :
-    selectedDevice.kind === 'breaker' ? !snapshot.breakerTripped :
-    selectedDevice.kind === 'overload' ? !snapshot.overloadTripped :
-    selectedDevice.kind === 'pump' ? snapshot.pumpOn :
     selectedDevice.kind === 'levelprobe' ? snapshot.io.TankHigh :
-    selectedDevice.kind === 'drainvalve' ? snapshot.drainOn :
-    selectedDevice.kind === 'conveyor' ? snapshot.conveyorOn :
     selectedDevice.kind === 'photoeye' ? snapshot.io.Photoeye :
-    selectedDevice.kind === 'diverter' ? snapshot.diverterOn :
-    selectedDevice.kind === 'motor' || selectedDevice.kind === 'contactor' || selectedDevice.kind === 'plc' || selectedDevice.kind === 'lamp' ? perDeviceLive(snapshot, selectedDevice) === true :
+    perDeviceLive(snapshot, selectedDevice) !== undefined ? perDeviceLive(snapshot, selectedDevice) === true :
     selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' ? !isPressed : true;
   const state = selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
     selectedDevice.kind === 'forwardcontactor' ? (isLive ? 'Forward contact closed' : 'Open') :
@@ -75,7 +95,7 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'breaker' ? (isLive ? 'Closed' : 'Tripped open') :
     selectedDevice.kind === 'overload' ? (isLive ? '95-96 closed' : '95-96 tripped open') :
     selectedDevice.kind === 'lamp' ? (isLive ? 'Illuminated' : 'Off') :
-    selectedDevice.kind === 'tank' ? `${Math.round(snapshot.tank.levelMl)} / 1000 ml` :
+    selectedDevice.kind === 'tank' ? `${Math.round(snapshot.vessels[selectedDevice.id]?.levelMl ?? 0)} / 1000 ml` :
     selectedDevice.kind === 'pump' ? (isLive ? 'Filling' : 'Off') :
     selectedDevice.kind === 'levelprobe' ? (isLive ? 'High level' : 'Below level switch') :
     selectedDevice.kind === 'drainvalve' ? (isLive ? 'Open' : 'Closed') :
@@ -100,6 +120,13 @@ export function WorkbenchInspector({
       <span>Live state</span><strong className={isLive ? 'is-live' : ''}>{state}</strong>
       <span>Location</span><code>{Math.round(selectedDevice.x)}, {Math.round(selectedDevice.y)}</code>
     </div>
+    <div className="sandbox-inspector-position" role="group" aria-label="Exact position on the floor">
+      <PositionField key={`${selectedDevice.id}-x`} label="X" attr="data-pos-x" max={FLOOR_MAX_X} value={selectedDevice.x} disabled={!editable}
+        onCommit={x => onMoveTo(selectedDevice.id, { x, y: selectedDevice.y })} />
+      <PositionField key={`${selectedDevice.id}-y`} label="Y" attr="data-pos-y" max={FLOOR_MAX_Y} value={selectedDevice.y} disabled={!editable}
+        onCommit={y => onMoveTo(selectedDevice.id, { x: selectedDevice.x, y })} />
+    </div>
+    <p className="sandbox-help">Sensors, diverters, pumps and level switches act on the conveyor or tank they are placed beside, so exact positions matter.</p>
     <button type="button" className="btn ghost small sandbox-inspector-move" disabled={!editable}
       onClick={() => onMove(selectedDevice.id)}>Move on 3D floor</button>
     {(selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' || selectedDevice.kind === 'reversebutton') &&

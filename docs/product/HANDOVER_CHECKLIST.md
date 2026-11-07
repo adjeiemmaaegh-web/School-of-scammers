@@ -24,6 +24,10 @@ After reviewing the shipped product against **Cisco Packet Tracer / GNS3** (the 
 
 ---
 
+## Product direction correction (7 November 2026): simulator first
+
+Owner correction: the **simulator is the primary product**; Learn & Practice and Assessments are separate, secondary sections; remove single-instance and fixed-workcell limits through a generalised component and signal model; build a complete user-authored multi-device scenario from an empty project. Evidence-based audit and ordered plan: [AUDIT_SIMULATOR_FIRST.md](AUDIT_SIMULATOR_FIRST.md). Done so far (branch `engineering/p9-simulator-first`): simulator-first home and primary navigation, `/learn` and `/assess` hubs, with a real-browser check. Next: generalised plant model, configurable PLC I/O and new equipment, FBD, unify the `/labs` engines, and the empty-project scenario test.
+
 ## Sandbox breadth slice 2 — editing a plant (7 November 2026, DRAFT)
 
 Branch `engineering/p8-edit-plant`, stacked on `engineering/p7-multi-plc` (PR #20). Remove a device (full cleanup, first-PLC promotion), one-click pre-wired starter panels, Undo, Delete key; fixed the toolbar sliding behind the app header. 19 new mutation-checked unit tests and a real-browser E2E. Details and limits: [SANDBOX_BREADTH_PROGRESS.md](SANDBOX_BREADTH_PROGRESS.md).

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { BRAND } from '../platform/config';
 import { useTheme } from './useTheme';
 
@@ -26,6 +26,12 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
           <BrandMark />
           <span>{BRAND.name}</span>
         </Link>
+        {/* The product has one primary experience (the simulator) and two secondary sections. */}
+        <nav className="primary-nav" aria-label="Primary">
+          <NavLink to="/sandbox" className={({ isActive }) => `pn-link pn-sim${isActive ? ' is-active' : ''}`}>Simulator</NavLink>
+          <NavLink to="/learn" className={({ isActive }) => `pn-link${isActive ? ' is-active' : ''}`}>Learn &amp; Practice</NavLink>
+          <NavLink to="/assess" className={({ isActive }) => `pn-link pn-secondary${isActive ? ' is-active' : ''}`}>Assessments</NavLink>
+        </nav>
         <div className="app-header-right">
           {right}
           <button className="theme-btn" onClick={toggle} aria-label="Toggle light and dark theme">
