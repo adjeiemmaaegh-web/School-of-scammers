@@ -64,7 +64,7 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'motor' ? snapshot.motorOn :
     selectedDevice.kind === 'contactor' ? snapshot.contactorOn :
     selectedDevice.kind === 'plc' ? snapshot.io.PlcPowered :
-    selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' ? isPressed : true;
+    selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' ? isPressed : true;
   const state = selectedDevice.kind === 'breaker' ? (isLive ? 'Closed' : 'Tripped open') :
     selectedDevice.kind === 'overload' ? (isLive ? '95-96 closed' : '95-96 tripped open') :
     selectedDevice.kind === 'lamp' ? (isLive ? 'Illuminated' : 'Off') :
@@ -78,7 +78,9 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'motor' ? (isLive ? 'Running' : 'Stopped') :
     selectedDevice.kind === 'contactor' ? (isLive ? 'Coil energised' : 'Coil off') :
     selectedDevice.kind === 'plc' ? (isLive ? 'Powered' : 'Unpowered') :
-    selectedDevice.kind === 'supply' ? '24V DC source' : isPressed ? 'Pressed' : 'Released';
+    selectedDevice.kind === 'supply' ? '24V DC source' :
+    selectedDevice.kind === 'estop' ? (isPressed ? 'NC open · latched' : 'NC closed · reset') :
+    isPressed ? 'Pressed' : 'Released';
 
   return <aside className="sandbox-inspector panel" aria-label="Workbench inspector">
     <div className="sandbox-inspector-top">
@@ -93,10 +95,12 @@ export function WorkbenchInspector({
     </div>
     <button type="button" className="btn ghost small sandbox-inspector-move" disabled={!editable}
       onClick={() => onMove(selectedDevice.id)}>Move on 3D floor</button>
-    {(selectedDevice.kind === 'start' || selectedDevice.kind === 'stop') &&
+    {(selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop') &&
       <button type="button" className="btn primary small sandbox-inspector-operate"
         onClick={() => onOperate(selectedDevice.id, !isPressed)}>
-        {isPressed ? 'Release pushbutton' : 'Press pushbutton'}
+        {selectedDevice.kind === 'estop' ?
+          (isPressed ? 'Reset training E-stop' : 'Press training E-stop') :
+          isPressed ? 'Release pushbutton' : 'Press pushbutton'}
       </button>}
     <div className="sandbox-inspector-subheading"><h3>Terminals</h3><small>{definition.terminals.length ?
         'Click two pins to wire' : 'Passive process device (no electrical terminals)'}</small></div>
