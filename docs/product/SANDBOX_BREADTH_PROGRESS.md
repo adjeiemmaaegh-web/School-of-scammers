@@ -25,6 +25,8 @@ The goal this serves: a learner builds a *plant*, not one fixed circuit: several
 - One existing test changed on purpose: a second E-stop used to be refused (`sandbox-p4-panel`); it is now accepted because E-stop state is per component, and the test says so.
 - `scripts/sandbox-p7-multiplc-browser.cjs`, real Chrome: lay out two panels, wire 22 conductors by clicking terminals, Ladder on PLC 1 and Structured Text on PLC 2, independent run/seal-in/stop, I/O lamps following the selected PLC, a PLC-to-PLC signal that is blocked until the commons are tied, reload persistence of both programs, no horizontal overflow at 390 px.
 
+- **CI:** `ci.yml` dispatched manually on the branch: [run 42385092279](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/42385092279) **succeeded**, including the multi-PLC E2E, the P6 and P5 E2Es, bundle budgets (entry 103 KB gzip, limit 120 KB), accessibility and the Linux Firefox/WebKit smoke. Locally the E2E passed 10 of 10 consecutive runs, all earlier browser scenarios still passed, and 749/749 unit tests pass.
+
 ## Limits — read before relying on it
 
 - **Still single-instance:** conveyor, photoeye, diverter, tank, pump, level probe, drain valve, breaker, overload, and the forward/reverse set. Those plant models and protection flags are not multi-instance, so two sorting lines or two protected panels are not possible yet.
