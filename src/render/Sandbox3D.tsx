@@ -305,7 +305,8 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
         c.kind === 'breaker' ? !snapshot.breakerTripped :
         c.kind === 'overload' ? !snapshot.overloadTripped :
         c.kind === 'lamp' ? snapshot.lampOn :
-        c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' ? c.pressed : false}
+        c.kind === 'estop' ? !c.pressed :
+        c.kind === 'start' || c.kind === 'stop' ? c.pressed : false}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect} />)}
     <OrbitControls makeDefault enablePan enableZoom enableRotate
       minDistance={4.4} maxDistance={23} minPolarAngle={0.1} maxPolarAngle={Math.PI / 2.05}
