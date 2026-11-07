@@ -13,11 +13,15 @@ export const emptyMeter = (): MeterReading => ({
 export function measureDC24(
   voltages: Readonly<Record<string, number | null>>,
   diagnostics: readonly string[], positive: string | null, negative: string | null,
+  /** With several isolated supplies, a differential reading only exists within one supply's nets. */
+  sameSupply?: (a: string, b: string) => boolean,
 ): MeterReading {
   if (!positive || !negative)
     return { positive, negative, volts: null, status: 'select' };
   if (diagnostics.some(d => d.startsWith('Supply short')))
     return { positive, negative, volts: null, status: 'short' };
+  if (sameSupply && !sameSupply(positive, negative))
+    return { positive, negative, volts: null, status: 'floating' };
   const hi = voltages[positive], lo = voltages[negative];
   if (hi === null || lo === null || hi === undefined || lo === undefined ||
       !Number.isFinite(hi) || !Number.isFinite(lo))
