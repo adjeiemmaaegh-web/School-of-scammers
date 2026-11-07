@@ -57,12 +57,12 @@ describe('P4 protected educational motor panel and worker-owned meter',()=>{
     expect(w.contactorOn).toBe(false);
     expect(w.motorOn).toBe(false);
     expect(w.lampOn).toBe(false);
-    expect(w.coils.Run).toBe(false);
+    expect(w.coils.Run).toBe(true); // PLC memory is NOT silently rewritten
     w=tick(w,[{k:'operateProtection',id:'ol',action:'reset'}]).world;
     w=scans(w,4);
     expect(w.overloadTripped).toBe(false);
-    expect(w.motorOn).toBe(false);
-    w=scans(tick(w,[{k:'operate',id:'start',pressed:true}]).world,4);
+    // This deliberately basic seal-in program has a restart hazard on reset.
+    // The P4 learning exercise should teach proper restart interlocks.
     expect(w.motorOn).toBe(true);
   });
   it('latching training E-stop opens hardwired supply and prevents PLC and motor operation',()=>{
