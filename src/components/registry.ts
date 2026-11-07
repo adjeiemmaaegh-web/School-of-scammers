@@ -1,5 +1,5 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
-export type ComponentKind = 'supply' | 'plc' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp';
+export type ComponentKind = 'supply' | 'plc' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'estop';
 export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 export const COMPONENTS: Record<ComponentKind, Definition> = {
@@ -38,6 +38,8 @@ export const COMPONENTS: Record<ComponentKind, Definition> = {
     { name: 'OUT', side: 'right', y: 75, role: 'output' }] },
   drainvalve: { kind: 'drainvalve', label: '24V drain valve', help: 'Q0.3 Drain output energises a simplified 260 ml/s outlet', terminals: [
     { name: 'A1', side: 'left', y: 47, role: 'load' }, { name: 'A2', side: 'left', y: 93, role: 'load' }] },
+  estop: { kind: 'estop', label: 'Emergency stop (training)', help: 'Latching NC contact: pressing opens A/B; manual reset restores. Educational simulation only, NOT safety-rated, redundant or certified.', terminals: [
+    { name: 'A', side: 'left', y: 70, role: 'passive' }, { name: 'B', side: 'right', y: 70, role: 'passive' }] },
   breaker: { kind: 'breaker', label: '24V branch breaker', help: 'Idealized two-pole-path DC protection: opens on downstream direct short or manual test; NOT a rated breaker', terminals: [
     { name: 'IN', side: 'left', y: 50, role: 'passive' }, { name: 'OUT', side: 'right', y: 50, role: 'passive' }] },
   overload: { kind: 'overload', label: 'Overload NC auxiliary', help: 'Manual instructional trip/reset opens 95-96 in the contactor coil path; no thermal/current curve', terminals: [
