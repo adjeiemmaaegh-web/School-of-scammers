@@ -24,6 +24,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  // The ready-made starters live in a menu: open it, then choose, as a person would.
+  const starter = async selector => { await page.click('[data-starters] > summary'); await page.waitForSelector(`${selector}`, { visible: true }); await page.click(selector); };
   const clickText = async text => {
     const ok = await page.evaluate(label => {
       const b = [...document.querySelectorAll('button')].find(el => el.textContent.trim() === label);
@@ -51,10 +53,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await page.waitForSelector('.sandbox-toolbar');
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle0' });
-    await page.waitForSelector('[data-layout-two-panels]');
+    await page.waitForSelector('[data-starters]');
 
     // 1. Two complete panels: two supplies, two PLCs, two of each device, all wired by clicking terminals.
-    await page.click('[data-layout-two-panels]');
+    await starter('[data-layout-two-panels]');
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 12, { timeout: 8000 });
     for (const [a, b] of [...panel(1), ...panel(2)]) await wire(a, b);
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-wire-list > div').length === 22, { timeout: 8000 });

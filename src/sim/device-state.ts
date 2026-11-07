@@ -8,7 +8,8 @@ import type { PlacedComponent, RenderSnapshot } from './signals';
  */
 export function perDeviceLive(snapshot: RenderSnapshot, c: Pick<PlacedComponent, 'id' | 'kind'>): boolean | undefined {
   switch (c.kind) {
-    case 'plc': return snapshot.plcs[c.id]?.powered ?? snapshot.io.PlcPowered;
+    case 'plc':
+    case 'plc16': return snapshot.plcs[c.id]?.powered ?? snapshot.io.PlcPowered;
     case 'motor': return snapshot.deviceOn[c.id] ?? snapshot.motorOn;
     case 'contactor': return snapshot.deviceOn[c.id] ?? snapshot.contactorOn;
     case 'lamp': return snapshot.deviceOn[c.id] ?? snapshot.lampOn;

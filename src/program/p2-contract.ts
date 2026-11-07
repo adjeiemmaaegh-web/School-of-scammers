@@ -1,6 +1,7 @@
 /** Supported P2 teaching subset for the open sandbox, not full IEC 61131-3. */
 import { validateLadder, type LadderDocument, type NumericOperand } from '../engineering/ladder';
 import { compileStructuredText, type STProgram } from '../engineering/structured-text';
+import { LEGACY_NAMES, type IoNames } from '../sim/plc-io';
 
 export const MAX_SANDBOX_RUNGS = 8;
 export const MAX_SANDBOX_SYMBOLS = 16;
@@ -16,11 +17,14 @@ export const DEFAULT_ST_SOURCE = [
   'Run := StopOK AND (Start OR Run);',
 ].join('\n');
 
-const builtIns = new Set(['Start', 'StopOK', 'Photoeye', 'TankHigh', 'ReverseRequest', 'Run', 'Sort', 'Fill', 'Drain', 'Forward', 'Reverse', 'Unused']);
+/** Tag names a program may use without declaring: the controller's own inputs and outputs, plus the idle placeholder. */
+const builtInsOf = (names: IoNames) => new Set([...names.inputs, ...names.outputs, 'Unused']);
 const safeTag = (tag: string) => /^[A-Za-z][A-Za-z0-9_.]{0,39}$/.test(tag) &&
   !['__proto__', 'constructor', 'prototype'].includes(tag.toLowerCase());
 
-export function validateSandboxProgram(program: LadderDocument): string[] {
+export function validateSandboxProgram(program: LadderDocument, names: IoNames = LEGACY_NAMES): string[] {
+  const builtIns = builtInsOf(names);
+  const outputNames = new Set([...names.outputs, 'Unused']);
   const errors = validateLadder(program);
   if (errors.length) return errors;
   if (program.rungs.length > MAX_SANDBOX_RUNGS) errors.push(`Sandbox supports at most ${MAX_SANDBOX_RUNGS} Ladder rungs`);
@@ -36,7 +40,7 @@ export function validateSandboxProgram(program: LadderDocument): string[] {
   const known = new Set([...builtIns, ...symbols, ...coils]);
   for (const [index, rung] of program.rungs.entries()) {
     if (rung.elements.length > 8 || rung.elements.length < 1) errors.push(`Rung ${index + 1} needs 1–8 series elements`);
-    if (!safeTag(rung.coil) || (rung.coil !== 'Run' && rung.coil !== 'Sort' && rung.coil !== 'Fill' && rung.coil !== 'Drain' && rung.coil !== 'Forward' && rung.coil !== 'Reverse' && rung.coil !== 'Unused' && !symbols.includes(rung.coil)))
+    if (!safeTag(rung.coil) || (!outputNames.has(rung.coil) && !symbols.includes(rung.coil)))
       errors.push(`Rung ${index + 1}: declare local output tag ${rung.coil} before use`);
     if (numeric.has(rung.coil)) errors.push(`Rung ${index + 1}: numeric tag cannot be a BOOL output coil`);
     const operation = rung.operation;
@@ -73,21 +77,25 @@ export function validateSandboxProgram(program: LadderDocument): string[] {
   return errors;
 }
 
-export function compileSandboxST(source: string): STProgram {
+export function compileSandboxST(source: string, names: IoNames = LEGACY_NAMES): STProgram {
   const compiled = compileStructuredText(source);
-  if (!compiled.assignedOutputs.some(name => name.toLowerCase() === 'run'))
+  if (names.requireRun && !compiled.assignedOutputs.some(name => name.toLowerCase() === 'run'))
     throw new SyntaxError('The sandbox 24V motor circuit requires a Run output (BOOL)');
   if (compiled.declarations.length) {
     const inputs = compiled.declarations.filter(d => d.scope === 'input');
     for (const decl of inputs) {
-      if (!SANDBOX_INPUTS.some(tag => tag.toLowerCase() === decl.name.toLowerCase()) || decl.type !== 'BOOL')
-        throw new SyntaxError(`Unsupported VAR_INPUT ${decl.name}; use BOOL Start, StopOK, Photoeye, TankHigh and ReverseRequest`);
+      if (!names.inputs.some(tag => tag.toLowerCase() === decl.name.toLowerCase()) || decl.type !== 'BOOL')
+        throw new SyntaxError(names === LEGACY_NAMES
+          ? `Unsupported VAR_INPUT ${decl.name}; use BOOL Start, StopOK, Photoeye, TankHigh and ReverseRequest`
+          : `Unsupported VAR_INPUT ${decl.name}; use BOOL ${names.inputs.join(', ')}`);
     }
-    const run = compiled.declarations.find(d => d.name.toLowerCase() === 'run');
-    if (!run || run.scope !== 'output' || run.type !== 'BOOL')
-      throw new SyntaxError('Declare Run : BOOL inside VAR_OUTPUT to control the motor');
+    if (names.requireRun) {
+      const run = compiled.declarations.find(d => d.name.toLowerCase() === 'run');
+      if (!run || run.scope !== 'output' || run.type !== 'BOOL')
+        throw new SyntaxError('Declare Run : BOOL inside VAR_OUTPUT to control the motor');
+    }
   }
-  for (const name of ['sort', 'fill', 'drain', 'forward', 'reverse']) {
+  for (const name of names.outputs.filter(n => n !== 'Run').map(n => n.toLowerCase())) {
     const output = compiled.declarations.find(d => d.name.toLowerCase() === name);
     if (output && (output.scope !== 'output' || output.type !== 'BOOL'))
       throw new SyntaxError(`Declare optional ${name} : BOOL inside VAR_OUTPUT`);

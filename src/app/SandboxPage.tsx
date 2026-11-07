@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { COMPONENTS, componentKinds, type ComponentKind } from '../components/registry';
+import { COMPONENTS, componentKinds, isPlcKind, type ComponentKind } from '../components/registry';
+import { IoMappingPanel } from '../ui/sandbox/IoMappingPanel';
 import { AppHeader } from '../ui/AppHeader';
 import { ProgrammingDock } from '../program/ProgrammingDock';
 import { LiveMonitor } from '../program/LiveMonitor';
@@ -330,7 +331,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   });
   const selectDevice = (id: string | null) => {
     setSelectedDeviceId(id);
-    if (id && project?.components.find(c => c.id === id)?.kind === 'plc') setSelectedPlcId(id);
+    if (id && isPlcKind(project?.components.find(c => c.id === id)?.kind ?? '')) setSelectedPlcId(id);
   };
   const visibleKinds = componentKinds.filter(kind => {
     const definition = COMPONENTS[kind];
@@ -378,19 +379,26 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       <div className="sandbox-toolbar">
         {!scenario && <>
         <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setActiveStage('build'); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
-        <button className="btn ghost small" onClick={layout} disabled={!editable || !!project?.components.length}>Place starter layout</button>
-        <button className="btn ghost small" onClick={layoutSorting}
-          disabled={!editable || !!project?.components.length}>Place 3D sorting layout</button>
-        <button className="btn ghost small" data-add-panel onClick={() => send([{ k: 'addPanel', template: 'motor-starter' }])}
-          disabled={!editable}>Add starter panel</button>
-        <button className="btn ghost small" onClick={layoutTwoPanels} data-layout-two-panels
-          disabled={!editable || !!project?.components.length}>Place two-panel layout</button>
-        <button className="btn ghost small" onClick={layoutTank}
-          disabled={!editable || !!project?.components.length}>Place 3D tank layout</button>
-        <button className="btn ghost small" onClick={layoutProtectedDOL}
-          disabled={!editable || !!project?.components.length}>Place protected DOL layout</button>
-        <button className="btn ghost small" onClick={layoutReverser}
-          disabled={!editable || !!project?.components.length}>Place reversing DOL layout</button>
+        {/* The ready-made starters live in one menu so the sticky toolbar stays a single short row. */}
+        <details className="sandbox-starters" data-starters>
+          <summary className="btn ghost small">Starters</summary>
+          <div className="sandbox-starters-menu" role="group" aria-label="Ready-made starters"
+            onClick={e => { if ((e.target as HTMLElement).closest('button')) (e.currentTarget.closest('details') as HTMLDetailsElement).open = false; }}>
+            <button className="btn ghost small" data-add-panel onClick={() => send([{ k: 'addPanel', template: 'motor-starter' }])}
+              disabled={!editable}>Add starter panel</button>
+            <button className="btn ghost small" onClick={layout} disabled={!editable || !!project?.components.length}>Place starter layout</button>
+            <button className="btn ghost small" onClick={layoutTwoPanels} data-layout-two-panels
+              disabled={!editable || !!project?.components.length}>Place two-panel layout</button>
+            <button className="btn ghost small" onClick={layoutSorting}
+              disabled={!editable || !!project?.components.length}>Place 3D sorting layout</button>
+            <button className="btn ghost small" onClick={layoutTank}
+              disabled={!editable || !!project?.components.length}>Place 3D tank layout</button>
+            <button className="btn ghost small" onClick={layoutProtectedDOL}
+              disabled={!editable || !!project?.components.length}>Place protected DOL layout</button>
+            <button className="btn ghost small" onClick={layoutReverser}
+              disabled={!editable || !!project?.components.length}>Place reversing DOL layout</button>
+          </div>
+        </details>
         </>}
         <button className="btn ghost small" data-undo onClick={undo}
           disabled={!editable || !undoStack.length}>Undo</button>
@@ -423,7 +431,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               onClick={() => place(kind)} disabled={!editable}
               className="sandbox-palette-item">
               <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
-                {kind === 'plc' ? 'PLC' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
+                {kind === 'plc' ? 'PLC' : kind === 'plc16' ? '16/16' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
                   kind === 'conveyor' ? 'BELT' : kind === 'photoeye' ? 'EYE' :
                   kind === 'diverter' ? 'DIV' : kind === 'tank' ? 'TANK' :
                   kind === 'pump' ? 'PUMP' : kind === 'levelprobe' ? 'LVL' :
@@ -480,7 +488,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                       aria-label={`Inspect ${def.label}`}>{def.label}</button>
                     <span className="sandbox-device-status">{c.kind === 'motor' ? (live ? 'RUNNING' : 'STOPPED') :
                       c.kind === 'contactor' ? (live ? 'COIL ON' : 'COIL OFF') :
-                      c.kind === 'plc' ? (live ? 'POWER OK' : 'NO POWER') :
+                      isPlcKind(c.kind) ? (live ? 'POWER OK' : 'NO POWER') :
                       c.kind === 'conveyor' ? (live ? 'BELT MOVING' : 'BELT STOPPED') :
                       c.kind === 'photoeye' ? (live ? 'MARK DETECTED' : 'NO MARK') :
                       c.kind === 'diverter' ? (live ? 'REJECT ACTIVE' : 'PASS') :
@@ -530,7 +538,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </details>
           <div className="sandbox-status panel">
             <div><span className="eyebrow">Live I/O{plcList.length > 1 && activePlcId ? ` · ${activePlcId}` : ''}</span><div className="sandbox-lamps">
-              {(['Start', 'StopOK', 'Photoeye', 'TankHigh', 'ReverseRequest', 'Run', 'Sort', 'Fill', 'Drain', 'Forward', 'Reverse',
+              {activePlcView?.kind === 'plc16'
+                ? [...activePlcView.io.inputs, ...activePlcView.io.outputs].map(p =>
+                    <span className={p.on ? 'lit' : ''} key={p.terminal} title={p.terminal}><i />{p.tag}</span>)
+                  .concat([<span className={activePlcView.powered ? 'lit' : ''} key="PlcPowered"><i />PlcPowered</span>])
+                : (['Start', 'StopOK', 'Photoeye', 'TankHigh', 'ReverseRequest', 'Run', 'Sort', 'Fill', 'Drain', 'Forward', 'Reverse',
                   'Q0.0', 'Q0.1', 'Q0.2', 'Q0.3', 'Q0.4', 'Q0.5', 'PlcPowered'] as const).map(k =>
                 <span className={activeIo[k] ? 'lit' : ''} key={k}><i />{k}</span>)}
               </div></div>
@@ -679,9 +691,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>}
           {dockProject && dockSnapshot && <ProgrammingDock project={dockProject} snapshot={dockSnapshot} disabled={!editable}
             showExamples={!scenario}
+            io={activePlcView ? { kind: activePlcView.kind, inputs: activePlcView.io.inputs, outputs: activePlcView.io.outputs } : undefined}
             onLadder={program => send([{ k: 'loadProgram', program, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onST={source => send([{ k: 'loadST', source, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onLanguage={language => send([{ k: 'activateLanguage', language, ...(activePlcId ? { plc: activePlcId } : {}) }])} />}
+          {activePlcId && activePlcView?.kind === 'plc16' && <IoMappingPanel plcId={activePlcId} view={activePlcView} editable={editable} send={send} />}
         </div>
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
           {snapshot && <LiveMonitor snapshot={snapshot}

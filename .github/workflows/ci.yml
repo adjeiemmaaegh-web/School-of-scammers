@@ -58,6 +58,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-sensor-browser.cjs
       - name: Multi-PLC - two panels, per-PLC Ladder/ST programs, PLC-to-PLC signalling over a shared common
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-multiplc-browser.cjs
+      - name: Configurable I/O - a 16/16 PLC with named tags in both banks, refused renames, persistence
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p12-configurable-io-browser.cjs
       - name: Authored plant - build a two-station plant from an empty floor through the UI, commission, troubleshoot, reload
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p11-authored-plant-browser.cjs
       - name: Per-instance plant - two conveyor lanes and two tanks, each with its own PLC, devices and counters

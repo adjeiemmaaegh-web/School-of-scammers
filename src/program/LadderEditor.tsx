@@ -9,8 +9,11 @@ type Props = {
   document: LadderDocument; snapshot: RenderSnapshot; disabled: boolean; onChange: (doc: LadderDocument) => void;
   /** One-click solved example programs. Off in graded scenarios, where they would be the answer. */
   showExamples?: boolean;
+  /** The selected PLC's inputs and outputs with their tag names. Omitted means the classic controller. */
+  io?: { inputs: { terminal: string; tag: string }[]; outputs: { terminal: string; tag: string }[] };
 };
-const BUILT_INS = ['Start', 'StopOK', 'Photoeye', 'TankHigh', 'ReverseRequest', 'Run', 'Sort', 'Fill', 'Drain', 'Forward', 'Reverse', 'Unused'];
+const CLASSIC_INPUTS = ['Start', 'StopOK', 'Photoeye', 'TankHigh', 'ReverseRequest'];
+const CLASSIC_OUTPUTS = ['Run', 'Sort', 'Fill', 'Drain', 'Forward', 'Reverse'];
 const operationFor = (kind: string, target: string): RungOperation | undefined => {
   if (kind === 'coil') return undefined;
   if (kind === 'ton' || kind === 'tof' || kind === 'rto' || kind === 'tp') return { kind, presetMs: 250 };
@@ -37,7 +40,11 @@ function ContactControl({ value, onChange, onRemove, active, tags }: {
     {onRemove && <button type="button" className="sandbox-remove" onClick={onRemove} aria-label="Remove contact">×</button>}
   </div>;
 }
-export function LadderEditor({ document, snapshot, disabled, onChange, showExamples = true }: Props) {
+export function LadderEditor({ document, snapshot, disabled, onChange, showExamples = true, io }: Props) {
+  // Tag names come from the selected PLC's I/O map; without one this is the classic controller.
+  const inputNames = io ? io.inputs.map(p => p.tag) : CLASSIC_INPUTS;
+  const outputNames = io ? io.outputs.map(p => p.tag) : CLASSIC_OUTPUTS;
+  const classic = !io || io.inputs[0]?.tag === 'Start';
   const [newTag, setNewTag] = useState('');
   const [newTagType, setNewTagType] = useState<'BOOL' | NumericTagType>('BOOL');
   const [newInitial, setNewInitial] = useState('0');
@@ -45,8 +52,8 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
   const symbols = Object.keys(document.symbols ?? {});
   const numericTags = symbols.filter(tag => ['INT','DINT','REAL'].includes(document.symbols![tag].type ?? 'BOOL'));
   const boolSymbols = symbols.filter(tag => !numericTags.includes(tag));
-  const tags = Array.from(new Set([...BUILT_INS, ...boolSymbols, ...document.rungs.map(r => r.coil)]));
-  const coils = Array.from(new Set(['Run', 'Sort', 'Fill', 'Drain', 'Forward', 'Reverse', 'Unused', ...boolSymbols]));
+  const tags = Array.from(new Set([...inputNames, ...outputNames, 'Unused', ...boolSymbols, ...document.rungs.map(r => r.coil)]));
+  const coils = Array.from(new Set([...outputNames, 'Unused', ...boolSymbols]));
   const live: Record<string, boolean | number> = { ...snapshot.tagValues, Unused: false };
 
   const patchRung = (rungId: string, replacement: Rung) => onChange({
@@ -106,11 +113,11 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
       ...document,
       symbols: { ...document.symbols, [newCoil]: { description: 'Local BOOL rung output' } },
       rungs: [...document.rungs, {
-        id: `rung-${suffix}`, elements: [{ type: 'contact', tag: 'Start' }], coil: newCoil,
+        id: `rung-${suffix}`, elements: [{ type: 'contact', tag: inputNames[0] }], coil: newCoil,
       }],
     });
   };
-  const reset = () => onChange(blankProgram());
+  const reset = () => onChange(classic ? blankProgram() : { id: 'sandbox-program', version: '1.0', rungs: [{ id: 'rung-1', elements: [{ type: 'contact', tag: inputNames[0] }], coil: outputNames[0] }] });
   const updateTimerPreset = (rung: Rung, presetMs: number) => {
     const operation = rung.operation;
     if (operation && 'presetMs' in operation)
@@ -225,7 +232,7 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
               onClick={() => patchRung(rung.id, { ...rung, elements: [...rung.elements, { type: 'contact', tag: 'StopOK' }] })}>+ Series contact</button>
             <button type="button" className="btn ghost small" disabled={rung.elements.length >= 8}
               onClick={() => patchRung(rung.id, { ...rung, elements: [...rung.elements,
-                { type: 'branch', alternatives: [[{ type: 'contact', tag: 'Start' }], [{ type: 'contact', tag: 'Run' }]] }] })}>+ Parallel branch</button>
+                { type: 'branch', alternatives: [[{ type: 'contact', tag: inputNames[0] }], [{ type: 'contact', tag: outputNames[0] }]] }] })}>+ Parallel branch</button>
           </div>
         </div>;
       })}
@@ -243,7 +250,8 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
       </div>
       <div className="sandbox-tag-editor">
         <div><span className="eyebrow">Local tag table</span><h3>BOOL and numeric registers</h3>
-          <p className="sandbox-help">Physical inputs: Start (I0.0), StopOK (I0.1), Photoeye (I0.2), TankHigh (I0.3), ReverseRequest (I0.4); outputs: Run (Q0.0), Sort (Q0.1), Fill (Q0.2), Drain (Q0.3), Forward (Q0.4), Reverse (Q0.5). Local tags are internal to the simulated PLC.</p></div>
+          <p className="sandbox-help">{io ? <>Physical inputs: {io.inputs.map(p => `${p.tag} (${p.terminal})`).join(', ')}; outputs: {io.outputs.map(p => `${p.tag} (${p.terminal})`).join(', ')}. </>
+            : 'Physical inputs: Start (I0.0), StopOK (I0.1), Photoeye (I0.2), TankHigh (I0.3), ReverseRequest (I0.4); outputs: Run (Q0.0), Sort (Q0.1), Fill (Q0.2), Drain (Q0.3), Forward (Q0.4), Reverse (Q0.5). '}Local tags are internal to the simulated PLC.</p></div>
         <div className="sandbox-add-tag">
           <label htmlFor="sandbox-new-tag">Tag name</label>
           <input id="sandbox-new-tag" type="text" value={newTag} maxLength={40}
