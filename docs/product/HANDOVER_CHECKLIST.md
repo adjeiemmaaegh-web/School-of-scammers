@@ -24,6 +24,27 @@ After reviewing the shipped product against **Cisco Packet Tracer / GNS3** (the 
 
 ---
 
+## P5 faults & diagnostics — branch review and first slice (7 November 2026, DRAFT)
+
+**Where the work stood.** `main` is still the v3 app plus docs (`6bf6fdd`); none of the sandbox work is merged. It lives on a **stacked chain of unmerged draft branches**, each based on the previous: `feat/p0-p1-sandbox-foundation` (#14) → `design/ux-first-3d-workbench` (#15) → `engineering/p2-plc-programming` (#16) → `engineering/p3-3d-conveyor-sorting` (#17) → `engineering/p4-electrical-panel` (#18, the tip). P5 continues from the P4 tip on **`engineering/p5-faults-diagnostics`** (also draft and unmerged). The older `feat/*-2026110x` branches are the previous developer's and are not part of this chain.
+
+**Baseline checked independently** on the P4 tip (clean `npm ci`, Node 22, headless Chromium): typecheck clean, 619/619 unit tests, `verify:full` green, and 7 of the 8 sandbox browser scenarios passing first time.
+
+**Defect found and fixed: the flaky P4 reversing browser test was a real UI race.** `sandbox-p4-reversing-browser.cjs` failed roughly 1 run in 3 at the final "Forward lamp lit" wait. A command log captured from a failing run showed the UI sending `operate pressed:false` twice in 24 ms, when the second click was meant to press. The UI built `pressed = !c.pressed` from its last worker snapshot, which is stale until the next ~50 ms scan, so two quick clicks sent the same value and a press was lost. That also broke the rule that the UI must not derive truth from snapshots. Fix: new command **`operateToggle`**, resolved by the worker against authoritative state in command order; all three UI call sites (patch panel, 3D label, inspector) use it. `operate { pressed }` is unchanged. Tests: `tests/sandbox-operate-toggle.test.ts` (8). Result: the reversing scenario passed **15/15** consecutive runs after the fix. **Do not compute a button's next state from a snapshot in new UI code.**
+
+**P5 slice delivered (see [P5_FAULTS_PROGRESS.md](P5_FAULTS_PROGRESS.md)).** First-class, seeded, optionally hidden faults (open conductor, open contactor coil, welded contacts, open motor winding, stuck pushbutton) that change what the circuit solver sees, symptom-only supervisory alarms with an active/cleared history, a *Replace a part* repair action (paused only, neutral log), and a Troubleshooting panel in the Test stage. Faults are saved in the optional `ProjectFile.faults`; legacy v1 projects load unchanged. Evidence: 32 unit tests (mutation-checked), a real-browser E2E (10/10 stable), 659/659 unit tests and all nine sandbox browser scenarios locally. **Final GitHub Actions status for the head commit has not been verified**, and cross-browser, low-spec Windows and owner review remain open. P5 full exit is INCOMPLETE.
+
+**Running the browser scripts locally (cloud sandbox or any machine without Puppeteer's browser download).** Build, serve `npx vite preview --host 127.0.0.1 --port 4173`, then:
+
+```bash
+PUPPETEER_SKIP_DOWNLOAD=1 npm install --no-save --no-audit --no-fund puppeteer@24.31.0 axe-core@4.10.3
+PLC_BASE_URL=http://127.0.0.1:4173 PUPPETEER_EXECUTABLE_PATH=/path/to/chrome node scripts/sandbox-p5-faults-browser.cjs
+```
+
+**Suggested next steps:** extend faults to the photoeye/level probe and the tank/sorting workcells; add overload/breaker and feedback-mismatch alarms; tie an execution-trace export to a fault session; then P6 (scoring repairs, re-hosting the assessment mode). Before relying on any browser script as a gate, run it several times in a row: one of the existing ones was only passing by luck.
+
+---
+
 ## Current P0/P1 implementation and verification (6 November 2026)
 
 Development branch `feat/p0-p1-sandbox-foundation`; draft review PR #14. **Owner revised 2.5D-first to genuine interactive 3D from P1**. The public-facing sandbox is a real Three.js/React Three Fiber workbench with original low-poly 3D devices (supply, PLC, START/STOP, contactor, ideal DC motor), projected drag-to-place, 3D terminal hit targets, actual 3D cable geometry, camera orbit/pan/zoom, motor fan rotation derived from the authoritative scan clock, and an accessible browser-local patch panel/fallback. The saved project coordinate format remains compatible with the earlier JSON format. The deterministic PLC and 24V circuit computations still execute only in `src/sim/orchestrator.ts` (Web Worker); nothing about the renderer proves certified PLC or real machinery physics. Existing v3 guided exercises and employer assessments remain unchanged. No backend, account or cloud features were introduced.

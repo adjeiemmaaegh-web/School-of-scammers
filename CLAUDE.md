@@ -7,6 +7,7 @@
 2. `docs/product/ARCHITECTURE.md` — how it's built: modules, the tick pipeline, the signal/event contract, the salvage map.
    **UX/UI-first workbench:** `docs/product/UX_WORKBENCH_V1.md` — established UX framework. Owner authorized continuing into engineering; review signoff remains separate.
    **P2 programming status:** `docs/product/P2_PROGRAMMING_PROGRESS.md` — actual Ladder/ST integration, pending full P2 features, and release blockers.
+   **P5 faults & diagnostics:** `docs/product/P5_FAULTS_PROGRESS.md` — seeded/hidden fault injection that changes real solver inputs, symptom-only alarms, repair, and what is still open.
 3. `.claude/skills/automation-platform/SKILL.md` — the day-to-day developer guide and recipes. **Follow it when writing simulator code.**
 4. `docs/product/HANDOVER_CHECKLIST.md` — current status and what's next.
 
