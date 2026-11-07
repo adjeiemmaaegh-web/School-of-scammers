@@ -15,6 +15,7 @@ const wireGuide = 'Supply P24 → PLC L+, START A, STOP A, contactor 13. Supply 
 const sortingWireGuide = 'For 3D sorting: supply P24 → PLC L+, START A, STOP A, contactor 13, photoeye L+. Supply M0 → PLC M, contactor A2, conveyor M-, photoeye M, diverter A2. START B → I0.0; STOP B → I0.1; PLC Q0.0 → contactor A1; contactor 14 → conveyor L+. Photoeye OUT → PLC I0.2; PLC Q0.1 → diverter A1. Load the sorting Ladder example, Run, press START, and feed marked or plain parcels. Photoeye and diverter must be positioned alongside the conveyor in sensor→diverter order.';
 const tankWireGuide = 'For tank process: P24 to PLC L+, STOP A and level probe L+. M0 to PLC M, pump M-, level probe M and drain valve A2. STOP B to PLC I0.1; level probe OUT to PLC I0.3; PLC Q0.2 to pump L+; PLC Q0.3 to drain valve A1. Mount the pump, probe and valve near the tank. Load the tank control Ladder example, Run and observe filling to 750 ml, switching and drainage until 600 ml. Wrong PLC logic, miswiring or moving equipment alters the real result.';
 const protectedDOLGuide = 'Protected DOL training circuit (16 wires): supply P24 → breaker IN; breaker OUT → E-stop A; E-stop B → PLC L+, START A, STOP A and contactor 13. Supply M0 → PLC M, contactor A2, motor M- and pilot lamp M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → overload 95; overload 96 → contactor A1; contactor 14 → motor L+ and lamp L+. Load editable latch program. Press E-stop to open the upstream NC supply path (training demonstration, NOT a certified safety function), reset it manually. Trip overload to open coil path. For a breaker short demo, wire breaker OUT directly to supply M0, Run or Step to trip; remove that wire before reset. Use meter probes to compare actual net potentials.';
+const reverseWireGuide = 'P4 forward/reverse (21 wires): supply P24 → breaker IN; breaker OUT → E-stop A; E-stop B → PLC L+, START A, REVERSE A, STOP A, forward contactor 13, reverse contactor 13. Supply M0 → PLC M, both contactor A2 and reversible motor M-. START B → PLC I0.0; REVERSE B → PLC I0.4; STOP B → PLC I0.1. PLC Q0.4 → reverse contactor NC 21; reverse NC 22 → forward A1. PLC Q0.5 → forward NC 21; forward NC 22 → reverse A1. Forward contactor 14 → motor F+; reverse contactor 14 → motor R+. Load forward/reverse Ladder example and Run; press/release START to latch forward, STOP then press/release REVERSE to latch reverse. Pressing both requests together is rejected by example logic. Miswire or bypass NC contacts to observe actual electrical/mechanical interlock warnings. Educational 24V direction-input model, NOT three-phase reversing wiring or safety-certified machinery.';
 export function SandboxPage() {
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
   const [project, setProject] = useState<ProjectFile | null>(null);
@@ -131,6 +132,19 @@ export function SandboxPage() {
     send(devices.map((d,i):Command=>({k:'place',id:`${d.kind}-${i+1}`,kind:d.kind,
       at:{x:d.x,y:d.y}})));
   };
+  const layoutReverser = () => {
+    if (project?.components.length) return;
+    setMoveTarget(null);
+    const devices: { kind: ComponentKind; x: number; y: number }[] = [
+      {kind:'supply',x:25,y:25}, {kind:'breaker',x:175,y:25},
+      {kind:'estop',x:130,y:245}, {kind:'plc',x:350,y:25},
+      {kind:'start',x:25,y:405}, {kind:'reversebutton',x:250,y:405},
+      {kind:'stop',x:340,y:245}, {kind:'forwardcontactor',x:595,y:25},
+      {kind:'reversecontactor',x:595,y:245}, {kind:'revmotor',x:875,y:25},
+    ];
+    send(devices.map((d,i):Command=>({k:'place',id:`${d.kind}-${i+1}`,kind:d.kind,
+      at:{x:d.x,y:d.y}})));
+  };
   const meterTerminals = project?.components.flatMap(c =>
     COMPONENTS[c.kind].terminals.map(t => `${c.id}.${t.name}`)) ?? [];
   const exportProject = () => {
@@ -178,7 +192,8 @@ export function SandboxPage() {
           <span className={`sandbox-work-status ${snapshot?.running ? 'is-running' : ''}`}>
             <i aria-hidden="true" />{snapshot?.running ? 'SIMULATION RUNNING' : 'EDIT MODE'}
           </span>
-          <strong>{project?.components.some(c => c.kind === 'breaker') ? 'Untitled protected 24V DOL panel' :
+          <strong>{project?.components.some(c => c.kind === 'revmotor') ? 'Untitled forward/reverse motor panel' :
+            project?.components.some(c => c.kind === 'breaker') ? 'Untitled protected 24V DOL panel' :
             project?.components.some(c => c.kind === 'tank') ? 'Untitled tank process project' :
             project?.components.some(c => c.kind === 'conveyor') ?
             'Untitled conveyor sorting project' : 'Untitled motor-control project'}</strong>
@@ -204,6 +219,8 @@ export function SandboxPage() {
           disabled={!editable || !!project?.components.length}>Place 3D tank layout</button>
         <button className="btn ghost small" onClick={layoutProtectedDOL}
           disabled={!editable || !!project?.components.length}>Place protected DOL layout</button>
+        <button className="btn ghost small" onClick={layoutReverser}
+          disabled={!editable || !!project?.components.length}>Place reversing DOL layout</button>
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
@@ -236,7 +253,9 @@ export function SandboxPage() {
                   kind === 'diverter' ? 'DIV' : kind === 'tank' ? 'TANK' :
                   kind === 'pump' ? 'PUMP' : kind === 'levelprobe' ? 'LVL' :
                   kind === 'drainvalve' ? 'VAL' : kind === 'estop' ? 'E-STOP' : kind === 'breaker' ? 'CB' :
-                  kind === 'overload' ? 'OL' : kind === 'lamp' ? 'LED' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
+                  kind === 'overload' ? 'OL' : kind === 'reversebutton' ? 'REV' :
+                  kind === 'forwardcontactor' ? 'KF' : kind === 'reversecontactor' ? 'KR' :
+                  kind === 'revmotor' ? 'M↔' : kind === 'lamp' ? 'LED' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
               </span>
               <span><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
               <span className="sandbox-add-device" aria-hidden="true">+</span>
@@ -270,7 +289,11 @@ export function SandboxPage() {
             <div className="sandbox-device-list">
               {project?.components.map(c => {
                 const def = COMPONENTS[c.kind];
-                const live = c.kind === 'breaker' ? !snapshot?.breakerTripped :
+                const live = c.kind === 'revmotor' ? snapshot?.motorDirection !== 'stopped' :
+                  c.kind === 'forwardcontactor' ? snapshot?.forwardContactorOn :
+                  c.kind === 'reversecontactor' ? snapshot?.reverseContactorOn :
+                  c.kind === 'reversebutton' ? c.pressed :
+                  c.kind === 'breaker' ? !snapshot?.breakerTripped :
                   c.kind === 'overload' ? !snapshot?.overloadTripped :
                   c.kind === 'estop' ? !c.pressed :
                   c.kind === 'lamp' ? snapshot?.lampOn :
@@ -298,12 +321,16 @@ export function SandboxPage() {
                       c.kind === 'drainvalve' ? (live ? 'DRAIN OPEN' : 'CLOSED') :
                       c.kind === 'breaker' ? (live ? 'CLOSED' : 'TRIPPED') :
                       c.kind === 'overload' ? (live ? '95-96 CLOSED' : 'TRIPPED') :
+                      c.kind === 'revmotor' ? (snapshot?.motorDirection ?? 'stopped').toUpperCase() :
+                      c.kind === 'forwardcontactor' || c.kind === 'reversecontactor' ?
+                        (live ? 'CLOSED' : 'OPEN') :
+                      c.kind === 'reversebutton' ? (c.pressed ? 'PRESSED' : 'RELEASED') :
                       c.kind === 'estop' ? (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') :
                       c.kind === 'lamp' ? (live ? 'ILLUMINATED' : 'OFF') :
                       c.kind === 'supply' ? '24V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</span>
                   </div>
                   <div className="sandbox-patch-actions">
-                    {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop') && <button
+                    {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') && <button
                       className={`sandbox-operate ${c.pressed ? 'pressed' : ''}`}
                       onClick={() => send([{ k: 'operate', id: c.id, pressed: !c.pressed }])}>
                         {c.kind === 'estop' ? (c.pressed ? 'Reset E-stop (training)' : 'Press E-stop (training)') :
@@ -332,8 +359,8 @@ export function SandboxPage() {
           </details>
           <div className="sandbox-status panel">
             <div><span className="eyebrow">Live I/O</span><div className="sandbox-lamps">
-              {(['Start', 'StopOK', 'Photoeye', 'TankHigh', 'Run', 'Sort', 'Fill', 'Drain',
-                  'Q0.0', 'Q0.1', 'Q0.2', 'Q0.3', 'PlcPowered'] as const).map(k =>
+              {(['Start', 'StopOK', 'Photoeye', 'TankHigh', 'ReverseRequest', 'Run', 'Sort', 'Fill', 'Drain', 'Forward', 'Reverse',
+                  'Q0.0', 'Q0.1', 'Q0.2', 'Q0.3', 'Q0.4', 'Q0.5', 'PlcPowered'] as const).map(k =>
                 <span className={snapshot?.io[k] ? 'lit' : ''} key={k}><i />{k}</span>)}
               </div></div>
             <div><span className="eyebrow">Plant</span>
@@ -346,6 +373,10 @@ export function SandboxPage() {
                 Tank: <strong data-tank-brief>{Math.round(snapshot?.tank.levelMl ?? 0)} ml</strong> ·
                 Pump: <strong>{snapshot?.pumpOn ? 'on' : 'off'}</strong> ·
                 Drain: <strong>{snapshot?.drainOn ? 'open' : 'closed'}</strong></p>}
+              {project?.components.some(c => c.kind === 'revmotor') && <p>
+                Direction: <strong data-reverse-direction>{snapshot?.motorDirection ?? 'stopped'}</strong> ·
+                Forward: <strong>{snapshot?.forwardContactorOn ? 'on' : 'off'}</strong> ·
+                Reverse: <strong>{snapshot?.reverseContactorOn ? 'on' : 'off'}</strong></p>}
               {project?.components.some(c => c.kind === 'breaker') && <p>
                 Breaker: <strong data-breaker-status>{snapshot?.breakerTripped ? 'TRIPPED' : 'CLOSED'}</strong> ·
                 Overload: <strong data-overload-status>{snapshot?.overloadTripped ? 'TRIPPED' : 'CLOSED'}</strong> ·
@@ -397,6 +428,24 @@ export function SandboxPage() {
             <details><summary>Tank wiring and editable PLC example</summary>
               <p className="sandbox-help">{tankWireGuide}</p></details>
           </section>}
+          {project?.components.some(c => c.kind === 'revmotor') && snapshot && <section
+            className="sandbox-protection-panel panel" aria-label="Forward reverse motor interlock">
+            <div className="sandbox-section-head"><div><span className="eyebrow">P4 · electrical interlocks</span>
+              <h2>Forward / reverse control</h2></div>
+              <span className="status-pill is-idle">24V teaching drive · not 3-phase</span></div>
+            <p className="sandbox-help">Physical NC 21–22 contacts cross-interlock the forward and reverse
+              contactor coils. Example PLC logic also blocks simultaneous requests. Changing the
+              wiring or program genuinely changes the motor feed; a modeled mechanical lockout
+              inhibits simultaneous coil engagement.</p>
+            <div className="sandbox-sort-metrics" aria-live="off">
+              <span>Direction: <strong data-direction>{snapshot.motorDirection.toUpperCase()}</strong></span>
+              <span>Forward contactor: <strong data-forward-contactor>{snapshot.forwardContactorOn ? 'CLOSED' : 'OPEN'}</strong></span>
+              <span>Reverse contactor: <strong data-reverse-contactor>{snapshot.reverseContactorOn ? 'CLOSED' : 'OPEN'}</strong></span>
+              <span>Interlock: <strong data-interlock>{snapshot.interlockConflict ? 'CONFLICT · BOTH INHIBITED' : 'NORMAL'}</strong></span>
+            </div>
+            <details><summary>21-wire reversing motor circuit</summary>
+              <p className="sandbox-help">{reverseWireGuide}</p></details>
+          </section>}
           {project?.components.some(c => c.kind === 'breaker') && <section
             className="sandbox-protection-panel panel" aria-label="Protected motor control panel">
             <div className="sandbox-section-head"><div>
@@ -420,10 +469,13 @@ export function SandboxPage() {
         </div>
         <WorkbenchInspector project={project ?? { formatVersion: 1, components: [], wires: [], program: { id: 'pending', version: '1', rungs: [] } }}
           snapshot={snapshot ?? { tick: 0, running: false, components: [], wires: [],
-            io: { Start: false, StopOK: false, Photoeye: false, TankHigh: false,
-              Run: false, Sort: false, Fill: false, Drain: false,
-              'Q0.0': false, 'Q0.1': false, 'Q0.2': false, 'Q0.3': false, PlcPowered: false },
+            io: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
+              Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false,
+              'Q0.0': false, 'Q0.1': false, 'Q0.2': false, 'Q0.3': false,
+              'Q0.4': false, 'Q0.5': false, PlcPowered: false },
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
+            forwardContactorOn: false, reverseContactorOn: false,
+            motorDirection: 'stopped', reverseMotorAngleRad: 0, interlockConflict: false,
             conveyorOn: false, diverterOn: false,
             plant: { parcel: null, lastParcelId: 0, photoeyeActive: false, accepted: 0, rejected: 0 },
             tank: { levelMl: 0, highLevel: false, filledMl: 0, drainedMl: 0, spills: 0 },
@@ -431,8 +483,8 @@ export function SandboxPage() {
             breakerTripped: false, overloadTripped: false, lampOn: false,
             meter: { positive:null, negative:null, volts:null, status:'select' },
             diagnostics: [], lastError: null, language: 'ladder',
-            tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false,
-              Run: false, Sort: false, Fill: false, Drain: false },
+            tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
+              Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
             ladderSteps: [], ladderMemory: {}, breakpointScan: null, breakpointHit: null,
             breakpointTag: null, scanTrace: [] }}
           selectedDevice={selectedDevice} selectedTerminal={selectedTerminal} editable={editable}
@@ -457,7 +509,8 @@ export function SandboxPage() {
           <details><summary>Example wiring map</summary><p>{wireGuide}</p>
             {project?.components.some(c => c.kind === 'conveyor') && <p>{sortingWireGuide}</p>}
             {project?.components.some(c => c.kind === 'tank') && <p>{tankWireGuide}</p>}
-            {project?.components.some(c => c.kind === 'breaker') && <p>{protectedDOLGuide}</p>}</details>
+            {project?.components.some(c => c.kind === 'breaker') && <p>{protectedDOLGuide}</p>}
+            {project?.components.some(c => c.kind === 'revmotor') && <p>{reverseWireGuide}</p>}</details>
           <h3>Wires ({project?.wires.length ?? 0})</h3>
           <div className="sandbox-wire-list">{project?.wires.map(w =>
             <div key={w.id}><code>{w.from} → {w.to}</code>
