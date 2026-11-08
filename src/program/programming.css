@@ -98,3 +98,26 @@
 @media(max-width:550px) {
   .sandbox-ux .sandbox-numeric-operand,.sandbox-ux .sandbox-numeric-target { flex-basis:100%; }
 }
+
+
+/* P2 Function Block Diagram: original 2D signal graph with accessible connection selectors. */
+.sandbox-fbd-editor { display:grid; gap:12px; min-width:0; padding:16px; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
+.sandbox-fbd-editor h2 { margin-top:5px; font-size:19px; }
+.sandbox-fbd-actions { display:flex; flex-wrap:wrap; align-items:end; gap:8px; }
+.sandbox-fbd-actions label,.sandbox-fbd-block label { display:grid; gap:4px; font-size:11px; color:var(--muted); }
+.sandbox-fbd-actions select,.sandbox-fbd-block :is(select,input) {
+  padding:6px 7px; border:1px solid var(--line); border-radius:6px; background:var(--surface);
+  color:var(--ink); font:12px var(--mono); min-width:0; max-width:100%;
+}
+.sandbox-fbd-canvas { overflow:auto; border:1px solid var(--line); background:#0c1927; border-radius:9px; max-height:530px; }
+.sandbox-fbd-canvas svg { display:block; min-width:900px; color:#709eb8; }
+.sandbox-fbd-blocks { display:grid; grid-template-columns:repeat(auto-fill,minmax(205px,1fr)); gap:9px; max-height:520px; overflow:auto; }
+.sandbox-fbd-block { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;
+  align-content:start; padding:10px; border:1px solid var(--line); border-radius:8px;
+  background:var(--surface-2); min-width:0;
+}
+.sandbox-fbd-block legend { font:600 11px var(--mono); padding:0 4px; }
+.sandbox-fbd-block label:nth-of-type(-n+3),.sandbox-fbd-block button { grid-column:1/-1; }
+.sandbox-fbd-validation { padding:10px; font:12px var(--mono); border:1px solid var(--line); border-radius:8px; background:var(--surface-2); overflow-wrap:anywhere; }
+.sandbox-fbd-block :disabled { opacity:.6; }
+@media(max-width:560px){.sandbox-fbd-blocks{grid-template-columns:1fr}.sandbox-fbd-editor{padding:10px}}
