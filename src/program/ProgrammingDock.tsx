@@ -1,6 +1,7 @@
 import type { LadderDocument } from '../engineering/ladder';
 import { fbdMotorStarter, type FbdDocument } from '../engineering/fbd';
 import { FbdEditor } from './FbdEditor';
+import { PlcTagTable } from './PlcTagTable';
 import type { ProjectFile, RenderSnapshot } from '../sim/signals';
 import { LadderEditor } from './LadderEditor';
 import { StructuredTextEditor } from './StructuredTextEditor';
@@ -37,5 +38,6 @@ export function ProgrammingDock({ project, snapshot, disabled, onLadder, onST, o
       : language === 'fbd' ? <FbdEditor document={project.fbd ?? fbdMotorStarter()} snapshot={snapshot}
         disabled={disabled} onActivate={onFBD} showExamples={showExamples} io={io} />
       : <LadderEditor document={project.program} snapshot={snapshot} disabled={disabled} onChange={onLadder} showExamples={showExamples && !configurable} io={configurable ? io : undefined} />}
+    <PlcTagTable project={project} snapshot={snapshot} disabled={disabled} io={io} onLadder={onLadder} />
   </div>;
 }
