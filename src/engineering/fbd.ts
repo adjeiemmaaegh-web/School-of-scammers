@@ -14,7 +14,7 @@ export type FbdNames = { inputs: readonly string[]; outputs: readonly string[]; 
 export type FbdState = { elapsedMs: number; count: number; done: boolean; lastEnable: boolean };
 export type FbdMemory = Record<string, FbdState>;
 export type FbdStep = { nodeId: string; kind: FbdKind; on: boolean; elapsedMs?: number; count?: number; tag?: string };
-export type FbdProgram = { document: FbdDocument; order: readonly FbdNode[] };
+export type FbdProgram = { document: FbdDocument; order: readonly FbdNode[]; outputTags: readonly string[] };
 export type FbdResult = { outputs: Record<string,boolean>; values: Record<string,boolean>; memory: FbdMemory; steps: FbdStep[] };
 export const MAX_FBD_NODES = 64;
 const ID = /^[A-Za-z][A-Za-z0-9_-]{0,39}$/, TAG = /^[A-Za-z][A-Za-z0-9_.]{0,39}$/;
@@ -47,7 +47,7 @@ export function compileFbd(doc: FbdDocument, names: FbdNames): FbdProgram {
       throw new Error('FBD input must name a mapped BOOL input or prior output');
     if (node.kind === 'output') {
       if (!isName(node.tag) || !names.outputs.includes(node.tag) || usedOutputs.has(node.tag))
-        throw new Error('FBD output must be mapped and unique');
+        throw new Error('FBD output tag is unknown or duplicate');
       usedOutputs.add(node.tag);
     }
     if (node.kind === 'constant' && typeof node.value !== 'boolean') throw new Error('FBD constant must be BOOL');
@@ -79,7 +79,7 @@ export function compileFbd(doc: FbdDocument, names: FbdNames): FbdProgram {
     status.set(node.id,'done'); order.push(node);
   };
   doc.nodes.forEach(visit);
-  return { document:doc,order };
+  return { document:doc,order,outputTags:[...names.outputs] };
 }
 
 export function executeFbd(program: FbdProgram, sampled: Readonly<Record<string,STValue>>,
@@ -95,7 +95,11 @@ export function executeFbd(program: FbdProgram, sampled: Readonly<Record<string,
     const old = priorMemory[node.id] ?? fresh();
     let on = false, elapsedMs = 0, count = 0;
     if (node.kind === 'input') {
-      const v = Object.hasOwn(sampled,node.tag!) ? sampled[node.tag!] : priorOutputs[node.tag!];
+      // A feedback tag reads the PREVIOUS output image; at scan zero it is
+      // necessarily FALSE. Missing physical inputs still fail closed.
+      const v = Object.hasOwn(sampled,node.tag!) ? sampled[node.tag!] :
+        Object.hasOwn(priorOutputs,node.tag!) ? priorOutputs[node.tag!] :
+        program.outputTags.includes(node.tag!) ? false : undefined;
       if (typeof v !== 'boolean') throw new TypeError('FBD BOOL input unavailable: ' + node.tag);
       on = v;
     } else if (node.kind === 'constant') on = node.value!;
