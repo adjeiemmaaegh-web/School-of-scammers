@@ -36,9 +36,19 @@ const STORAGE = 'efo-open-sandbox-project-v1';
     await page.waitForSelector('.sandbox-palette-item');
 
     // P1 authoring without selecting a lesson, question or grading screen.
-    await clickText('24V supply');
+    const place = async label => {
+      const found = await page.evaluate(value => {
+        const button = [...document.querySelectorAll('.sandbox-palette-item')]
+          .find(b => b.querySelector('strong')?.textContent.trim() === value);
+        if (!button || button.disabled) return false;
+        button.click();
+        return true;
+      }, label);
+      assert.ok(found, 'Equipment available in catalogue: ' + label);
+    };
+    await place('24V supply');
     await count(1);
-    await clickText('24V pilot lamp');
+    await place('24V pilot lamp');
     await count(2);
     await page.click('[data-workspace-selection] summary');
     await clickText('Select all');
