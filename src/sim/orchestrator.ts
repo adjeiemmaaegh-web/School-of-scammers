@@ -7,6 +7,7 @@ import { executeStructuredText, type STResult, type STValue } from '../engineeri
 import { compileSandboxST, DEFAULT_ST_SOURCE, validateSandboxProgram } from '../program/p2-contract';
 import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from '../program/scan-trace';
 import { fbdReadings, instructionBreakpointHit, ladderReadings, validateInstructionBreakpoint } from '../program/instruction-breakpoint';
+import { applyLocalForce } from '../program/local-force';
 import { feedPlant, freshPlant, stepPlant } from '../plant/sorting-conveyor';
 import { freshTank, stepTank } from '../plant/tank-process';
 import {
@@ -122,7 +123,7 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     // Only a classic first PLC (or no PLC at all) uses the legacy compiled-program field; every other PLC compiles in its runtime.
     stCompiled: project.language === 'st' && (legacyPrimaryId(project) !== undefined || plcComponents(project).length === 0)
       ? compileSandboxST(project.stSource ?? '', namesFor(project, undefined)) : null,
-    stMemory: {}, fbdMemory: {}, fbdSteps: [],
+    stMemory: {}, fbdMemory: {}, fbdSteps: [], debugForces: {},
     tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
       Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false }, ladderSteps: [],
     breakpointScan: null, breakpointHit: null, breakpointTag: null, breakpointInstruction: null, scanTrace: [],
@@ -613,6 +614,24 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (cmd.breakpoint !== null && !validateInstructionBreakpoint(cmd.breakpoint, ids))
         world = setError(world, 'Instruction breakpoint requires an existing FBD block or Ladder rung, and a bounded edge/threshold');
       else world = { ...world, breakpointInstruction: cmd.breakpoint, breakpointHit: null };
+    } else if (cmd.k === 'forceLocal') {
+      const selectedPlc = cmd.plc ?? primaryPlcId(world.project);
+      const plc = selectedPlc ? plcComponents(world.project).find(c=>c.id===selectedPlc) : undefined;
+      if(world.running) world = setError(world,'Pause simulation before setting a local debug force');
+      else if(!plc) world = setError(world,'Select a real PLC before forcing local memory');
+      else if(programOf(world.project,plc.id).language!=='ladder')
+        world = setError(world,'Local debug forcing is supported only for Ladder memory tags');
+      else {
+        try {
+          const prior = world.debugForces[plc.id] ?? {};
+          const updated = applyLocalForce(prior,programOf(world.project,plc.id).program,cmd.tag,cmd.value);
+          const all = {...world.debugForces};
+          if(Object.keys(updated).length)all[plc.id]=updated;else delete all[plc.id];
+          world = {...world,debugForces:all};
+          commandEvents.push({tick:world.tick,kind:'debug',
+            detail:'Local memory force '+plc.id+'.'+cmd.tag+(cmd.value===null?' removed':' active')});
+        } catch (error) {world=setError(world,error instanceof Error?error.message:'Invalid local force');}
+      }
     } else if (cmd.k === 'loadProject') {
       try { world = createWorld(validateProject(cmd.project)); } catch (e) { world = setError(world, e instanceof Error ? e.message : 'Invalid project'); }
     }
@@ -713,10 +732,10 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       return [c.id, c.id === legacyPrimaryId(world.project)
         ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
           { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory,
-            fbdSteps: world.fbdSteps })
+            fbdSteps: world.fbdSteps }, world.debugForces[c.id] ?? {})
         : plcView(c.kind, lang, rt?.powered ?? false, ioOf(world.project, c), rt?.tagInputs ?? idle, rt?.coils ?? {},
           { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {},
-            fbdSteps: rt?.fbdSteps ?? [] })];
+            fbdSteps: rt?.fbdSteps ?? [] }, world.debugForces[c.id] ?? {})];
     })),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
     lanes: Object.fromEntries(Object.entries(world.lanes).map(([id, l]) => [id, { ...l, parcel: l.parcel ? { ...l.parcel } : null }])),
@@ -742,6 +761,7 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     language: world.project.language ?? 'ladder',
     tagValues: { ...world.tagValues }, ladderSteps: [...world.ladderSteps],
     ladderMemory: { ...world.ladderMemory }, fbdSteps: world.fbdSteps.map(step => ({ ...step })),
+    debugForces: { ...(world.debugForces[primaryPlcId(world.project) ?? ''] ?? {}) },
     breakpointScan: world.breakpointScan, breakpointHit: world.breakpointHit,
     breakpointTag: world.breakpointTag, breakpointInstruction: world.breakpointInstruction,
     scanTrace: world.scanTrace.map(entry => ({
@@ -822,7 +842,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
         stResult = executeStructuredText(compiled, inputs, w.stMemory);
         const run = Object.entries(stResult.outputs).find(([key]) => key.toLowerCase() === 'run')?.[1];
         if (typeof run !== 'boolean') throw new TypeError('ST Run output must be BOOL');
-      } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs, w.ladderNumeric);
+      } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs,
+        w.ladderNumeric,w.debugForces[plc.id] ?? {});
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'PLC runtime failed';
@@ -886,7 +907,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
         Forward: stForward === true, Reverse: stReverse === true }
     : fbdResult?.outputs ?? ladderResult?.outputs ?? {};
   const tagValues: Record<string, STValue> = {
-    ...inputs, ...(stResult?.signals ?? {}), ...(ladderResult?.numericValues ?? {}), ...coils,
+    ...inputs, ...(stResult?.signals ?? {}), ...(w.debugForces[plc?.id ?? ''] ?? {}),
+    ...(ladderResult?.numericValues ?? {}), ...coils,
     Run: coils.Run === true, Sort: coils.Sort === true,
     Fill: coils.Fill === true, Drain: coils.Drain === true,
     Forward: coils.Forward === true, Reverse: coils.Reverse === true, Unused: false,
@@ -904,7 +926,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       circuit.reads24(terminal(extra.id, pin), terminal(extra.id, 'M'))]));
     const cfg = programOf(w.project, extra.id);
     try {
-      nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)), tagInputs, extraPowered, dtMs);
+      nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)),
+        tagInputs, extraPowered, dtMs, w.debugForces[extra.id] ?? {});
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PLC runtime failed';
       const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
