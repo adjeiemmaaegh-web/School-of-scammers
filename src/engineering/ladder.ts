@@ -56,7 +56,7 @@ export function validateLadder(doc: LadderDocument): string[] {
       }
     }
   }
-  const ids = new Set<string>(); const coils = new Map<string, string>();
+  const ids = new Set<string>(); const coils = new Map<string, Set<string>>();
   for (const [index, rung] of doc.rungs.entries()) {
     if (!rung || typeof rung !== 'object') { errors.push(`Rung ${index}: invalid rung`); continue; }
     if (typeof rung.id !== 'string' || !rung.id || ids.has(rung.id)) errors.push(`Rung ${index}: duplicate or missing id`);
@@ -64,10 +64,11 @@ export function validateLadder(doc: LadderDocument): string[] {
     if (typeof rung.coil !== 'string' || !tagOK(rung.coil)) errors.push(`Rung ${index}: invalid coil`);
     const previousCoil=coils.get(rung.coil);
     const currentKind=rung.operation?.kind??'coil';
-    if(previousCoil && !(['set','reset'].includes(previousCoil) &&
-       ['set','reset'].includes(currentKind) && previousCoil!==currentKind))
+    if(previousCoil && !(previousCoil.size===1 && ['set','reset'].includes(currentKind) &&
+        [...previousCoil].every(previous=>['set','reset'].includes(previous)&&previous!==currentKind)))
       errors.push(`Rung ${index}: duplicate output tag ${rung.coil}`);
-    coils.set(rung.coil,currentKind);
+    if(previousCoil) previousCoil.add(currentKind);
+    else coils.set(rung.coil,new Set([currentKind]));
     if (!Array.isArray(rung.elements) || rung.elements.length === 0) { errors.push(`Rung ${index}: empty logic`); continue; }
     for (const element of rung.elements) {
       if (!element || typeof element !== 'object') { errors.push(`Rung ${index}: invalid element`); continue; }
