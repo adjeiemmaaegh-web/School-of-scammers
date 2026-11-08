@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { COMPONENTS, componentKinds, isPlcKind, type ComponentKind } from '../components/registry';
+import { COMPONENTS, isPlcKind, type ComponentKind } from '../components/registry';
 import { IoMappingPanel } from '../ui/sandbox/IoMappingPanel';
 import { WorkspaceAuthoringBar } from '../ui/sandbox/WorkspaceAuthoringBar';
 import { WorkspaceLibraryFilters } from '../ui/sandbox/WorkspaceLibraryFilters';
@@ -10,7 +10,7 @@ import { clampPlacement } from '../workspace/geometry';
 import { makeFragment } from '../workspace/clipboard';
 import { recordChange, emptyHistory, undoHistory, redoHistory } from '../workspace/history';
 import { workspaceShortcut } from '../workspace/keyboard';
-import { selectOne, toggleOne, selectAll, reconcileSelection } from '../workspace/selection';
+import { emptySelection, selectOne, toggleOne, selectAll, reconcileSelection } from '../workspace/selection';
 import type { WorkspaceCategory, GridStep, WorkspaceFragment, WorkspaceEdit, WorkspaceHistory } from '../workspace/types';
 import { AppHeader } from '../ui/AppHeader';
 import { ProgrammingDock } from '../program/ProgrammingDock';
@@ -210,12 +210,18 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   };
   const place = (kind: ComponentKind, x?: number, y?: number) => {
     const i = project?.components.length ?? 0;
-    send([{ k: 'place', id: uniqueId(kind), kind, at: {
+    send([{ k: 'place', id: uniqueId(kind), kind, at: clampPlacement({
       x: Math.max(5, Math.min(CANVAS_W - BOX_W - 5, x ?? 20 + (i % 5) * 205)),
       y: Math.max(5, Math.min(CANVAS_H - 145, y ?? 25 + Math.floor(i / 5) * 175)),
-    } }]);
+    }, grid) }]);
   };
-  const move = (id: string, at: { x: number; y: number }) => send([{ k: 'move', id, to: at }]);
+  const move = (id: string, at: { x: number; y: number }) => {
+    const part = project?.components.find(c => c.id === id);
+    if (!part) return;
+    const target = clampPlacement(at, grid);
+    send([{ k: 'editWorkspace', edit: { kind: 'translate', ids: [id],
+      delta: { x: target.x - part.x, y: target.y - part.y }, grid: 1 } }]);
+  };
   const connect = (terminal: string) => {
     if (!selectedTerminal) { setSelectedTerminal(terminal); return; }
     if (selectedTerminal !== terminal) send([{ k: 'wire', id: uniqueId('wire'), from: selectedTerminal, to: terminal }]);
@@ -502,8 +508,12 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>
         </details>
         </>}
-        <button className="btn ghost small" data-undo onClick={undo}
-          disabled={!editable || !undoStack.length}>Undo</button>
+        {!scenario ? <WorkspaceAuthoringBar editable={editable} selectedCount={selectedDeviceIds.length}
+          canUndo={history.undo.length > 0} canRedo={history.redo.length > 0} canPaste={!!clipboard}
+          grid={grid} onGrid={setGrid} onUndo={undo} onRedo={redo} onCopy={copySelection}
+          onPaste={pasteSelection} onDuplicate={duplicateSelection} onRemove={deleteSelection}
+          onRotate={rotateSelection} onNudge={moveSelection} /> :
+          <button className="btn ghost small" data-undo onClick={undo} disabled={!editable || !history.undo.length}>Undo</button>}
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         {!scenario && <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>}
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
@@ -526,6 +536,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <input type="search" value={libraryQuery} onChange={e => setLibraryQuery(e.target.value)}
               placeholder="Search motors, PLCs…" aria-label="Search component library" />
           </label>
+          <WorkspaceLibraryFilters category={libraryCategory} onChange={setLibraryCategory} />
           <p className="sandbox-library-help">Drag into the 3D floor or select a device to place it. Edits pause while the PLC runs.</p>
           <div className="sandbox-palette-list">
             {visibleKinds.map(kind => <button key={kind} draggable={editable}
@@ -547,7 +558,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             </button>)}
             {!visibleKinds.length && <p className="sandbox-help" role="status">No devices match your search. Try “motor” or “PLC”.</p>}
           </div>
-          <div className="sandbox-library-foot"><strong>Learning scope</strong><span>24V DC · one PLC · educational simulation</span></div>
+          <div className="sandbox-library-foot"><strong>Learning scope</strong><span>24V DC · up to 6 PLCs · bounded teaching simulation</span></div>
         </aside>
         <div className="sandbox-main" id="sandbox-stage-build">
           <div className="sandbox-scene-heading"><div><span className="eyebrow">Factory floor</span><h2>3D workspace</h2></div>
@@ -556,13 +567,18 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             {project && snapshot && <Sandbox3D
               project={project} snapshot={snapshot} editable={editable}
               selectedTerminal={selectedTerminal} moveTarget={moveTarget}
-              selectedDeviceId={selectedDeviceId} onSelectDevice={selectDevice}
+              selectedDeviceId={selectedDeviceId} selectedDeviceIds={selectedDeviceIds}
+              onSelectDevice={selectDevice}
               onTerminal={connect}
               onOperate={id => send([{ k: 'operateToggle', id }])}
               onPlace={(kind, at) => place(kind, at.x, at.y)}
               onMove={move} onMoveFinished={() => setMoveTarget(null)}
             />}
           </Suspense>
+          {!scenario && <WorkspaceSelectionPanel components={project?.components ?? []} selected={selectedDeviceIds}
+            onToggle={id => selectDevice(id, true)}
+            onSelectAll={() => setSelectedDeviceIds(selectAll(project?.components ?? []))}
+            onClear={() => setSelectedDeviceIds([])} />}
           {!project?.components.length && <div className="sandbox-3d-empty">
             <strong>Start with an empty 3D factory workbench.</strong>
             <span>Place and wire your own devices or load the starter equipment (without pre-wiring).</span>
@@ -586,7 +602,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                   c.kind === 'start' || c.kind === 'stop' ? c.pressed : false;
                 return <section className={`sandbox-device ${live ? 'active' : ''}`} key={c.id} data-device-id={c.id}>
                   <div className="sandbox-patch-head">
-                    <button type="button" className="sandbox-inspect-link" onClick={() => selectDevice(c.id)}
+                    <button type="button" className="sandbox-inspect-link" onClick={event => selectDevice(c.id, event.ctrlKey || event.metaKey)}
                       aria-label={`Inspect ${def.label}`}>{def.label}</button>
                     <span className="sandbox-device-status">{c.kind === 'motor' ? (live ? 'RUNNING' : 'STOPPED') :
                       c.kind === 'contactor' || c.kind === 'relay' ? (live ? 'COIL ON' : 'COIL OFF') :
