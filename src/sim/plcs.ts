@@ -131,6 +131,7 @@ export const classicInputs = (tags: Record<string, boolean>): PlcInputs => ({
  */
 export function scanPlc(
   cfg: ResolvedProgram, io: PlcIoMap, prior: PlcRuntime, tagInputs: Record<string, boolean>, powered: boolean, dtMs: number,
+  localForces: Readonly<Record<string, boolean | number>> = {},
 ): PlcRuntime {
   const names = namesOf(io);
   const inputs = classicInputs(tagInputs);
@@ -166,17 +167,18 @@ export function scanPlc(
       fbdMemory: {}, fbdSteps: [],
       tagValues: { ...tagInputs, ...result.signals, ...coils, ...mappedOutputs(coils), Unused: false } };
   }
-  const result = executeLadder(cfg.program, tagInputs, prior.coils, prior.ladderMemory, dtMs, prior.ladderNumeric);
+  const result = executeLadder(cfg.program, tagInputs, prior.coils, prior.ladderMemory, dtMs, prior.ladderNumeric, localForces);
   const coils = result.outputs;
   return { ...prior, powered, inputs, tagInputs, coils, stMemory: {}, ladderMemory: result.memory, ladderNumeric: result.numericValues, ladderSteps: [...result.steps],
     fbdMemory: {}, fbdSteps: [],
-    tagValues: { ...tagInputs, ...result.numericValues, ...coils, ...mappedOutputs(coils), Unused: false } };
+    tagValues: { ...tagInputs, ...localForces, ...result.numericValues, ...coils, ...mappedOutputs(coils), Unused: false } };
 }
 
 /** Publishable summary of one PLC: its I/O points with tags and live state, whatever its I/O map. */
 export function plcView(
   kind: string, language: 'ladder' | 'st' | 'fbd', powered: boolean, io: PlcIoMap, tagInputs: Record<string, boolean>, coils: Record<string, boolean>,
   live: { tagValues: Record<string, STValue>; ladderSteps: LadderStep[]; ladderMemory: LadderMemory; fbdSteps?: FbdStep[] },
+  localForces: Readonly<Record<string, boolean | number>> = {},
 ): PlcView {
   const names = namesOf(io);
   const point = (table: Record<string, string>, on: (tag: string) => boolean): PlcIoPoint[] =>
@@ -184,7 +186,7 @@ export function plcView(
   const outputs = point(io.outputs, t => coils[t] === true);
   return {
     powered, language, kind, io: { inputs: point(io.inputs, t => tagInputs[t] === true), outputs },
-    fbdSteps: [...(live.fbdSteps ?? [])],
+    fbdSteps: [...(live.fbdSteps ?? [])], debugForces: { ...localForces },
     inputs: classicInputs(tagInputs), coils: Object.fromEntries(names.outputs.map(c => [c, coils[c] === true])),
     outputs: Object.fromEntries(outputs.map(o => [o.terminal, o.on])),
     tagValues: { ...live.tagValues }, ladderSteps: [...live.ladderSteps], ladderMemory: { ...live.ladderMemory },
