@@ -19,6 +19,7 @@ import { laneOf, lanesOf, vesselOf, vesselsOf } from './stations';
 import { electricalDevices } from '../components/electrical-defs';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { clearedAlarm, engineFault, freshCylinder, stepCylinder } from '../plant/cylinder';
+import { analogWireError, sampleAnalogInputs } from './analog';
 export { MAX_COMPONENTS, MAX_WIRES };
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
@@ -168,10 +169,14 @@ export function validateProject(raw: unknown): ProjectFile {
     if (components.filter(c => c.kind === kind).length > 1)
       throw new Error(`Only one ${kind} protection device is supported`);
   const wireIds = new Set<string>();
+  const wiresChecked: { id: string; from: string; to: string }[] = [];
   for (const wire of p.wires) {
     if (!wire || !validId(wire.id) || wireIds.has(wire.id) || typeof wire.from !== 'string' ||
         typeof wire.to !== 'string' || wire.from === wire.to ||
         !terminalExists(wire.from, components) || !terminalExists(wire.to, components)) throw new Error('Invalid wire in project');
+    const domainError = analogWireError(wire.from, wire.to, components, wiresChecked);
+    if (domainError) throw new Error(domainError);
+    wiresChecked.push({ id: wire.id, from: wire.from, to: wire.to });
     wireIds.add(wire.id);
   }
   const plcIo = validatePlcIo(p.plcIo, components);
@@ -535,7 +540,9 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (!validPos(cmd.to) || !world.project.components.some(c => c.id === cmd.id)) world = setError(world, 'Invalid movement');
       else world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, ...cmd.to } : c) } };
     } else if (cmd.k === 'wire') {
-      if (!validId(cmd.id) || world.project.wires.some(w => w.id === cmd.id || (w.from === cmd.from && w.to === cmd.to) || (w.from === cmd.to && w.to === cmd.from)) ||
+      const domainError = analogWireError(cmd.from, cmd.to, world.project.components, world.project.wires);
+      if (domainError) world = setError(world, domainError);
+      else if (!validId(cmd.id) || world.project.wires.some(w => w.id === cmd.id || (w.from === cmd.from && w.to === cmd.to) || (w.from === cmd.to && w.to === cmd.from)) ||
           cmd.from === cmd.to || !terminalExists(cmd.from, world.project.components) ||
           !terminalExists(cmd.to, world.project.components) || world.project.wires.length >= MAX_WIRES)
         world = setError(world, 'Invalid or duplicate terminal connection');
@@ -684,7 +691,7 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
         ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
           { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory })
         : plcView(c.kind, lang, rt?.powered ?? false, ioOf(world.project, c), rt?.tagInputs ?? idle, rt?.coils ?? {},
-          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {} })];
+          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {} }, rt?.analogInputs ?? [])];
     })),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
     lanes: Object.fromEntries(Object.entries(world.lanes).map(([id, l]) => [id, { ...l, parcel: l.parcel ? { ...l.parcel } : null }])),
@@ -862,12 +869,17 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     const extraPowered = !shorted && circuit.reads24(terminal(extra.id, 'L+'), terminal(extra.id, 'M'));
     const io = ioOf(w.project, extra);
     // A sensor-named input only reads high if some powered sensor of that kind exists (guards a wire straight to P24).
-    const tagInputs = Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => [tag, extraPowered &&
+    const digitalInputs = Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => [tag, extraPowered &&
       (tag === 'Photoeye' ? eyePowered : tag === 'TankHigh' ? probePowered : true) &&
       circuit.reads24(terminal(extra.id, pin), terminal(extra.id, 'M'))]));
     const cfg = programOf(w.project, extra.id);
     try {
-      nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)), tagInputs, extraPowered, dtMs);
+      const openAnalogWires = new Set(faultsOf(w.project).filter(f => f.kind === 'wire-open').map(f => f.target));
+      const numeric = sampleAnalogInputs(w.project, w.vessels, extra.id, io, extraPowered, openAnalogWires);
+      // Physical numeric process inputs come from the preceding settled scan state.
+      const tagInputs = { ...digitalInputs, ...numeric.values };
+      nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)),
+        tagInputs, extraPowered, dtMs, numeric.points);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PLC runtime failed';
       const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
