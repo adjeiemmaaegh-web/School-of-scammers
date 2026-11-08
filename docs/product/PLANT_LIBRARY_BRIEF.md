@@ -12,7 +12,7 @@ Read first: `CLAUDE.md`, `docs/product/ARCHITECTURE.md`, `.claude/skills/automat
 
 1. **Pure and DOM-free.** No `window`, `document`, React, Three.js, timers, `Date.now`, `Math.random`, `fetch`, or async. Plant code runs inside the worker.
 2. **Deterministic.** Same project + same command sequence ⇒ byte-identical snapshots. Randomness only through the seeded RNG already used by `faults.ts` (pass the seed in). Avoid transcendental functions (`sin`, `cos`, `pow` with fractions) in state that feeds back into the simulation; precompute tables or use rational approximations. Round state to a fixed quantum (1e-6) after each step, as `sorting-conveyor.ts` does, so replays match.
-3. **Fixed step.** The scan is 50 ms. `step()` receives `dtMs` and internally sub-steps at a fixed 10 ms (5 substeps per scan). Never use variable-length integration.
+3. **Fixed step.** The integrator's scheduler calls each equipment `step()` exactly once per 10 ms substep (five substeps per 50 ms PLC scan). Equipment must not substep again or advance the shared clock; the world scheduler owns time and collision resolution. Never use variable-length integration.
 4. **The engine is authoritative.** Sensors report what the *simulated geometry* says. The renderer only draws the published snapshot. No canned animations: a box moves because a belt drives it, a pusher pushes it, gravity drops it.
 5. **Bounded.** Hard caps on bodies per scene (start with 60), on constraints, on events per scan. Over the cap: refuse the spawn with an event, never grow unbounded. Performance budget: a full scene step must cost under 2 ms on a mid laptop (benchmark test included).
 6. **Original assets only.** No copied models, textures, names or layouts from any commercial product. Geometry is described as primitives (box, cylinder, extrusion) we render ourselves.
@@ -65,26 +65,38 @@ A general rigid-body engine (including WASM ones such as Rapier) is **out of sco
 // src/plant/world/equipment.ts
 import type { ParamSpec } from '../../components/params';
 
-export type Channel = { name: string; kind: 'bool' | 'number'; unit?: string };
+export type Channel = {
+  name: string;
+  kind: 'bool' | 'number';
+  unit?: string;                    // required on numeric channels: e.g. kg, mm, mm/s
+  min?: number; max?: number;       // finite bounds required on numeric channels
+};
 
-export type EquipmentDef<State, Params> = {
-  kind: string;                                   // registry key, e.g. 'stopper', 'lift', 'palletizer'
-  label: string;                                  // shown in the palette
-  footprint: { x: number; y: number; z: number }; // mm, used for placement and collisions
-  /** What the controller can DRIVE (24 V loads / PLC outputs): extend, run, raise ... */
-  commands: Channel[];
-  /** What the controller can READ (switches, sensors, encoders): limit, present, count ... */
-  signals: Channel[];
-  params: readonly ParamSpec[];                   // speeds, heights, delays (reuse the existing spec type)
-  faults: string[];                               // injectable faults this equipment understands
-  fresh(params: Record<string, number>): State;
-  /** One 10 ms substep. Reads/moves bodies in `world`. Pure: returns new state and world. */
-  step(state: State, world: World, commands: Record<string, boolean | number>,
-       dtMs: number, fault: string | null): { state: State; world: World };
-  /** Current values of every signal, from the simulated geometry. */
-  read(state: State, world: World): Record<string, boolean | number>;
-  /** What the 3D view should draw: named parts with a transform, no React. */
-  describe(state: State): Array<{ part: string; shape: 'box' | 'cylinder'; pos: Vec3; size: Vec3; yawDeg: number; colour: string }>;
+/** The integrator supplies this for each placed instance; no device-specific globals. */
+export type EquipmentContext = {
+  id: string;                       // persistent component id
+  originMm: Vec3;                   // floor x/y, vertical z; device anchor in millimetres
+  yawDeg: 0 | 90 | 180 | 270;
+  params: Readonly<Record<string, number>>; // validated, defaults already resolved
+};
+
+export type EquipmentDef<State> = {
+  kind: string;                                   // registry key, e.g. stopper, lift, palletizer
+  label: string;
+  footprint: { x: number; y: number; z: number }; // local millimetres, relative to anchor
+  commands: readonly Channel[];                   // bool and typed numeric control inputs
+  signals: readonly Channel[];                    // bool and typed numeric sensor outputs
+  params: readonly ParamSpec[];
+  faults: readonly string[];
+  fresh(ctx: EquipmentContext): State;
+  /** ONE 10 ms substep; no nested stepping, no independent clock updates. */
+  step(state: State, world: World, ctx: EquipmentContext, commands: Readonly<Record<string, boolean | number>>,
+       dtMs: 10, fault: string | null): { state: State; world: World };
+  read(state: State, world: World, ctx: EquipmentContext): Record<string, boolean | number>;
+  /** 3D primitives expressed in world millimetres, no animations independent of state. */
+  describe(state: State, ctx: EquipmentContext): Array<{
+    part: string; shape: 'box' | 'cylinder'; pos: Vec3; size: Vec3; yawDeg: number; colour: string;
+  }>
 };
 ```
 
