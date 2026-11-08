@@ -16,6 +16,13 @@ import { supportsWebGL } from '../components/SceneShell';
 import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-coordinates';
 import { perDeviceLive } from '../sim/device-state';
 
+/** Three-fiber forwards pointer modifiers through the native or intersection event. */
+const additiveSelection = (value: unknown): boolean => {
+  const event = value as { ctrlKey?: boolean; metaKey?: boolean;
+    nativeEvent?: { ctrlKey?: boolean; metaKey?: boolean } };
+  return Boolean(event.ctrlKey || event.metaKey || event.nativeEvent?.ctrlKey || event.nativeEvent?.metaKey);
+};
+
 const COLORS = {
   chassis: '#35546b', steel: '#829bb0', panel: '#192b3c', light: '#d3e4ef',
   live: '#20d6a6', off: '#52677c', highlight: '#ffa633', cable: '#7793ad',
@@ -224,11 +231,11 @@ function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, ro
   const [x, y, z] = worldPosition(c);
   const def = COMPONENTS[c.kind];
   return <group position={[x, y, z]} rotation={[0, -(c.yawDeg ?? 0) * Math.PI / 180, 0]}>
-    <mesh position={[0, 0.035, 0]} onClick={e => { e.stopPropagation(); onSelect(c.id, e.ctrlKey || e.metaKey); }}>
+    <mesh position={[0, 0.035, 0]} onClick={e => { e.stopPropagation(); onSelect(c.id, additiveSelection(e)); }}>
       <boxGeometry args={[1.5, 0.08, 1.2]} />
       <meshStandardMaterial color={selected || moveTarget === c.id ? COLORS.highlight : COLORS.panel} />
     </mesh>
-    <group onClick={e => { e.stopPropagation(); onSelect(c.id, e.ctrlKey || e.metaKey); }}>
+    <group onClick={e => { e.stopPropagation(); onSelect(c.id, additiveSelection(e)); }}>
       <DeviceSculpture kind={c.kind} active={active} pressed={c.pressed} motorAngleRad={motorAngleRad}
         parcel={c.kind === 'conveyor' ? parcel : null}
         tankLevelMl={c.kind === 'tank' ? tankLevelMl : undefined}
