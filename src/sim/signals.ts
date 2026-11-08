@@ -3,6 +3,7 @@ import type { FbdDocument, FbdMemory, FbdStep } from '../engineering/fbd';
 import type { STProgram, STValue } from '../engineering/structured-text';
 import type { ComponentKind } from '../components/registry';
 import type { ScanTrace, TagBreakpoint } from '../program/scan-trace';
+import type { InstructionBreakpoint } from '../program/instruction-breakpoint';
 import type { SortingPlant, ParcelKind } from '../plant/sorting-conveyor';
 import type { TankProcess } from '../plant/tank-process';
 import type { CylinderState } from '../plant/cylinder';
@@ -119,6 +120,7 @@ export type WorldState = {
   breakpointScan: number | null;
   breakpointHit: string | null;
   breakpointTag: TagBreakpoint | null;
+  breakpointInstruction: InstructionBreakpoint | null;
   scanTrace: ScanTrace[];
   contactorOn: boolean;
   motorOn: boolean;
@@ -199,6 +201,7 @@ export type Command =
   | { k: 'activateLanguage'; language: 'ladder' | 'st' | 'fbd'; plc?: string }
   | { k: 'breakAtScan'; scan: number | null }
   | { k: 'breakOnTag'; breakpoint: TagBreakpoint | null }
+  | { k: 'breakOnInstruction'; breakpoint: InstructionBreakpoint | null }
   | { k: 'loadProject'; project: unknown }
   | { k: 'run' | 'pause' | 'step' | 'reset' | 'clear' };
 export type SimEvent = { tick: number; kind: string; detail: string };
@@ -256,6 +259,7 @@ export type RenderSnapshot = {
   breakpointScan: number | null;
   breakpointHit: string | null;
   breakpointTag: TagBreakpoint | null;
+  breakpointInstruction: InstructionBreakpoint | null;
   scanTrace: ScanTrace[];
 };
 export type WorkerRequest = { kind: 'commands'; commands: Command[] };
