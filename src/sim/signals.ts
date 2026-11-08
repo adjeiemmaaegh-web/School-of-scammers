@@ -257,6 +257,6 @@ export type RenderSnapshot = {
 export type WorkerRequest = { kind: 'commands'; commands: Command[]; requestId?: number };
 export type WorkerResponse = { kind: 'snapshot'; snapshot: RenderSnapshot; events: SimEvent[];
   /** Reply correlation; absent for the periodic scan and worker startup. */
-  requestId?: number; project?: ProjectFile;
+  requestId?: number; requestIds?: number[]; project?: ProjectFile;
   /** Authoritative previous document for accepted edits; enables safe grouped undo/redo. */
   previousProject?: ProjectFile };
