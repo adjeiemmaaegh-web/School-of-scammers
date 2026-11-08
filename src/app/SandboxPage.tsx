@@ -106,14 +106,16 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     engine.onmessage = (ev: MessageEvent<WorkerResponse>) => {
       if (ev.data?.kind !== 'snapshot') return;
       setSnapshot(ev.data.snapshot);
-      if (ev.data.requestId !== undefined) {
-        const mode = historyRequests.current.get(ev.data.requestId);
-        historyRequests.current.delete(ev.data.requestId);
-        if (mode === 'record' && ev.data.previousProject && ev.data.project) {
-          const next = recordChange(historyRef.current, ev.data.previousProject, ev.data.project);
-          historyRef.current = next;
-          setHistory(next);
-        }
+      const acknowledged = ev.data.requestIds ?? (ev.data.requestId === undefined ? [] : [ev.data.requestId]);
+      let record = false;
+      for (const id of acknowledged) {
+        if (historyRequests.current.get(id) === 'record') record = true;
+        historyRequests.current.delete(id);
+      }
+      if (record && ev.data.previousProject && ev.data.project) {
+        const next = recordChange(historyRef.current, ev.data.previousProject, ev.data.project);
+        historyRef.current = next;
+        setHistory(next);
       }
       if (ev.data.project) {
         projectRef.current = ev.data.project;
