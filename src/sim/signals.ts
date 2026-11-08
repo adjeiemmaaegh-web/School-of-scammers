@@ -83,6 +83,7 @@ export type PlcView = {
   ladderSteps: LadderStep[];
   ladderMemory: LadderMemory;
   fbdSteps: FbdStep[];
+  debugForces: Record<string, boolean | number>;
 };
 export type ProjectFile = {
   formatVersion: 1;
@@ -115,6 +116,8 @@ export type WorldState = {
   stMemory: Record<string, STValue>;
   fbdMemory: FbdMemory;
   fbdSteps: FbdStep[];
+  /** Per-PLC educational Ladder-local overrides; never persisted to ProjectFile. */
+  debugForces: Record<string, Record<string, boolean | number>>;
   tagValues: Record<string, STValue>;
   ladderSteps: LadderStep[];
   breakpointScan: number | null;
@@ -202,6 +205,7 @@ export type Command =
   | { k: 'breakAtScan'; scan: number | null }
   | { k: 'breakOnTag'; breakpoint: TagBreakpoint | null }
   | { k: 'breakOnInstruction'; breakpoint: InstructionBreakpoint | null }
+  | { k: 'forceLocal'; plc?: string; tag: string; value: boolean | number | null }
   | { k: 'loadProject'; project: unknown }
   | { k: 'run' | 'pause' | 'step' | 'reset' | 'clear' };
 export type SimEvent = { tick: number; kind: string; detail: string };
@@ -256,6 +260,7 @@ export type RenderSnapshot = {
   ladderSteps: LadderStep[];
   ladderMemory: LadderMemory;
   fbdSteps: FbdStep[];
+  debugForces: Record<string, boolean | number>;
   breakpointScan: number | null;
   breakpointHit: string | null;
   breakpointTag: TagBreakpoint | null;
