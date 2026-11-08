@@ -1,3 +1,4 @@
+.workspace-editing-strip { margin:-5px 0 16px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); }
 /* P1 workspace-authoring controls. All styles scoped to simulator. */
 .workspace-authoring-bar { display:flex; flex-wrap:wrap; align-items:center; gap:6px; width:100%; }
 .workspace-authoring-bar .workspace-selection-count { font:11px var(--mono); color:var(--muted); white-space:nowrap; padding:4px 7px; }
