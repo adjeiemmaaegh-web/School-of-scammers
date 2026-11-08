@@ -73,3 +73,9 @@ P1 does not create FBD, comprehensive IEC 61131-3 instructions, true 3-phase con
 ## Acceptance statement
 
 **P1 source increment is deliverable, not approved/accepted:** no device/platform compatibility claims; no independent qualified technician review; no full automated run reported for this branch. Existing source functionality must not be described as certified electrical or industrial equipment.
+
+## Source review note — 8 November 2026
+
+The initial PR #30 automatic `build-and-test` run (`42441544055`) passed TypeScript, production build and all **890/890 Vitest tests**, but its existing P8 browser check correctly reported a toolbar-height regression at 1440 px. This was caused by placing the new full-width authoring controls **inside** the sticky simulator Run/Pause toolbar. The source fix moves these controls into a dedicated sibling `workspace-editing-strip`, styles the strip independently and retains scenario Undo in the original toolbar. The core Run/Pause toolbar remains visually separate from P1 editing. The subsequent checks were queued when this note was written; the integration developer must not treat the old failing run as a current result, or the new queued run as passed without verification.
+
+Prior Windows Edge CI on the same initial head passed, but device/platform acceptance remains out of source scope.
