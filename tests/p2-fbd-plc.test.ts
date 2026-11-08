@@ -53,7 +53,7 @@ describe('FBD through the actual wiring/PLC 50ms scan',()=>{
       ...w.project.plcPrograms!['plc-2'],fbd:{...graph,nodes:graph.nodes.map(node=>
         node.id==='coil'?{...node,inputs:['coil']}:node)},
     }}};
-    expect(()=>validateProject(broken)).toThrow(/cycle/);
+    expect(()=>validateProject(broken)).toThrow(/Output cannot feed/);
   });
   it('fails closed on FBD numeric errors or missing physical inputs instead of energizing the plant',()=>{
     let w=starter();
