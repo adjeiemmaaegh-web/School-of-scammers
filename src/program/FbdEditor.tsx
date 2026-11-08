@@ -27,10 +27,10 @@ export function FbdEditor({document,snapshot,disabled,onActivate,showExamples=tr
     try {compileFbd(draft,names);return {ok:true,message:'Graph validated for the selected PLC'};}
     catch(e){return {ok:false,message:e instanceof Error?e.message:String(e)};}
   },[draft,names]);
-  const live = new Map(snapshot.fbdSteps.map(step=>[step.nodeId,step]));
-  const positions = new Map(draft.nodes.map((node,i)=>[
+  const live = new Map<string,(typeof snapshot.fbdSteps)[number]>(snapshot.fbdSteps.map(step=>[step.nodeId,step] as const));
+  const positions = new Map<string,{x:number;y:number}>(draft.nodes.map((node,i)=>[
     node.id,{x:node.x??(50+Math.floor(i/5)*220),y:node.y??(50+(i%5)*90)},
-  ]));
+  ] as const));
   const width = Math.max(900,...[...positions.values()].map(p=>p.x+155));
   const height = Math.max(440,...[...positions.values()].map(p=>p.y+100));
   const alter = (node:FbdNode) => {setDraft(doc=>replaceFbdNode(doc,node));setEditingError('');};
