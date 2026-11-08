@@ -691,11 +691,18 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       const lang = programOf(world.project, c.id).language;
       const idle: Record<string, boolean> = {};
       const rt = world.plcs[c.id];
+      const io = ioOf(world.project, c);
+      // Show the physical numeric connection on the paused bench before the first scan.
+      // While running, the live PLC view shows the previous scan's actual sampled value.
+      const analogPoints = io.analogInputs && !world.running
+        ? sampleAnalogInputs(world.project, world.vessels, c.id, io, rt?.powered ?? false,
+          new Set(faultsOf(world.project).filter(f => f.kind === 'wire-open').map(f => f.target))).points
+        : rt?.analogInputs ?? [];
       return [c.id, c.id === legacyPrimaryId(world.project)
         ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
           { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory })
-        : plcView(c.kind, lang, rt?.powered ?? false, ioOf(world.project, c), rt?.tagInputs ?? idle, rt?.coils ?? {},
-          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {} }, rt?.analogInputs ?? [])];
+        : plcView(c.kind, lang, rt?.powered ?? false, io, rt?.tagInputs ?? idle, rt?.coils ?? {},
+          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {} }, analogPoints)];
     })),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
     lanes: Object.fromEntries(Object.entries(world.lanes).map(([id, l]) => [id, { ...l, parcel: l.parcel ? { ...l.parcel } : null }])),
