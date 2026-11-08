@@ -130,6 +130,14 @@ export function scanPlc(
     tagValues: { ...tagInputs, ...mappedOutputs({}), Unused: false }, ladderMemory: {}, ladderNumeric: {}, ladderSteps: [], stMemory: prior.stMemory };
   if (cfg.language === 'st') {
     const compiled = prior.stCompiled ?? compileSandboxST(cfg.stSource, names);
+    // A connected numeric process source is mandatory if ST declares that physical
+    // VAR_INPUT. Treat a missing/open numeric wire as a scan fault, not 0 ml/0 kg:
+    // zero is a valid reading and silently substituting it could energize outputs.
+    for (const declaration of compiled.declarations) {
+      if (declaration.scope !== 'input' || !names.numericInputs.some(n => n.toLowerCase() === declaration.name.toLowerCase())) continue;
+      if (!analogInputs.some(p => p.tag.toLowerCase() === declaration.name.toLowerCase() && p.connected))
+        throw new Error('Numeric input ' + declaration.name + ' has no connected source');
+    }
     const result = executeStructuredText(compiled, tagInputs, prior.stMemory);
     const out = (name: string) => Object.entries(result.outputs).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1];
     if (names.requireRun && typeof out('Run') !== 'boolean') throw new TypeError('ST Run output must be BOOL');
