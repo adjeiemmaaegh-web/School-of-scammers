@@ -701,7 +701,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             onLadder={program => send([{ k: 'loadProgram', program, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onST={source => send([{ k: 'loadST', source, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onFBD={document => send([{ k: 'loadFBD', document, ...(activePlcId ? { plc: activePlcId } : {}) }])}
-            onLocalForce={scenario ? undefined : (tag,value)=>send([{k:'forceLocal',tag,value,...(activePlcId?{plc:activePlcId}:{})}])}
+            onLocalForce={scenario ? undefined : (tag: string, value: boolean | number | null)=>send([{k:'forceLocal',tag,value,...(activePlcId?{plc:activePlcId}:{})}])}
             onLanguage={language => send([{ k: 'activateLanguage', language, ...(activePlcId ? { plc: activePlcId } : {}) }])} />}
           {activePlcId && activePlcView?.kind === 'plc16' && <IoMappingPanel plcId={activePlcId} view={activePlcView} editable={editable} send={send} />}
         </div>
