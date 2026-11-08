@@ -1,6 +1,6 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
 export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor';
-export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' };
+export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
 export const isPlcKind = (kind: string): boolean => kind === 'plc' || kind === 'plc16';
@@ -11,6 +11,8 @@ const plc16Terminals = (): Terminal[] => [
   { name: 'L+', side: 'left', y: 8, role: 'supply' }, { name: 'M', side: 'left', y: 18, role: 'return' },
   ...PLC16_INPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'left', y: 30 + i * 6.5, role: 'input' })),
   ...PLC16_OUTPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'right', y: 30 + i * 6.5, role: 'output' })),
+  { name: 'AI0', side: 'left', y: 142, role: 'analog-input' },
+  { name: 'AI1', side: 'left', y: 153, role: 'analog-input' },
 ];
 export const COMPONENTS: Record<ComponentKind, Definition> = {
   stacklight: { kind: 'stacklight', label: 'Stack light (R/Y/G)', help: 'Three 24V signal lamps on one column: R, Y and G each to the common M-', terminals: [
@@ -29,7 +31,7 @@ export const COMPONENTS: Record<ComponentKind, Definition> = {
     { name: 'EXT+', side: 'left', y: 28, role: 'load' }, { name: 'RET+', side: 'left', y: 54, role: 'load' },
     { name: 'M-', side: 'left', y: 80, role: 'load' }, { name: 'L+', side: 'left', y: 106, role: 'supply' },
     { name: 'EXT_LS', side: 'right', y: 54, role: 'output' }, { name: 'RET_LS', side: 'right', y: 90, role: 'output' }] },
-  plc16: { kind: 'plc16', label: 'Virtual PLC 16/16', help: '24V PLC, 16 digital inputs and 16 high-side outputs with names you choose', terminals: plc16Terminals() },
+  plc16: { kind: 'plc16', label: 'Virtual PLC 16/16', help: '24V PLC, 16 digital inputs and 16 high-side outputs; two separate numeric AI channels for educational process signals', terminals: plc16Terminals() },
   supply: { kind: 'supply', label: '24V supply', help: 'Educational DC source', terminals: [
     { name: 'P24', side: 'right', y: 45, role: 'supply' }, { name: 'M0', side: 'right', y: 92, role: 'return' }] },
   plc: { kind: 'plc', label: 'Virtual PLC', help: '24V PLC, five digital inputs and six high-side outputs', terminals: [
@@ -60,7 +62,8 @@ export const COMPONENTS: Record<ComponentKind, Definition> = {
     { name: 'OUT', side: 'right', y: 75, role: 'output' }] },
   diverter: { kind: 'diverter', label: '24V diverter', help: 'Solenoid/actuator; wired Q0.1 selects reject lane at station', terminals: [
     { name: 'A1', side: 'left', y: 47, role: 'load' }, { name: 'A2', side: 'left', y: 93, role: 'load' }] },
-  tank: { kind: 'tank', label: '3D process tank', help: 'Passive 1000 ml teaching vessel. Locate inlet pump, level probe and outlet valve nearby.', terminals: [] },
+  tank: { kind: 'tank', label: '3D process tank', help: 'Passive 1000 ml teaching vessel; LEVEL gives 0–1000 ml on a separate numeric signal (not 24V). Locate the pump/valve nearby.', terminals: [
+    { name: 'LEVEL', side: 'right', y: 75, role: 'analog-output' }] },
   pump: { kind: 'pump', label: '24V inlet pump', help: 'Q0.2 Fill output energises the 180 ml/s illustrative inlet pump', terminals: [
     { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
   levelprobe: { kind: 'levelprobe', label: 'High-level switch', help: '24V high-side switch with 750/600 ml hysteresis, output to PLC I0.3', terminals: [
