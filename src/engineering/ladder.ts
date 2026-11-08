@@ -10,7 +10,7 @@ export type NumericRungOperation =
   | { kind: 'compare'; left: NumericOperand; comparator: 'eq' | 'ne' | 'lt' | 'le' | 'gt' | 'ge'; right: NumericOperand }
   | { kind: 'move'; target: string; left: NumericOperand }
   | { kind: 'add' | 'sub' | 'mul' | 'div'; target: string; left: NumericOperand; right: NumericOperand };
-export type RungOperation = { kind: 'coil' | 'osr' | 'osf' } |
+export type RungOperation = { kind: 'coil' | 'osr' | 'osf' | 'set' | 'reset' } |
   { kind: 'ton' | 'tof' | 'rto' | 'tp'; presetMs: number; resetTag?: string } |
   { kind: 'ctu'; preset: number; resetTag?: string } | { kind: 'ctd'; preset: number; loadTag: string } |
   NumericRungOperation;
@@ -56,14 +56,18 @@ export function validateLadder(doc: LadderDocument): string[] {
       }
     }
   }
-  const ids = new Set<string>(); const coils = new Set<string>();
+  const ids = new Set<string>(); const coils = new Map<string, string>();
   for (const [index, rung] of doc.rungs.entries()) {
     if (!rung || typeof rung !== 'object') { errors.push(`Rung ${index}: invalid rung`); continue; }
     if (typeof rung.id !== 'string' || !rung.id || ids.has(rung.id)) errors.push(`Rung ${index}: duplicate or missing id`);
     ids.add(rung.id);
     if (typeof rung.coil !== 'string' || !tagOK(rung.coil)) errors.push(`Rung ${index}: invalid coil`);
-    if (coils.has(rung.coil)) errors.push(`Rung ${index}: duplicate output tag ${rung.coil}`);
-    coils.add(rung.coil);
+    const previousCoil=coils.get(rung.coil);
+    const currentKind=rung.operation?.kind??'coil';
+    if(previousCoil && !(['set','reset'].includes(previousCoil) &&
+       ['set','reset'].includes(currentKind) && previousCoil!==currentKind))
+      errors.push(`Rung ${index}: duplicate output tag ${rung.coil}`);
+    coils.set(rung.coil,currentKind);
     if (!Array.isArray(rung.elements) || rung.elements.length === 0) { errors.push(`Rung ${index}: empty logic`); continue; }
     for (const element of rung.elements) {
       if (!element || typeof element !== 'object') { errors.push(`Rung ${index}: invalid element`); continue; }
@@ -73,7 +77,7 @@ export function validateLadder(doc: LadderDocument): string[] {
       } else errors.push(`Rung ${index}: unknown element`);
     }
     const op = rung.operation;
-    if (op && (typeof op !== 'object' || !['coil','ton','tof','rto','tp','ctu','ctd','osr','osf','compare','move','add','sub','mul','div'].includes(op.kind))) errors.push(`Rung ${index}: invalid operation`);
+    if (op && (typeof op !== 'object' || !['coil','ton','tof','rto','tp','ctu','ctd','osr','osf','set','reset','compare','move','add','sub','mul','div'].includes(op.kind))) errors.push(`Rung ${index}: invalid operation`);
     if (op?.kind === 'compare' && (!validNumericOperand(op.left) || !validNumericOperand(op.right) ||
       !['eq','ne','lt','le','gt','ge'].includes(op.comparator)))
       errors.push(`Rung ${index}: invalid numeric comparator`);
@@ -150,7 +154,11 @@ export function executeLadder(doc: LadderDocument, inputs: Inputs, previousCoils
     const old = previousMemory[rung.id] ?? { elapsedMs: 0, done: false, count: 0, lastEnable: false };
     let elapsedMs = 0; let count = old.count; let result = energized;
     let numericResult: number | undefined;
-    if (op.kind === 'ton') {
+    if (op.kind === 'set') {
+      result = energized || read(signals,rung.coil);
+    } else if (op.kind === 'reset') {
+      result = !energized && read(signals,rung.coil);
+    } else if (op.kind === 'ton') {
       elapsedMs = energized ? Math.min(op.presetMs, old.elapsedMs + deltaMs) : 0;
       result = energized && elapsedMs >= op.presetMs;
     } else if (op.kind === 'tof') {
@@ -195,7 +203,8 @@ export function executeLadder(doc: LadderDocument, inputs: Inputs, previousCoils
         const next = op.kind === 'move' ? lhs : op.kind === 'add' ? lhs + rhs :
           op.kind === 'sub' ? lhs - rhs : op.kind === 'mul' ? lhs * rhs : lhs / rhs;
         numericResult = checkedNumber(type, next, op.target);
-        numericValues[op.target] = typeof localForces[op.target]==='number' ? localForces[op.target] as number : numericResult;
+        if(typeof localForces[op.target]==='number') numericResult=checkedNumber(type,localForces[op.target] as number,op.target);
+        numericValues[op.target] = numericResult;
         signals[op.target] = numericValues[op.target];
       }
     } else if (op.kind === 'osr') {
