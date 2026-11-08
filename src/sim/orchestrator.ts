@@ -485,7 +485,11 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (!plc || errors.length) world = setError(world, errors.join('; '));
       else {
         const merged = { inputs: { ...defaultIo(plc.kind).inputs, ...cmd.io.inputs }, outputs: { ...defaultIo(plc.kind).outputs, ...cmd.io.outputs } };
-        const isDefault = JSON.stringify(merged) === JSON.stringify(defaultIo(plc.kind));
+        // PLC16 has fixed analog channels; a digital tag rename should not persist
+        // a fake non-default map solely because defaultIo also describes analog ports.
+        const original = defaultIo(plc.kind);
+        const isDefault = JSON.stringify(merged.inputs) === JSON.stringify(original.inputs) &&
+          JSON.stringify(merged.outputs) === JSON.stringify(original.outputs);
         const { plcIo: previous, ...rest } = world.project;
         const nextIo = { ...(previous ?? {}) };
         if (isDefault) delete nextIo[plc.id]; else nextIo[plc.id] = merged;
