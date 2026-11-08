@@ -292,7 +292,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const dockProject = project && activePlcId ? { ...project, ...programOf(project, activePlcId) } : project;
   const dockSnapshot = snapshot && activePlcView ? { ...snapshot, language: activePlcView.language,
     tagValues: activePlcView.tagValues, ladderSteps: activePlcView.ladderSteps,
-    ladderMemory: activePlcView.ladderMemory, fbdSteps: activePlcView.fbdSteps } : snapshot;
+    ladderMemory: activePlcView.ladderMemory, fbdSteps: activePlcView.fbdSteps,
+    debugForces: activePlcView.debugForces } : snapshot;
   const activeIo: Record<string, boolean> = { ...(snapshot?.io ?? {}), ...(activePlcView ? {
     ...activePlcView.inputs, ...activePlcView.coils, ...activePlcView.outputs, PlcPowered: activePlcView.powered } : {}) };
   const selectedDevice = project?.components.find(c => c.id === selectedDeviceId) ?? null;
@@ -670,7 +671,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             pumpOn: false, drainOn: false,
             breakerTripped: false, overloadTripped: false, lampOn: false,
             meter: { positive:null, negative:null, volts:null, status:'select' },
-            diagnostics: [], lastError: null, alarms: [], language: 'ladder', fbdSteps: [],
+            diagnostics: [], lastError: null, alarms: [], language: 'ladder', fbdSteps: [], debugForces: {},
             tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
               Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
             ladderSteps: [], ladderMemory: {}, breakpointScan: null, breakpointHit: null,
@@ -700,6 +701,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             onLadder={program => send([{ k: 'loadProgram', program, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onST={source => send([{ k: 'loadST', source, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onFBD={document => send([{ k: 'loadFBD', document, ...(activePlcId ? { plc: activePlcId } : {}) }])}
+            onLocalForce={(tag,value)=>send([{k:'forceLocal',tag,value,...(activePlcId?{plc:activePlcId}:{})}])}
             onLanguage={language => send([{ k: 'activateLanguage', language, ...(activePlcId ? { plc: activePlcId } : {}) }])} />}
           {activePlcId && activePlcView?.kind === 'plc16' && <IoMappingPanel plcId={activePlcId} view={activePlcView} editable={editable} send={send} />}
         </div>
