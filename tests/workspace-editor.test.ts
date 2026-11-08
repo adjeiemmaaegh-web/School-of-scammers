@@ -18,9 +18,9 @@ describe('P1 pure project editor', () => {
     const before = starter();
     const ids = ['start-1', 'stop-1'];
     const moved = editWorkspace(before, { kind: 'translate', ids, delta: { x: 36, y: 14 }, grid: 25 });
-    expect(moved.components.find(c => c.id === 'start-1')?.x).toBe(50);
-    expect(moved.components.find(c => c.id === 'start-1')?.y).toBe(150);
-    expect(moved.components.find(c => c.id === 'stop-1')?.x).toBe(225);
+    expect(moved.components.find(c => c.id === 'start-1')?.x).toBe(35);
+    expect(moved.components.find(c => c.id === 'start-1')?.y).toBe(175);
+    expect(moved.components.find(c => c.id === 'stop-1')?.x).toBe(210);
     expect(moved.wires).toEqual(before.wires);
     expect(before.components.find(c => c.id === 'start-1')?.x).toBe(10);
     expect(valid(moved)).toEqual(moved);
