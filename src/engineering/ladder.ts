@@ -100,18 +100,34 @@ export type LadderResult = { outputs: Record<string, boolean>; steps: readonly L
   numericValues: Record<string, number> };
 /** Each scan samples inputs once, then evaluates rungs in document order. Timers use simulation time, never wall time. */
 export function executeLadder(doc: LadderDocument, inputs: Inputs, previousCoils: Readonly<Record<string, boolean>> = {},
-  previousMemory: LadderMemory = {}, deltaMs = 20, previousNumeric: Readonly<Record<string, number>> = {}): LadderResult {
+  previousMemory: LadderMemory = {}, deltaMs = 20, previousNumeric: Readonly<Record<string, number>> = {},
+  localForces: Readonly<Record<string, Signal>> = {}): LadderResult {
   const errors = validateLadder(doc);
   if (errors.length) throw new Error(errors.join('; '));
   if (!Number.isSafeInteger(deltaMs) || deltaMs < 1 || deltaMs > 1000) throw new RangeError('Scan interval must be 1..1000 ms');
   const definitions = doc.symbols ?? {};
+  // Defense in depth: only typed local tags can be overridden; physical inputs
+  // and hardware safety wiring are never part of this force map.
+  for (const [tag,override] of Object.entries(localForces)) {
+    const def=definitions[tag];
+    if(!def)throw new Error('Cannot force a physical or undeclared tag: '+tag);
+    const type=numericType(def);
+    if(type==='BOOL'){
+      if(typeof override!=='boolean')throw new TypeError('BOOL force requires boolean: '+tag);
+    }else{
+      if(typeof override!=='number')throw new TypeError('Numeric force requires a number: '+tag);
+      checkedNumber(type,override,tag);
+    }
+  }
   const numericValues: Record<string, number> = {};
   for (const [name, definition] of Object.entries(definitions)) {
     const type = numericType(definition);
     if (type !== 'BOOL')
-      numericValues[name] = checkedNumber(type, previousNumeric[name] ?? (typeof definition.initial === 'number' ? definition.initial : 0), name);
+      numericValues[name] = checkedNumber(type, typeof localForces[name]==='number' ? localForces[name] as number :
+        previousNumeric[name] ?? (typeof definition.initial === 'number' ? definition.initial : 0), name);
   }
-  const signals: Record<string, Signal> = { ...previousCoils, ...numericValues, ...inputs };
+  const boolForces=Object.fromEntries(Object.entries(localForces).filter(([,v])=>typeof v==='boolean'));
+  const signals: Record<string, Signal> = { ...previousCoils, ...numericValues, ...boolForces, ...inputs };
   const operand = (value: NumericOperand): number => {
     if (value.kind === 'literal') return value.value;
     const number = numericValues[value.name];
@@ -179,14 +195,17 @@ export function executeLadder(doc: LadderDocument, inputs: Inputs, previousCoils
         const next = op.kind === 'move' ? lhs : op.kind === 'add' ? lhs + rhs :
           op.kind === 'sub' ? lhs - rhs : op.kind === 'mul' ? lhs * rhs : lhs / rhs;
         numericResult = checkedNumber(type, next, op.target);
-        numericValues[op.target] = numericResult;
-        signals[op.target] = numericResult;
+        numericValues[op.target] = typeof localForces[op.target]==='number' ? localForces[op.target] as number : numericResult;
+        signals[op.target] = numericValues[op.target];
       }
     } else if (op.kind === 'osr') {
       result = energized && !old.lastEnable;
     } else if (op.kind === 'osf') {
       result = !energized && old.lastEnable;
     }
+    // A local BOOL force overrides that symbol's published local memory only.
+    // The sandbox contract prohibits putting mapped physical outputs in symbols.
+    if(typeof localForces[rung.coil]==='boolean')result=localForces[rung.coil] as boolean;
     memory[rung.id] = { elapsedMs, count, done: result, lastEnable: energized };
     outputs[rung.coil] = result; signals[rung.coil] = result;
     steps.push({ rungId: rung.id, energized, coil: rung.coil, result, operation: op.kind, elements: trace,
