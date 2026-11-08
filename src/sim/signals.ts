@@ -1,4 +1,5 @@
 import type { LadderDocument, LadderMemory, LadderStep } from '../engineering/ladder';
+import type { FbdDocument, FbdMemory, FbdStep } from '../engineering/fbd';
 import type { STProgram, STValue } from '../engineering/structured-text';
 import type { ComponentKind } from '../components/registry';
 import type { ScanTrace, TagBreakpoint } from '../program/scan-trace';
@@ -41,8 +42,9 @@ export type AlarmWatch = { noResponse: number; uncommanded: number; nextId: numb
 /** The program of one additional PLC. The first PLC's program stays in the legacy top-level fields. */
 export type PlcProgram = {
   program: LadderDocument;
-  language?: 'ladder' | 'st';
+  language?: 'ladder' | 'st' | 'fbd';
   stSource?: string;
+  fbd?: FbdDocument;
 };
 /** The five physical input tags a PLC samples (I0.0..I0.4) and its six output coils (Q0.0..Q0.5). */
 export type PlcInputs = { Start: boolean; StopOK: boolean; Photoeye: boolean; TankHigh: boolean; ReverseRequest: boolean };
@@ -59,12 +61,14 @@ export type PlcRuntime = {
   ladderSteps: LadderStep[];
   stCompiled: STProgram | null;
   stMemory: Record<string, STValue>;
+  fbdMemory: FbdMemory;
+  fbdSteps: FbdStep[];
 };
 /** What the UI may show about any one PLC (first or additional). */
 export type PlcIoPoint = { terminal: string; tag: string; on: boolean };
 export type PlcView = {
   powered: boolean;
-  language: 'ladder' | 'st';
+  language: 'ladder' | 'st' | 'fbd';
   /** Component kind: `plc` (fixed 5/6 I/O) or `plc16` (16/16 with nameable tags). */
   kind: string;
   /** Every input and output terminal with the tag bound to it and its live state, whatever the I/O map. */
@@ -77,6 +81,7 @@ export type PlcView = {
   tagValues: Record<string, STValue>;
   ladderSteps: LadderStep[];
   ladderMemory: LadderMemory;
+  fbdSteps: FbdStep[];
 };
 export type ProjectFile = {
   formatVersion: 1;
@@ -84,8 +89,9 @@ export type ProjectFile = {
   wires: Wire[];
   program: LadderDocument;
   /** Optional in v1 JSON for backwards compatibility. Defaults to ladder. */
-  language?: 'ladder' | 'st';
+  language?: 'ladder' | 'st' | 'fbd';
   stSource?: string;
+  fbd?: FbdDocument;
   /** Optional in v1 JSON for backwards compatibility. Defaults to no faults. */
   faults?: FaultSpec[];
   /** Programs of PLCs beyond the first, keyed by PLC component id. Omitted for single-PLC projects. */
@@ -106,6 +112,8 @@ export type WorldState = {
   /** Validated AST cached in authoritative worker state, never persisted in ProjectFile. */
   stCompiled: STProgram | null;
   stMemory: Record<string, STValue>;
+  fbdMemory: FbdMemory;
+  fbdSteps: FbdStep[];
   tagValues: Record<string, STValue>;
   ladderSteps: LadderStep[];
   breakpointScan: number | null;
@@ -187,7 +195,8 @@ export type Command =
   | { k: 'configureIo'; plc: string; io: { inputs: Record<string, string>; outputs: Record<string, string> } }
   | { k: 'loadProgram'; program: LadderDocument; plc?: string }
   | { k: 'loadST'; source: string; plc?: string }
-  | { k: 'activateLanguage'; language: 'ladder' | 'st'; plc?: string }
+  | { k: 'loadFBD'; document: FbdDocument; plc?: string }
+  | { k: 'activateLanguage'; language: 'ladder' | 'st' | 'fbd'; plc?: string }
   | { k: 'breakAtScan'; scan: number | null }
   | { k: 'breakOnTag'; breakpoint: TagBreakpoint | null }
   | { k: 'loadProject'; project: unknown }
@@ -239,10 +248,11 @@ export type RenderSnapshot = {
   diagnostics: string[];
   lastError: string | null;
   alarms: AlarmRecord[];
-  language: 'ladder' | 'st';
+  language: 'ladder' | 'st' | 'fbd';
   tagValues: Record<string, STValue>;
   ladderSteps: LadderStep[];
   ladderMemory: LadderMemory;
+  fbdSteps: FbdStep[];
   breakpointScan: number | null;
   breakpointHit: string | null;
   breakpointTag: TagBreakpoint | null;
