@@ -674,7 +674,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
               Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
             ladderSteps: [], ladderMemory: {}, breakpointScan: null, breakpointHit: null,
-            breakpointTag: null, scanTrace: [] }}
+            breakpointTag: null, breakpointInstruction: null, scanTrace: [] }}
           selectedDevice={selectedDevice} selectedTerminal={selectedTerminal} editable={editable}
           onTerminal={connect} onCancelWire={() => setSelectedTerminal(null)}
           onMove={id => setMoveTarget(id)}
@@ -704,9 +704,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           {activePlcId && activePlcView?.kind === 'plc16' && <IoMappingPanel plcId={activePlcId} view={activePlcView} editable={editable} send={send} />}
         </div>
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
-          {snapshot && <LiveMonitor snapshot={snapshot}
+          {snapshot && <LiveMonitor snapshot={snapshot} project={project}
             onBreakpoint={scan => send([{ k: 'breakAtScan', scan }])}
-            onTagBreakpoint={breakpoint => send([{ k: 'breakOnTag', breakpoint }])} />}
+            onTagBreakpoint={breakpoint => send([{ k: 'breakOnTag', breakpoint }])}
+            onInstructionBreakpoint={breakpoint => send([{ k: 'breakOnInstruction', breakpoint }])} />}
           <span className="eyebrow">Diagnostics</span><h2>Electrical &amp; event trace</h2>
           <p className="sandbox-help">Click a wire's remove button to break a connection and observe what changes. All values come from the simulator.</p>
           {!scenario && <details><summary>Example wiring map</summary><p>{wireGuide}</p>
