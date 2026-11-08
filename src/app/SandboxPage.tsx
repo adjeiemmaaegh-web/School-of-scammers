@@ -194,7 +194,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     setResult(null);
     setEvidence([]);
     startedAt.current = Date.now();
-    setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setEvents([]); setClientError(null);
+    setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceIds([]); setEvents([]); setClientError(null);
     worker.current?.postMessage({ kind: 'commands', commands: [
       { k: 'loadProject', project: scenario.def.starter(scenario.seed) }, { k: 'reset' }] });
   };
@@ -311,7 +311,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       if (file.size > 200000) throw new Error('Project must be under 200 KB');
       const parsed: unknown = JSON.parse(await file.text());
       send([{ k: 'loadProject', project: parsed }]);
-      setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setEvents([]); setClientError(null);
+      setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceIds([]); setEvents([]); setClientError(null);
     } catch (e) { setClientError(e instanceof Error ? e.message : 'Project import failed'); }
     ev.target.value = '';
   };
@@ -327,16 +327,69 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     ...activePlcView.inputs, ...activePlcView.coils, ...activePlcView.outputs, PlcPowered: activePlcView.powered } : {}) };
   const selectedDevice = project?.components.find(c => c.id === selectedDeviceId) ?? null;
   const removeDevice = (id: string) => {
-    if (selectedDeviceId === id) setSelectedDeviceId(null);
-    if (selectedTerminal?.startsWith(`${id}.`)) setSelectedTerminal(null);
+    setSelectedDeviceIds(current => current.filter(part => part !== id));
+    if (selectedTerminal?.startsWith(id + '.')) setSelectedTerminal(null);
     send([{ k: 'remove', id }]);
   };
+  const selectDevice = (id: string | null, additive = false) => {
+    setSelectedDeviceIds(current => id ? additive ? toggleOne(current, id) : selectOne(id) : emptySelection());
+    if (id && isPlcKind(project?.components.find(c => c.id === id)?.kind ?? '')) setSelectedPlcId(id);
+  };
+  const edit = (operation: WorkspaceEdit) => {
+    if (!snapshot || snapshot.running || scenario) return;
+    send([{ k: 'editWorkspace', edit: operation }]);
+  };
+  const moveSelection = (dx: number, dy: number) => {
+    if (!selectedDeviceIds.length) return;
+    edit({ kind: 'translate', ids: [...selectedDeviceIds], delta: { x: dx, y: dy }, grid });
+  };
+  const rotateSelection = (quarterTurns: -1 | 1) => {
+    if (selectedDeviceIds.length) edit({ kind: 'rotate', ids: [...selectedDeviceIds], quarterTurns });
+  };
+  const duplicateSelection = () => {
+    if (selectedDeviceIds.length) edit({ kind: 'duplicate', ids: [...selectedDeviceIds],
+      offset: { x: 25, y: 25 }, grid });
+  };
+  const deleteSelection = () => {
+    if (!selectedDeviceIds.length) return;
+    edit({ kind: 'delete', ids: [...selectedDeviceIds] });
+    setSelectedDeviceIds([]);
+    setSelectedTerminal(null);
+  };
+  const copySelection = () => {
+    if (!project || !selectedDeviceIds.length || scenario) return;
+    try { setClipboard(makeFragment(project, selectedDeviceIds)); pasteIndex.current = 0; }
+    catch (error) { setClientError(error instanceof Error ? error.message : 'Cannot copy the selection'); }
+  };
+  const pasteSelection = () => {
+    if (!clipboard || !clipboard.components.length || scenario) return;
+    const offset = Math.min(150, 25 * (pasteIndex.current + 1));
+    const x = Math.min(...clipboard.components.map(part => part.x));
+    const y = Math.min(...clipboard.components.map(part => part.y));
+    edit({ kind: 'paste', fragment: clipboard, at: { x: x + offset, y: y + offset }, grid });
+    pasteIndex.current++;
+  };
   const undo = () => {
-    const previous = undoStack[undoStack.length - 1];
-    if (!previous) return;
-    setUndoStack(stack => stack.slice(0, -1));
-    setSelectedDeviceId(null); setSelectedTerminal(null); setMoveTarget(null);
-    send([{ k: 'loadProject', project: previous }]);
+    if (!projectRef.current || snapshot?.running) return;
+    const result = undoHistory(historyRef.current, projectRef.current);
+    if (!result) return;
+    historyRef.current = result.history;
+    setHistory(result.history);
+    setSelectedDeviceIds([]);
+    setSelectedTerminal(null);
+    setMoveTarget(null);
+    send([{ k: 'loadProject', project: result.project }], 'ignore');
+  };
+  const redo = () => {
+    if (!projectRef.current || snapshot?.running) return;
+    const result = redoHistory(historyRef.current, projectRef.current);
+    if (!result) return;
+    historyRef.current = result.history;
+    setHistory(result.history);
+    setSelectedDeviceIds([]);
+    setSelectedTerminal(null);
+    setMoveTarget(null);
+    send([{ k: 'loadProject', project: result.project }], 'ignore');
   };
   // The toolbar is sticky: keep it just below the sticky app header, whatever height the header has.
   useEffect(() => {
@@ -349,26 +402,44 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     window.addEventListener('resize', apply);
     return () => { observer?.disconnect(); window.removeEventListener('resize', apply); document.documentElement.style.removeProperty('--app-header-h'); };
   }, []);
-  // Delete removes the selected device (when paused), like a bench tool; never while typing in a field.
+  // Keyboard shortcuts operate only on the P1 workspace; never hijack ST/LD text editing.
   useEffect(() => {
-    const onKey = (ev: KeyboardEvent) => {
-      if (ev.key !== 'Delete' || !selectedDeviceId || snapshot?.running) return;
-      const el = ev.target as HTMLElement | null;
-      if (el && /^(input|textarea|select)$/i.test(el.tagName)) return;
-      removeDevice(selectedDeviceId);
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const shortcut = workspaceShortcut({
+        key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey,
+        shiftKey: event.shiftKey, altKey: event.altKey, targetTag: target?.tagName,
+        isContentEditable: target?.isContentEditable,
+      });
+      if (!shortcut) return;
+      if (shortcut === 'clear-selection') {
+        if (selectedDeviceIds.length) { event.preventDefault(); setSelectedDeviceIds([]); }
+        return;
+      }
+      if (snapshot?.running || scenario) return;
+      if (shortcut === 'undo' && historyRef.current.undo.length) { event.preventDefault(); undo(); return; }
+      if (shortcut === 'redo' && historyRef.current.redo.length) { event.preventDefault(); redo(); return; }
+      if (shortcut === 'select-all' && project?.components.length) {
+        event.preventDefault(); setSelectedDeviceIds(selectAll(project.components)); return;
+      }
+      if (shortcut === 'copy' && selectedDeviceIds.length) { event.preventDefault(); copySelection(); return; }
+      if (shortcut === 'paste' && clipboard) { event.preventDefault(); pasteSelection(); return; }
+      if (!selectedDeviceIds.length) return;
+      if (shortcut === 'duplicate') { event.preventDefault(); duplicateSelection(); return; }
+      if (shortcut === 'delete') { event.preventDefault(); deleteSelection(); return; }
+      if (shortcut === 'rotate-left') { event.preventDefault(); rotateSelection(-1); return; }
+      if (shortcut === 'rotate-right') { event.preventDefault(); rotateSelection(1); return; }
+      const directions: Record<string, [number, number]> = {
+        'nudge-left': [-grid, 0], 'nudge-right': [grid, 0],
+        'nudge-up': [0, -grid], 'nudge-down': [0, grid],
+      };
+      const delta = directions[shortcut];
+      if (delta) { event.preventDefault(); moveSelection(delta[0], delta[1]); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
-  const selectDevice = (id: string | null) => {
-    setSelectedDeviceId(id);
-    if (id && isPlcKind(project?.components.find(c => c.id === id)?.kind ?? '')) setSelectedPlcId(id);
-  };
-  const visibleKinds = componentKinds.filter(kind => {
-    const definition = COMPONENTS[kind];
-    const words = `${definition.kind} ${definition.label} ${definition.help}`.toLowerCase();
-    return words.includes(libraryQuery.trim().toLowerCase());
-  });
+  const visibleKinds = searchEquipment(libraryQuery, libraryCategory);
   const workflow = [
     { id: 'build' as const, label: 'Build', hint: 'Place equipment', count: project?.components.length ?? 0 },
     { id: 'wire' as const, label: 'Wire', hint: 'Connect terminals', count: project?.wires.length ?? 0 },
@@ -409,7 +480,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       </nav>
       <div className="sandbox-toolbar">
         {!scenario && <>
-        <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setActiveStage('build'); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
+        <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceIds([]); setActiveStage('build'); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
         {/* The ready-made starters live in one menu so the sticky toolbar stays a single short row. */}
         <details className="sandbox-starters" data-starters>
           <summary className="btn ghost small">Starters</summary>
@@ -711,7 +782,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onMoveTo={(id, at) => move(id, at)}
           onSetParam={(id, key, value) => send([{ k: 'setParam', id, key, value }])}
           onOperate={id => send([{ k: 'operateToggle', id }])}
-          onClearSelection={() => setSelectedDeviceId(null)} />
+          onClearSelection={() => setSelectedDeviceIds([])} />
       </div>
       <div className="sandbox-bottom">
         <div id="sandbox-stage-program" className="sandbox-program-dock">
