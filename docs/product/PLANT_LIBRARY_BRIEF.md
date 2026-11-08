@@ -47,7 +47,19 @@ export type World = {
   bodies: Body[];
   nextBodyId: number;
   timeMs: number;
-  events: string[];              // drained by the integrator every scan
+  events: WorldEvent[];          // bounded and drained by the integrator each scan
+  spawnedCount: number;           // increments only after successful append
+  despawnedCount: number;         // increments only after explicit discharge/removal
+  droppedEventCount: number;      // count of events discarded due to capped event buffer
+  rngState: number;               // replayable PRNG state
+};
+
+export type WorldEvent = {
+  atMs: number;                    // simulated time, never wall clock
+  kind: 'spawn' | 'despawn' | 'spawn-refused' | 'fault' | 'info';
+  equipmentId: string;
+  bodyId?: string;                 // mandatory for spawn/despawn
+  detail?: string;                 // bounded description
 };
 ```
 
@@ -96,7 +108,7 @@ export type EquipmentDef<State> = {
   /** 3D primitives expressed in world millimetres, no animations independent of state. */
   describe(state: State, ctx: EquipmentContext): Array<{
     part: string; shape: 'box' | 'cylinder'; pos: Vec3; size: Vec3; yawDeg: number; colour: string;
-  }>
+  }>;
 };
 ```
 
