@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { compileFbd, MAX_FBD_NODES, type FbdComparator, type FbdDocument, type FbdKind, type FbdNode } from '../engineering/fbd';
+import { compileFbd, MAX_FBD_NODES, type FbdComparator, type FbdDocument, type FbdKind, type FbdNode, type FbdNames } from '../engineering/fbd';
 import type { RenderSnapshot } from '../sim/signals';
 import { LEGACY_NAMES } from '../sim/plc-io';
 import { FBD_ARITY, FBD_KINDS, initialFbdNode, addFbdNode, removeFbdNode, replaceFbdNode } from './fbd-editor-model';
@@ -19,7 +19,7 @@ export function FbdEditor({document,snapshot,disabled,onActivate,showExamples=tr
   const [kind,setKind] = useState<FbdKind>('and');
   const [editingError,setEditingError] = useState('');
   useEffect(()=>{setDraft(document);setEditingError('');},[document]);
-  const names = useMemo(()=>io ? {
+  const names: FbdNames = useMemo(()=>io ? {
     inputs:io.inputs.map(p=>p.tag),outputs:io.outputs.map(p=>p.tag),
     numericInputs:io.numericInputs?.map(p=>p.tag)??[],requireRun:io.outputs.some(p=>p.tag==='Run'),
   } : LEGACY_NAMES,[io]);
