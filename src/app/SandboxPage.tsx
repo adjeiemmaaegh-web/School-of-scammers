@@ -510,7 +510,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>
         </details>
         </>}
-
+        {scenario && <button className="btn ghost small" data-undo onClick={undo}
+          disabled={!editable || !history.undo.length}>Undo</button>}
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         {!scenario && <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>}
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
