@@ -6,6 +6,7 @@ import { compileFbd, executeFbd, type FbdResult } from '../engineering/fbd';
 import { executeStructuredText, type STResult, type STValue } from '../engineering/structured-text';
 import { compileSandboxST, DEFAULT_ST_SOURCE, validateSandboxProgram } from '../program/p2-contract';
 import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from '../program/scan-trace';
+import { fbdReadings, instructionBreakpointHit, ladderReadings, validateInstructionBreakpoint } from '../program/instruction-breakpoint';
 import { feedPlant, freshPlant, stepPlant } from '../plant/sorting-conveyor';
 import { freshTank, stepTank } from '../plant/tank-process';
 import {
@@ -124,7 +125,7 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     stMemory: {}, fbdMemory: {}, fbdSteps: [],
     tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
       Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false }, ladderSteps: [],
-    breakpointScan: null, breakpointHit: null, breakpointTag: null, scanTrace: [],
+    breakpointScan: null, breakpointHit: null, breakpointTag: null, breakpointInstruction: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     plcs: Object.fromEntries(runtimePlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id), namesFor(project, c.id))])),
     lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
@@ -342,7 +343,8 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Program validation failed'); }
     } else if (cmd.k === 'pause') world = { ...world, running: false };
     else if (cmd.k === 'step') { world = { ...world, running: false }; forceStep = true; }
-    else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
+    else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag,
+      breakpointInstruction: world.breakpointInstruction };
     else if (cmd.k === 'clear') world = createWorld();
     else if (cmd.k === 'feedParcel') {
       const lane = cmd.conveyor !== undefined
@@ -604,6 +606,13 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (cmd.breakpoint !== null && !validateTagBreakpoint(cmd.breakpoint, tags))
         world = setError(world, 'Tag breakpoint requires a known Boolean PLC tag and valid edge');
       else world = { ...world, breakpointTag: cmd.breakpoint, breakpointHit: null };
+    } else if (cmd.k === 'breakOnInstruction') {
+      const cfg = programOf(world.project, undefined);
+      const ids = cfg.language === 'fbd' ? cfg.fbd.nodes.map(node => node.id) :
+        cfg.language === 'ladder' ? cfg.program.rungs.map(rung => rung.id) : [];
+      if (cmd.breakpoint !== null && !validateInstructionBreakpoint(cmd.breakpoint, ids))
+        world = setError(world, 'Instruction breakpoint requires an existing FBD block or Ladder rung, and a bounded edge/threshold');
+      else world = { ...world, breakpointInstruction: cmd.breakpoint, breakpointHit: null };
     } else if (cmd.k === 'loadProject') {
       try { world = createWorld(validateProject(cmd.project)); } catch (e) { world = setError(world, e instanceof Error ? e.message : 'Invalid project'); }
     }
@@ -734,7 +743,8 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     tagValues: { ...world.tagValues }, ladderSteps: [...world.ladderSteps],
     ladderMemory: { ...world.ladderMemory }, fbdSteps: world.fbdSteps.map(step => ({ ...step })),
     breakpointScan: world.breakpointScan, breakpointHit: world.breakpointHit,
-    breakpointTag: world.breakpointTag, scanTrace: world.scanTrace.map(entry => ({
+    breakpointTag: world.breakpointTag, breakpointInstruction: world.breakpointInstruction,
+    scanTrace: world.scanTrace.map(entry => ({
       ...entry, networks: entry.networks.map(network => ({ ...network })),
     })) };
 }
@@ -1031,7 +1041,11 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const edgeHit = w.breakpointTag && tagEdge(w.tagValues[w.breakpointTag.tag],
     tagValues[w.breakpointTag.tag], w.breakpointTag.edge)
     ? `Paused at scan ${nextTick}: ${w.breakpointTag.tag} ${w.breakpointTag.edge} edge` : null;
-  const breakpointHit = scanHit ?? edgeHit;
+  const instructionHit = instructionBreakpointHit(w.breakpointInstruction,
+    w.project.language === 'fbd' ? fbdReadings(w.fbdSteps) : ladderReadings(w.ladderSteps),
+    w.project.language === 'fbd' ? fbdReadings(fbdResult?.steps ?? []) : ladderReadings(ladderResult?.steps ?? []),
+    nextTick);
+  const breakpointHit = scanHit ?? edgeHit ?? instructionHit;
   if (breakpointHit) events.push({ tick: nextTick, kind: 'breakpoint', detail: breakpointHit });
   // Supervisory alarms report commanded-vs-observed symptoms only; they never name a cause.
   const alarmUpdate = updateAlarms({
