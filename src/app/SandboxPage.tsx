@@ -510,12 +510,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>
         </details>
         </>}
-        {!scenario ? <WorkspaceAuthoringBar editable={editable} selectedCount={selectedDeviceIds.length}
-          canUndo={history.undo.length > 0} canRedo={history.redo.length > 0} canPaste={!!clipboard}
-          grid={grid} onGrid={setGrid} onUndo={undo} onRedo={redo} onCopy={copySelection}
-          onPaste={pasteSelection} onDuplicate={duplicateSelection} onRemove={deleteSelection}
-          onRotate={rotateSelection} onNudge={moveSelection} /> :
-          <button className="btn ghost small" data-undo onClick={undo} disabled={!editable || !history.undo.length}>Undo</button>}
+
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         {!scenario && <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>}
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
@@ -526,6 +521,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           {snapshot?.running ? 'Pause' : '▶ Run'}</button>
         <span className="sandbox-scan" aria-live="off">Scan {snapshot?.tick ?? 0}</span>
       </div>
+        {!scenario && <div className="workspace-editing-strip" aria-label="Workspace tools">
+          <WorkspaceAuthoringBar editable={editable} selectedCount={selectedDeviceIds.length}
+            canUndo={history.undo.length > 0} canRedo={history.redo.length > 0} canPaste={!!clipboard}
+            grid={grid} onGrid={setGrid} onUndo={undo} onRedo={redo} onCopy={copySelection}
+            onPaste={pasteSelection} onDuplicate={duplicateSelection} onRemove={deleteSelection}
+            onRotate={rotateSelection} onNudge={moveSelection} />
+        </div>}
       {(clientError || snapshot?.lastError) && <div role="alert" className="sandbox-alert">{clientError || snapshot?.lastError}</div>}
       {scenario && <ScenarioPanel session={scenario} project={project} evidence={evidence} result={result}
         onSubmit={submitScenario} onRestart={restartScenario} />}
