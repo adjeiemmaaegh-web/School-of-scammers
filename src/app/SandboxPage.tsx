@@ -702,7 +702,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>}
           {dockProject && dockSnapshot && <ProgrammingDock project={dockProject} snapshot={dockSnapshot} disabled={!editable}
             showExamples={!scenario}
-            io={activePlcView ? { kind: activePlcView.kind, inputs: activePlcView.io.inputs, outputs: activePlcView.io.outputs } : undefined}
+            io={activePlcView ? { kind: activePlcView.kind, inputs: activePlcView.io.inputs, outputs: activePlcView.io.outputs,
+              analogInputs: activePlcView.io.analogInputs } : undefined}
             onLadder={program => send([{ k: 'loadProgram', program, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onST={source => send([{ k: 'loadST', source, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onLanguage={language => send([{ k: 'activateLanguage', language, ...(activePlcId ? { plc: activePlcId } : {}) }])} />}
