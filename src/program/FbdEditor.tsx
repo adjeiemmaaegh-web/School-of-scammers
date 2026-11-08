@@ -18,7 +18,11 @@ export function FbdEditor({document,snapshot,disabled,onActivate,showExamples=tr
   const [draft,setDraft] = useState<FbdDocument>(document);
   const [kind,setKind] = useState<FbdKind>('and');
   const [editingError,setEditingError] = useState('');
-  useEffect(()=>{setDraft(document);setEditingError('');},[document]);
+  // Worker snapshots may reconstruct an equivalent FBD object each scan. Only
+  // replace the editing draft when the SAVED graph content actually changes;
+  // otherwise a learner's uncommitted pin edits would vanish every 50 ms.
+  const savedFingerprint=JSON.stringify(document);
+  useEffect(()=>{setDraft(document);setEditingError('');},[savedFingerprint]);
   const names: FbdNames = useMemo(()=>io ? {
     inputs:io.inputs.map(p=>p.tag),outputs:io.outputs.map(p=>p.tag),
     numericInputs:io.numericInputs?.map(p=>p.tag)??[],requireRun:io.outputs.some(p=>p.tag==='Run'),
