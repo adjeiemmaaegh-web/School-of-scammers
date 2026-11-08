@@ -6,14 +6,14 @@ export type STType='BOOL'|'INT'|'DINT'|'REAL'|'LREAL';
 export type STDeclaration={name:string;type:STType;scope:'input'|'output'|'local';initial:STValue};
 type Token={value:string;offset:number};
 type Expression={kind:'literal';value:STValue}|{kind:'read';name:string}|{kind:'unary';op:string;inner:Expression}|{kind:'binary';op:string;left:Expression;right:Expression};
-type Statement={kind:'assign';name:string;expr:Expression}|{kind:'if';branches:{when:Expression;body:Statement[]}[];otherwise:Statement[]}|{kind:'case';selector:Expression;arms:{value:STValue;body:Statement[]}[];otherwise:Statement[]}|{kind:'for';counter:string;from:Expression;to:Expression;step:Expression;body:Statement[]};
+type Statement={kind:'assign';name:string;expr:Expression}|{kind:'if';branches:{when:Expression;body:Statement[]}[];otherwise:Statement[]}|{kind:'case';selector:Expression;arms:{value:STValue;body:Statement[]}[];otherwise:Statement[]}|{kind:'for';counter:string;from:Expression;to:Expression;step:Expression;body:Statement[]}|{kind:'while';condition:Expression;body:Statement[]};
 export type STProgram={source:string;bodySource:string;statements:readonly Statement[];referencedInputs:string[];assignedOutputs:string[];declarations:readonly STDeclaration[]};
 export type STResult={outputs:Record<string,STValue>;signals:Record<string,STValue>;assignments:{tag:string;value:STValue}[];memory:Record<string,STValue>};
 const keyword=(s:string)=>s.toUpperCase();
 const identifier=/^[A-Za-z][A-Za-z0-9_]*$/;
 const number=/^(?:\d+(?:\.\d+)?|\.\d+)$/;
 const precedence:Readonly<Record<string,number>>={OR:1,XOR:2,AND:3,'=':4,'<>':4,'<':4,'<=':4,'>':4,'>=':4,'+':5,'-':5,'*':6,'/':6,MOD:6};
-const RESERVED=new Set(['IF','THEN','ELSIF','ELSE','END_IF','AND','OR','XOR','NOT','TRUE','FALSE','MOD','VAR','VAR_INPUT','VAR_OUTPUT','END_VAR','BOOL','INT','DINT','REAL','LREAL','CASE','OF','END_CASE','FOR','TO','BY','DO','END_FOR']);
+const RESERVED=new Set(['IF','THEN','ELSIF','ELSE','END_IF','AND','OR','XOR','NOT','TRUE','FALSE','MOD','VAR','VAR_INPUT','VAR_OUTPUT','END_VAR','BOOL','INT','DINT','REAL','LREAL','CASE','OF','END_CASE','FOR','TO','BY','DO','END_FOR','WHILE','END_WHILE']);
 function tokenize(source:string):Token[]{
  if(typeof source!=='string'||source.length>12000)throw new RangeError('Structured Text must be at most 12,000 characters');
  const tokens:Token[]=[];
@@ -125,6 +125,11 @@ export function compileStructuredText(source:string):STProgram{
     if(!arms.length)fail('CASE requires at least one arm');
     const otherwise=accept('ELSE')?statements(new Set(['END_CASE']),depth+1):[];
     requireToken('END_CASE');requireToken(';');result.push({kind:'case',selector,arms,otherwise});
+   }else if(accept('WHILE')){
+    const condition=expression();requireToken('DO');
+    const body=statements(new Set(['END_WHILE']),depth+1);
+    requireToken('END_WHILE');requireToken(';');
+    result.push({kind:'while',condition,body});
    }else if(accept('FOR')){
     const counterName=readName(),counter=keyword(counterName);if(!writes.has(counter))writes.set(counter,counterName);
     requireToken(':=');const from=expression();requireToken('TO');const to=expression();
@@ -153,7 +158,8 @@ export function compileStructuredText(source:string):STProgram{
     const type=table.get(stmt.counter)?.type;
     if(type!=='INT'&&type!=='DINT')throw new SyntaxError('FOR counter must be declared INT or DINT');
     validateFor(stmt.body);
-   }else if(stmt.kind==='if'){for(const arm of stmt.branches)validateFor(arm.body);validateFor(stmt.otherwise);}
+   }else if(stmt.kind==='while'){validateFor(stmt.body);}
+   else if(stmt.kind==='if'){for(const arm of stmt.branches)validateFor(arm.body);validateFor(stmt.otherwise);}
    else if(stmt.kind==='case'){for(const arm of stmt.arms)validateFor(arm.body);validateFor(stmt.otherwise);}
   }};
   validateFor(compiled);
@@ -262,6 +268,12 @@ export function executeStructuredText(program:STProgram,inputs:STSignals,previou
     const selected=evaluate(statement.selector,values);
     const arm=statement.arms.find(entry=>typeof entry.value===typeof selected&&entry.value===selected);
     run(arm?.body??statement.otherwise,depth+1);
+   }else if(statement.kind==='while'){
+    let iterations=0;
+    while(bool(evaluate(statement.condition,values))){
+     if(++iterations>400)throw new RangeError('WHILE iteration budget exceeded (400)');
+     run(statement.body,depth+1);
+    }
    }else if(statement.kind==='for'){
     if(inputKeys.has(statement.counter))throw new Error('Cannot use input as FOR counter');
     const from=numeric(evaluate(statement.from,values)),to=numeric(evaluate(statement.to,values)),step=numeric(evaluate(statement.step,values));
