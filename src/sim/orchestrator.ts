@@ -915,7 +915,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     const cfg = programOf(w.project, extra.id);
     try {
       const openNumeric=new Set(faultsOf(w.project).filter(f=>f.kind==='wire-open').map(f=>f.target));
-      const numeric=sampleNumericInputs(w.project,w.plantWorld,extra.id,io,extraPowered,openNumeric);
+      const numeric=sampleNumericInputs(w.project,w.plantWorld,extra.id,io,extraPowered,openNumeric,
+        id=>circuit.reads24(terminal(id,'L+'),terminal(id,'M')));
       const tagInputs={...digitalInputs,...numeric.values};
       nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)),
         tagInputs, extraPowered, dtMs, numeric.points);
