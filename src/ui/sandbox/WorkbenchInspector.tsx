@@ -109,7 +109,13 @@ export function WorkbenchInspector({
     selectedDevice.kind === 'photoeye' ? snapshot.io.Photoeye :
     perDeviceLive(snapshot, selectedDevice) !== undefined ? perDeviceLive(snapshot, selectedDevice) === true :
     selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' ? !isPressed : true;
-  const state = selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
+  const state = selectedDevice.kind === 'three-phase-supply' ?
+    (snapshot.threePhaseSources[selectedDevice.id]===false?'Isolated virtual mains':'Virtual 400V source available') :
+    selectedDevice.kind === 'star-delta-drive' ? (()=>{
+      const drive=snapshot.threePhase[selectedDevice.id];
+      return drive?`${drive.motor.mode.toUpperCase()} · ${Math.round(drive.motor.speedRpm)} rpm · ${drive.motor.currentA.toFixed(1)} A${drive.motor.tripped?' · TRIPPED':''}`:'Not commissioned';
+    })() :
+    selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
     selectedDevice.kind === 'forwardcontactor' ? (isLive ? 'Forward contact closed' : 'Open') :
     selectedDevice.kind === 'reversecontactor' ? (isLive ? 'Reverse contact closed' : 'Open') :
     selectedDevice.kind === 'reversebutton' ? (isPressed ? 'Request pressed' : 'Released') :
