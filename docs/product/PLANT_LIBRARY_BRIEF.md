@@ -12,7 +12,7 @@ Read first: `CLAUDE.md`, `docs/product/ARCHITECTURE.md`, `.claude/skills/automat
 
 1. **Pure and DOM-free.** No `window`, `document`, React, Three.js, timers, `Date.now`, `Math.random`, `fetch`, or async. Plant code runs inside the worker.
 2. **Deterministic.** Same project + same command sequence ⇒ byte-identical snapshots. Randomness only through the seeded RNG already used by `faults.ts` (pass the seed in). Avoid transcendental functions (`sin`, `cos`, `pow` with fractions) in state that feeds back into the simulation; precompute tables or use rational approximations. Round state to a fixed quantum (1e-6) after each step, as `sorting-conveyor.ts` does, so replays match.
-3. **Fixed step.** The scan is 50 ms. `step()` receives `dtMs` and internally sub-steps at a fixed 10 ms (5 substeps per scan). Never use variable-length integration.
+3. **Fixed step.** The integrator's scheduler calls each equipment `step()` exactly once per 10 ms substep (five substeps per 50 ms PLC scan). Equipment must not substep again or advance the shared clock; the world scheduler owns time and collision resolution. Never use variable-length integration.
 4. **The engine is authoritative.** Sensors report what the *simulated geometry* says. The renderer only draws the published snapshot. No canned animations: a box moves because a belt drives it, a pusher pushes it, gravity drops it.
 5. **Bounded.** Hard caps on bodies per scene (start with 60), on constraints, on events per scan. Over the cap: refuse the spawn with an event, never grow unbounded. Performance budget: a full scene step must cost under 2 ms on a mid laptop (benchmark test included).
 6. **Original assets only.** No copied models, textures, names or layouts from any commercial product. Geometry is described as primitives (box, cylinder, extrusion) we render ourselves.
@@ -47,7 +47,19 @@ export type World = {
   bodies: Body[];
   nextBodyId: number;
   timeMs: number;
-  events: string[];              // drained by the integrator every scan
+  events: WorldEvent[];          // bounded and drained by the integrator each scan
+  spawnedCount: number;           // increments only after successful append
+  despawnedCount: number;         // increments only after explicit discharge/removal
+  droppedEventCount: number;      // count of events discarded due to capped event buffer
+  rngState: number;               // replayable PRNG state
+};
+
+export type WorldEvent = {
+  atMs: number;                    // simulated time, never wall clock
+  kind: 'spawn' | 'despawn' | 'spawn-refused' | 'fault' | 'info';
+  equipmentId: string;
+  bodyId?: string;                 // mandatory for spawn/despawn
+  detail?: string;                 // bounded description
 };
 ```
 
@@ -65,30 +77,42 @@ A general rigid-body engine (including WASM ones such as Rapier) is **out of sco
 // src/plant/world/equipment.ts
 import type { ParamSpec } from '../../components/params';
 
-export type Channel = { name: string; kind: 'bool' | 'number'; unit?: string };
+export type Channel = {
+  name: string;
+  kind: 'bool' | 'number';
+  unit?: string;                    // required on numeric channels: e.g. kg, mm, mm/s
+  min?: number; max?: number;       // finite bounds required on numeric channels
+};
 
-export type EquipmentDef<State, Params> = {
-  kind: string;                                   // registry key, e.g. 'stopper', 'lift', 'palletizer'
-  label: string;                                  // shown in the palette
-  footprint: { x: number; y: number; z: number }; // mm, used for placement and collisions
-  /** What the controller can DRIVE (24 V loads / PLC outputs): extend, run, raise ... */
-  commands: Channel[];
-  /** What the controller can READ (switches, sensors, encoders): limit, present, count ... */
-  signals: Channel[];
-  params: readonly ParamSpec[];                   // speeds, heights, delays (reuse the existing spec type)
-  faults: string[];                               // injectable faults this equipment understands
-  fresh(params: Record<string, number>): State;
-  /** One 10 ms substep. Reads/moves bodies in `world`. Pure: returns new state and world. */
-  step(state: State, world: World, commands: Record<string, boolean | number>,
-       dtMs: number, fault: string | null): { state: State; world: World };
-  /** Current values of every signal, from the simulated geometry. */
-  read(state: State, world: World): Record<string, boolean | number>;
-  /** What the 3D view should draw: named parts with a transform, no React. */
-  describe(state: State): Array<{ part: string; shape: 'box' | 'cylinder'; pos: Vec3; size: Vec3; yawDeg: number; colour: string }>;
+/** The integrator supplies this for each placed instance; no device-specific globals. */
+export type EquipmentContext = {
+  id: string;                       // persistent component id
+  originMm: Vec3;                   // floor x/y, vertical z; device anchor in millimetres
+  yawDeg: 0 | 90 | 180 | 270;
+  params: Readonly<Record<string, number>>; // validated, defaults already resolved
+};
+
+export type EquipmentDef<State> = {
+  kind: string;                                   // registry key, e.g. stopper, lift, palletizer
+  label: string;
+  footprint: { x: number; y: number; z: number }; // local millimetres, relative to anchor
+  commands: readonly Channel[];                   // bool and typed numeric control inputs
+  signals: readonly Channel[];                    // bool and typed numeric sensor outputs
+  params: readonly ParamSpec[];
+  faults: readonly string[];
+  fresh(ctx: EquipmentContext): State;
+  /** ONE 10 ms substep; no nested stepping, no independent clock updates. */
+  step(state: State, world: World, ctx: EquipmentContext, commands: Readonly<Record<string, boolean | number>>,
+       dtMs: 10, fault: string | null): { state: State; world: World };
+  read(state: State, world: World, ctx: EquipmentContext): Record<string, boolean | number>;
+  /** 3D primitives expressed in world millimetres, no animations independent of state. */
+  describe(state: State, ctx: EquipmentContext): Array<{
+    part: string; shape: 'box' | 'cylinder'; pos: Vec3; size: Vec3; yawDeg: number; colour: string;
+  }>;
 };
 ```
 
-The integrator turns `commands` into terminals and loads (so a solenoid or motor on the 24 V circuit drives them), turns `signals` into limit switches and sensor terminals, registers the kind, and draws `describe()`. You never touch the electrical side: a command is just "is this input energised" by the time it reaches you.
+The integrator maps discrete `commands` and `signals` onto 24 V terminals and maps **numeric** channels onto a separately validated PLC analog/numeric signal path. The equipment author receives sampled, unit-correct command values and never reads terminals directly. The integrator registers the kind and draws `describe()` with the agreed coordinate conversion.
 
 Add one more export per equipment: `export const EQUIPMENT: EquipmentDef<...>` and register it in `src/plant/equipment/index.ts` (a plain array). That array is the only integration point.
 
@@ -112,7 +136,7 @@ Deliver and merge in small phases; the integrator wires each phase before you st
 9. `robot-arm` (2-link or 3-DOF with a simple analytic inverse kinematics, joint position commands, gripper, workspace limit and a collision stop). Keep it kinematic, not dynamic.
 
 **Phase D — process** (after analog signals exist in the integrator)
-10. `tank` (generalise the existing process: inflow/outflow valves, level number signal), `mixer`, `heater` (first-order thermal model), `proportional-valve`.
+10. `tank` (generalise the existing process: inflow/outflow valves, level number signal), `mixer`, `heater` (first-order thermal model), `proportional-valve`, plus discrete `filler` and `capper` mechanisms (required by the planned bottling scene).
 
 For every equipment list its own **fault set** and make each fault change the model's inputs or parameters (never set the symptom directly), as `src/sim/faults.ts` requires: for example stopper stuck, pusher weak, belt slipping, photoeye lens dirty (shorter range), prox drifting, lift end-switch dead, gripper loses part, valve stuck.
 
@@ -131,7 +155,7 @@ A scene is data, not code: a list of `{ kind, x, y, yawDeg, params }`, plus the 
 9. Mixing tank with heater and proportional valve
 10. Bottling-style fill line (counter, stopper, filler, capper)
 
-Each scene ships with a **reference controller** (an ST program using the tags from the scene's I/O list) and an automated test that runs it through the real `tick()` for N scans and asserts the outcome (for example "20 boxes palletised, none dropped"). The integrator adds a seeded fault set per scene for troubleshooting exercises.
+Each scene ships with a **reference controller** (ST using its declared I/O tags) and pure equipment-level tests from the co-developer. **The integrator** owns the wired, authoritative `tick()` acceptance test running that ST for N scans and asserting actual plant outcomes (for example "20 boxes palletised, none dropped"), plus the seeded fault set. The co-developer must not edit integrator-owned files to make scene tests work. A scene is not accepted until its end-to-end `tick()` test passes.
 
 ## 6. Testing and acceptance, per equipment
 
@@ -140,7 +164,7 @@ Each scene ships with a **reference controller** (an ST program using the tags f
 - **Conservation checks:** bodies are never lost or duplicated; total count only changes through spawn/despawn events.
 - **Bounds:** positions stay within the scene volume; no NaN or Infinity in any snapshot over a 10-minute scripted run.
 - **Fault tests:** each fault produces its symptom through the model and is cleared by repair.
-- **Performance test:** one scene step with the cap of bodies completes under 2 ms (measured median of 1000 steps; record the number in the PR).
+- **Performance test:** the *entire 50 ms plant update* (five 10 ms substeps, every equipment model and global contacts, at the provisional body cap) targets under 2 ms median across 1000 updates on a documented laptop. Report p50/p95/p99 and allocations. The 60-body limit and 2 ms budget remain estimates until measured, including on low-spec Windows hardware.
 - **Mutation check:** break one rule per behaviour, watch a test fail, restore byte-identical (use `cmp`). Note the mutants in the PR.
 - Gate before every PR: `npx tsc --noEmit && npm test && npm run build && npm run verify:full`. Keep the existing 800+ tests green.
 
@@ -154,3 +178,24 @@ Each scene ships with a **reference controller** (an ST program using the tags f
 ## 8. What the integrator will do with each phase
 
 Wire `EQUIPMENT` into the registry and palette; map commands/signals onto 24 V terminals and PLC I/O; add per-instance state, snapshot fields and project save/load; draw `describe()` in 3D; expose faults in the instructor panel; add placement validation and starter scenes; write browser E2E from an empty floor for each new piece; keep CI green and the entry bundle under budget (the plant library will be lazy-loaded with the 3D workbench).
+
+
+## 9. Pre-Phase A integration contract (mandatory)
+
+This section resolves ambiguities between earlier examples and the new EquipmentContext interface above. It must be included when forwarding this brief to the co-developer.
+
+**Position, identity and scale.** Each equipment definition may have arbitrarily many instances. The instance's persistent ID, transform and validated settings come only from EquipmentContext; the co-developer never reads the legacy 2D project representation or the Three.js renderer. Current project coordinates are *workspace units*, not millimetres. To preserve previously saved projects, the integrator converts each placed component to the physics model as:
+
+    originMm.x = (component.x + 85 - 540) * 10
+    originMm.y = (component.y + 65 - 290) * 10
+    originMm.z = 0
+
+This is consistent with the current scene-coordinates adapter (1080 × 580 workspace units; device centre offset 85 × 65; 100 units per Three.js unit). Physics uses x/y for the floor and z upward; rendering uses Three.js x/z for floor and y upward. One workspace unit maps to 10 mm; one Three.js world unit maps to 1000 mm. Equipment geometry is defined in local millimetres relative to its anchor. The integrator supplies 0/90/180/270-degree yaw and verifies orientation against the existing 3D view. A future scale change requires a migration, never a silent reinterpretation of saved projects.
+
+**PLC/plant scheduling.** At a 50 ms scan boundary, sample the prior settled plant into PLC inputs and solve the electrical/PLC programs once. Hold the resulting commands constant while advancing the plant through five 10 ms substeps. Within each substep, visit equipment instances in ascending stable ID order, apply equipment influences, resolve shared body-to-body and body-to-fixture contacts in the world layer, quantize state to the stated 1e-6 quantum and advance the shared world clock *once*. Equipment step functions never run another five-substep loop and never advance the world clock themselves. Sensors measured after motion are visible to the PLC on its next scan; do not invent instantaneous mid-scan feedback. All processing and collision tie breaks must have stable ordering.
+
+**Bodies and event accounting.** Before the first equipment PR, the co-developer defines a typed, bounded event record with simulated timestamp, equipment ID, kind, optional body ID and bounded detail. Events must distinguish successful spawn, successful despawn, rejected spawn, fault and information. A new body gets one monotonically increasing stable ID; only successful spawn increments the spawned counter, and only explicit disposal/discharge increments despawned. The invariant for a fresh initially empty world is: successful spawns minus successful despawns equals the number of live bodies. A belt edge must not make a body vanish silently. Start with the provisional maximum of 60 live bodies and a finite per-scan event cap (propose 128 pending the first benchmark); overflow must increment an explicit dropped-event counter rather than growing memory. Validate all body IDs and positions, and refuse nonfinite data. Renderers are passive consumers of the settled state.
+
+**Analog/numeric I/O.** A boolean output can mean a 24 V load; a numeric output cannot. Numeric channels declare a physical unit and a finite range and are validated independently. Phase A's weigh cell outputs a physically named numeric reading in kg, with any optional noise generated only from saved seeded PRNG state. The co-developer tests the numeric sensor in isolation; the integrator provides the numeric PLC I/O adapter and the actual end-to-end wiring, readback, scanning and save/load checks before declaring the weighing scene integrated. Likewise Phase B's positioned gantry and lift must not pretend that servo position is a boolean. Advanced analog process plant stays Phase D, but the **numeric channel contract is needed in Phase A**.
+
+**Ownership and gates.** The equipment author owns the world, equipment definitions, local world tests and scene data/reference ST text. The integrator owns the orchestrator, mapping, registry, wiring, project persistence, scene wiring and the real tick() integration tests. Each co-developer PR names exact required integration changes without editing integrator-owned files. Integration occurs before the next dependent equipment deliverable. Keep the existing browser and unit assertions strict; a timeout is a failing run until diagnosed, not a pass just because a rerun succeeds. The 2 ms and 60-body targets remain provisional and must be measured at first integration (p50/p95/p99, body cap and hardware details).
