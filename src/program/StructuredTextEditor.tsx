@@ -16,7 +16,7 @@ export function StructuredTextEditor({ source, disabled, snapshot, onActivate, s
     try {
       // Validate against THIS PLC's tag names (the classic names when no I/O map is given).
       const program = compileSandboxST(draft, io ? { inputs: io.inputs.map(p => p.tag), outputs: io.outputs.map(p => p.tag),
-        requireRun: io.outputs.some(p => p.tag === 'Run') } : undefined);
+        numericInputs:io.analogInputs?.map(p=>p.tag)??[], requireRun: io.outputs.some(p => p.tag === 'Run') } : undefined);
       return { message: 'Source compiles in the bounded teaching subset', ok: true,
         outputs: program.assignedOutputs.join(', ') };
     } catch (error) { return { message: error instanceof Error ? error.message : String(error), ok: false, outputs: '' }; }
@@ -27,7 +27,7 @@ export function StructuredTextEditor({ source, disabled, snapshot, onActivate, s
       <span className="status-pill is-idle">Bounded IEC-style teaching subset</span>
     </div>
     <p className="sandbox-help">Write and compile real Structured Text. The simulator uses the compiled code on every scan, with persistent variable memory. {io
-      ? <>Declare the inputs you read as <code>VAR_INPUT</code> and the outputs you drive as <code>VAR_OUTPUT</code>, all BOOL, using this PLC's tag names: inputs {io.inputs.map(p => `${p.tag} (${p.terminal})`).join(', ')}; outputs {io.outputs.map(p => `${p.tag} (${p.terminal})`).join(', ')}.</>
+      ? <>Declare physical input/output tags as BOOL in <code>VAR_INPUT</code>/<code>VAR_OUTPUT</code>: inputs {io.inputs.map(p => `${p.tag} (${p.terminal})`).join(', ')}; outputs {io.outputs.map(p => `${p.tag} (${p.terminal})`).join(', ')}. {io.analogInputs?.length ? <>Numeric process inputs must be declared REAL or LREAL: {io.analogInputs.map(p=>`${p.tag} (${p.terminal}${p.unit?', '+p.unit:''})`).join(', ')}. Wire an actual plant signal before using a numeric reading.</>:null}</>
       : <>Output <code>Run : BOOL</code> controls Q0.0.</>}</p>
     <label className="sandbox-st-label" htmlFor="sandbox-st-source">Structured Text program</label>
     <textarea id="sandbox-st-source" value={draft} rows={14} spellCheck={false}
