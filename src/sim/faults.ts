@@ -15,6 +15,8 @@
  * These are educational abstractions of idealised 24 V parts, not failure physics.
  */
 import { COMPONENTS, type ComponentKind } from '../components/registry';
+import { isThreePhaseWire } from '../electrical/three-phase-netlist';
+import { isPlantNumericWire } from './p3-numeric';
 import { isAnalogWire } from './analog';
 import type { FaultKind, FaultSpec, PlacedComponent, ProjectFile, Wire } from './signals';
 
