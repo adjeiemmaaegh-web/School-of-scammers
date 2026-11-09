@@ -6,6 +6,7 @@ import { AppHeader } from '../ui/AppHeader';
 import { ProgrammingDock } from '../program/ProgrammingDock';
 import { LiveMonitor } from '../program/LiveMonitor';
 import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
+import { PlantScenePanel } from '../ui/sandbox/PlantScenePanel';
 import { TroubleshootingPanel } from '../ui/sandbox/TroubleshootingPanel';
 import { ScenarioPanel } from '../ui/sandbox/ScenarioPanel';
 import { perDeviceLive } from '../sim/device-state';
@@ -569,6 +570,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                 Overload: <strong data-overload-status>{snapshot?.overloadTripped ? 'TRIPPED' : 'CLOSED'}</strong> ·
                 Pilot: <strong data-lamp-status>{snapshot?.lampOn ? 'ON' : 'OFF'}</strong></p>}</div>
           </div>
+          {!scenario && <PlantScenePanel project={project} snapshot={snapshot} editable={editable} onCommands={send}/>}
           {snapshot && project?.components.filter(c => c.kind === 'conveyor').map(conv => { const lane = snapshot.lanes[conv.id] ?? snapshot.plant; return <section key={conv.id}
             className="sandbox-sorting-panel panel" aria-label={`Conveyor sorting controls ${conv.id}`} data-lane={conv.id}>
             <div className="sandbox-section-head"><div>
