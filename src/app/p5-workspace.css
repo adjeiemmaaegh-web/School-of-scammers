@@ -296,8 +296,8 @@
   border:1px solid var(--scene-line);background:var(--surface-2);color:var(--ink);
   border-radius:4px;font:10px var(--mono);cursor:crosshair;white-space:nowrap;
 }
-.p5-logical-terminal.left{left:-28px}
-.p5-logical-terminal.right{right:-28px}
+.p5-logical-terminal.left{left:-4px}
+.p5-logical-terminal.right{right:-4px}
 .p5-logical-terminal.is-selected{
   background:var(--accent);color:var(--accent-ink);outline:2px solid var(--accent);
 }
