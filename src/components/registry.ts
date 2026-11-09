@@ -14,7 +14,7 @@ const plc16Terminals = (): Terminal[] => [
   ...PLC16_INPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'left', y: 30 + i * 6.5, role: 'input' })),
   ...PLC16_OUTPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'right', y: 30 + i * 6.5, role: 'output' })),
 ];
-const EXISTING_COMPONENTS = {
+const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
   stacklight: { kind: 'stacklight', label: 'Stack light (R/Y/G)', help: 'Three 24V signal lamps on one column: R, Y and G each to the common M-', terminals: [
     { name: 'R', side: 'left', y: 32, role: 'load' }, { name: 'Y', side: 'left', y: 62, role: 'load' },
     { name: 'G', side: 'left', y: 92, role: 'load' }, { name: 'M-', side: 'left', y: 122, role: 'load' }] },
