@@ -24,7 +24,7 @@ export const ROTATABLE = new Set([
   'breaker', 'overload', 'motor', 'revmotor', 'lamp', 'stacklight',
   // Orientation-aware Tier 1 material handling and square-footprint geometry sensing.
   'belt-conveyor', 'roller-conveyor', 'turntable', 'geometry-photoeye',
-  'inductive-prox', 'capacitive-prox', 'light-curtain', 'weigh-cell',
+  'inductive-prox', 'capacitive-prox', 'weigh-cell',
 ]);
 const pinOwner = (pin: string): string => pin.slice(0, pin.indexOf('.'));
 const remapPin = (pin: string, mapped: Map<string, string>): string =>

@@ -74,6 +74,14 @@ describe('P1 pure project editor', () => {
     const withTank = tick(createWorld(), [{ k: 'place', id: 't', kind: 'tank', at: { x: 200, y: 200 } }]).world.project;
     expect(() => editWorkspace(withTank, { kind: 'rotate', ids: ['t'], quarterTurns: 1 }))
       .toThrow(/orientation-locked/);
+    // The line-shaped curtain's physical sensing kernel is not yet yaw-aware.
+    // Refuse cosmetic rotation until model geometry and detection agree.
+    const withCurtain = tick(createWorld(), [
+      { k: 'place', id: 'curtain', kind: 'light-curtain', at: { x: 200, y: 200 } },
+    ]).world.project;
+    expect(() => editWorkspace(withCurtain, {
+      kind: 'rotate', ids: ['curtain'], quarterTurns: 1,
+    })).toThrow(/orientation-locked/);
   });
   it('fails safely at the authoritative worker boundary; bad edits are not half-applied', () => {
     const initial = tick(createWorld(), [{ k: 'addPanel', template: 'motor-starter' }]).world;
