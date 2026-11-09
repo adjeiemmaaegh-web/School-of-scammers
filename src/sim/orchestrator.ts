@@ -514,7 +514,11 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (!plc || errors.length) world = setError(world, errors.join('; '));
       else {
         const merged = { inputs: { ...defaultIo(plc.kind).inputs, ...cmd.io.inputs }, outputs: { ...defaultIo(plc.kind).outputs, ...cmd.io.outputs } };
-        const isDefault = JSON.stringify(merged) === JSON.stringify(defaultIo(plc.kind));
+        // Fixed analog AI channels must not make an otherwise default digital
+        // map appear customized in the existing saved-project format.
+        const baseIo=defaultIo(plc.kind);
+        const isDefault=JSON.stringify(merged.inputs)===JSON.stringify(baseIo.inputs)&&
+          JSON.stringify(merged.outputs)===JSON.stringify(baseIo.outputs);
         const { plcIo: previous, ...rest } = world.project;
         const nextIo = { ...(previous ?? {}) };
         if (isDefault) delete nextIo[plc.id]; else nextIo[plc.id] = merged;
