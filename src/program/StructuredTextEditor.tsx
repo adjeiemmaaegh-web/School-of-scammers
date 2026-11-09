@@ -7,7 +7,8 @@ export function StructuredTextEditor({ source, disabled, snapshot, onActivate, s
   /** The start/stop sample and worked example line. Off in graded scenarios. */
   showSamples?: boolean;
   /** The selected PLC's I/O points, when it is not the classic controller. */
-  io?: { inputs: { terminal: string; tag: string }[]; outputs: { terminal: string; tag: string }[] };
+  io?: { inputs: { terminal: string; tag: string }[]; outputs: { terminal: string; tag: string }[];
+    analogInputs?: {terminal:string;tag:string;value:number;unit:string;connected:boolean}[] };
 }) {
   const [draft, setDraft] = useState(source || DEFAULT_ST_SOURCE);
   useEffect(() => { setDraft(source || DEFAULT_ST_SOURCE); }, [source]);
