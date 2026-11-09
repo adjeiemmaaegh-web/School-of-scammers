@@ -317,3 +317,14 @@
 @media(max-width:570px){
   .p5-logical-scroll{height:58vh;min-height:390px}
 }
+
+/* Drei Html device labels use very high internal z-index values. Confine those
+ * labels to the 3D scene's stacking context so they can never cover the sticky
+ * project toolbar when the long engineering page is scrolled.
+ * AppHeader z=20 > toolbar z=9 > isolated 3D scene z=0.
+ */
+.p5-organized .sandbox-3d-shell {
+  position:relative;
+  z-index:0;
+  isolation:isolate;
+}
