@@ -185,6 +185,7 @@ export type Command =
   /** `conveyor` names the lane; omitted means the first conveyor (the single-conveyor behaviour). */
   | { k: 'feedParcel'; kind: ParcelKind; conveyor?: string }
   | { k:'setPlantFault'; id:string; fault:string|null }
+  | { k:'loadPlantScene'; id:string }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
   /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
