@@ -403,6 +403,50 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             localSave === 'failed' ? 'Not saved — export your JSON' : 'Loading local project'}</small>
         </div>
       </header>
+      <nav className="p5-menu-bar" aria-label="Engineering workspace menus" data-p5-menu>
+        <details><summary>Project</summary><div className="p5-menu-content">
+          {!scenario && <button type="button" disabled={!editable} onClick={()=>{
+            setSelectedTerminal(null);setMoveTarget(null);setSelectedDeviceId(null);
+            setWorkspaceView('physical');send([{k:'clear'}]);
+          }}>New empty project</button>}
+          {!scenario && <button type="button" onClick={()=>fileInput.current?.click()}>Open local JSON project</button>}
+          <button type="button" disabled={!project} onClick={exportProject}>Download project JSON</button>
+          <span>Projects stay in this browser unless exported.</span>
+        </div></details>
+        <details><summary>Edit</summary><div className="p5-menu-content">
+          <button type="button" disabled={!editable||!undoStack.length} onClick={undo}>Undo last destructive edit</button>
+          <button type="button" disabled={!editable||!selectedDeviceId}
+            onClick={()=>selectedDeviceId&&removeDevice(selectedDeviceId)}>Remove selected device</button>
+          <button type="button" onClick={()=>{setSelectedTerminal(null);setMoveTarget(null);}}>Cancel tool/terminal</button>
+        </div></details>
+        <details><summary>View</summary><div className="p5-menu-content">
+          <button type="button" onClick={()=>setWorkspaceView('logical')}>Show logical wiring</button>
+          <button type="button" onClick={()=>setWorkspaceView('physical')}>Show physical plant</button>
+          <button type="button" onClick={()=>setLibraryExpanded(v=>!v)}>Toggle device library</button>
+          <button type="button" onClick={()=>setInspectorExpanded(v=>!v)}>Toggle inspector</button>
+          <button type="button" onClick={()=>setDockExpanded(v=>!v)}>Toggle engineering dock</button>
+        </div></details>
+        <details><summary>Simulation</summary><div className="p5-menu-content">
+          <button type="button" onClick={()=>send([{k:snapshot?.running?'pause':'run'}])}>
+            {snapshot?.running?'Pause simulation':'Start simulation'}</button>
+          <button type="button" disabled={!editable} onClick={()=>send([{k:'step'}])}>Advance one PLC scan</button>
+          <button type="button" onClick={()=>send([{k:'reset'}])}>Reset simulated state</button>
+        </div></details>
+        <details><summary>Tools</summary><div className="p5-menu-content">
+          <button type="button" onClick={()=>{setWorkspaceView('logical');setActiveStage('wire');}}>Open terminal wiring</button>
+          <button type="button" onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);}}>Open virtual instruments</button>
+          <button type="button" onClick={()=>{setDockFocus('program');setDockExpanded(true);}}>Open PLC programming</button>
+        </div></details>
+        <details><summary>Help</summary><div className="p5-menu-content">
+          <button type="button" onClick={()=>setWorkspaceHelp(v=>!v)}>Toggle workspace instructions</button>
+          <span>Alt+1 logical · Alt+2 physical · Ctrl+S export · Esc cancel</span>
+        </div></details>
+      </nav>
+      {workspaceHelp&&<aside className="p5-help" aria-label="Workspace instructions">
+        Place supported equipment from the library, connect real terminal pairs in Logical/Wiring,
+        edit the selected PLC program, then Run or Step. Both views share one project and one
+        authoritative worker. Values are illustrative educational simulations, not field ratings.
+      </aside>}
       <nav className="sandbox-workflow" aria-label="Sandbox workflow shortcuts">
         {workflow.map((step, index) => <button type="button" key={step.id}
           onClick={() => goToStage(step.id)} aria-pressed={activeStage === step.id}
@@ -447,6 +491,30 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         <button className="btn primary small" onClick={() => send([{ k: snapshot?.running ? 'pause' : 'run' }])}>
           {snapshot?.running ? 'Pause' : '▶ Run'}</button>
         <span className="sandbox-scan" aria-live="off">Scan {snapshot?.tick ?? 0}</span>
+      </div>
+      <div className="p5-view-tools" role="toolbar" aria-label="Canvas views and active tools">
+        <div className="p5-view-tabs" role="group" aria-label="Project view">
+          <button type="button" data-p5-view="logical" aria-pressed={workspaceView==='logical'}
+            onClick={()=>setWorkspaceView('logical')}>Logical / Wiring</button>
+          <button type="button" data-p5-view="physical" aria-pressed={workspaceView==='physical'}
+            onClick={()=>setWorkspaceView('physical')}>Physical / 3D Plant</button>
+        </div>
+        <div className="p5-tool-actions" role="group" aria-label="Engineering tools">
+          <button type="button" onClick={()=>{setMoveTarget(null);setSelectedTerminal(null);}}>Select</button>
+          <button type="button" disabled={!editable} onClick={()=>{setWorkspaceView('logical');setActiveStage('wire');}}>
+            Wire terminals</button>
+          <button type="button" onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);
+            document.getElementById('sandbox-stage-test')?.scrollIntoView({block:'nearest'});}}>
+            Measure / diagnose</button>
+        </div>
+        <div className="p5-panel-toggles" role="group" aria-label="Workspace panels">
+          <button type="button" aria-pressed={libraryExpanded}
+            onClick={()=>setLibraryExpanded(v=>!v)}>Library</button>
+          <button type="button" aria-pressed={inspectorExpanded}
+            onClick={()=>setInspectorExpanded(v=>!v)}>Inspector</button>
+          <button type="button" aria-pressed={dockExpanded}
+            onClick={()=>setDockExpanded(v=>!v)}>Dock</button>
+        </div>
       </div>
       {(clientError || snapshot?.lastError) && <div role="alert" className="sandbox-alert">{clientError || snapshot?.lastError}</div>}
       {scenario && <ScenarioPanel session={scenario} project={project} evidence={evidence} result={result}
