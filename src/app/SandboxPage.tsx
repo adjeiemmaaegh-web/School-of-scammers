@@ -551,6 +551,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                   'Q0.0', 'Q0.1', 'Q0.2', 'Q0.3', 'Q0.4', 'Q0.5', 'PlcPowered'] as const).map(k =>
                 <span className={activeIo[k] ? 'lit' : ''} key={k}><i />{k}</span>)}
               </div></div>
+            {!!activePlcView?.io.analogInputs?.length && <div className="sandbox-analog-readings" aria-label="Typed numeric PLC input image">
+              {activePlcView.io.analogInputs.map(point=><p key={point.terminal}
+                data-analog-input={point.terminal}>
+                {point.terminal} · {point.tag}: <strong>{point.connected ? point.value+' '+point.unit : 'No connected numeric source'}</strong>
+                {point.source ? <small> · {point.source}</small> : null}
+              </p>)}
+            </div>}
             <div><span className="eyebrow">Plant</span>
               <p>Contactor: <strong>{snapshot?.contactorOn ? 'energised' : 'off'}</strong> · Motor: <strong>{snapshot?.motorOn ? 'running' : 'stopped'}</strong></p>
               {project?.components.some(c => c.kind === 'conveyor') && <p>
