@@ -99,15 +99,12 @@ const clickText = async (page, label) => {
     // not merely the reset button click, before testing a future breakpoint.
     await page.waitForFunction(() => document.querySelector('.sandbox-scan')?.textContent.trim()==='Scan 0',
       {timeout:10000});
-    await page.type('input[aria-label="Breakpoint scan number"]','3');
-    console.log('P2 breakpoint input state',JSON.stringify(await page.evaluate(()=>{
-      const panel=document.querySelector('.sandbox-breakpoint-panel');
-      const set=Array.from(panel?.querySelectorAll('button')??[]).find(b=>b.textContent.trim()==='Set');
-      return {field:panel?.querySelector('input[aria-label="Breakpoint scan number"]')?.value,
-        setDisabled:set?.disabled,scan:document.querySelector('.sandbox-scan')?.textContent,
-        running:document.querySelector('[data-p5-sim-state]')?.textContent,
-        panelText:panel?.textContent.slice(-180)};
-    })));
+    // Native controlled-input setter avoids Puppeteer typing into a previously
+    // focused element after the reorganized dock causes a scroll and re-render.
+    await page.$eval('input[aria-label="Breakpoint scan number"]', input => {
+      const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+      set.call(input,'3');input.dispatchEvent(new Event('input',{bubbles:true}));
+    });
     await page.waitForFunction(() => {
       const panel=document.querySelector('.sandbox-breakpoint-panel');
       const set=Array.from(panel?.querySelectorAll('button')??[]).find(b=>b.textContent.trim()==='Set');
