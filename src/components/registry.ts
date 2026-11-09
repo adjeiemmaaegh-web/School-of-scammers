@@ -13,6 +13,8 @@ const plc16Terminals = (): Terminal[] => [
   { name: 'L+', side: 'left', y: 8, role: 'supply' }, { name: 'M', side: 'left', y: 18, role: 'return' },
   ...PLC16_INPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'left', y: 30 + i * 6.5, role: 'input' })),
   ...PLC16_OUTPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'right', y: 30 + i * 6.5, role: 'output' })),
+  { name:'AI0',side:'left',y:142,role:'analog-input' },
+  { name:'AI1',side:'left',y:153,role:'analog-input' },
 ];
 const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
   stacklight: { kind: 'stacklight', label: 'Stack light (R/Y/G)', help: 'Three 24V signal lamps on one column: R, Y and G each to the common M-', terminals: [
