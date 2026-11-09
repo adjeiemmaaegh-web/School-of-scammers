@@ -134,12 +134,23 @@ export const classicInputs = (tags: Record<string, STValue>): PlcInputs => ({
 export function scanPlc(
   cfg: ResolvedProgram, io: PlcIoMap, prior: PlcRuntime, tagInputs: Record<string, STValue>, powered: boolean, dtMs: number,
   analogInputs: AnalogPoint[] = [],
+  localForces: Readonly<Record<string, boolean | number>> = {},
 ): PlcRuntime {
   const names = namesOf(io);
   const inputs = classicInputs(tagInputs);
   const mappedOutputs = (coils: Record<string, boolean>) => Object.fromEntries(names.outputs.map(n => [n, coils[n] === true]));
   if (!powered) return { ...prior, powered, inputs, tagInputs, analogInputs, coils: {},
-    tagValues: { ...tagInputs, ...mappedOutputs({}), Unused: false }, ladderMemory: {}, ladderNumeric: {}, ladderSteps: [], stMemory: prior.stMemory };
+    tagValues: { ...tagInputs, ...mappedOutputs({}), Unused: false }, ladderMemory: {}, ladderNumeric: {}, ladderSteps: [],
+    fbdMemory: {}, fbdSteps: [], stMemory: prior.stMemory };
+  if (cfg.language === 'fbd') {
+    const program = compileFbd(cfg.fbd, names);
+    const result = executeFbd(program, tagInputs, prior.coils, prior.fbdMemory, dtMs);
+    const coils = result.outputs;
+    return { ...prior, powered, inputs, tagInputs, analogInputs, coils,
+      fbdMemory: result.memory, fbdSteps: result.steps,
+      stMemory: {}, ladderMemory: {}, ladderNumeric: {}, ladderSteps: [],
+      tagValues: { ...tagInputs, ...coils, ...mappedOutputs(coils), Unused: false } };
+  }
   if (cfg.language === 'st') {
     const compiled = prior.stCompiled ?? compileSandboxST(cfg.stSource, names);
     // A connected numeric process source is mandatory if ST declares that physical
@@ -164,18 +175,21 @@ export function scanPlc(
       ...Object.fromEntries(names.outputs.map(n => [n, out(n) === true])),
     } as Record<string, boolean>;
     return { ...prior, powered, inputs, tagInputs, analogInputs, coils, stCompiled: compiled, stMemory: result.memory, ladderMemory: {}, ladderNumeric: {}, ladderSteps: [],
+      fbdMemory: {}, fbdSteps: [],
       tagValues: { ...tagInputs, ...result.signals, ...coils, ...mappedOutputs(coils), Unused: false } };
   }
-  const result = executeLadder(cfg.program, tagInputs, prior.coils, prior.ladderMemory, dtMs, prior.ladderNumeric);
+  const result = executeLadder(cfg.program, tagInputs, prior.coils, prior.ladderMemory, dtMs, prior.ladderNumeric, localForces);
   const coils = result.outputs;
   return { ...prior, powered, inputs, tagInputs, analogInputs, coils, stMemory: {}, ladderMemory: result.memory, ladderNumeric: result.numericValues, ladderSteps: [...result.steps],
-    tagValues: { ...tagInputs, ...result.numericValues, ...coils, ...mappedOutputs(coils), Unused: false } };
+    fbdMemory: {}, fbdSteps: [],
+    tagValues: { ...tagInputs, ...localForces, ...result.numericValues, ...coils, ...mappedOutputs(coils), Unused: false } };
 }
 
 /** Publishable summary of one PLC: its I/O points with tags and live state, whatever its I/O map. */
 export function plcView(
-  kind: string, language: 'ladder' | 'st', powered: boolean, io: PlcIoMap, tagInputs: Record<string, STValue>, coils: Record<string, boolean>,
-  live: { tagValues: Record<string, STValue>; ladderSteps: LadderStep[]; ladderMemory: LadderMemory }, analogInputs: AnalogPoint[] = [],
+  kind: string, language: 'ladder' | 'st' | 'fbd', powered: boolean, io: PlcIoMap, tagInputs: Record<string, STValue>, coils: Record<string, boolean>,
+  live: { tagValues: Record<string, STValue>; ladderSteps: LadderStep[]; ladderMemory: LadderMemory; fbdSteps?: FbdStep[] }, analogInputs: AnalogPoint[] = [],
+  localForces: Readonly<Record<string, boolean | number>> = {},
 ): PlcView {
   const names = namesOf(io);
   const point = (table: Record<string, string>, on: (tag: string) => boolean): PlcIoPoint[] =>
@@ -184,6 +198,7 @@ export function plcView(
   return {
     powered, language, kind, io: { inputs: point(io.inputs, t => tagInputs[t] === true), outputs,
       ...(io.analogInputs ? { analogInputs: analogInputs.map(p => ({ ...p })) } : {}) },
+    fbdSteps: [...(live.fbdSteps ?? [])], debugForces: { ...localForces },
     inputs: classicInputs(tagInputs), coils: Object.fromEntries(names.outputs.map(c => [c, coils[c] === true])),
     outputs: Object.fromEntries(outputs.map(o => [o.terminal, o.on])),
     tagValues: { ...live.tagValues }, ladderSteps: [...live.ladderSteps], ladderMemory: { ...live.ladderMemory },
