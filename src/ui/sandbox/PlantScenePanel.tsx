@@ -44,6 +44,17 @@ export function PlantScenePanel({project,snapshot,editable,onCommands}:Props){
       <span>World time: <strong>{snapshot.plantWorld.world.timeMs} ms</strong></span>
       <span>Dropped events: <strong>{snapshot.plantWorld.world.droppedEventCount}</strong></span>
      </div>
+     <details className="sandbox-p3-body-tracker">
+      <summary>Track physical parcels · authoritative worker positions</summary>
+      <ul className="sandbox-p3-body-list">
+       {snapshot.plantWorld.world.bodies.map(body=><li key={body.id}
+         data-p3-body-id={body.id} data-supported-by={body.supportedBy??''}>
+         <strong>{body.id}</strong> · {body.supportedBy??'unassigned'} ·
+         x {Math.round(body.pos.x)} mm, y {Math.round(body.pos.y)} mm, z {Math.round(body.pos.z)} mm
+         {body.tags.jammed===true?' · jammed':''}
+        </li>)}
+      </ul>
+     </details>
      <details><summary>Live sensors, measurements and equipment faults</summary>
       <div className="sandbox-p3-signal-list">
        {parts.map(part=>{
