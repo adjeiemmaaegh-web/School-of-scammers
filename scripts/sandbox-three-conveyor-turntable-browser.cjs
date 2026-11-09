@@ -108,10 +108,8 @@ const makeProject = (wrong = false) => ({
         {timeout:15000});
       await page.waitForFunction(() =>
         document.querySelector('[data-device-id="pilot"] .sandbox-device-status')
-          ?.textContent.includes('ON') || 
-        document.querySelector('[data-device-id="pilot"] .sandbox-device-status')
-          ?.textContent.includes('LIT'),
-        {timeout:15000}).catch(()=>{});
+          ?.textContent.includes('ILLUMINATED'),
+        {timeout:15000});
       assert.equal(await page.$eval('.sandbox-p3-body-list',el=>
         !!el.querySelector('[data-supported-by="east"]')),false,'Correct ST must not route east');
     } else {
