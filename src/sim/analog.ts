@@ -30,7 +30,7 @@ export function analogWireError(
     return 'Numeric signals must connect an analog output directly to an analog input; 24V and numeric wires cannot mix';
   const input = a === 'analog-input' ? from : to;
   if (existing.some(w => w.from === input || w.to === input))
-    return 'An analog PLC input supports exactly one signal source';
+    return 'An analog PLC input supports exactly one signal source; only one numeric source may be connected';
   return null;
 }
 

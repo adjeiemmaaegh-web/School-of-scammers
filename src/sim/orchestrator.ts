@@ -1065,7 +1065,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       const numericValues = Object.fromEntries(numericPoints.map(point => [point.tag, point.value]));
       const tagInputs = { ...digitalInputs, ...numericValues };
       nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)),
-        tagInputs, extraPowered, dtMs, numericPoints, w.debugForces[extra.id] ?? {});
+        tagInputs, extraPowered, dtMs, numericPoints, w.debugForces[extra.id] ?? {},
+        w.project.components.some(c => Object.hasOwn(PLANT_EQUIPMENT, c.kind)));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PLC runtime failed';
       const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };

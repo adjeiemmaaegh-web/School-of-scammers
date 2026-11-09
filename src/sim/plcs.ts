@@ -135,6 +135,7 @@ export function scanPlc(
   cfg: ResolvedProgram, io: PlcIoMap, prior: PlcRuntime, tagInputs: Record<string, STValue>, powered: boolean, dtMs: number,
   analogInputs: AnalogPoint[] = [],
   localForces: Readonly<Record<string, boolean | number>> = {},
+  processNumericSource = false,
 ): PlcRuntime {
   const names = namesOf(io);
   const inputs = classicInputs(tagInputs);
@@ -159,7 +160,8 @@ export function scanPlc(
     for (const declaration of compiled.declarations) {
       if (declaration.scope !== 'input' || !names.numericInputs.some(n => n.toLowerCase() === declaration.name.toLowerCase())) continue;
       if (!analogInputs.some(p => p.tag.toLowerCase() === declaration.name.toLowerCase() && p.connected))
-        throw new Error('Numeric input ' + declaration.name + ' has no connected source');
+        throw new Error('Numeric input ' + declaration.name +
+          (processNumericSource ? ' has no connected process source' : ' has no connected source'));
     }
     const result = executeStructuredText(compiled, tagInputs, prior.stMemory);
     const out = (name: string) => Object.entries(result.outputs).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1];
