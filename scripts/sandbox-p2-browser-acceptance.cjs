@@ -102,7 +102,7 @@ const clickText = async (page, label) => {
     await page.type('input[aria-label="Breakpoint scan number"]','3');
     await page.waitForFunction(() => {
       const panel=document.querySelector('.sandbox-breakpoint-panel');
-      const set=[...panel?.querySelectorAll('button')??[]].find(b=>b.textContent.trim()==='Set');
+      const set=Array.from(panel?.querySelectorAll('button')??[]).find(b=>b.textContent.trim()==='Set');
       return panel?.querySelector('input[aria-label="Breakpoint scan number"]')?.value==='3' &&
         !!set && !set.disabled;
     },{timeout:10000});
