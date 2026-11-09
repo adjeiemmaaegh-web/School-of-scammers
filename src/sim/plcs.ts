@@ -9,6 +9,7 @@
  * Pure and deterministic, like everything under src/sim.
  */
 import { executeLadder, type LadderDocument, type LadderMemory, type LadderStep } from '../engineering/ladder';
+import { compileFbd, executeFbd, fbdMotorStarter, type FbdDocument, type FbdStep } from '../engineering/fbd';
 import { executeStructuredText, type STValue } from '../engineering/structured-text';
 import { compileSandboxST, DEFAULT_ST_SOURCE } from '../program/p2-contract';
 import { isPlcKind } from '../components/registry';
@@ -56,22 +57,29 @@ export function defaultProgramFor(kind: string | undefined, io?: PlcIoMap): Reso
     const [input, output] = [names.inputs[0], names.outputs[0]];
     return {
       program: { id: 'sandbox-program', version: '1.0', rungs: [{ id: 'rung-1', elements: [{ type: 'contact', tag: input }], coil: output }] },
+      fbd: { id: 'plc16-fbd', version: '1.0', nodes: [
+        { id: 'source', kind: 'input', tag: input }, { id: 'coil', kind: 'output', tag: output, inputs: ['source'] },
+      ] },
       language: 'ladder', stSource: ['VAR_INPUT', `  ${input} : BOOL;`, 'END_VAR', 'VAR_OUTPUT', `  ${output} : BOOL;`, 'END_VAR', `${output} := ${input};`].join('\n'),
     };
   }
-  return { program: blankProgram(), language: 'ladder', stSource: DEFAULT_ST_SOURCE };
+  return { program: blankProgram(), language: 'ladder', stSource: DEFAULT_ST_SOURCE, fbd: fbdMotorStarter() };
 }
 
-export type ResolvedProgram = { program: LadderDocument; language: 'ladder' | 'st'; stSource: string };
+export type ResolvedProgram = { program: LadderDocument; language: 'ladder' | 'st' | 'fbd'; stSource: string; fbd: FbdDocument };
 
 /** The program of any PLC, with defaults filled in. Unknown ids resolve to a blank Ladder program. */
 export function programOf(project: ProjectFile, plcId: string | undefined): ResolvedProgram {
-  if (plcId === undefined || plcId === primaryPlcId(project) || plcComponents(project).length === 0)
-    return { program: project.program, language: project.language ?? 'ladder', stSource: project.stSource ?? DEFAULT_ST_SOURCE };
+  if (plcId === undefined || plcId === primaryPlcId(project) || plcComponents(project).length === 0) {
+    const primary = plcComponents(project)[0];
+    return { program: project.program, language: project.language ?? 'ladder', stSource: project.stSource ?? DEFAULT_ST_SOURCE,
+      fbd: project.fbd ?? defaultProgramFor(primary?.kind, primary ? ioOf(project, primary) : undefined).fbd };
+  }
   const own = project.plcPrograms?.[plcId];
   const comp = project.components.find(c => c.id === plcId);
   const fallback = defaultProgramFor(comp?.kind, comp ? ioOf(project, comp) : undefined);
-  return { program: own?.program ?? fallback.program, language: own?.language ?? 'ladder', stSource: own?.stSource ?? fallback.stSource };
+  return { program: own?.program ?? fallback.program, language: own?.language ?? 'ladder',
+    stSource: own?.stSource ?? fallback.stSource, fbd: own?.fbd ?? fallback.fbd };
 }
 
 /** The tag names a PLC's program is validated against (its I/O map). Unknown ids get the classic names. */
@@ -87,12 +95,14 @@ export function withProgramOf(project: ProjectFile, plcId: string | undefined, p
     ...(patch.program !== undefined ? { program: patch.program } : {}),
     ...(patch.language !== undefined ? { language: patch.language } : {}),
     ...(patch.stSource !== undefined ? { stSource: patch.stSource } : {}),
+    ...(patch.fbd !== undefined ? { fbd: patch.fbd } : {}),
   };
   const current = programOf(project, plcId);
   return { ...project, plcPrograms: { ...project.plcPrograms, [plcId]: {
     program: patch.program ?? current.program,
     language: patch.language ?? current.language,
     stSource: patch.stSource ?? current.stSource,
+    fbd: patch.fbd ?? current.fbd,
   } } };
 }
 
@@ -105,6 +115,7 @@ export function freshPlcRuntime(cfg: ResolvedProgram, names?: IoNames): PlcRunti
   return {
     powered: false, inputs, tagInputs: {}, coils: {}, tagValues: idleTags(inputs), ladderMemory: {}, ladderNumeric: {}, ladderSteps: [],
     stCompiled: cfg.language === 'st' ? compileSandboxST(cfg.stSource, names) : null, stMemory: {},
+    fbdMemory: {}, fbdSteps: [],
   };
 }
 
@@ -120,12 +131,23 @@ export const classicInputs = (tags: Record<string, boolean>): PlcInputs => ({
  */
 export function scanPlc(
   cfg: ResolvedProgram, io: PlcIoMap, prior: PlcRuntime, tagInputs: Record<string, boolean>, powered: boolean, dtMs: number,
+  localForces: Readonly<Record<string, boolean | number>> = {},
 ): PlcRuntime {
   const names = namesOf(io);
   const inputs = classicInputs(tagInputs);
   const mappedOutputs = (coils: Record<string, boolean>) => Object.fromEntries(names.outputs.map(n => [n, coils[n] === true]));
   if (!powered) return { ...prior, powered, inputs, tagInputs, coils: {},
-    tagValues: { ...tagInputs, ...mappedOutputs({}), Unused: false }, ladderMemory: {}, ladderNumeric: {}, ladderSteps: [], stMemory: prior.stMemory };
+    tagValues: { ...tagInputs, ...mappedOutputs({}), Unused: false }, ladderMemory: {}, ladderNumeric: {}, ladderSteps: [],
+    fbdMemory: {}, fbdSteps: [], stMemory: prior.stMemory };
+  if (cfg.language === 'fbd') {
+    const program = compileFbd(cfg.fbd, names);
+    const result = executeFbd(program, tagInputs, prior.coils, prior.fbdMemory, dtMs);
+    const coils = result.outputs;
+    return { ...prior, powered, inputs, tagInputs, coils,
+      fbdMemory: result.memory, fbdSteps: result.steps,
+      stMemory: {}, ladderMemory: {}, ladderNumeric: {}, ladderSteps: [],
+      tagValues: { ...tagInputs, ...coils, ...mappedOutputs(coils), Unused: false } };
+  }
   if (cfg.language === 'st') {
     const compiled = prior.stCompiled ?? compileSandboxST(cfg.stSource, names);
     const result = executeStructuredText(compiled, tagInputs, prior.stMemory);
@@ -142,18 +164,21 @@ export function scanPlc(
       ...Object.fromEntries(names.outputs.map(n => [n, out(n) === true])),
     } as Record<string, boolean>;
     return { ...prior, powered, inputs, tagInputs, coils, stCompiled: compiled, stMemory: result.memory, ladderMemory: {}, ladderNumeric: {}, ladderSteps: [],
+      fbdMemory: {}, fbdSteps: [],
       tagValues: { ...tagInputs, ...result.signals, ...coils, ...mappedOutputs(coils), Unused: false } };
   }
-  const result = executeLadder(cfg.program, tagInputs, prior.coils, prior.ladderMemory, dtMs, prior.ladderNumeric);
+  const result = executeLadder(cfg.program, tagInputs, prior.coils, prior.ladderMemory, dtMs, prior.ladderNumeric, localForces);
   const coils = result.outputs;
   return { ...prior, powered, inputs, tagInputs, coils, stMemory: {}, ladderMemory: result.memory, ladderNumeric: result.numericValues, ladderSteps: [...result.steps],
-    tagValues: { ...tagInputs, ...result.numericValues, ...coils, ...mappedOutputs(coils), Unused: false } };
+    fbdMemory: {}, fbdSteps: [],
+    tagValues: { ...tagInputs, ...localForces, ...result.numericValues, ...coils, ...mappedOutputs(coils), Unused: false } };
 }
 
 /** Publishable summary of one PLC: its I/O points with tags and live state, whatever its I/O map. */
 export function plcView(
-  kind: string, language: 'ladder' | 'st', powered: boolean, io: PlcIoMap, tagInputs: Record<string, boolean>, coils: Record<string, boolean>,
-  live: { tagValues: Record<string, STValue>; ladderSteps: LadderStep[]; ladderMemory: LadderMemory },
+  kind: string, language: 'ladder' | 'st' | 'fbd', powered: boolean, io: PlcIoMap, tagInputs: Record<string, boolean>, coils: Record<string, boolean>,
+  live: { tagValues: Record<string, STValue>; ladderSteps: LadderStep[]; ladderMemory: LadderMemory; fbdSteps?: FbdStep[] },
+  localForces: Readonly<Record<string, boolean | number>> = {},
 ): PlcView {
   const names = namesOf(io);
   const point = (table: Record<string, string>, on: (tag: string) => boolean): PlcIoPoint[] =>
@@ -161,6 +186,7 @@ export function plcView(
   const outputs = point(io.outputs, t => coils[t] === true);
   return {
     powered, language, kind, io: { inputs: point(io.inputs, t => tagInputs[t] === true), outputs },
+    fbdSteps: [...(live.fbdSteps ?? [])], debugForces: { ...localForces },
     inputs: classicInputs(tagInputs), coils: Object.fromEntries(names.outputs.map(c => [c, coils[c] === true])),
     outputs: Object.fromEntries(outputs.map(o => [o.terminal, o.on])),
     tagValues: { ...live.tagValues }, ladderSteps: [...live.ladderSteps], ladderMemory: { ...live.ladderMemory },
