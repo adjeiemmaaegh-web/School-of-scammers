@@ -1,6 +1,8 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
-export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor';
-export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' };
+import { EQUIPMENT } from '../plant/equipment';
+import type { EquipmentDef } from '../plant/world/equipment';
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper';
+export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
 export const isPlcKind = (kind: string): boolean => kind === 'plc' || kind === 'plc16';
@@ -12,7 +14,7 @@ const plc16Terminals = (): Terminal[] => [
   ...PLC16_INPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'left', y: 30 + i * 6.5, role: 'input' })),
   ...PLC16_OUTPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'right', y: 30 + i * 6.5, role: 'output' })),
 ];
-export const COMPONENTS: Record<ComponentKind, Definition> = {
+const EXISTING_COMPONENTS = {
   stacklight: { kind: 'stacklight', label: 'Stack light (R/Y/G)', help: 'Three 24V signal lamps on one column: R, Y and G each to the common M-', terminals: [
     { name: 'R', side: 'left', y: 32, role: 'load' }, { name: 'Y', side: 'left', y: 62, role: 'load' },
     { name: 'G', side: 'left', y: 92, role: 'load' }, { name: 'M-', side: 'left', y: 122, role: 'load' }] },
@@ -91,6 +93,38 @@ export const COMPONENTS: Record<ComponentKind, Definition> = {
   lamp: { kind: 'lamp', label: '24V pilot lamp', help: 'Illuminates only when its two actual 24V DC terminals are energized', terminals: [
     { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
 };
+/** The registry drives both palette and terminal patchboard; equipment is not duplicated. */
+const plantTerminals=(def:EquipmentDef):Terminal[]=>{
+ const terms:Terminal[]=[];
+ const digital=def.commands.filter(ch=>ch.kind==='bool');
+ const analogCommands=def.commands.filter(ch=>ch.kind==='number');
+ const digitalSignals=def.signals.filter(ch=>ch.kind==='bool');
+ const numericSignals=def.signals.filter(ch=>ch.kind==='number');
+ if(digital.length) {
+  digital.forEach((ch,i)=>terms.push({name:'CMD_'+ch.name+'+',side:'left',y:24+i*14,role:'load'}));
+  terms.push({name:'M-',side:'left',y:24+digital.length*14,role:'load'});
+ }
+ if(digitalSignals.length||numericSignals.length){
+  terms.push({name:'L+',side:'right',y:18,role:'supply'});
+  terms.push({name:'M',side:'right',y:32,role:'return'});
+ }
+ digitalSignals.forEach((ch,i)=>terms.push({
+  name:'OUT_'+ch.name,side:'right',y:50+i*12,role:'output',
+ }));
+ numericSignals.forEach((ch,i)=>terms.push({
+  name:'AN_'+ch.name,side:'right',y:65+(i+digitalSignals.length)*12,role:'analog-output',
+ }));
+ analogCommands.forEach((ch,i)=>terms.push({
+  name:'SET_'+ch.name,side:'left',y:125+i*10,role:'analog-input',
+ }));
+ return terms;
+};
+const generatedPlant=Object.fromEntries(EQUIPMENT.map(def=>[def.kind,{
+ kind:def.kind,label:def.label,help:'Deterministic, bounded plant equipment. '+def.commands.length+
+ ' command channels, '+def.signals.length+' sensor channels; simplified physical model.',
+ terminals:plantTerminals(def),
+}])) as Record<string,Definition>;
+export const COMPONENTS={...EXISTING_COMPONENTS,...generatedPlant} as Record<ComponentKind,Definition>;
 export const componentKinds = Object.keys(COMPONENTS) as ComponentKind[];
 export function terminalExists(terminalId: string, components: readonly { id: string; kind: ComponentKind }[]): boolean {
   const dot = terminalId.indexOf('.');
