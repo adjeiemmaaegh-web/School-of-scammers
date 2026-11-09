@@ -65,17 +65,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     assert.equal(await statusNow('motor-1'), 'RUNNING', 'The template program latches');
     // The sticky toolbar must stay clickable after scrolling (it once slid behind the sticky app header).
     assert.ok(await page.evaluate(() => scrollY) > 100, 'The page scrolled when a device button was pressed');
-    console.log('P5 toolbar occlusion diagnostic',JSON.stringify(await page.evaluate(()=>{
-      const b=[...document.querySelectorAll('.sandbox-toolbar button')].find(b=>b.textContent.trim()==='Import JSON');
-      const r=b?.getBoundingClientRect();
-      const element=r&&document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
-      return {scrollY,viewport:innerWidth,toolbarTop:document.querySelector('.sandbox-toolbar')?.getBoundingClientRect().top,
-        appHeaderHeight:document.querySelector('.app-header')?.getBoundingClientRect().height,
-        cssHeader:document.documentElement.style.getPropertyValue('--app-header-h'),
-        importRect:r&&{x:r.x,y:r.y,width:r.width,height:r.height},
-        covering:element&&{tag:element.tagName,cls:element.className,text:element.textContent?.slice(0,100)},
-        starterOpen:document.querySelector('[data-starters]')?.open};
-    })));
     assert.equal(await page.evaluate(() => {
       const hidden = [...document.querySelectorAll('.sandbox-toolbar button')].filter(b => !b.closest('details:not([open])')).filter(b => {
         const r = b.getBoundingClientRect();
