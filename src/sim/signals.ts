@@ -6,6 +6,7 @@ import type { SortingPlant, ParcelKind } from '../plant/sorting-conveyor';
 import type { TankProcess } from '../plant/tank-process';
 import type { CylinderState } from '../plant/cylinder';
 import type { MeterReading } from '../electrical/panel-meter';
+import type { StarterPanelState, PhaseReading } from '../electrical/three-phase-types';
 
 export type XY = { x: number; y: number };
 export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean };
@@ -121,6 +122,8 @@ export type WorldState = {
   vessels: Record<string, TankProcess>;
   /** Trip state of every breaker and overload, by component id (the legacy flags mirror the first of each). */
   tripped: Record<string, boolean>;
+  /** P4 virtual three-phase motor state per separately powered starter. */
+  threePhase: Record<string, StarterPanelState>;
   /** Rod position, limit switches and valve state of every pneumatic cylinder, by component id. */
   cylinders: Record<string, CylinderState>;
   /** Milliseconds each on-delay relay's coil has been energised (capped at its delay), by component id. */
@@ -129,6 +132,8 @@ export type WorldState = {
   plcs: Record<string, PlcRuntime>;
   /** Energised state of every contactor, motor and lamp by component id (the legacy booleans mirror the first). */
   deviceOn: Record<string, boolean>;
+  /** P4 virtual mains sources can be isolated independently of the 24V supplies. */
+  threePhasePower: Record<string, boolean>;
   /** Shaft angle of every motor by component id (the legacy angle mirrors the first). */
   motorAngles: Record<string, number>;
   forwardContactorOn: boolean;
@@ -182,6 +187,8 @@ export type Command =
   | { k: 'feedParcel'; kind: ParcelKind; conveyor?: string }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
+  /** Change the virtual three-phase source only while paused (no mains hardware). */
+  | { k: 'setThreePhasePower'; id: string; enabled: boolean }
   /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
   /** Rename the tags of a configurable (16/16) PLC. Refused if it would break that PLC's program. Paused only. */
   | { k: 'configureIo'; plc: string; io: { inputs: Record<string, string>; outputs: Record<string, string> } }
@@ -236,6 +243,9 @@ export type RenderSnapshot = {
   overloadTripped: boolean;
   lampOn: boolean;
   meter: MeterReading;
+  threePhase: Record<string, StarterPanelState>;
+  phaseMeters: Record<string, PhaseReading>;
+  threePhaseSources: Record<string, boolean>;
   diagnostics: string[];
   lastError: string | null;
   alarms: AlarmRecord[];
