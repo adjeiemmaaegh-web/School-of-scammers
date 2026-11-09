@@ -10,10 +10,10 @@ const commands: Command[] = [
   { k: 'place', id: 'ctrl', kind: 'plc16', at: { x: 280, y: 10 } },
   { k: 'place', id: 'tank', kind: 'tank', at: { x: 800, y: 500 } },
   { k: 'place', id: 'pump', kind: 'pump', at: { x: 850, y: 550 } },
-  { k: 'wire', id: 'ps+', from: 'ps.P24', to: 'ctrl.L+' },
-  { k: 'wire', id: 'ps-', from: 'ps.M0', to: 'ctrl.M' },
-  { k: 'wire', id: 'pump+', from: 'ctrl.Q0.0', to: 'pump.L+' },
-  { k: 'wire', id: 'pump-', from: 'ps.M0', to: 'pump.M-' },
+  { k: 'wire', id: 'power1', from: 'ps.P24', to: 'ctrl.L+' },
+  { k: 'wire', id: 'power2', from: 'ps.M0', to: 'ctrl.M' },
+  { k: 'wire', id: 'power3', from: 'ctrl.Q0.0', to: 'pump.L+' },
+  { k: 'wire', id: 'power4', from: 'ps.M0', to: 'pump.M-' },
   { k: 'wire', id: 'numeric', from: 'tank.LEVEL', to: 'ctrl.AI0' },
 ];
 const control = [
