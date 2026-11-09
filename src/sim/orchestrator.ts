@@ -1015,6 +1015,30 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     nextVessels[vessel.tank.id] = change.tank;
     for (const detail of change.events) events.push({ tick: w.tick + 1, kind: 'tank', detail });
   }
+  // P4 three-phase process after the worker's actual 24V coil demand scan.
+  // Three-phase conductors are not supplied by the 24V electrical solver.
+  const connectedThreePhase=threePhaseConnections(w.project.components,w.project.wires.filter(wire=>
+    !faultsOf(w.project).some(f=>f.kind==='wire-open'&&f.target===wire.id)));
+  const nextThreePhase:WorldState['threePhase']={};
+  for(const part of w.project.components.filter(c=>c.kind==='star-delta-drive')){
+    const wired=connectedThreePhase[part.id]??null;
+    const live=wired&&w.threePhasePower[wired.supplyId]!==false?wired:null;
+    const coils={
+      main:circuit.energizedLoads.includes(part.id+'-MAIN'),
+      star:circuit.energizedLoads.includes(part.id+'-STAR'),
+      delta:circuit.energizedLoads.includes(part.id+'-DELTA'),
+      reset:circuit.energizedLoads.includes(part.id+'-RESET'),
+    };
+    const previous=w.threePhase[part.id]??freshStarterPanel();
+    const next=stepWiredStarter(previous,live,coils,dtMs);
+    nextThreePhase[part.id]=next;
+    deviceOn[part.id]=next.mainClosed&&(next.starClosed||next.deltaClosed);
+    if(next.motor.mode!==previous.motor.mode||next.motor.tripped!==previous.motor.tripped)
+      events.push({tick:w.tick+1,kind:'three-phase',detail:part.id+': '+next.motor.mode+
+        (next.motor.tripped?' (thermal trip)':'')});
+    if(next.conflict&&!previous.conflict)events.push({tick:w.tick+1,kind:'interlock',
+      detail:part.id+': STAR/DELTA control conflict; motor inhibited'});
+  }
   // 8. Photoeye state from geometry is sampled by the circuit on NEXT scan.
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
@@ -1054,7 +1078,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     ladderSteps: [...(ladderResult?.steps ?? [])],
     stMemory: stResult?.memory ?? {},
     tagValues, powered, inputs, contactorOn, motorOn, motorAngleRad,
-    plcs: nextPlcs, deviceOn, motorAngles,
+    plcs: nextPlcs, deviceOn, motorAngles, threePhase: nextThreePhase,
     alarms: alarmUpdate.alarms, alarmWatch: alarmUpdate.watch,
     forwardContactorOn, reverseContactorOn, motorDirection,
     reverseMotorAngleRad, interlockConflict,
@@ -1067,6 +1091,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       ...(w.project.components.some(c => c.kind === 'overload' && w.tripped[c.id] === true) ? ['Motor overload auxiliary 95-96 open (manual test trip)'] : []),
       ...(interlockConflict ? ['Reversing contactors demand simultaneous engagement: mechanical interlock active'] : []),
       ...(opposingDrives ? ['Both direction terminals energized: reversible motor inhibited'] : []),
+      ...Object.entries(nextThreePhase).flatMap(([id,state])=>state.motor.diagnostics.map(msg=>id+': '+msg)),
       ...(!powered && plc ? ['PLC is not powered (wire L+ and M to the 24V supply)'] : []),
       ...unpoweredExtras.map(id => `PLC ${id} is not powered (wire L+ and M to a 24V supply)`)],
     breakpointHit,
