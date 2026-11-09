@@ -62,6 +62,16 @@ const STORAGE = 'efo-open-sandbox-project-v1';
     await page.click('[data-redo]');
     await count(4);
 
+    // Accepted undo/redo deliberately clears selection to avoid stale IDs.
+    // Re-select the two original devices before the next real user edit.
+    await page.waitForFunction(() =>
+      document.querySelectorAll('[data-workspace-selection] input:checked').length === 0);
+    const checkboxes = await page.$('[data-workspace-selection] input[type="checkbox"]');
+    assert.equal(checkboxes.length, 4);
+    await checkboxes[0].click();
+    await checkboxes[1].click();
+    await page.waitForFunction(() =>
+      document.querySelectorAll('[data-workspace-selection] input:checked').length === 2);
     await clickText('↷ 90°');
     await page.waitForFunction(key => {
       const data = JSON.parse(localStorage.getItem(key) || 'null');
