@@ -548,7 +548,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                 : (['Start', 'StopOK', 'Photoeye', 'TankHigh', 'ReverseRequest', 'Run', 'Sort', 'Fill', 'Drain', 'Forward', 'Reverse',
                   'Q0.0', 'Q0.1', 'Q0.2', 'Q0.3', 'Q0.4', 'Q0.5', 'PlcPowered'] as const).map(k =>
                 <span className={activeIo[k] ? 'lit' : ''} key={k}><i />{k}</span>)}
-              </div></div>
+              </div>
+              {!!activePlcView?.io.analogInputs?.length && <div className="sandbox-analog-readings" aria-label="Numeric PLC inputs">
+                {activePlcView.io.analogInputs.map(p => <p key={p.terminal} data-analog-input={p.terminal}>
+                  {p.terminal} · {p.tag}: <strong>{p.connected ? `${p.value} ${p.unit}` : 'No numeric source'}</strong>
+                  {p.source && <small> · {p.source}</small>}
+                </p>)}
+              </div>}
+            </div>
             <div><span className="eyebrow">Plant</span>
               <p>Contactor: <strong>{snapshot?.contactorOn ? 'energised' : 'off'}</strong> · Motor: <strong>{snapshot?.motorOn ? 'running' : 'stopped'}</strong></p>
               {project?.components.some(c => c.kind === 'conveyor') && <p>
@@ -695,7 +702,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>}
           {dockProject && dockSnapshot && <ProgrammingDock project={dockProject} snapshot={dockSnapshot} disabled={!editable}
             showExamples={!scenario}
-            io={activePlcView ? { kind: activePlcView.kind, inputs: activePlcView.io.inputs, outputs: activePlcView.io.outputs } : undefined}
+            io={activePlcView ? { kind: activePlcView.kind, inputs: activePlcView.io.inputs, outputs: activePlcView.io.outputs,
+              analogInputs: activePlcView.io.analogInputs } : undefined}
             onLadder={program => send([{ k: 'loadProgram', program, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onST={source => send([{ k: 'loadST', source, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onLanguage={language => send([{ k: 'activateLanguage', language, ...(activePlcId ? { plc: activePlcId } : {}) }])} />}

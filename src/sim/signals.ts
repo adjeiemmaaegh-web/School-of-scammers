@@ -6,6 +6,7 @@ import type { SortingPlant, ParcelKind } from '../plant/sorting-conveyor';
 import type { TankProcess } from '../plant/tank-process';
 import type { CylinderState } from '../plant/cylinder';
 import type { MeterReading } from '../electrical/panel-meter';
+import type { AnalogPoint } from './analog';
 
 export type XY = { x: number; y: number };
 export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean };
@@ -51,7 +52,9 @@ export type PlcRuntime = {
   powered: boolean;
   inputs: PlcInputs;
   /** The sampled input image by tag name, for any I/O map (the classic five-tag `inputs` is derived from it). */
-  tagInputs: Record<string, boolean>;
+  tagInputs: Record<string, STValue>;
+  /** Typed numeric input readings, sampled from the simulated plant, never from DC voltage. */
+  analogInputs: AnalogPoint[];
   coils: Record<string, boolean>;
   tagValues: Record<string, STValue>;
   ladderMemory: LadderMemory;
@@ -68,7 +71,7 @@ export type PlcView = {
   /** Component kind: `plc` (fixed 5/6 I/O) or `plc16` (16/16 with nameable tags). */
   kind: string;
   /** Every input and output terminal with the tag bound to it and its live state, whatever the I/O map. */
-  io: { inputs: PlcIoPoint[]; outputs: PlcIoPoint[] };
+  io: { inputs: PlcIoPoint[]; outputs: PlcIoPoint[]; analogInputs?: AnalogPoint[] };
   inputs: PlcInputs;
   coils: Record<string, boolean>;
   /** Every output terminal (for example `Q0.0`) -> on. */
