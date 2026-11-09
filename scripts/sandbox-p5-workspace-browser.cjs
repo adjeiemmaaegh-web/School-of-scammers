@@ -3,6 +3,7 @@
  * UI organization only; does not claim hardware/browser/device acceptance.
  */
 const assert=require('node:assert/strict');
+const fs=require('node:fs');
 const puppeteer=require('puppeteer');
 const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
 (async()=>{
@@ -11,6 +12,7 @@ const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
     '--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader',
   ]});
   try{
+    fs.mkdirSync('qa-artifacts/p5-ux',{recursive:true});
     const page=await browser.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(String(e)));
     await page.setViewport({width:1440,height:900,deviceScaleFactor:1});
@@ -28,6 +30,7 @@ const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
     assert.equal(initial.inspector,true);
     assert.equal(initial.dock,true);
     assert.deepEqual(initial.tools,['Logical / Wiring','Physical / 3D Plant']);
+    await page.screenshot({path:'qa-artifacts/p5-ux/desktop-physical-1440.png'});
     const countBefore=await page.$eval('.sandbox-scene-stat',el=>el.textContent.trim());
     await page.click('[data-p5-view="logical"]');
     await page.waitForFunction(()=>document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active')==='logical');
@@ -39,6 +42,7 @@ const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
     assert.equal(logical.visible,true);
     assert.notEqual(logical.heading,'none');
     assert.equal(logical.physical,'none');
+    await page.screenshot({path:'qa-artifacts/p5-ux/desktop-logical-1440.png'});
     await page.click('[data-p5-category="plc"]');
     const palette=await page.$$eval('.sandbox-palette-item',els=>els.map(e=>e.textContent.trim()));
     assert.ok(palette.length>=2,'Controller models in family');
@@ -66,10 +70,13 @@ const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
     await page.keyboard.down('Alt');await page.keyboard.press('2');await page.keyboard.up('Alt');
     assert.equal(await page.$eval('[data-p5-view-active]',e=>e.getAttribute('data-p5-view-active')),'physical');
     assert.ok(await page.$('[data-p5-sim-state]'),'Worker state readout remains visible');
+    await page.setViewport({width:1280,height:800,deviceScaleFactor:1});
+    await page.screenshot({path:'qa-artifacts/p5-ux/laptop-physical-1280.png'});
     await page.setViewport({width:390,height:844,deviceScaleFactor:1});
     assert.equal(await page.$eval('[data-p5-workspace]',e=>e.getAttribute('data-p5-workspace')),'organized');
     assert.ok(await page.$('[data-p5-view="logical"]'),'Narrow screens retain view switch');
     assert.ok(await page.$('[data-p5-dock-tab="program"]'),'Narrow screens retain PLC editor access');
+    await page.screenshot({path:'qa-artifacts/p5-ux/narrow-physical-390.png'});
     assert.deepEqual(errors.filter(e=>!/WebGL|favicon|GPU stall/i.test(e)),[]);
     console.log('P5-UX BROWSER PASS: view state, catalog, dock, panels, keyboard and narrow controls');
   }finally{await browser.close();}
