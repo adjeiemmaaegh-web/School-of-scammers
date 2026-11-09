@@ -6,6 +6,7 @@ import { AppHeader } from '../ui/AppHeader';
 import { ProgrammingDock } from '../program/ProgrammingDock';
 import { LiveMonitor } from '../program/LiveMonitor';
 import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
+import {DEVICE_FAMILIES,matchesFamily,supportedFamilies,type DeviceFamily} from '../ui/sandbox/workspace-catalog';
 import { TroubleshootingPanel } from '../ui/sandbox/TroubleshootingPanel';
 import { ScenarioPanel } from '../ui/sandbox/ScenarioPanel';
 import { perDeviceLive } from '../sim/device-state';
@@ -17,6 +18,7 @@ import { getScenario } from '../exercises/catalogue';
 import type { AttemptResult, EvidenceEvent, RubricResult } from '../platform/types';
 import type { Command, ProjectFile, RenderSnapshot, WorkerResponse } from '../sim/signals';
 import './sandbox.css';
+import './p5-workspace.css';
 
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
@@ -51,6 +53,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [selectedPlcId, setSelectedPlcId] = useState<string | null>(null);
   const [libraryQuery, setLibraryQuery] = useState('');
+  // View/panel preferences do not belong to PLC or electrical project state.
+  const [libraryFamily,setLibraryFamily] = useState<DeviceFamily>('all');
+  const [workspaceView,setWorkspaceView] = useState<'physical'|'logical'>('physical');
+  const [libraryExpanded,setLibraryExpanded] = useState(true);
+  const [inspectorExpanded,setInspectorExpanded] = useState(true);
+  const [dockExpanded,setDockExpanded] = useState(true);
+  const [dockFocus,setDockFocus] = useState<'program'|'diagnostics'>('program');
+  const [workspaceHelp,setWorkspaceHelp] = useState(false);
   const [activeStage, setActiveStage] = useState<'build' | 'wire' | 'program' | 'test'>('build');
   const [localSave, setLocalSave] = useState<'pending' | 'saved' | 'failed'>('pending');
   const [events, setEvents] = useState<string[]>([]);
@@ -169,6 +179,12 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   };
   const goToStage = (stage: 'build' | 'wire' | 'program' | 'test') => {
     setActiveStage(stage);
+    if(stage==='build')setWorkspaceView('physical');
+    if(stage==='wire')setWorkspaceView('logical');
+    if(stage==='program'||stage==='test'){
+      setDockExpanded(true);
+      setDockFocus(stage==='program'?'program':'diagnostics');
+    }
     document.getElementById(`sandbox-stage-${stage}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const uniqueId = (prefix: string): string => {
@@ -336,17 +352,37 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const visibleKinds = componentKinds.filter(kind => {
     const definition = COMPONENTS[kind];
     const words = `${definition.kind} ${definition.label} ${definition.help}`.toLowerCase();
-    return words.includes(libraryQuery.trim().toLowerCase());
+    return matchesFamily(kind,libraryFamily) &&
+      words.includes(libraryQuery.trim().toLowerCase());
   });
+  const availableFamilies=supportedFamilies(componentKinds);
   const workflow = [
     { id: 'build' as const, label: 'Build', hint: 'Place equipment', count: project?.components.length ?? 0 },
     { id: 'wire' as const, label: 'Wire', hint: 'Connect terminals', count: project?.wires.length ?? 0 },
     { id: 'program' as const, label: 'Program', hint: 'Edit Ladder logic', count: project?.program.rungs.length ?? 0 },
     { id: 'test' as const, label: 'Test', hint: 'Run and troubleshoot', count: snapshot?.tick ?? 0 },
   ];
+  // Shortcuts affect only the active view, except explicit export.
+  useEffect(()=>{
+    const onShortcut=(event:KeyboardEvent)=>{
+      const target=event.target as HTMLElement|null;
+      const typing=!!target&&(/^(input|textarea|select)$/i.test(target.tagName)||target.isContentEditable);
+      if(event.key==='Escape'){setSelectedTerminal(null);setMoveTarget(null);return;}
+      if(typing||event.repeat)return;
+      if(event.altKey&&(event.key==='1'||event.key==='2')){
+        event.preventDefault();setWorkspaceView(event.key==='1'?'logical':'physical');
+      }
+      if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){
+        event.preventDefault();exportProject();
+      }
+    };
+    window.addEventListener('keydown',onShortcut);
+    return ()=>window.removeEventListener('keydown',onShortcut);
+  });
   return <>
     <AppHeader />
-    <main id="main" className="sandbox-page sandbox-ux wrap wrap-wide">
+    <main id="main" className="sandbox-page sandbox-ux p5-organized wrap wrap-wide"
+      data-p5-workspace="organized">
       <header className="sandbox-masthead">
         <div>
           <p className="sandbox-breadcrumb"><Link to="/">Skills Lab</Link><span>/</span> {scenario ? 'Scenario' : 'Simulator'} <span>/</span> {scenario ? scenario.def.title : 'Open workspace'}</p>
