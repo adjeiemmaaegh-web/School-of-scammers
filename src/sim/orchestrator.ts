@@ -19,6 +19,7 @@ import { laneOf, lanesOf, vesselOf, vesselsOf } from './stations';
 import { electricalDevices } from '../components/electrical-defs';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { clearedAlarm, engineFault, freshCylinder, stepCylinder } from '../plant/cylinder';
+import { freshProjectPlant, plantPlacements, stepProjectPlant, sensorImage,validatePlantFaults } from './p3-plant-bridge';
 export { MAX_COMPONENTS, MAX_WIRES };
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
@@ -127,6 +128,7 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     plcs: Object.fromEntries(runtimePlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id), namesFor(project, c.id))])),
     lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
+    plantWorld:freshProjectPlant(project),
     deviceOn: {}, motorAngles: {},
     forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
     reverseMotorAngleRad: 0, interlockConflict: false,
@@ -190,6 +192,7 @@ export function validateProject(raw: unknown): ProjectFile {
   const faults = validateFaults(p.faults, components, wires);
   const plcPrograms = validatePlcPrograms(p.plcPrograms, components, plcIo);
   const params = validateParams(p.params, components);
+  const plantFaults=validatePlantFaults(p.plantFaults,{components});
   return {
     formatVersion: 1, components, wires, program: p.program,
     ...(p.language !== undefined ? { language: p.language } : {}),
@@ -199,6 +202,7 @@ export function validateProject(raw: unknown): ProjectFile {
     ...(plcPrograms ? { plcPrograms } : {}),
     ...(plcIo ? { plcIo } : {}),
     ...(params ? { params } : {}),
+    ...(plantFaults ? {plantFaults} : {}),
   };
 }
 /** Device settings: each key must be a setting its device kind defines, with an allowed value that differs from the default. */
@@ -330,6 +334,21 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
     else if (cmd.k === 'step') { world = { ...world, running: false }; forceStep = true; }
     else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
     else if (cmd.k === 'clear') world = createWorld();
+    else if (cmd.k === 'setPlantFault') {
+      if(world.running)world=setError(world,'Pause before changing a plant equipment fault');
+      else {
+        try {
+          const faults={...(world.project.plantFaults??{})};
+          if(cmd.fault===null)delete faults[cmd.id];
+          else faults[cmd.id]=cmd.fault;
+          const checked=validatePlantFaults(faults,world.project);
+          const {plantFaults:ignored,...rest}=world.project;
+          world={...world,project:checked?{...rest,plantFaults:checked}:rest};
+          commandEvents.push({tick:world.tick,kind:'fault',
+            detail:'Plant fault for '+cmd.id+(cmd.fault?' set: '+cmd.fault:' cleared')});
+        }catch(error){world=setError(world,error instanceof Error?error.message:'Invalid plant fault');}
+      }
+    }
     else if (cmd.k === 'feedParcel') {
       const lane = cmd.conveyor !== undefined
         ? world.project.components.find(c => c.id === cmd.conveyor && c.kind === 'conveyor')
@@ -594,7 +613,8 @@ function buildCircuit(world: WorldState): Device[] {
   const primary = legacyPrimaryId(world.project);
   for (const c of world.project.components) {
     // Equipment described as data (relay, cylinder): the definition says which loads and switches it contributes.
-    const described = electricalDevices(c, { on: world.deviceOn[c.id] === true, hasFault: kind => hasFault(world.project, kind, c.id), cylinder: world.cylinders[c.id] });
+    const described = electricalDevices(c, { on: world.deviceOn[c.id] === true, hasFault: kind => hasFault(world.project, kind, c.id),
+      cylinder: world.cylinders[c.id],plantSignals:sensorImage(world.plantWorld,c.id) });
     if (described) { devices.push(...described); continue; }
     if (c.kind === 'supply') devices.push({ id: c.id, kind: 'supply', positive: terminal(c.id, 'P24'), negative: terminal(c.id, 'M0'), volts: 24 });
     if (c.kind === 'breaker') devices.push({
@@ -688,6 +708,15 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     })),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
     lanes: Object.fromEntries(Object.entries(world.lanes).map(([id, l]) => [id, { ...l, parcel: l.parcel ? { ...l.parcel } : null }])),
+    plantWorld:{
+      world:{...world.plantWorld.world,
+        bodies:world.plantWorld.world.bodies.map(b=>({...b,pos:{...b.pos},vel:{...b.vel},size:{...b.size},tags:{...b.tags}})),
+        model:Object.fromEntries(Object.entries(world.plantWorld.world.model).map(([id,state])=>
+          [id,{...state,...(state.slots?{slots:{...state.slots}}:{})}])),
+        events:world.plantWorld.world.events.map(e=>({...e}))},
+      signals:Object.fromEntries(Object.entries(world.plantWorld.signals).map(([id,readings])=>
+        [id,{...readings}])),
+    },
     vessels: Object.fromEntries(Object.entries(world.vessels).map(([id, v]) => [id, { ...v }])),
     tripped: { ...world.tripped },
     timers: Object.fromEntries(world.project.components.filter(c => c.kind === 'timerelay').map(c => {
@@ -989,6 +1018,12 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     nextVessels[vessel.tank.id] = change.tank;
     for (const detail of change.events) events.push({ tick: w.tick + 1, kind: 'tank', detail });
   }
+  // P3: the independent equipment world is stepped using the electrical
+  // solver's already-committed actuator image. Its new geometric sensor values
+  // may only affect PLC inputs at the following 50ms scan.
+  const p3=stepProjectPlant(w.plantWorld,w.project,circuit.energizedLoads,dtMs);
+  for(const event of p3.events)events.push({tick:w.tick+1,kind:'plant',
+    detail:event.source+': '+event.detail});
   // 8. Photoeye state from geometry is sampled by the circuit on NEXT scan.
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
@@ -1033,6 +1068,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     forwardContactorOn, reverseContactorOn, motorDirection,
     reverseMotorAngleRad, interlockConflict,
     conveyorOn, diverterOn, lanes: nextLanes, vessels: nextVessels, cylinders: nextCylinders, timers: nextTimers,
+    plantWorld:p3.runtime,
     pumpOn, drainOn, lampOn,
     voltages: circuit.voltage,
     meter: measureDC24(circuit.voltage,circuit.diagnostics,w.meter.positive,w.meter.negative,circuit.sameSupply),
