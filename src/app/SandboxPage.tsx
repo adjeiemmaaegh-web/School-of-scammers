@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, isPlcKind, type ComponentKind } from '../components/registry';
 import { IoMappingPanel } from '../ui/sandbox/IoMappingPanel';
+import { LogicalWiringCanvas } from '../ui/sandbox/LogicalWiringCanvas';
 import { AppHeader } from '../ui/AppHeader';
 import { ProgrammingDock } from '../program/ProgrammingDock';
 import { LiveMonitor } from '../program/LiveMonitor';
@@ -585,6 +586,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <button className="btn ghost small" onClick={layout}>Place starter layout</button>
           </div>}
           </div>
+          <LogicalWiringCanvas project={project} snapshot={snapshot} editable={editable}
+            selectedDeviceId={selectedDeviceId} selectedTerminal={selectedTerminal}
+            onSelectDevice={id=>selectDevice(id)} onTerminal={connect} />
           <details id="sandbox-stage-wire" className="sandbox-patch panel p5-logical-stage" open>
             <summary>Component wiring &amp; keyboard controls · {project?.components.length ?? 0} devices</summary>
             <p className="sandbox-help">These controls access the same terminals and states shown in the 3D workbench. Use them on phones, with a keyboard, or when WebGL is unavailable.</p>
