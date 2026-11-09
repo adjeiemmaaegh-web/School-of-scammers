@@ -328,3 +328,9 @@
   z-index:0;
   isolation:isolate;
 }
+/* Bound all canvas-attached Html portals to the workspace column as well. */
+.p5-organized .sandbox-main {
+  position:relative;
+  z-index:0;
+  isolation:isolate;
+}
