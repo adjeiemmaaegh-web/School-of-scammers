@@ -712,6 +712,8 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     threePhase: Object.fromEntries(Object.entries(world.threePhase).map(([id,state])=>
       [id,{...state,motor:{...state.motor,diagnostics:[...state.motor.diagnostics]},
         events:[...state.events]}])),
+    threePhaseSources: Object.fromEntries(world.project.components.filter(c=>c.kind==='three-phase-supply')
+      .map(c=>[c.id,world.threePhasePower[c.id]!==false])),
     phaseMeters: Object.fromEntries(Object.entries(threePhaseConnections(world.project.components,
       world.project.wires.filter(w=>!faultsOf(world.project).some(f=>f.kind==='wire-open'&&f.target===w.id))))
       .map(([id,connection])=>[id,readPhaseMeter(connection,
