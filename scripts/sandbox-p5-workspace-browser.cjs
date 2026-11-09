@@ -54,7 +54,7 @@ const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
     let afterPlacement=await page.$eval('.sandbox-scene-stat',el=>el.textContent.trim());
     assert.notEqual(afterPlacement,countBefore,'Placement is a real project mutation');
     await page.click('[data-p5-category="all"]');
-    assert.ok((await page.$('.sandbox-palette-item')).length>palette.length);
+    assert.ok((await page.$eval('.sandbox-palette-item',els=>els.length))>palette.length);
     const foundSupply=await page.evaluate(()=>{
       const button=[...document.querySelectorAll('.sandbox-palette-item')]
         .find(el=>el.querySelector('.kind-supply'));
@@ -74,7 +74,7 @@ const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
     await page.$eval(`[data-p5-pin="${plcId}.L+"]`,el=>el.click());
     await page.waitForFunction(()=>document.querySelectorAll('[data-p5-wire]').length===1,
       {timeout:15000});
-    assert.equal((await page.$('.sandbox-wire-list>div')).length,1,
+    assert.equal((await page.$eval('.sandbox-wire-list>div',els=>els.length)),1,
       'The schematic creates one true worker-owned project wire');
     afterPlacement=await page.$eval('.sandbox-scene-stat',el=>el.textContent.trim());
     await page.click('[data-p5-view="physical"]');
