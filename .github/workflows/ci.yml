@@ -42,6 +42,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux-acceptance.cjs
       - name: P5-UX workspace organization - logical/physical view, category, docks and keyboard browser E2E
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-workspace-browser.cjs
+      - name: Edit plant - one-click panels, remove with cleanup, undo, first-PLC promotion, Delete key
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-edit-plant-browser.cjs
       - name: P2 PLC programming - real multi-rung timers and Structured Text E2E
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-browser-acceptance.cjs
       - name: P2 typed numeric PLC - INT, ADD and comparator 3D motor browser E2E
@@ -74,8 +76,6 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p10-multiplant-browser.cjs
       - name: Product structure - simulator-first home, primary navigation, separate Learn and Assessments sections
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/simulator-first-browser.cjs
-      - name: Edit plant - one-click panels, remove with cleanup, undo, first-PLC promotion, Delete key
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-edit-plant-browser.cjs
       - name: P6 scenarios - graded by outcome on the real sandbox, employer to candidate to review
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p6-scenario-browser.cjs
       - name: Browser smoke - routes, machine control, meter, assessment and mobile
