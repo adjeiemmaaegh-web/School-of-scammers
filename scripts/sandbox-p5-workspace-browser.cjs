@@ -68,7 +68,7 @@ const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
       {timeout:15000});
     const ids=await page.$$eval('[data-p5-logical-device]',
       els=>els.map(el=>el.getAttribute('data-p5-logical-device')));
-    const plcId=ids.find(id=>id.startsWith('plc-'));
+    const plcId=ids.find(id=>/^(plc|plc16)-/.test(id));
     const supplyId=ids.find(id=>id.startsWith('supply-'));
     assert.ok(plcId&&supplyId,'Real PLC and supply instances');
     await page.$eval(`[data-p5-pin="${supplyId}.P24"]`,el=>el.click());
