@@ -10,6 +10,8 @@ export function perDeviceLive(snapshot: RenderSnapshot, c: Pick<PlacedComponent,
   switch (c.kind) {
     case 'plc':
     case 'plc16': return snapshot.plcs[c.id]?.powered ?? snapshot.io.PlcPowered;
+    case 'three-phase-supply': return snapshot.threePhaseSources[c.id]!==false;
+    case 'star-delta-drive': return snapshot.threePhase[c.id]?.mainClosed===true;
     case 'motor': return snapshot.deviceOn[c.id] ?? snapshot.motorOn;
     case 'contactor': return snapshot.deviceOn[c.id] ?? snapshot.contactorOn;
     case 'lamp': return snapshot.deviceOn[c.id] ?? snapshot.lampOn;

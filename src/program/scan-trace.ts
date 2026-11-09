@@ -3,6 +3,7 @@
  * The worker owns these records. Never sample UI time, DOM, or animation frames.
  */
 import type { LadderStep } from '../engineering/ladder';
+import type { FbdStep } from '../engineering/fbd';
 import type { STValue } from '../engineering/structured-text';
 
 export type EdgeDirection = 'rising' | 'falling' | 'either';
@@ -10,7 +11,7 @@ export type TagBreakpoint = { tag: string; edge: EdgeDirection };
 export type ScanTrace = {
   scan: number;
   simulatedMs: number;
-  language: 'ladder' | 'st';
+  language: 'ladder' | 'st' | 'fbd';
   start: boolean;
   stopOK: boolean;
   run: boolean;
@@ -35,21 +36,25 @@ export function validateTagBreakpoint(value: unknown, names: ReadonlySet<string>
     (bp.edge === 'rising' || bp.edge === 'falling' || bp.edge === 'either');
 }
 export function buildScanTrace(input: {
-  scan: number; simulatedMs: number; language: 'ladder' | 'st';
+  scan: number; simulatedMs: number; language: 'ladder' | 'st' | 'fbd';
   start: boolean; stopOK: boolean; run: boolean; plcPowered: boolean;
-  contactorOn: boolean; motorOn: boolean; ladderSteps: readonly LadderStep[];
+  contactorOn: boolean; motorOn: boolean; ladderSteps: readonly LadderStep[]; fbdSteps?: readonly FbdStep[];
   breakpoint: string | null;
 }): ScanTrace {
   return {
     scan: input.scan, simulatedMs: input.simulatedMs, language: input.language,
     start: input.start, stopOK: input.stopOK, run: input.run, plcPowered: input.plcPowered,
     contactorOn: input.contactorOn, motorOn: input.motorOn,
-    networks: input.ladderSteps.map(step => ({
+    networks: [...input.ladderSteps.map(step => ({
       rung: step.rungId, instruction: step.operation, result: step.result,
       ...(step.elapsedMs === undefined ? {} : { elapsedMs: step.elapsedMs }),
       ...(step.count === undefined ? {} : { count: step.count }),
       ...(step.numericResult === undefined ? {} : { numericResult: step.numericResult }),
-    })),
+    })), ...(input.fbdSteps ?? []).map(step => ({
+      rung: step.nodeId, instruction: 'FBD-' + step.kind, result: step.on,
+      ...(step.elapsedMs === undefined ? {} : { elapsedMs: step.elapsedMs }),
+      ...(step.count === undefined ? {} : { count: step.count }),
+    }))],
     breakpoint: input.breakpoint,
   };
 }
