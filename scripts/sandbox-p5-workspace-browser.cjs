@@ -51,10 +51,32 @@ const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
     await page.click('.sandbox-palette-item');
     await page.waitForFunction(()=>document.querySelectorAll('[data-p5-logical-device]').length===1,
       {timeout:15000});
-    const afterPlacement=await page.$eval('.sandbox-scene-stat',el=>el.textContent.trim());
+    let afterPlacement=await page.$eval('.sandbox-scene-stat',el=>el.textContent.trim());
     assert.notEqual(afterPlacement,countBefore,'Placement is a real project mutation');
     await page.click('[data-p5-category="all"]');
-    assert.ok((await page.$$('.sandbox-palette-item')).length>palette.length);
+    assert.ok((await page.$('.sandbox-palette-item')).length>palette.length);
+    const foundSupply=await page.evaluate(()=>{
+      const button=[...document.querySelectorAll('.sandbox-palette-item')]
+        .find(el=>el.querySelector('.kind-supply'));
+      if(!button)return false;button.click();return true;
+    });
+    assert.ok(foundSupply,'Real supply model available to place');
+    await page.waitForFunction(()=>document.querySelectorAll('[data-p5-logical-device]').length===2,
+      {timeout:15000});
+    const ids=await page.$eval('[data-p5-logical-device]',
+      els=>els.map(el=>el.getAttribute('data-p5-logical-device')));
+    const plcId=ids.find(id=>id.startsWith('plc-'));
+    const supplyId=ids.find(id=>id.startsWith('supply-'));
+    assert.ok(plcId&&supplyId,'Real PLC and supply instances');
+    await page.$eval(`[data-p5-pin="${supplyId}.P24"]`,el=>el.click());
+    await page.waitForFunction(pin=>document.querySelector(
+      `[data-p5-pin="${pin}"]`)?.getAttribute('aria-pressed')==='true',{},`${supplyId}.P24`);
+    await page.$eval(`[data-p5-pin="${plcId}.L+"]`,el=>el.click());
+    await page.waitForFunction(()=>document.querySelectorAll('[data-p5-wire]').length===1,
+      {timeout:15000});
+    assert.equal((await page.$('.sandbox-wire-list>div')).length,1,
+      'The schematic creates one true worker-owned project wire');
+    afterPlacement=await page.$eval('.sandbox-scene-stat',el=>el.textContent.trim());
     await page.click('[data-p5-view="physical"]');
     await page.waitForFunction(()=>document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active')==='physical');
     assert.equal(await page.$eval('.sandbox-scene-stat',e=>e.textContent.trim()),afterPlacement,
