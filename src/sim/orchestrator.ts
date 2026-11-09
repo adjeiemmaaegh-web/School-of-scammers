@@ -14,6 +14,10 @@ import {
 import { LEGACY_IO, defaultIo, ioOf, isConfigurableIo, validateIoMap } from './plc-io';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
+import { threePhaseWireError, threePhaseConnections } from '../electrical/three-phase-netlist';
+import { freshStarterPanel } from '../electrical/three-phase-types';
+import { stepWiredStarter } from '../electrical/wired-star-delta';
+import { readPhaseMeter } from '../electrical/phase-instruments';
 import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
 import { laneOf, lanesOf, vesselOf, vesselsOf } from './stations';
 import { electricalDevices } from '../components/electrical-defs';
@@ -127,6 +131,7 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     plcs: Object.fromEntries(runtimePlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id), namesFor(project, c.id))])),
     lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
+    threePhase: {}, threePhasePower: {},
     deviceOn: {}, motorAngles: {},
     forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
     reverseMotorAngleRad: 0, interlockConflict: false,
@@ -168,10 +173,13 @@ export function validateProject(raw: unknown): ProjectFile {
     if (components.filter(c => c.kind === kind).length > 1)
       throw new Error(`Only one ${kind} protection device is supported`);
   const wireIds = new Set<string>();
+  const threePhaseOwners = Object.fromEntries(components.map(c=>[c.id,c.kind]));
   for (const wire of p.wires) {
     if (!wire || !validId(wire.id) || wireIds.has(wire.id) || typeof wire.from !== 'string' ||
         typeof wire.to !== 'string' || wire.from === wire.to ||
         !terminalExists(wire.from, components) || !terminalExists(wire.to, components)) throw new Error('Invalid wire in project');
+    const domainError=threePhaseWireError(wire.from,wire.to,threePhaseOwners);
+    if(domainError)throw new Error(domainError);
     wireIds.add(wire.id);
   }
   const plcIo = validatePlcIo(p.plcIo, components);
@@ -371,6 +379,15 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           commandEvents.push({ tick: world.tick, kind: 'protection',
             detail: `${component.kind} ${cmd.action === 'trip' ? 'opened (manual training trip)' : 'reset by learner'}` });
         }
+      }
+    } else if (cmd.k === 'setThreePhasePower') {
+      const source=world.project.components.find(c=>c.id===cmd.id&&c.kind==='three-phase-supply');
+      if(world.running)world=setError(world,'Pause the simulator before isolating three-phase source');
+      else if(!source||typeof cmd.enabled!=='boolean')world=setError(world,'Invalid virtual three-phase source control');
+      else {
+        world={...world,threePhasePower:{...world.threePhasePower,[cmd.id]:cmd.enabled}};
+        commandEvents.push({tick:world.tick,kind:'mains',
+          detail:'Virtual three-phase source '+cmd.id+(cmd.enabled?' energised':' isolated')});
       }
     } else if (cmd.k === 'setMeterProbe') {
       if ((cmd.lead !== 'positive' && cmd.lead !== 'negative') ||
@@ -594,7 +611,9 @@ function buildCircuit(world: WorldState): Device[] {
   const primary = legacyPrimaryId(world.project);
   for (const c of world.project.components) {
     // Equipment described as data (relay, cylinder): the definition says which loads and switches it contributes.
-    const described = electricalDevices(c, { on: world.deviceOn[c.id] === true, hasFault: kind => hasFault(world.project, kind, c.id), cylinder: world.cylinders[c.id] });
+    const described = electricalDevices(c, { on: world.deviceOn[c.id] === true,
+      hasFault: kind => hasFault(world.project, kind, c.id), cylinder: world.cylinders[c.id],
+      threePhase: world.threePhase[c.id] });
     if (described) { devices.push(...described); continue; }
     if (c.kind === 'supply') devices.push({ id: c.id, kind: 'supply', positive: terminal(c.id, 'P24'), negative: terminal(c.id, 'M0'), volts: 24 });
     if (c.kind === 'breaker') devices.push({
@@ -690,6 +709,13 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     lanes: Object.fromEntries(Object.entries(world.lanes).map(([id, l]) => [id, { ...l, parcel: l.parcel ? { ...l.parcel } : null }])),
     vessels: Object.fromEntries(Object.entries(world.vessels).map(([id, v]) => [id, { ...v }])),
     tripped: { ...world.tripped },
+    threePhase: Object.fromEntries(Object.entries(world.threePhase).map(([id,state])=>
+      [id,{...state,motor:{...state.motor,diagnostics:[...state.motor.diagnostics]},
+        events:[...state.events]}])),
+    phaseMeters: Object.fromEntries(Object.entries(threePhaseConnections(world.project.components,
+      world.project.wires.filter(w=>!faultsOf(world.project).some(f=>f.kind==='wire-open'&&f.target===w.id))))
+      .map(([id,connection])=>[id,readPhaseMeter(connection,
+        world.threePhasePower[connection.supplyId]!==false)])),
     timers: Object.fromEntries(world.project.components.filter(c => c.kind === 'timerelay').map(c => {
       const delayMs = paramValue(world.project.params, c.id, paramSpecsOf('timerelay')[0]);
       const elapsedMs = world.timers[c.id] ?? 0;
