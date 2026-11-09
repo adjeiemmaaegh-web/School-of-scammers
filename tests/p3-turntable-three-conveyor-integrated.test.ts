@@ -29,7 +29,7 @@ const ST = [
   'Out7 := In2;', // north exit photoeye drives a wired pilot
 ].join('\n');
 
-const pieces: Array<[string, Command & { k: 'place' }['kind'], number, number]> = [
+const pieces: Array<[string, Extract<Command, { k: 'place' }>['kind'], number, number]> = [
   ['supply', 'supply', 10, 10], ['ctrl', 'plc16', 260, 10],
   ['feeder', 'box-feeder', 390, 225],
   ['in', 'roller-conveyor', 410, 225],
