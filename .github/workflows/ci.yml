@@ -36,6 +36,16 @@ jobs:
             sleep 1
           done
           curl --silent --fail http://127.0.0.1:4173/ > /dev/null
+      - name: P1 original workspace authoring - selection, duplicate, undo/redo, rotate and save
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p1-workspace-browser.cjs
+      - name: P2 authored FBD - real edit, compile, motor latch, stop and persistence
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-fbd-browser.cjs
+      - name: P3 worker plant - PLC output to body to geometry eye and lamp
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-plant-browser.cjs
+      - name: P4 wired three-phase - real star/delta interlock and thermal model
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-star-delta-browser.cjs
+      - name: P1-P4 integration - 3 rollers plus turned table with correct and incorrect ST
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-three-conveyor-turntable-browser.cjs
       - name: Open sandbox P1 - place, wire, program, run and test failures
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-browser-acceptance.cjs
       - name: UX-first workbench - workflow, device inspector and responsive design
@@ -78,16 +88,6 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-edit-plant-browser.cjs
       - name: P6 scenarios - graded by outcome on the real sandbox, employer to candidate to review
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p6-scenario-browser.cjs
-      - name: P1 original workspace authoring - selection, duplicate, undo/redo, rotate and save
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p1-workspace-browser.cjs
-      - name: P2 authored FBD - real edit, compile, motor latch, stop and persistence
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-fbd-browser.cjs
-      - name: P3 worker plant - PLC output to body to geometry eye and lamp
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-plant-browser.cjs
-      - name: P4 wired three-phase - real star/delta interlock and thermal model
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-star-delta-browser.cjs
-      - name: P1-P4 integration - 3 rollers plus turned table with correct and incorrect ST
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-three-conveyor-turntable-browser.cjs
       - name: Browser smoke - routes, machine control, meter, assessment and mobile
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
       - name: Offline deep-link and lazy-lab cache acceptance
