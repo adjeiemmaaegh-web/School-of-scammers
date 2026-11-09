@@ -245,6 +245,7 @@ export type RenderSnapshot = {
   meter: MeterReading;
   threePhase: Record<string, StarterPanelState>;
   phaseMeters: Record<string, PhaseReading>;
+  threePhaseSources: Record<string, boolean>;
   diagnostics: string[];
   lastError: string | null;
   alarms: AlarmRecord[];
