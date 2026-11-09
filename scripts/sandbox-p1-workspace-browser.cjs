@@ -66,10 +66,13 @@ const STORAGE = 'efo-open-sandbox-project-v1';
     // Re-select the two original devices before the next real user edit.
     await page.waitForFunction(() =>
       document.querySelectorAll('[data-workspace-selection] input:checked').length === 0);
-    const checkboxes = await page.$('[data-workspace-selection] input[type="checkbox"]');
-    assert.equal(checkboxes.length, 4);
-    await checkboxes[0].click();
-    await checkboxes[1].click();
+    const available = await page.evaluate(() =>
+      document.querySelectorAll('[data-workspace-selection] input[type="checkbox"]').length);
+    assert.equal(available, 4);
+    await page.click('.workspace-selection-list label:nth-child(1) input');
+    await page.waitForFunction(() =>
+      document.querySelectorAll('[data-workspace-selection] input:checked').length === 1);
+    await page.click('.workspace-selection-list label:nth-child(2) input');
     await page.waitForFunction(() =>
       document.querySelectorAll('[data-workspace-selection] input:checked').length === 2);
     await clickText('↷ 90°');
