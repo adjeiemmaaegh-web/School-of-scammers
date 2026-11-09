@@ -663,7 +663,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             </div>
           </details>
           <div className="sandbox-status panel">
-            <div><span className="eyebrow">Live I/O{plcList.length > 1 && activePlcId ? ` · ${activePlcId}` : ''}</span><div className="sandbox-lamps">
+            <div><span className="eyebrow">Live I/O{plcList.length > 1 && activePlcId ? ` · ${activePlcId}` : ''}</span><div className="sandbox-lamps" tabIndex={0} role="region" aria-label="Live PLC I/O indicators">
               {activePlcView?.kind === 'plc16'
                 ? [...activePlcView.io.inputs, ...activePlcView.io.outputs].map(p =>
                     <span className={p.on ? 'lit' : ''} key={p.terminal} title={p.terminal}><i />{p.tag}</span>)
