@@ -772,6 +772,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               <p className="sandbox-help">{protectedDOLGuide}</p></details>}
           </section>}
         </div>
+        {inspectorExpanded&&<div className="p5-inspector-slot" data-p5-inspector>
         <WorkbenchInspector project={project ?? { formatVersion: 1, components: [], wires: [], program: { id: 'pending', version: '1', rungs: [] } }}
           snapshot={snapshot ?? { tick: 0, running: false, components: [], wires: [],
             io: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
@@ -800,8 +801,29 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onSetParam={(id, key, value) => send([{ k: 'setParam', id, key, value }])}
           onOperate={id => send([{ k: 'operateToggle', id }])}
           onClearSelection={() => setSelectedDeviceId(null)} />
+        </div>}
       </div>
-      <div className="sandbox-bottom">
+      <div className="p5-simulation-status" role="status" aria-label="Authoritative simulation state">
+        <strong data-p5-sim-state>{snapshot?.running?'Running':snapshot?.breakpointHit?'Breakpoint':'Paused / editing'}</strong>
+        <span>Scan <b>{snapshot?.tick??0}</b></span>
+        <span>Model time <b>{((snapshot?.tick??0)*50/1000).toFixed(2)} s</b> · nominal 50 ms scans</span>
+        <span>{project?.components.length??0} devices · {project?.wires.length??0} wires</span>
+        {selectedTerminal&&<span>Wiring from <code>{selectedTerminal}</code></span>}
+        {(clientError||snapshot?.lastError)&&<span className="p5-status-warning">Action error — inspect message above</span>}
+      </div>
+      <section className="p5-engineering-dock" data-p5-dock={dockFocus}>
+        <header className="p5-dock-heading">
+          <strong>Engineering dock</strong>
+          <div role="group" aria-label="Dock panels">
+            <button type="button" data-p5-dock-tab="program" aria-pressed={dockFocus==='program'}
+              onClick={()=>{setDockFocus('program');setDockExpanded(true);}}>PLC program & I/O</button>
+            <button type="button" data-p5-dock-tab="diagnostics" aria-pressed={dockFocus==='diagnostics'}
+              onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);}}>Measurements · faults · events</button>
+          </div>
+          <button type="button" aria-expanded={dockExpanded}
+            onClick={()=>setDockExpanded(v=>!v)}>{dockExpanded?'Collapse dock':'Expand dock'}</button>
+        </header>
+        {dockExpanded&&<div className="sandbox-bottom">
         <div id="sandbox-stage-program" className="sandbox-program-dock">
           {plcList.length > 1 && <div className="sandbox-plc-tabs" role="group" aria-label="Choose which PLC to program">
             <span className="eyebrow">Program</span>
@@ -872,7 +894,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <div className="sandbox-event-list">{events.length ? events.map((e, i) => <p key={i}>{e}</p>) :
             <p className="sandbox-help">No changes recorded yet.</p>}</div>
         </aside>
-      </div>
+      </div>}
+      </section>
       <p className="sandbox-disclaimer">Educational, simplified 24V DC simulation only. Not safety-rated or a substitute for commissioning. This P4 development preview adds a simplified 24V breaker, overload contact, latching NC training E-stop, pilot lamp and virtual DC voltmeter, alongside P3 sorting and tank scenarios. It does not simulate real-world rated fault clearing, certified E-stop circuits or thermal motor protection. The underlying Ladder/ST and 24V circuit models remain educational and bounded; no factory-grade mechanics, automatic object recognition, hardware PLC, certified safety, full IEC coverage or real machinery are claimed.</p>
     </main>
   </>;
