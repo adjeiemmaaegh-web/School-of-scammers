@@ -24,11 +24,18 @@ export function ProgrammingDock({ project, snapshot, disabled, onLadder, onST, o
         className={language === 'ladder' ? 'active' : ''} onClick={() => onLanguage('ladder')}>Ladder (LD)</button>
       <button type="button" disabled={disabled} aria-pressed={language === 'st'}
         className={language === 'st' ? 'active' : ''} onClick={() => onLanguage('st')}>Structured Text (ST)</button>
+      <button type="button" disabled={disabled} aria-pressed={language === 'fbd'}
+        className={language === 'fbd' ? 'active' : ''} onClick={() => onLanguage('fbd')}>Function Blocks (FBD)</button>
       <span>One active PLC runtime · saved in this project</span>
     </div>
     {language === 'st'
       ? <StructuredTextEditor source={project.stSource ?? DEFAULT_ST_SOURCE} snapshot={snapshot}
         disabled={disabled} onActivate={onST} showSamples={showExamples && !configurable} io={configurable ? io : undefined} />
+      : language === 'fbd' ? <FbdEditor document={project.fbd ?? fbdMotorStarter()} snapshot={snapshot}
+        disabled={disabled} onActivate={onFBD} showExamples={showExamples} io={io} />
       : <LadderEditor document={project.program} snapshot={snapshot} disabled={disabled} onChange={onLadder} showExamples={showExamples && !configurable} io={configurable ? io : undefined} />}
+    <PlcTagTable project={project} snapshot={snapshot} disabled={disabled} io={io} onLadder={onLadder} />
+    {language==='ladder'&&onLocalForce&&<LocalForcePanel document={project.program} disabled={disabled}
+      active={snapshot.debugForces} liveValues={snapshot.tagValues} onForce={onLocalForce}/>}
   </div>;
 }
