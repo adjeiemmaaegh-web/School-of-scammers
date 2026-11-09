@@ -45,7 +45,8 @@ export function plantNumericWireError(from:string,to:string,parts:readonly Place
 }
 export function sampleNumericInputs(project:Pick<ProjectFile,'components'|'wires'>,
  scene:SceneRuntime,plcId:string,io:PlcIoMap,powered:boolean,
- openWireIds:ReadonlySet<string>=new Set()):{values:Record<string,number>;points:NumericPoint[]}{
+ openWireIds:ReadonlySet<string>=new Set(),isSourcePowered:(id:string)=>boolean=()=>true):
+ {values:Record<string,number>;points:NumericPoint[]}{
  const values:Record<string,number>={};
  const points:NumericPoint[]=[];
  for(const [pin,tag] of Object.entries(io.analogInputs??{})){
@@ -58,7 +59,7 @@ export function sampleNumericInputs(project:Pick<ProjectFile,'components'|'wires
   const def=part&&PLANT_EQUIPMENT[part.kind];
   const signal=source?.slice(source.indexOf('.')+1).replace(/^AN_/,'')??'';
   const channel=def?.signals.find(ch=>ch.kind==='number'&&ch.name===signal);
-  const connected=!!source&&!!channel;
+  const connected=!!source&&!!channel&&isSourcePowered(id);
   let value=0;
   if(powered&&connected){
    const actual=scene.signals[id]?.[signal];
