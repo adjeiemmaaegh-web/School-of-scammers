@@ -40,6 +40,7 @@ const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
       physical:getComputedStyle(document.querySelector('.p5-physical-stage')).display,
     }));
     assert.equal(logical.visible,true);
+    assert.ok(await page.$('[data-p5-logical-canvas]'),'Physical project has a spatial logical board');
     assert.notEqual(logical.heading,'none');
     assert.equal(logical.physical,'none');
     await page.screenshot({path:'qa-artifacts/p5-ux/desktop-logical-1440.png'});
@@ -47,11 +48,16 @@ const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
     const palette=await page.$$eval('.sandbox-palette-item',els=>els.map(e=>e.textContent.trim()));
     assert.ok(palette.length>=2,'Controller models in family');
     assert.ok(palette.every(s=>/PLC/i.test(s)),'PLC family excludes unrelated devices');
+    await page.click('.sandbox-palette-item');
+    await page.waitForFunction(()=>document.querySelectorAll('[data-p5-logical-device]').length===1,
+      {timeout:15000});
+    const afterPlacement=await page.$eval('.sandbox-scene-stat',el=>el.textContent.trim());
+    assert.notEqual(afterPlacement,countBefore,'Placement is a real project mutation');
     await page.click('[data-p5-category="all"]');
     assert.ok((await page.$$('.sandbox-palette-item')).length>palette.length);
     await page.click('[data-p5-view="physical"]');
     await page.waitForFunction(()=>document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active')==='physical');
-    assert.equal(await page.$eval('.sandbox-scene-stat',e=>e.textContent.trim()),countBefore,
+    assert.equal(await page.$eval('.sandbox-scene-stat',e=>e.textContent.trim()),afterPlacement,
       'View switch never modifies project components');
     await page.click('.p5-panel-toggles button:nth-child(1)');
     assert.equal((await page.$('[data-p5-library]')),null);
