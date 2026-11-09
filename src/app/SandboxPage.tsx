@@ -519,8 +519,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       {(clientError || snapshot?.lastError) && <div role="alert" className="sandbox-alert">{clientError || snapshot?.lastError}</div>}
       {scenario && <ScenarioPanel session={scenario} project={project} evidence={evidence} result={result}
         onSubmit={submitScenario} onRestart={restartScenario} />}
-      <div className="sandbox-layout">
-        <aside className="sandbox-palette panel" aria-label="Component library">
+      <div className={`sandbox-layout p5-layout ${!libraryExpanded?'p5-no-library':''} ${!inspectorExpanded?'p5-no-inspector':''}`}
+        data-p5-view-active={workspaceView}>
+        {libraryExpanded&&<aside className="sandbox-palette panel" aria-label="Component library" data-p5-library>
           <div className="sandbox-rail-heading"><span className="eyebrow">Device library</span><h2>Components</h2>
             <small>{visibleKinds.length} types available</small></div>
           <label className="sandbox-library-search">
@@ -528,7 +529,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <input type="search" value={libraryQuery} onChange={e => setLibraryQuery(e.target.value)}
               placeholder="Search motors, PLCs…" aria-label="Search component library" />
           </label>
-          <p className="sandbox-library-help">Drag into the 3D floor or select a device to place it. Edits pause while the PLC runs.</p>
+          <div className="p5-device-families" role="group" aria-label="Industrial device families">
+            {DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).map(f=>
+              <button key={f.id} type="button" data-p5-category={f.id}
+                aria-pressed={libraryFamily===f.id} onClick={()=>setLibraryFamily(f.id)}>
+                {f.label}</button>)}
+          </div>
+          <p className="sandbox-library-help">Drag an available device into the 3D floor,
+            or click to place it. The registry determines what really works. Pause to edit.</p>
           <div className="sandbox-palette-list">
             {visibleKinds.map(kind => <button key={kind} draggable={editable}
               onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}
@@ -549,9 +557,15 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             </button>)}
             {!visibleKinds.length && <p className="sandbox-help" role="status">No devices match your search. Try “motor” or “PLC”.</p>}
           </div>
-          <div className="sandbox-library-foot"><strong>Learning scope</strong><span>24V DC · one PLC · educational simulation</span></div>
-        </aside>
+          <div className="sandbox-library-foot"><strong>Educational models</strong>
+            <span>{componentKinds.length} registered kinds · no live equipment</span></div>
+        </aside>}
         <div className="sandbox-main" id="sandbox-stage-build">
+          <div className="p5-logical-heading" aria-hidden={workspaceView!=='logical'}>
+            <strong>Logical / Wiring workspace</strong>
+            <span>Choose the first terminal, then a compatible second terminal. The worker validates each connection.</span>
+          </div>
+          <div className="p5-physical-stage">
           <div className="sandbox-scene-heading"><div><span className="eyebrow">Factory floor</span><h2>3D workspace</h2></div>
             <div><span className="sandbox-scene-stat">{project?.components.length ?? 0} devices</span><span className="sandbox-scene-stat">{project?.wires.length ?? 0} wires</span></div></div>
           <Suspense fallback={<div className="sandbox-3d-loading" role="status">Loading the interactive 3D workbench…</div>}>
@@ -570,7 +584,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <span>Place and wire your own devices or load the starter equipment (without pre-wiring).</span>
             <button className="btn ghost small" onClick={layout}>Place starter layout</button>
           </div>}
-          <details id="sandbox-stage-wire" className="sandbox-patch panel" open>
+          </div>
+          <details id="sandbox-stage-wire" className="sandbox-patch panel p5-logical-stage" open>
             <summary>Component wiring &amp; keyboard controls · {project?.components.length ?? 0} devices</summary>
             <p className="sandbox-help">These controls access the same terminals and states shown in the 3D workbench. Use them on phones, with a keyboard, or when WebGL is unavailable.</p>
             <div className="sandbox-device-list">
