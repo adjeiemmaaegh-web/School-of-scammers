@@ -6,7 +6,7 @@ export type ThermalConfig={pickupA:number;tripIntegral:number;coolingMs:number;
  ambientC:number;hotC:number};
 export type ThermalState={integral:number;temperatureC:number;tripped:boolean};
 export const THERMAL_CONFIG:ThermalConfig={
- pickupA:8,tripIntegral:30,coolingMs:60000,ambientC:20,hotC:110,
+ pickupA:8,tripIntegral:80,coolingMs:60000,ambientC:20,hotC:110,
 };
 export const freshThermal=():ThermalState=>({integral:0,temperatureC:20,tripped:false});
 const quant=(n:number):number=>Math.round(n*1e6)/1e6;
