@@ -20,7 +20,7 @@ const coordinate=(x:number,y:number):{x:number;y:number;z:number}=>({
 export function plantPlacements(project:Pick<ProjectFile,'components'|'params'>):EquipmentPlacement[]{
  return project.components.filter(c=>isP3Equipment(c.kind)).map(c=>({
   id:c.id,kind:c.kind,originMm:coordinate(c.x,c.y),
-  yawDeg:0 as const, // P3 physical orientation is locked until P1/P3 orientation integration
+  yawDeg:c.yawDeg ?? 0, // Persisted quarter-turn placement drives plant physics and 3D equally
   params:Object.fromEntries(paramSpecsOf(c.kind).map(spec=>
    [spec.key,paramValue(project.params,c.id,spec)])),
  }));
