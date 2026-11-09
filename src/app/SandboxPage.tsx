@@ -1,7 +1,17 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { COMPONENTS, componentKinds, isPlcKind, type ComponentKind } from '../components/registry';
+import { COMPONENTS, isPlcKind, type ComponentKind } from '../components/registry';
 import { IoMappingPanel } from '../ui/sandbox/IoMappingPanel';
+import { WorkspaceAuthoringBar } from '../ui/sandbox/WorkspaceAuthoringBar';
+import { WorkspaceLibraryFilters } from '../ui/sandbox/WorkspaceLibraryFilters';
+import { WorkspaceSelectionPanel } from '../ui/sandbox/WorkspaceSelectionPanel';
+import { searchEquipment } from '../workspace/catalogue';
+import { clampPlacement } from '../workspace/geometry';
+import { makeFragment } from '../workspace/clipboard';
+import { recordChange, emptyHistory, undoHistory, redoHistory } from '../workspace/history';
+import { workspaceShortcut } from '../workspace/keyboard';
+import { emptySelection, selectOne, toggleOne, selectAll, reconcileSelection } from '../workspace/selection';
+import type { WorkspaceCategory, GridStep, WorkspaceFragment, WorkspaceEdit, WorkspaceHistory } from '../workspace/types';
 import { AppHeader } from '../ui/AppHeader';
 import { ProgrammingDock } from '../program/ProgrammingDock';
 import { LiveMonitor } from '../program/LiveMonitor';
@@ -42,15 +52,23 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   }, [request]);
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
   const [project, setProject] = useState<ProjectFile | null>(null);
-  // Undo for destructive edits (remove / add panel): the project as it was before each one that took effect.
+  // The worker sends the authoritative previous document after each accepted edit.
+  // This avoids guessing history from stale React snapshots or optimistic UI events.
   const projectRef = useRef<ProjectFile | null>(null);
-  const pendingUndo = useRef<ProjectFile | null>(null);
-  const [undoStack, setUndoStack] = useState<ProjectFile[]>([]);
+  const historyRef = useRef<WorkspaceHistory>(emptyHistory());
+  const [history, setHistory] = useState<WorkspaceHistory>(emptyHistory);
+  const requestId = useRef(1);
+  const historyRequests = useRef(new Map<number, 'record' | 'ignore'>());
   const [selectedTerminal, setSelectedTerminal] = useState<string | null>(null);
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
+  const selectedDeviceId = selectedDeviceIds[selectedDeviceIds.length - 1] ?? null;
   const [selectedPlcId, setSelectedPlcId] = useState<string | null>(null);
   const [libraryQuery, setLibraryQuery] = useState('');
+  const [libraryCategory, setLibraryCategory] = useState<WorkspaceCategory | 'All'>('All');
+  const [grid, setGrid] = useState<GridStep>(5);
+  const [clipboard, setClipboard] = useState<WorkspaceFragment | null>(null);
+  const pasteIndex = useRef(0);
   const [activeStage, setActiveStage] = useState<'build' | 'wire' | 'program' | 'test'>('build');
   const [localSave, setLocalSave] = useState<'pending' | 'saved' | 'failed'>('pending');
   const [events, setEvents] = useState<string[]>([]);
@@ -64,7 +82,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [result, setResult] = useState<AttemptResult | null>(null);
   const resultRef = useRef<AttemptResult | null>(null);
   const startedAt = useRef(0);
-  const send = useCallback((commands: Command[]) => {
+  const send = useCallback((commands: Command[], historyMode: 'record' | 'ignore' = 'record') => {
     if (scenario && resultRef.current) return; // a submitted attempt is frozen
     if (scenario) {
       const at = Date.now() - startedAt.current;
@@ -73,8 +91,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         return e ? appendEvidence(log, at, e.action, e.detail) : log;
       }, prev));
     }
-    if (commands.some(c => c.k === 'remove' || c.k === 'addPanel')) pendingUndo.current = projectRef.current;
-    worker.current?.postMessage({ kind: 'commands', commands });
+    const id = requestId.current++;
+    const editKinds = new Set([
+      'place', 'move', 'wire', 'unwire', 'remove', 'addPanel', 'configureIo',
+      'setParam', 'loadProgram', 'loadST', 'activateLanguage', 'clear', 'loadProject',
+      'editWorkspace', 'injectFault', 'injectSeededFault', 'clearFault', 'revealFault', 'repair',
+    ]);
+    if (commands.some(c => editKinds.has(c.k))) historyRequests.current.set(id, historyMode);
+    worker.current?.postMessage({ kind: 'commands', requestId: id, commands });
   }, [scenario]);
   useEffect(() => {
     const engine = new Worker(new URL('../sim/worker.ts', import.meta.url), { type: 'module' });
@@ -82,13 +106,22 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     engine.onmessage = (ev: MessageEvent<WorkerResponse>) => {
       if (ev.data?.kind !== 'snapshot') return;
       setSnapshot(ev.data.snapshot);
-      if (pendingUndo.current) {
-        // The worker answered the destructive command: keep an undo point only if it actually changed the project.
-        const before = pendingUndo.current;
-        pendingUndo.current = null;
-        if (ev.data.project) setUndoStack(stack => [...stack.slice(-9), before]);
+      const acknowledged = ev.data.requestIds ?? (ev.data.requestId === undefined ? [] : [ev.data.requestId]);
+      let record = false;
+      for (const id of acknowledged) {
+        if (historyRequests.current.get(id) === 'record') record = true;
+        historyRequests.current.delete(id);
       }
-      if (ev.data.project) { projectRef.current = ev.data.project; setProject(ev.data.project); }
+      if (record && ev.data.previousProject && ev.data.project) {
+        const next = recordChange(historyRef.current, ev.data.previousProject, ev.data.project);
+        historyRef.current = next;
+        setHistory(next);
+      }
+      if (ev.data.project) {
+        projectRef.current = ev.data.project;
+        setProject(ev.data.project);
+        setSelectedDeviceIds(current => reconcileSelection(current, ev.data.project!.components));
+      }
       if (scenario) {
         // Repairs are recorded from the worker's own events, so a rejected attempt is never counted.
         const repairs = ev.data.events.filter(e => e.kind === 'repair');
@@ -163,7 +196,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     setResult(null);
     setEvidence([]);
     startedAt.current = Date.now();
-    setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setEvents([]); setClientError(null);
+    setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceIds([]); setEvents([]); setClientError(null);
     worker.current?.postMessage({ kind: 'commands', commands: [
       { k: 'loadProject', project: scenario.def.starter(scenario.seed) }, { k: 'reset' }] });
   };
@@ -179,12 +212,18 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   };
   const place = (kind: ComponentKind, x?: number, y?: number) => {
     const i = project?.components.length ?? 0;
-    send([{ k: 'place', id: uniqueId(kind), kind, at: {
+    send([{ k: 'place', id: uniqueId(kind), kind, at: clampPlacement({
       x: Math.max(5, Math.min(CANVAS_W - BOX_W - 5, x ?? 20 + (i % 5) * 205)),
       y: Math.max(5, Math.min(CANVAS_H - 145, y ?? 25 + Math.floor(i / 5) * 175)),
-    } }]);
+    }, grid) }]);
   };
-  const move = (id: string, at: { x: number; y: number }) => send([{ k: 'move', id, to: at }]);
+  const move = (id: string, at: { x: number; y: number }) => {
+    const part = project?.components.find(c => c.id === id);
+    if (!part) return;
+    const target = clampPlacement(at, grid);
+    send([{ k: 'editWorkspace', edit: { kind: 'translate', ids: [id],
+      delta: { x: target.x - part.x, y: target.y - part.y }, grid: 1 } }]);
+  };
   const connect = (terminal: string) => {
     if (!selectedTerminal) { setSelectedTerminal(terminal); return; }
     if (selectedTerminal !== terminal) send([{ k: 'wire', id: uniqueId('wire'), from: selectedTerminal, to: terminal }]);
@@ -280,7 +319,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       if (file.size > 200000) throw new Error('Project must be under 200 KB');
       const parsed: unknown = JSON.parse(await file.text());
       send([{ k: 'loadProject', project: parsed }]);
-      setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setEvents([]); setClientError(null);
+      setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceIds([]); setEvents([]); setClientError(null);
     } catch (e) { setClientError(e instanceof Error ? e.message : 'Project import failed'); }
     ev.target.value = '';
   };
@@ -296,16 +335,69 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     ...activePlcView.inputs, ...activePlcView.coils, ...activePlcView.outputs, PlcPowered: activePlcView.powered } : {}) };
   const selectedDevice = project?.components.find(c => c.id === selectedDeviceId) ?? null;
   const removeDevice = (id: string) => {
-    if (selectedDeviceId === id) setSelectedDeviceId(null);
-    if (selectedTerminal?.startsWith(`${id}.`)) setSelectedTerminal(null);
+    setSelectedDeviceIds(current => current.filter(part => part !== id));
+    if (selectedTerminal?.startsWith(id + '.')) setSelectedTerminal(null);
     send([{ k: 'remove', id }]);
   };
+  const selectDevice = (id: string | null, additive = false) => {
+    setSelectedDeviceIds(current => id ? additive ? toggleOne(current, id) : selectOne(id) : emptySelection());
+    if (id && isPlcKind(project?.components.find(c => c.id === id)?.kind ?? '')) setSelectedPlcId(id);
+  };
+  const edit = (operation: WorkspaceEdit) => {
+    if (!snapshot || snapshot.running || scenario) return;
+    send([{ k: 'editWorkspace', edit: operation }]);
+  };
+  const moveSelection = (dx: number, dy: number) => {
+    if (!selectedDeviceIds.length) return;
+    edit({ kind: 'translate', ids: [...selectedDeviceIds], delta: { x: dx, y: dy }, grid });
+  };
+  const rotateSelection = (quarterTurns: -1 | 1) => {
+    if (selectedDeviceIds.length) edit({ kind: 'rotate', ids: [...selectedDeviceIds], quarterTurns });
+  };
+  const duplicateSelection = () => {
+    if (selectedDeviceIds.length) edit({ kind: 'duplicate', ids: [...selectedDeviceIds],
+      offset: { x: 25, y: 25 }, grid });
+  };
+  const deleteSelection = () => {
+    if (!selectedDeviceIds.length) return;
+    edit({ kind: 'delete', ids: [...selectedDeviceIds] });
+    setSelectedDeviceIds([]);
+    setSelectedTerminal(null);
+  };
+  const copySelection = () => {
+    if (!project || !selectedDeviceIds.length || scenario) return;
+    try { setClipboard(makeFragment(project, selectedDeviceIds)); pasteIndex.current = 0; }
+    catch (error) { setClientError(error instanceof Error ? error.message : 'Cannot copy the selection'); }
+  };
+  const pasteSelection = () => {
+    if (!clipboard || !clipboard.components.length || scenario) return;
+    const offset = Math.min(150, 25 * (pasteIndex.current + 1));
+    const x = Math.min(...clipboard.components.map(part => part.x));
+    const y = Math.min(...clipboard.components.map(part => part.y));
+    edit({ kind: 'paste', fragment: clipboard, at: { x: x + offset, y: y + offset }, grid });
+    pasteIndex.current++;
+  };
   const undo = () => {
-    const previous = undoStack[undoStack.length - 1];
-    if (!previous) return;
-    setUndoStack(stack => stack.slice(0, -1));
-    setSelectedDeviceId(null); setSelectedTerminal(null); setMoveTarget(null);
-    send([{ k: 'loadProject', project: previous }]);
+    if (!projectRef.current || snapshot?.running) return;
+    const result = undoHistory(historyRef.current, projectRef.current);
+    if (!result) return;
+    historyRef.current = result.history;
+    setHistory(result.history);
+    setSelectedDeviceIds([]);
+    setSelectedTerminal(null);
+    setMoveTarget(null);
+    send([{ k: 'loadProject', project: result.project }], 'ignore');
+  };
+  const redo = () => {
+    if (!projectRef.current || snapshot?.running) return;
+    const result = redoHistory(historyRef.current, projectRef.current);
+    if (!result) return;
+    historyRef.current = result.history;
+    setHistory(result.history);
+    setSelectedDeviceIds([]);
+    setSelectedTerminal(null);
+    setMoveTarget(null);
+    send([{ k: 'loadProject', project: result.project }], 'ignore');
   };
   // The toolbar is sticky: keep it just below the sticky app header, whatever height the header has.
   useEffect(() => {
@@ -318,26 +410,44 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     window.addEventListener('resize', apply);
     return () => { observer?.disconnect(); window.removeEventListener('resize', apply); document.documentElement.style.removeProperty('--app-header-h'); };
   }, []);
-  // Delete removes the selected device (when paused), like a bench tool; never while typing in a field.
+  // Keyboard shortcuts operate only on the P1 workspace; never hijack ST/LD text editing.
   useEffect(() => {
-    const onKey = (ev: KeyboardEvent) => {
-      if (ev.key !== 'Delete' || !selectedDeviceId || snapshot?.running) return;
-      const el = ev.target as HTMLElement | null;
-      if (el && /^(input|textarea|select)$/i.test(el.tagName)) return;
-      removeDevice(selectedDeviceId);
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const shortcut = workspaceShortcut({
+        key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey,
+        shiftKey: event.shiftKey, altKey: event.altKey, targetTag: target?.tagName,
+        isContentEditable: target?.isContentEditable,
+      });
+      if (!shortcut) return;
+      if (shortcut === 'clear-selection') {
+        if (selectedDeviceIds.length) { event.preventDefault(); setSelectedDeviceIds([]); }
+        return;
+      }
+      if (snapshot?.running || scenario) return;
+      if (shortcut === 'undo' && historyRef.current.undo.length) { event.preventDefault(); undo(); return; }
+      if (shortcut === 'redo' && historyRef.current.redo.length) { event.preventDefault(); redo(); return; }
+      if (shortcut === 'select-all' && project?.components.length) {
+        event.preventDefault(); setSelectedDeviceIds(selectAll(project.components)); return;
+      }
+      if (shortcut === 'copy' && selectedDeviceIds.length) { event.preventDefault(); copySelection(); return; }
+      if (shortcut === 'paste' && clipboard) { event.preventDefault(); pasteSelection(); return; }
+      if (!selectedDeviceIds.length) return;
+      if (shortcut === 'duplicate') { event.preventDefault(); duplicateSelection(); return; }
+      if (shortcut === 'delete') { event.preventDefault(); deleteSelection(); return; }
+      if (shortcut === 'rotate-left') { event.preventDefault(); rotateSelection(-1); return; }
+      if (shortcut === 'rotate-right') { event.preventDefault(); rotateSelection(1); return; }
+      const directions: Record<string, [number, number]> = {
+        'nudge-left': [-grid, 0], 'nudge-right': [grid, 0],
+        'nudge-up': [0, -grid], 'nudge-down': [0, grid],
+      };
+      const delta = directions[shortcut];
+      if (delta) { event.preventDefault(); moveSelection(delta[0], delta[1]); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
-  const selectDevice = (id: string | null) => {
-    setSelectedDeviceId(id);
-    if (id && isPlcKind(project?.components.find(c => c.id === id)?.kind ?? '')) setSelectedPlcId(id);
-  };
-  const visibleKinds = componentKinds.filter(kind => {
-    const definition = COMPONENTS[kind];
-    const words = `${definition.kind} ${definition.label} ${definition.help}`.toLowerCase();
-    return words.includes(libraryQuery.trim().toLowerCase());
-  });
+  const visibleKinds = searchEquipment(libraryQuery, libraryCategory);
   const workflow = [
     { id: 'build' as const, label: 'Build', hint: 'Place equipment', count: project?.components.length ?? 0 },
     { id: 'wire' as const, label: 'Wire', hint: 'Connect terminals', count: project?.wires.length ?? 0 },
@@ -378,7 +488,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       </nav>
       <div className="sandbox-toolbar">
         {!scenario && <>
-        <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setActiveStage('build'); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
+        <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceIds([]); setActiveStage('build'); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
         {/* The ready-made starters live in one menu so the sticky toolbar stays a single short row. */}
         <details className="sandbox-starters" data-starters>
           <summary className="btn ghost small">Starters</summary>
@@ -400,8 +510,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>
         </details>
         </>}
-        <button className="btn ghost small" data-undo onClick={undo}
-          disabled={!editable || !undoStack.length}>Undo</button>
+        {scenario && <button className="btn ghost small" data-undo onClick={undo}
+          disabled={!editable || !history.undo.length}>Undo</button>}
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         {!scenario && <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>}
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
@@ -412,6 +522,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           {snapshot?.running ? 'Pause' : '▶ Run'}</button>
         <span className="sandbox-scan" aria-live="off">Scan {snapshot?.tick ?? 0}</span>
       </div>
+        {!scenario && <div className="workspace-editing-strip" aria-label="Workspace tools">
+          <WorkspaceAuthoringBar editable={editable} selectedCount={selectedDeviceIds.length}
+            canUndo={history.undo.length > 0} canRedo={history.redo.length > 0} canPaste={!!clipboard}
+            grid={grid} onGrid={setGrid} onUndo={undo} onRedo={redo} onCopy={copySelection}
+            onPaste={pasteSelection} onDuplicate={duplicateSelection} onRemove={deleteSelection}
+            onRotate={rotateSelection} onNudge={moveSelection} />
+        </div>}
       {(clientError || snapshot?.lastError) && <div role="alert" className="sandbox-alert">{clientError || snapshot?.lastError}</div>}
       {scenario && <ScenarioPanel session={scenario} project={project} evidence={evidence} result={result}
         onSubmit={submitScenario} onRestart={restartScenario} />}
@@ -424,6 +541,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <input type="search" value={libraryQuery} onChange={e => setLibraryQuery(e.target.value)}
               placeholder="Search motors, PLCs…" aria-label="Search component library" />
           </label>
+          <WorkspaceLibraryFilters category={libraryCategory} onChange={setLibraryCategory} />
           <p className="sandbox-library-help">Drag into the 3D floor or select a device to place it. Edits pause while the PLC runs.</p>
           <div className="sandbox-palette-list">
             {visibleKinds.map(kind => <button key={kind} draggable={editable}
@@ -445,7 +563,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             </button>)}
             {!visibleKinds.length && <p className="sandbox-help" role="status">No devices match your search. Try “motor” or “PLC”.</p>}
           </div>
-          <div className="sandbox-library-foot"><strong>Learning scope</strong><span>24V DC · one PLC · educational simulation</span></div>
+          <div className="sandbox-library-foot"><strong>Learning scope</strong><span>24V DC · up to 6 PLCs · bounded teaching simulation</span></div>
         </aside>
         <div className="sandbox-main" id="sandbox-stage-build">
           <div className="sandbox-scene-heading"><div><span className="eyebrow">Factory floor</span><h2>3D workspace</h2></div>
@@ -454,13 +572,18 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             {project && snapshot && <Sandbox3D
               project={project} snapshot={snapshot} editable={editable}
               selectedTerminal={selectedTerminal} moveTarget={moveTarget}
-              selectedDeviceId={selectedDeviceId} onSelectDevice={selectDevice}
+              selectedDeviceId={selectedDeviceId} selectedDeviceIds={selectedDeviceIds}
+              onSelectDevice={selectDevice}
               onTerminal={connect}
               onOperate={id => send([{ k: 'operateToggle', id }])}
               onPlace={(kind, at) => place(kind, at.x, at.y)}
               onMove={move} onMoveFinished={() => setMoveTarget(null)}
             />}
           </Suspense>
+          {!scenario && <WorkspaceSelectionPanel components={project?.components ?? []} selected={selectedDeviceIds}
+            onToggle={id => selectDevice(id, true)}
+            onSelectAll={() => setSelectedDeviceIds(selectAll(project?.components ?? []))}
+            onClear={() => setSelectedDeviceIds([])} />}
           {!project?.components.length && <div className="sandbox-3d-empty">
             <strong>Start with an empty 3D factory workbench.</strong>
             <span>Place and wire your own devices or load the starter equipment (without pre-wiring).</span>
@@ -484,7 +607,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                   c.kind === 'start' || c.kind === 'stop' ? c.pressed : false;
                 return <section className={`sandbox-device ${live ? 'active' : ''}`} key={c.id} data-device-id={c.id}>
                   <div className="sandbox-patch-head">
-                    <button type="button" className="sandbox-inspect-link" onClick={() => selectDevice(c.id)}
+                    <button type="button" className="sandbox-inspect-link" onClick={event => selectDevice(c.id, event.ctrlKey || event.metaKey)}
                       aria-label={`Inspect ${def.label}`}>{def.label}</button>
                     <span className="sandbox-device-status">{c.kind === 'motor' ? (live ? 'RUNNING' : 'STOPPED') :
                       c.kind === 'contactor' || c.kind === 'relay' ? (live ? 'COIL ON' : 'COIL OFF') :
@@ -680,7 +803,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onMoveTo={(id, at) => move(id, at)}
           onSetParam={(id, key, value) => send([{ k: 'setParam', id, key, value }])}
           onOperate={id => send([{ k: 'operateToggle', id }])}
-          onClearSelection={() => setSelectedDeviceId(null)} />
+          onClearSelection={() => setSelectedDeviceIds([])} />
       </div>
       <div className="sandbox-bottom">
         <div id="sandbox-stage-program" className="sandbox-program-dock">

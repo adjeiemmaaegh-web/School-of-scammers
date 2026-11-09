@@ -6,9 +6,13 @@ import type { SortingPlant, ParcelKind } from '../plant/sorting-conveyor';
 import type { TankProcess } from '../plant/tank-process';
 import type { CylinderState } from '../plant/cylinder';
 import type { MeterReading } from '../electrical/panel-meter';
+import type { WorkspaceEdit } from '../workspace/types';
 
 export type XY = { x: number; y: number };
-export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean };
+export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean;
+  /** Optional persisted quarter-turn orientation; absent means 0 degrees. Rotatable P1 electrical/indicator models only. */
+  yawDeg?: 0 | 90 | 180 | 270 };
+
 export type Wire = { id: string; from: string; to: string };
 /** Component/wire failures that alter what the circuit solver sees (P5). */
 export type FaultKind = 'wire-open' | 'contactor-coil-open' | 'contactor-welded' | 'motor-open-winding' | 'button-stuck' | 'sensor-stuck'
@@ -156,6 +160,8 @@ export type WorldState = {
   alarmWatch: AlarmWatch;
 };
 export type Command =
+  /** Bounded P1 grouped workspace edit; validated atomically against the full ProjectFile. */
+  | { k: 'editWorkspace'; edit: WorkspaceEdit }
   | { k: 'place'; id: string; kind: ComponentKind; at: XY }
   | { k: 'move'; id: string; to: XY }
   | { k: 'wire'; id: string; from: string; to: string }
@@ -248,5 +254,9 @@ export type RenderSnapshot = {
   breakpointTag: TagBreakpoint | null;
   scanTrace: ScanTrace[];
 };
-export type WorkerRequest = { kind: 'commands'; commands: Command[] };
-export type WorkerResponse = { kind: 'snapshot'; snapshot: RenderSnapshot; events: SimEvent[]; project?: ProjectFile };
+export type WorkerRequest = { kind: 'commands'; commands: Command[]; requestId?: number };
+export type WorkerResponse = { kind: 'snapshot'; snapshot: RenderSnapshot; events: SimEvent[];
+  /** Reply correlation; absent for the periodic scan and worker startup. */
+  requestId?: number; requestIds?: number[]; project?: ProjectFile;
+  /** Authoritative previous document for accepted edits; enables safe grouped undo/redo. */
+  previousProject?: ProjectFile };
