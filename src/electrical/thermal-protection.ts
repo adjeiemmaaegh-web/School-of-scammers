@@ -6,7 +6,7 @@ export type ThermalConfig={pickupA:number;tripIntegral:number;coolingMs:number;
  ambientC:number;hotC:number};
 export type ThermalState={integral:number;temperatureC:number;tripped:boolean};
 export const THERMAL_CONFIG:ThermalConfig={
- pickupA:8,tripIntegral:3,coolingMs:60000,ambientC:20,hotC:110,
+ pickupA:8,tripIntegral:30,coolingMs:60000,ambientC:20,hotC:110,
 };
 export const freshThermal=():ThermalState=>({integral:0,temperatureC:20,tripped:false});
 const quant=(n:number):number=>Math.round(n*1e6)/1e6;
@@ -19,7 +19,9 @@ export function stepThermal(previous:ThermalState,amps:number,dtMs:number,
     !Number.isFinite(config.coolingMs)||config.coolingMs<1000)
   throw new RangeError('Invalid thermal teaching input');
  const ratio=amps/config.pickupA;
- const heat=ratio*ratio*dtMs/1000;
+ // No temperature rise above nominal at or below rated current; simplified
+ // I²t overload memory integrates only EXCESS current and survives inrush.
+ const heat=Math.max(0,ratio*ratio-1)*dtMs/1000;
  const cool=previous.integral*dtMs/config.coolingMs;
  const integral=quant(Math.max(0,previous.integral+heat-cool));
  const temperatureC=quant(config.ambientC+
