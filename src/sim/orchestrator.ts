@@ -19,7 +19,7 @@ import { laneOf, lanesOf, vesselOf, vesselsOf } from './stations';
 import { electricalDevices } from '../components/electrical-defs';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { clearedAlarm, engineFault, freshCylinder, stepCylinder } from '../plant/cylinder';
-import { freshProjectPlant, plantPlacements, stepProjectPlant, sensorImage,validatePlantFaults } from './p3-plant-bridge';
+import { freshProjectPlant, stepProjectPlant, sensorImage,validatePlantFaults } from './p3-plant-bridge';
 export { MAX_COMPONENTS, MAX_WIRES };
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
