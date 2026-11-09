@@ -246,3 +246,74 @@
     scroll-behavior:auto!important;transition-duration:0ms!important;
   }
 }
+
+/* The new Logical view is an actual spatial diagram of project components/wires.
+ * Route strokes are neutral: only the worker, never SVG color, can claim power.
+ */
+.p5-organized .p5-logical-board{display:none}
+.p5-organized .p5-layout[data-p5-view-active="logical"] .p5-logical-board{display:block}
+.p5-logical-scroll{
+  position:relative;overflow:auto;scrollbar-width:thin;
+  height:clamp(490px,65vh,780px);
+  border:1px solid var(--line);border-radius:9px;background:var(--scene-bg);
+}
+.p5-logical-canvas{
+  position:relative;box-sizing:border-box;width:1080px;min-height:580px;
+  background-image:
+    linear-gradient(color-mix(in srgb,var(--scene-line) 13%,transparent) 1px,transparent 1px),
+    linear-gradient(90deg,color-mix(in srgb,var(--scene-line) 13%,transparent) 1px,transparent 1px);
+  background-size:25px 25px;
+}
+.p5-logical-wires{
+  position:absolute;left:0;top:0;z-index:1;
+  overflow:visible;pointer-events:none;
+}
+.p5-logical-wires path{
+  fill:none;stroke:var(--scene-line);stroke-width:2.5;
+  opacity:.9;stroke-linecap:round;stroke-linejoin:round;
+}
+.p5-logical-node{
+  position:absolute;z-index:2;box-sizing:border-box;width:170px;
+  border:2px solid var(--scene-line);border-radius:10px;
+  background:var(--surface);color:var(--ink);
+  box-shadow:0 4px 12px var(--scene-shadow);
+  display:flex;flex-direction:column;align-items:center;gap:8px;padding:9px 9px 13px;
+  text-align:center;
+}
+.p5-logical-node.is-selected{outline:3px solid var(--accent);outline-offset:2px}
+.p5-logical-device-title{
+  max-width:145px;padding:5px 2px;border:0;border-radius:5px;background:transparent;
+  color:var(--ink);font:700 12px var(--body);cursor:pointer;white-space:normal;
+}
+.p5-logical-device-title:hover{text-decoration:underline}
+.p5-logical-node>code{font:10px var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.p5-logical-state{
+  margin-top:5px;border:1px solid var(--line);padding:4px 8px;
+  font:10px var(--mono);border-radius:6px;color:var(--muted);
+}
+.p5-logical-terminal{
+  position:absolute;z-index:3;min-width:34px;min-height:19px;padding:2px 4px;
+  border:1px solid var(--scene-line);background:var(--surface-2);color:var(--ink);
+  border-radius:4px;font:10px var(--mono);cursor:crosshair;white-space:nowrap;
+}
+.p5-logical-terminal.left{left:-28px}
+.p5-logical-terminal.right{right:-28px}
+.p5-logical-terminal.is-selected{
+  background:var(--accent);color:var(--accent-ink);outline:2px solid var(--accent);
+}
+.p5-logical-terminal:disabled{cursor:not-allowed;opacity:.55}
+.p5-logical-empty{
+  position:absolute;left:220px;top:155px;
+  width:430px;max-width:calc(100% - 260px);
+  display:grid;gap:10px;padding:22px;border:1px dashed var(--scene-line);
+  border-radius:10px;background:var(--surface);color:var(--ink);
+}
+.p5-logical-empty strong{font-size:18px}
+.p5-logical-empty span{font-size:13px;color:var(--muted)}
+.p5-logical-board>.sandbox-help{margin:8px 2px 4px;line-height:1.5}
+.p5-organized .p5-layout[data-p5-view-active="logical"] .p5-logical-stage{
+  max-height:275px;
+}
+@media(max-width:570px){
+  .p5-logical-scroll{height:58vh;min-height:390px}
+}
