@@ -32,12 +32,10 @@ export function validateSandboxProgram(program: LadderDocument, names: IoNames =
   if (symbols.length > MAX_SANDBOX_SYMBOLS) errors.push(`Sandbox supports at most ${MAX_SANDBOX_SYMBOLS} local tags`);
   for (const tag of symbols) if (builtIns.has(tag) || !safeTag(tag)) errors.push(`Invalid or reserved local tag: ${tag}`);
   const numeric = new Set(symbols.filter(tag => ['INT','DINT','REAL'].includes(program.symbols![tag].type ?? 'BOOL')));
-  const physicalNumeric = new Set(names.numericInputs);
-  // The current Ladder numeric operand engine supports declared local registers only.
-  // Real physical numeric inputs are exposed through ST until the Ladder operand API is extended.
+  // Physical numeric channels are read-only operands in compares and arithmetic, never BOOL contacts or destinations.
   const physicalNumeric = new Set(names.numericInputs);
   const numericOperand = (operand: NumericOperand, index: number, description: string) => {
-    if (operand.kind === 'tag' && !numeric.has(operand.name))
+    if (operand.kind === 'tag' && !numeric.has(operand.name) && !physicalNumeric.has(operand.name))
       errors.push(`Rung ${index}: ${description} ${operand.name} must be a declared numeric local tag`);
   };
   const coils = new Set(program.rungs.map(rung => rung.coil));

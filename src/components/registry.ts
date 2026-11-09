@@ -1,6 +1,8 @@
-/** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
-export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor';
-export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' };
+/** Original equipment definitions for 24V, isolated numeric, three-phase and bounded plant domains. */
+import { EQUIPMENT } from '../plant/equipment';
+import type { EquipmentDef } from '../plant/world/equipment';
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive';
+export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' | 'three-phase' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
 export const isPlcKind = (kind: string): boolean => kind === 'plc' || kind === 'plc16';
@@ -13,8 +15,6 @@ const plc16Terminals = (): Terminal[] => [
   ...PLC16_OUTPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'right', y: 30 + i * 6.5, role: 'output' })),
   { name: 'AI0', side: 'left', y: 142, role: 'analog-input' },
   { name: 'AI1', side: 'left', y: 153, role: 'analog-input' },
-  { name:'AI0',side:'left',y:142,role:'analog-input' },
-  { name:'AI1',side:'left',y:153,role:'analog-input' },
 ];
 const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
   stacklight: { kind: 'stacklight', label: 'Stack light (R/Y/G)', help: 'Three 24V signal lamps on one column: R, Y and G each to the common M-', terminals: [
