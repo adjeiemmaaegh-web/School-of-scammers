@@ -552,7 +552,10 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (!validPos(cmd.to) || !world.project.components.some(c => c.id === cmd.id)) world = setError(world, 'Invalid movement');
       else world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, ...cmd.to } : c) } };
     } else if (cmd.k === 'wire') {
-      if (!validId(cmd.id) || world.project.wires.some(w => w.id === cmd.id || (w.from === cmd.from && w.to === cmd.to) || (w.from === cmd.to && w.to === cmd.from)) ||
+      const phaseError=threePhaseWireError(cmd.from,cmd.to,
+        Object.fromEntries(world.project.components.map(c=>[c.id,c.kind])));
+      if(phaseError)world=setError(world,phaseError);
+      else if (!validId(cmd.id) || world.project.wires.some(w => w.id === cmd.id || (w.from === cmd.from && w.to === cmd.to) || (w.from === cmd.to && w.to === cmd.from)) ||
           cmd.from === cmd.to || !terminalExists(cmd.from, world.project.components) ||
           !terminalExists(cmd.to, world.project.components) || world.project.wires.length >= MAX_WIRES)
         world = setError(world, 'Invalid or duplicate terminal connection');
