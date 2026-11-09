@@ -97,6 +97,7 @@ jobs:
       - name: No-WebGL low-resource browser functionality
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/cpu-fallback-acceptance.cjs
       - name: Install Firefox and Linux WebKit for browser acceptance
+        timeout-minutes: 4
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.64.1
           npx playwright install --with-deps firefox webkit
