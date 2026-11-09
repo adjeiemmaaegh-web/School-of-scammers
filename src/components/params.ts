@@ -4,12 +4,14 @@
  * Pure and deterministic; the worker validates every value, the UI only offers what the spec allows.
  */
 import type { ComponentKind } from './registry';
+import { EQUIPMENT } from '../plant/equipment';
 
 export type ParamSpec = { key: string; label: string; unit: string; min: number; max: number; step: number; default: number };
 
 export const PARAM_SPECS: Partial<Record<ComponentKind, readonly ParamSpec[]>> = {
   // One scan is 50 ms, so the finest useful delay is 100 ms; a bench timer relay dial tops out around a minute.
   timerelay: [{ key: 'delayMs', label: 'On-delay', unit: 'ms', min: 100, max: 60000, step: 100, default: 2000 }],
+  ...Object.fromEntries(EQUIPMENT.map(def=>[def.kind,def.params])),
 };
 
 export const paramSpecsOf = (kind: ComponentKind): readonly ParamSpec[] => PARAM_SPECS[kind] ?? [];

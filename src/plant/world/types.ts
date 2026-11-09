@@ -1,0 +1,37 @@
+/**
+ * P3 original bounded educational plant world.
+ * Units: millimetres, kilograms, milliseconds, Celsius. z is vertical.
+ * No real-machine accuracy, rigid-body certification or safety guarantees.
+ */
+export type Vec3={x:number;y:number;z:number};
+export type BodyShape='box'|'cylinder';
+export type Body={
+ id:string;shape:BodyShape;size:Vec3;massKg:number;pos:Vec3;
+ yawDeg:0|90|180|270;vel:Vec3;supportedBy:string|null;
+ tags:Record<string,string|number|boolean>;
+};
+export type WorldEvent={atMs:number;kind:'spawn'|'despawn'|'jam'|'contact'|'motion'|'fault'|'limit'|'process';source:string;bodyId?:string;detail:string};
+export type World={
+ bodies:Body[];nextBodyId:number;timeMs:number;rngState:number;
+ spawnedCount:number;despawnedCount:number;droppedEventCount:number;
+ events:WorldEvent[];model:Record<string,EquipmentState>;
+};
+export type EquipmentState={
+ positionMm:number;speedMmS:number;progress:number;count:number;
+ levelMl:number;temperatureC:number;value:number;engaged:boolean;done:boolean;
+ lastCommand:boolean;elapsedMs:number;stalled:boolean;faulted:boolean;
+ heldBodyId?:string|null;slots?:Record<string,string>;phase?:number;
+};
+export type EquipmentPlacement={
+ id:string;kind:string;originMm:Vec3;yawDeg:0|90|180|270;params:Record<string,number>;
+};
+export type EquipmentCommand=Readonly<Record<string,boolean|number>>;
+export type WorldInputs=Readonly<Record<string,EquipmentCommand>>;
+export type EquipmentSignal=boolean|number;
+export type LiveSignal=Record<string,EquipmentSignal>;
+export type EquipmentDrawing={
+ part:string;shape:BodyShape;pos:Vec3;size:Vec3;yawDeg:number;colour:string;
+};
+export const MAX_BODIES=60, MAX_WORLD_EVENTS=80, MAX_SCENE_EQUIPMENT=60;
+export const QUANTUM=1e-6, SUBSTEP_MS=10, SCAN_MS=50;
+export const G_MM_S2=9810;
