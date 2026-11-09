@@ -22,6 +22,7 @@ export const LEGACY_IO: PlcIoMap = {
 export const defaultIo = (kind: string): PlcIoMap => kind === 'plc16' ? {
   inputs: Object.fromEntries(PLC16_INPUT_TERMINALS.map((t, i) => [t, `In${i}`])),
   outputs: Object.fromEntries(PLC16_OUTPUT_TERMINALS.map((t, i) => [t, `Out${i}`])),
+  analogInputs:{AI0:'Analog0',AI1:'Analog1'},
   // Two fixed engineering-unit numeric channels, separate from the 24V digital netlist.
   analogInputs: { AI0: 'Analog0', AI1: 'Analog1' },
 } : LEGACY_IO;

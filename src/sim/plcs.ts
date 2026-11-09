@@ -9,11 +9,13 @@
  * Pure and deterministic, like everything under src/sim.
  */
 import { executeLadder, type LadderDocument, type LadderMemory, type LadderStep } from '../engineering/ladder';
+import { compileFbd, executeFbd, fbdMotorStarter, type FbdDocument, type FbdStep } from '../engineering/fbd';
 import { executeStructuredText, type STValue } from '../engineering/structured-text';
 import { compileSandboxST, DEFAULT_ST_SOURCE } from '../program/p2-contract';
 import { isPlcKind } from '../components/registry';
 import { defaultIo, ioOf, namesOf, type IoNames, type PlcIoMap } from './plc-io';
 import type { PlacedComponent, PlcInputs, PlcIoPoint, PlcProgram, PlcRuntime, PlcView, ProjectFile } from './signals';
+import type { NumericPoint } from './p3-numeric';
 import type { AnalogPoint } from './analog';
 
 export const MAX_PLCS = 6;
@@ -57,22 +59,29 @@ export function defaultProgramFor(kind: string | undefined, io?: PlcIoMap): Reso
     const [input, output] = [names.inputs[0], names.outputs[0]];
     return {
       program: { id: 'sandbox-program', version: '1.0', rungs: [{ id: 'rung-1', elements: [{ type: 'contact', tag: input }], coil: output }] },
+      fbd: { id: 'plc16-fbd', version: '1.0', nodes: [
+        { id: 'source', kind: 'input', tag: input }, { id: 'coil', kind: 'output', tag: output, inputs: ['source'] },
+      ] },
       language: 'ladder', stSource: ['VAR_INPUT', `  ${input} : BOOL;`, 'END_VAR', 'VAR_OUTPUT', `  ${output} : BOOL;`, 'END_VAR', `${output} := ${input};`].join('\n'),
     };
   }
-  return { program: blankProgram(), language: 'ladder', stSource: DEFAULT_ST_SOURCE };
+  return { program: blankProgram(), language: 'ladder', stSource: DEFAULT_ST_SOURCE, fbd: fbdMotorStarter() };
 }
 
-export type ResolvedProgram = { program: LadderDocument; language: 'ladder' | 'st'; stSource: string };
+export type ResolvedProgram = { program: LadderDocument; language: 'ladder' | 'st' | 'fbd'; stSource: string; fbd: FbdDocument };
 
 /** The program of any PLC, with defaults filled in. Unknown ids resolve to a blank Ladder program. */
 export function programOf(project: ProjectFile, plcId: string | undefined): ResolvedProgram {
-  if (plcId === undefined || plcId === primaryPlcId(project) || plcComponents(project).length === 0)
-    return { program: project.program, language: project.language ?? 'ladder', stSource: project.stSource ?? DEFAULT_ST_SOURCE };
+  if (plcId === undefined || plcId === primaryPlcId(project) || plcComponents(project).length === 0) {
+    const primary = plcComponents(project)[0];
+    return { program: project.program, language: project.language ?? 'ladder', stSource: project.stSource ?? DEFAULT_ST_SOURCE,
+      fbd: project.fbd ?? defaultProgramFor(primary?.kind, primary ? ioOf(project, primary) : undefined).fbd };
+  }
   const own = project.plcPrograms?.[plcId];
   const comp = project.components.find(c => c.id === plcId);
   const fallback = defaultProgramFor(comp?.kind, comp ? ioOf(project, comp) : undefined);
-  return { program: own?.program ?? fallback.program, language: own?.language ?? 'ladder', stSource: own?.stSource ?? fallback.stSource };
+  return { program: own?.program ?? fallback.program, language: own?.language ?? 'ladder',
+    stSource: own?.stSource ?? fallback.stSource, fbd: own?.fbd ?? fallback.fbd };
 }
 
 /** The tag names a PLC's program is validated against (its I/O map). Unknown ids get the classic names. */
@@ -88,12 +97,14 @@ export function withProgramOf(project: ProjectFile, plcId: string | undefined, p
     ...(patch.program !== undefined ? { program: patch.program } : {}),
     ...(patch.language !== undefined ? { language: patch.language } : {}),
     ...(patch.stSource !== undefined ? { stSource: patch.stSource } : {}),
+    ...(patch.fbd !== undefined ? { fbd: patch.fbd } : {}),
   };
   const current = programOf(project, plcId);
   return { ...project, plcPrograms: { ...project.plcPrograms, [plcId]: {
     program: patch.program ?? current.program,
     language: patch.language ?? current.language,
     stSource: patch.stSource ?? current.stSource,
+    fbd: patch.fbd ?? current.fbd,
   } } };
 }
 
@@ -106,6 +117,7 @@ export function freshPlcRuntime(cfg: ResolvedProgram, names?: IoNames): PlcRunti
   return {
     powered: false, inputs, tagInputs: {}, analogInputs: [], coils: {}, tagValues: idleTags(inputs), ladderMemory: {}, ladderNumeric: {}, ladderSteps: [],
     stCompiled: cfg.language === 'st' ? compileSandboxST(cfg.stSource, names) : null, stMemory: {},
+    fbdMemory: {}, fbdSteps: [],
   };
 }
 
