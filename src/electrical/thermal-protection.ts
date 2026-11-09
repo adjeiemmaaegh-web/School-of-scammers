@@ -21,9 +21,9 @@ export function stepThermal(previous:ThermalState,amps:number,dtMs:number,
  const ratio=amps/config.pickupA;
  // No temperature rise above nominal at or below rated current; simplified
  // I²t overload memory integrates only EXCESS current and survives inrush.
- const heat=Math.max(0,ratio*ratio-1)*dtMs/1000;
+ const heat=previous.tripped?0:Math.max(0,ratio*ratio-1)*dtMs/1000;
  const cool=previous.integral*dtMs/config.coolingMs;
- const integral=quant(Math.max(0,previous.integral+heat-cool));
+ const integral=quant(Math.min(config.tripIntegral,Math.max(0,previous.integral+heat-cool)));
  const temperatureC=quant(config.ambientC+
    (config.hotC-config.ambientC)*Math.min(1,integral/config.tripIntegral));
  const reached=integral>=config.tripIntegral;
