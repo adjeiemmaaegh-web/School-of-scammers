@@ -15,7 +15,11 @@
 | `src/app/SandboxPage.tsx` | Original six-menu workspace, separate project toolbar, real Logical/Wiring and Physical/3D view selection, catalog filters, library/inspector collapse, dock and worker-state display; menu and tool actions use existing commands |
 | `src/app/p5-workspace.css` | Scoped industrial desktop visual hierarchy, dominant central plant region, compact menus, status strip, responsive stacked/narrow behavior, reduced-motion and visible keyboard focus |
 | `src/ui/sandbox/workspace-catalog.ts` | Deterministic family taxonomy for supported registry kinds, no fabricated device entries |
+| `src/ui/sandbox/LogicalWiringCanvas.tsx` | Original spatial logical view: device cards at actual saved coordinates, neutral SVG wire routing, clickable real terminals and worker-derived device state |
+| `src/ui/sandbox/logical-wiring.ts` | Pure positioning and route helpers for terminal-based diagram geometry |
 | `tests/p5-workspace-organization.test.ts` | Unit-level catalog family consistency, filtering, discoverability |
+| `tests/p5-logical-wiring.test.ts` | Pure diagram geometry/port-spacing and endpoint route tests |
+| `scripts/sandbox-p2-browser-acceptance.cjs` | Preserves existing P2 validation while synchronizing the breakpoint test to the worker's reset snapshot before arming it |
 | `scripts/sandbox-p5-workspace-browser.cjs` | Chromium acceptance recipe for two-view state, library categories, panel/dock toggles, keyboard shortcuts, responsive entry; emits 1440/1280/390 evidence screenshots |
 | `.github/workflows/ci.yml` | Runs the new browser acceptance check in existing source CI, following genuine preview/test server initialization |
 
@@ -38,7 +42,7 @@
 
 ## 3. Deliberate boundary decisions
 
-- The current **Logical/Wiring** view is the existing keyboard-accessible terminal/connection workbench, not a new node-wire drawing engine. A zoomable, spatial multi-wire schematic is a future task, not a claim of this source.
+- The **Logical/Wiring** view now includes an original spatial 2D device/wire diagram with worker-backed terminal commands and click-to-select. Its routing is a simple orthogonal display of real project wires, not a professional electrical CAD auto-router, zoom/pan engine or guaranteed clearance-aware layout. The original keyboard-accessible terminal patch remains available as an accessibility fallback.
 - Physical and logical tabs change **rendering only**. The authoritative Web Worker still owns the PLC, 24V solver, plant and time; the UI cannot fabricate device state.
 - Categories derive from `componentKinds`. P3 PR #32 advanced plant-world and P4 PR #33 three-phase source remain unmerged separate branches; they are not silently imported into P5-UX.
 - The lower dock reuses genuine `ProgrammingDock`, `IoMappingPanel`, `LiveMonitor`, `TroubleshootingPanel` and the virtual meter. No independent PLC interpreter or dummy instrument.
