@@ -6,9 +6,11 @@ import { AppHeader } from '../ui/AppHeader';
 import { ProgrammingDock } from '../program/ProgrammingDock';
 import { LiveMonitor } from '../program/LiveMonitor';
 import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
+import { PlantScenePanel } from '../ui/sandbox/PlantScenePanel';
 import { TroubleshootingPanel } from '../ui/sandbox/TroubleshootingPanel';
 import { ScenarioPanel } from '../ui/sandbox/ScenarioPanel';
 import { perDeviceLive } from '../sim/device-state';
+import {freshWorld} from '../plant/world/bodies';
 import { plcComponents, programOf } from '../sim/plcs';
 import { vesselsOf } from '../sim/stations';
 import { appendEvidence, evidenceFromCommand } from '../exercises/evidence';
@@ -549,6 +551,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                   'Q0.0', 'Q0.1', 'Q0.2', 'Q0.3', 'Q0.4', 'Q0.5', 'PlcPowered'] as const).map(k =>
                 <span className={activeIo[k] ? 'lit' : ''} key={k}><i />{k}</span>)}
               </div></div>
+            {!!activePlcView?.io.analogInputs?.length && <div className="sandbox-analog-readings" aria-label="Typed numeric PLC input image">
+              {activePlcView.io.analogInputs.map(point=><p key={point.terminal}
+                data-analog-input={point.terminal}>
+                {point.terminal} · {point.tag}: <strong>{point.connected ? point.value+' '+point.unit : 'No connected numeric source'}</strong>
+                {point.source ? <small> · {point.source}</small> : null}
+              </p>)}
+            </div>}
             <div><span className="eyebrow">Plant</span>
               <p>Contactor: <strong>{snapshot?.contactorOn ? 'energised' : 'off'}</strong> · Motor: <strong>{snapshot?.motorOn ? 'running' : 'stopped'}</strong></p>
               {project?.components.some(c => c.kind === 'conveyor') && <p>
@@ -568,6 +577,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                 Overload: <strong data-overload-status>{snapshot?.overloadTripped ? 'TRIPPED' : 'CLOSED'}</strong> ·
                 Pilot: <strong data-lamp-status>{snapshot?.lampOn ? 'ON' : 'OFF'}</strong></p>}</div>
           </div>
+          {!scenario && <PlantScenePanel project={project} snapshot={snapshot} editable={editable} onCommands={send}/>}
           {snapshot && project?.components.filter(c => c.kind === 'conveyor').map(conv => { const lane = snapshot.lanes[conv.id] ?? snapshot.plant; return <section key={conv.id}
             className="sandbox-sorting-panel panel" aria-label={`Conveyor sorting controls ${conv.id}`} data-lane={conv.id}>
             <div className="sandbox-section-head"><div>
@@ -661,6 +671,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               'Q0.4': false, 'Q0.5': false, PlcPowered: false },
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
             plcs: {}, deviceOn: {}, motorAngles: {}, lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
+            plantWorld:{world:freshWorld(),signals:{}},
             forwardContactorOn: false, reverseContactorOn: false,
             motorDirection: 'stopped', reverseMotorAngleRad: 0, interlockConflict: false,
             conveyorOn: false, diverterOn: false,
@@ -695,7 +706,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>}
           {dockProject && dockSnapshot && <ProgrammingDock project={dockProject} snapshot={dockSnapshot} disabled={!editable}
             showExamples={!scenario}
-            io={activePlcView ? { kind: activePlcView.kind, inputs: activePlcView.io.inputs, outputs: activePlcView.io.outputs } : undefined}
+            io={activePlcView ? { kind: activePlcView.kind, inputs: activePlcView.io.inputs,
+              outputs: activePlcView.io.outputs, analogInputs: activePlcView.io.analogInputs } : undefined}
             onLadder={program => send([{ k: 'loadProgram', program, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onST={source => send([{ k: 'loadST', source, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onLanguage={language => send([{ k: 'activateLanguage', language, ...(activePlcId ? { plc: activePlcId } : {}) }])} />}

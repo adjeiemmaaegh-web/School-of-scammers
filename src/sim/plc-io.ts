@@ -13,7 +13,9 @@ import { PLC16_INPUT_TERMINALS, PLC16_OUTPUT_TERMINALS } from '../components/reg
 import type { PlacedComponent, ProjectFile } from './signals';
 
 /** terminal -> tag, for inputs and for outputs. */
-export type PlcIoMap = { inputs: Record<string, string>; outputs: Record<string, string> };
+export type PlcIoMap = { inputs: Record<string, string>; outputs: Record<string, string>;
+  /** Fixed teaching analog input tags; real physical PLC module characteristics are not modeled. */
+  analogInputs?: Record<string,string> };
 
 export const LEGACY_IO: PlcIoMap = {
   inputs: { 'I0.0': 'Start', 'I0.1': 'StopOK', 'I0.2': 'Photoeye', 'I0.3': 'TankHigh', 'I0.4': 'ReverseRequest' },
@@ -22,6 +24,7 @@ export const LEGACY_IO: PlcIoMap = {
 export const defaultIo = (kind: string): PlcIoMap => kind === 'plc16' ? {
   inputs: Object.fromEntries(PLC16_INPUT_TERMINALS.map((t, i) => [t, `In${i}`])),
   outputs: Object.fromEntries(PLC16_OUTPUT_TERMINALS.map((t, i) => [t, `Out${i}`])),
+  analogInputs:{AI0:'Analog0',AI1:'Analog1'},
 } : LEGACY_IO;
 
 /** The classic controller's map is fixed; only the 16/16 controller can be renamed. */
@@ -31,7 +34,8 @@ export const isConfigurableIo = (kind: string): boolean => kind === 'plc16';
 export function ioOf(project: Pick<ProjectFile, 'plcIo'>, plc: Pick<PlacedComponent, 'id' | 'kind'>): PlcIoMap {
   const base = defaultIo(plc.kind);
   const saved = isConfigurableIo(plc.kind) ? project.plcIo?.[plc.id] : undefined;
-  return saved ? { inputs: { ...base.inputs, ...saved.inputs }, outputs: { ...base.outputs, ...saved.outputs } } : base;
+  return saved ? { inputs: { ...base.inputs, ...saved.inputs }, outputs: { ...base.outputs, ...saved.outputs },
+    ...(base.analogInputs?{analogInputs:{...base.analogInputs}}:{}) } : base;
 }
 
 /** Words a program tag may not be: they would collide with Structured Text and Ladder syntax or the engine. */
@@ -61,7 +65,8 @@ export function validateIoMap(kind: string, map: unknown): string[] {
   if (errors.length) return errors;
   // Names are case-insensitive in Structured Text, so uniqueness is checked that way across inputs AND outputs.
   const full = { inputs: { ...base.inputs, ...(inputs as Record<string, string>) }, outputs: { ...base.outputs, ...(outputs as Record<string, string>) } };
-  for (const side of ['inputs', 'outputs'] as const) for (const [terminal, tag] of Object.entries(full[side])) {
+  for (const side of ['inputs', 'outputs','analogInputs'] as const) for (const [terminal, tag] of
+    Object.entries(side==='analogInputs'?base.analogInputs??{}:full[side])) {
     const key = tag.toUpperCase();
     if (seen.has(key)) errors.push(`Tag ${tag} is used by both ${seen.get(key)} and ${terminal}`); else seen.set(key, terminal);
   }
@@ -69,9 +74,10 @@ export function validateIoMap(kind: string, map: unknown): string[] {
 }
 
 /** The program-visible names for a PLC: what validators and editors accept as inputs and outputs. */
-export type IoNames = { inputs: string[]; outputs: string[]; requireRun: boolean };
+export type IoNames = { inputs: string[]; outputs: string[]; numericInputs: string[]; requireRun: boolean };
 export const namesOf = (io: PlcIoMap): IoNames => ({
-  inputs: Object.values(io.inputs), outputs: Object.values(io.outputs), requireRun: Object.values(io.outputs).includes('Run'),
+  inputs: Object.values(io.inputs), outputs: Object.values(io.outputs),
+  numericInputs:Object.values(io.analogInputs??{}), requireRun: Object.values(io.outputs).includes('Run'),
 });
 /** What the classic controller always accepted. */
 export const LEGACY_NAMES: IoNames = namesOf(LEGACY_IO);

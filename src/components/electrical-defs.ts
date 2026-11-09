@@ -9,12 +9,14 @@
 import type { Device } from '../engineering/electrical';
 import type { FaultKind, PlacedComponent } from '../sim/signals';
 import type { CylinderState } from '../plant/cylinder';
+import { PLANT_EQUIPMENT } from '../plant/equipment';
 
 export type ElectricalContext = {
   /** The device's coil/actuator was energised on the previous scan (the one-scan delay every relay has). */
   on: boolean;
   hasFault: (kind: FaultKind) => boolean;
   cylinder?: CylinderState;
+  plantSignals?: Record<string,boolean|number>;
 };
 
 const t = (id: string, pin: string) => `${id}.${pin}`;
@@ -60,4 +62,17 @@ const DEFS: Partial<Record<PlacedComponent['kind'], Def>> = {
 };
 
 /** The circuit devices a data-driven kind contributes, or null when the kind is still hand-coded in the orchestrator. */
-export const electricalDevices = (c: PlacedComponent, ctx: ElectricalContext): Device[] | null => DEFS[c.kind]?.(c, ctx) ?? null;
+export const electricalDevices = (c: PlacedComponent, ctx: ElectricalContext): Device[] | null => {
+ const def=PLANT_EQUIPMENT[c.kind];
+ if(def){
+  const signals=ctx.plantSignals??{};
+  const boolCommands=def.commands.filter(ch=>ch.kind==='bool');
+  const boolSensors=def.signals.filter(ch=>ch.kind==='bool');
+  return [
+   ...boolCommands.map(ch=>load(c.id+'-CMD_'+ch.name,t(c.id,'CMD_'+ch.name+'+'),t(c.id,'M-'))),
+   ...boolSensors.map(ch=>sw(c.id+'-SENSE_'+ch.name,t(c.id,'L+'),t(c.id,'OUT_'+ch.name),
+      signals[ch.name]===true)),
+  ];
+ }
+ return DEFS[c.kind]?.(c,ctx)??null;
+};
