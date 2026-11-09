@@ -20,6 +20,7 @@ import { electricalDevices } from '../components/electrical-defs';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { clearedAlarm, engineFault, freshCylinder, stepCylinder } from '../plant/cylinder';
 import { freshProjectPlant, stepProjectPlant, sensorImage,validatePlantFaults } from './p3-plant-bridge';
+import { makePlantSceneProject } from './p3-scene-import';
 export { MAX_COMPONENTS, MAX_WIRES };
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
@@ -334,6 +335,15 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
     else if (cmd.k === 'step') { world = { ...world, running: false }; forceStep = true; }
     else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
     else if (cmd.k === 'clear') world = createWorld();
+    else if (cmd.k === 'loadPlantScene') {
+      if(world.running)world=setError(world,'Pause before loading a plant scene');
+      else try {
+        const project=validateProject(makePlantSceneProject(cmd.id));
+        world=createWorld(project);
+        commandEvents.push({tick:world.tick,kind:'scene',
+          detail:'Opened unsolved editable plant scene '+cmd.id});
+      }catch(error){world=setError(world,error instanceof Error?error.message:'Unable to load plant scene');}
+    }
     else if (cmd.k === 'setPlantFault') {
       if(world.running)world=setError(world,'Pause before changing a plant equipment fault');
       else {
