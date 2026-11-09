@@ -3,7 +3,7 @@
 **Review:** https://github.com/adjeiemmaaegh-web/School-of-scammers/pull/33
 **Branch:** `engineering/p4-electrical-depth-source`
 **Source baseline:** main at `7a4c38bc8c33341f1957c2ffd72ead7e1fdd43f2` (after merged #27)
-**Status:** SOURCE DELIVERED FOR CODE-DEVELOPER REVIEW. Draft PR only. Not accepted, merged, deployed or certified.
+**Status:** **SOURCE DEVELOPMENT COMPLETE** (9 November 2026) for the bounded P4 educational three-phase/star-delta source scope. Draft PR remains for developer review; not combined-branch accepted, merged, production released or certified.
 **Owner division:** the assistant produces code, source tests and handoff; the code developer owns combined validation, integration and physical device/browser compatibility acceptance.
 
 ## 1 — Created files
@@ -58,10 +58,10 @@
 
 ## 5 — Engineering evidence and known limits
 
-Source CI on intermediate heads found overly aggressive thermal tripping, a missing UI snapshot field, and then an integration test missing DELTA after 95 scans. Source fixes adjusted the deliberately illustrative thermal memory to tolerate brief acceleration/transfer while still tripping sustained overload. A subsequent source head obtained passing Linux+Windows checks; **the final head must still be independently verified**, and any later source edit restarts that evidence boundary.
+Source CI on intermediate heads found overly aggressive thermal tripping, a missing UI snapshot field, and then an integration test missing DELTA after 95 scans. Source fixes adjusted the deliberately illustrative thermal memory to tolerate brief acceleration/transfer while still tripping sustained overload. The final implementation head `9c6acc3e9b5ee00e848fd1524b4da7ee1563343a` has verified GitHub Actions results: [Build and Test run 42554395592](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/42554395592) **success** (99 test files, 884/884 Vitest tests, including 13 new P4 three-phase tests, TypeScript and Vite build plus existing source/browser smoke checks); [Windows Edge Hosted Runner run 42554395546](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/42554395546) **success**. A later documentation-only commit carries a new SHA and is not itself evidence of rerunning all checks. The optional P4-specific browser recipe was not independently accepted. Combined P1/P2/P3/P4 integration and user-device acceptance remain unverified.
 
 The source scope includes new star/delta physical teaching behavior and original 3D assets. It does **not** expand to 3-phase fault-energy calculations, actual IEC contactor trip thresholds, rated breakers, generic SPICE, real PLC Ethernet or calibrated field measurement.
 
 ## Handoff status
 
-P4 source package is ready for **developer code review and integration testing**, not formal release. No OS/Mac/Windows compatibility work was performed as a release task, and production deployment remains unauthorized.
+**P4 source-development deliverable COMPLETE** and ready for **developer code review and combined integration testing**, not formal release. The project CI included an automated hosted Windows Edge run; no owner device/browser-compatibility signoff was performed. Do not merge or deploy without explicit authorization.
