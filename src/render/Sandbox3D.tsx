@@ -15,6 +15,7 @@ import type { Parcel } from '../plant/sorting-conveyor';
 import { supportsWebGL } from '../components/SceneShell';
 import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-coordinates';
 import { perDeviceLive } from '../sim/device-state';
+import { PlantWorld3D } from './PlantWorld3D';
 
 const COLORS = {
   chassis: '#35546b', steel: '#829bb0', panel: '#192b3c', light: '#d3e4ef',
@@ -324,6 +325,7 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
       fadeDistance={35} infiniteGrid={false} />
     {project.wires.map(w => <Cable3D key={w.id} project={project} from={w.from} to={w.to}
       live={snapshot.voltages[w.from] === 24 && snapshot.voltages[w.to] === 24} />)}
+    <PlantWorld3D project={project} scene={snapshot.plantWorld} />
     {project.components.map(c => <Device3D key={c.id} c={c} editable={editable}
       motorAngleRad={c.kind === 'revmotor' ? snapshot.reverseMotorAngleRad : snapshot.motorAngles[c.id] ?? snapshot.motorAngleRad}
       direction={c.kind === 'revmotor' ? snapshot.motorDirection : undefined}
