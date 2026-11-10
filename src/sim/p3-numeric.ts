@@ -27,7 +27,7 @@ export function plantNumericWireError(from:string,to:string,parts:readonly Place
  if(!a&&!b)return null;
  if(!((a==='analog-output'&&b==='analog-input')||
       (b==='analog-output'&&a==='analog-input')))
-  return 'Numeric signals must connect a process-output to an analog-input; never to a 24V node';
+  return '24V and numeric wires cannot mix; connect a numeric process-output to an analog-input';
  const input=a==='analog-input'?from:to;
  const source=a==='analog-output'?from:to;
  const dot=input.indexOf('.');
