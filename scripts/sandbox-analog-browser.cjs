@@ -65,11 +65,18 @@ const project = {
       { timeout: 10000 });
     assert.equal(await page.$eval('.sandbox-wire-list', e => e.children.length), 4);
 
-    // The numeric cable is placed through the patch panel, not injected via a test-only API.
-    await page.click('[data-terminal-id="tank.LEVEL"]');
-    await page.waitForFunction(() => document.querySelector('[data-terminal-id="tank.LEVEL"]')?.classList.contains('selected'));
-    await page.click('[data-terminal-id="ctrl.AI0"]');
+    // The learner creates a genuine numeric wire in the integrated P5 logical
+    // schematic. PR29's worker validates its non-24V domain and updates PLC16 AI0.
+    await page.click('[data-p5-view="logical"]');
+    await page.waitForFunction(() => document.querySelector('[data-p5-view-active]')
+      ?.getAttribute('data-p5-view-active') === 'logical');
+    await page.$eval('[data-p5-pin="tank.LEVEL"]', button => button.click());
+    await page.waitForFunction(() => document.querySelector('[data-p5-pin="tank.LEVEL"]')
+      ?.getAttribute('aria-pressed') === 'true');
+    await page.$eval('[data-p5-pin="ctrl.AI0"]', button => button.click());
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-wire-list > div').length === 5);
+    await page.waitForFunction(() => document.querySelectorAll('[data-p5-wire]').length === 5);
+    assert.ok(await page.$('[data-p5-wire]'), 'Logical view draws the worker-owned numeric cable');
     await page.waitForFunction(() =>
       document.querySelector('[data-analog-input="AI0"] strong')?.textContent.trim() === '0 ml');
     assert.match(await page.$eval('#sandbox-st-source', e => e.value), /Analog0 : REAL/);
