@@ -203,7 +203,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     setResult(null);
     setEvidence([]);
     startedAt.current = Date.now();
-    setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setEvents([]); setClientError(null);
+    setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceIds([]); setEvents([]); setClientError(null);
     worker.current?.postMessage({ kind: 'commands', commands: [
       { k: 'loadProject', project: scenario.def.starter(scenario.seed) }, { k: 'reset' }] });
   };
@@ -225,12 +225,18 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   };
   const place = (kind: ComponentKind, x?: number, y?: number) => {
     const i = project?.components.length ?? 0;
-    send([{ k: 'place', id: uniqueId(kind), kind, at: {
-      x: Math.max(5, Math.min(CANVAS_W - BOX_W - 5, x ?? 20 + (i % 5) * 205)),
-      y: Math.max(5, Math.min(CANVAS_H - 145, y ?? 25 + Math.floor(i / 5) * 175)),
-    } }]);
+    send([{k:'place',id:uniqueId(kind),kind,at:clampPlacement({
+      x:Math.max(5,Math.min(CANVAS_W-BOX_W-5,x??20+(i%5)*205)),
+      y:Math.max(5,Math.min(CANVAS_H-145,y??25+Math.floor(i/5)*175)),
+    },grid)}]);
   };
-  const move = (id: string, at: { x: number; y: number }) => send([{ k: 'move', id, to: at }]);
+  const move=(id:string,at:{x:number;y:number})=>{
+    const part=project?.components.find(c=>c.id===id);
+    if(!part)return;
+    const target=clampPlacement(at,grid);
+    send([{k:'editWorkspace',edit:{kind:'translate',ids:[id],
+      delta:{x:target.x-part.x,y:target.y-part.y},grid:1}}]);
+  };
   const connect = (terminal: string) => {
     if (!selectedTerminal) { setSelectedTerminal(terminal); return; }
     if (selectedTerminal !== terminal) send([{ k: 'wire', id: uniqueId('wire'), from: selectedTerminal, to: terminal }]);
@@ -326,7 +332,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       if (file.size > 200000) throw new Error('Project must be under 200 KB');
       const parsed: unknown = JSON.parse(await file.text());
       send([{ k: 'loadProject', project: parsed }]);
-      setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setEvents([]); setClientError(null);
+      setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceIds([]); setEvents([]); setClientError(null);
     } catch (e) { setClientError(e instanceof Error ? e.message : 'Project import failed'); }
     ev.target.value = '';
   };
@@ -341,17 +347,26 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const activeIo: Record<string, boolean> = { ...(snapshot?.io ?? {}), ...(activePlcView ? {
     ...activePlcView.inputs, ...activePlcView.coils, ...activePlcView.outputs, PlcPowered: activePlcView.powered } : {}) };
   const selectedDevice = project?.components.find(c => c.id === selectedDeviceId) ?? null;
-  const removeDevice = (id: string) => {
-    if (selectedDeviceId === id) setSelectedDeviceId(null);
-    if (selectedTerminal?.startsWith(`${id}.`)) setSelectedTerminal(null);
-    send([{ k: 'remove', id }]);
+  const removeDevice=(id:string)=>{
+    setSelectedDeviceIds(curr=>curr.filter(part=>part!==id));
+    if(selectedTerminal?.startsWith(id+'.'))setSelectedTerminal(null);
+    send([{k:'remove',id}]);
   };
-  const undo = () => {
-    const previous = undoStack[undoStack.length - 1];
-    if (!previous) return;
-    setUndoStack(stack => stack.slice(0, -1));
-    setSelectedDeviceId(null); setSelectedTerminal(null); setMoveTarget(null);
-    send([{ k: 'loadProject', project: previous }]);
+  const undo=()=>{
+    if(!projectRef.current||snapshot?.running)return;
+    const result=undoHistory(historyRef.current,projectRef.current);
+    if(!result)return;
+    historyRef.current=result.history;setHistory(result.history);
+    setSelectedDeviceIds([]);setSelectedTerminal(null);setMoveTarget(null);
+    send([{k:'loadProject',project:result.project}],'ignore');
+  };
+  const redo=()=>{
+    if(!projectRef.current||snapshot?.running)return;
+    const result=redoHistory(historyRef.current,projectRef.current);
+    if(!result)return;
+    historyRef.current=result.history;setHistory(result.history);
+    setSelectedDeviceIds([]);setSelectedTerminal(null);setMoveTarget(null);
+    send([{k:'loadProject',project:result.project}],'ignore');
   };
   // The toolbar is sticky: keep it just below the sticky app header, whatever height the header has.
   useEffect(() => {
@@ -375,9 +390,42 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
-  const selectDevice = (id: string | null) => {
-    setSelectedDeviceId(id);
-    if (id && isPlcKind(project?.components.find(c => c.id === id)?.kind ?? '')) setSelectedPlcId(id);
+  const selectDevice=(id:string|null,additive=false)=>{
+    setSelectedDeviceIds(curr=>id?(additive?toggleOne(curr,id):selectOne(id)):emptySelection());
+    if(id&&isPlcKind(project?.components.find(c=>c.id===id)?.kind??''))setSelectedPlcId(id);
+  };
+  const edit=(operation:WorkspaceEdit)=>{
+    if(!snapshot||snapshot.running||scenario)return;
+    send([{k:'editWorkspace',edit:operation}]);
+  };
+  const moveSelection=(dx:number,dy:number)=>{
+    if(selectedDeviceIds.length)edit({kind:'translate',ids:[...selectedDeviceIds],
+      delta:{x:dx,y:dy},grid});
+  };
+  const rotateSelection=(quarterTurns:-1|1)=>{
+    if(selectedDeviceIds.length)edit({kind:'rotate',ids:[...selectedDeviceIds],quarterTurns});
+  };
+  const duplicateSelection=()=>{
+    if(selectedDeviceIds.length)edit({kind:'duplicate',ids:[...selectedDeviceIds],
+      offset:{x:25,y:25},grid});
+  };
+  const deleteSelection=()=>{
+    if(!selectedDeviceIds.length)return;
+    edit({kind:'delete',ids:[...selectedDeviceIds]});
+    setSelectedDeviceIds([]);setSelectedTerminal(null);
+  };
+  const copySelection=()=>{
+    if(!project||!selectedDeviceIds.length||scenario)return;
+    try{setClipboard(makeFragment(project,selectedDeviceIds));pasteIndex.current=0;}
+    catch(error){setClientError(error instanceof Error?error.message:'Unable to copy selection');}
+  };
+  const pasteSelection=()=>{
+    if(!clipboard||!clipboard.components.length||scenario)return;
+    const offset=Math.min(150,25*(pasteIndex.current+1));
+    const x=Math.min(...clipboard.components.map(part=>part.x));
+    const y=Math.min(...clipboard.components.map(part=>part.y));
+    edit({kind:'paste',fragment:clipboard,at:{x:x+offset,y:y+offset},grid});
+    pasteIndex.current++;
   };
   const visibleKinds = componentKinds.filter(kind => {
     const definition = COMPONENTS[kind];
@@ -436,7 +484,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       <nav className="p5-menu-bar" aria-label="Engineering workspace menus" data-p5-menu>
         <details><summary>Project</summary><div className="p5-menu-content">
           {!scenario && <button type="button" disabled={!editable} onClick={()=>{
-            setSelectedTerminal(null);setMoveTarget(null);setSelectedDeviceId(null);
+            setSelectedTerminal(null);setMoveTarget(null);setSelectedDeviceIds([]);
             setWorkspaceView('physical');send([{k:'clear'}]);
           }}>New empty project</button>}
           {!scenario && <button type="button" onClick={()=>fileInput.current?.click()}>Open local JSON project</button>}
@@ -444,7 +492,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <span>Projects stay in this browser unless exported.</span>
         </div></details>
         <details><summary>Edit</summary><div className="p5-menu-content">
-          <button type="button" disabled={!editable||!undoStack.length} onClick={undo}>Undo last destructive edit</button>
+          <button type="button" disabled={!editable||!history.undo.length} onClick={undo}>Undo last destructive edit</button>
           <button type="button" disabled={!editable||!selectedDeviceId}
             onClick={()=>selectedDeviceId&&removeDevice(selectedDeviceId)}>Remove selected device</button>
           <button type="button" onClick={()=>{setSelectedTerminal(null);setMoveTarget(null);}}>Cancel tool/terminal</button>
@@ -488,7 +536,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       </nav>
       <div className="sandbox-toolbar">
         {!scenario && <>
-        <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setActiveStage('build'); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
+        <button className="btn ghost small" onClick={() => { setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceIds([]); setActiveStage('build'); send([{ k: 'clear' }]); }} disabled={!editable}>New blank project</button>
         {/* The ready-made starters live in one menu so the sticky toolbar stays a single short row. */}
         <details className="sandbox-starters" data-starters>
           <summary className="btn ghost small">Starters</summary>
@@ -511,7 +559,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         </details>
         </>}
         <button className="btn ghost small" data-undo onClick={undo}
-          disabled={!editable || !undoStack.length}>Undo</button>
+          disabled={!editable || !history.undo.length}>Undo</button>
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         {!scenario && <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>}
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
@@ -884,7 +932,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onMoveTo={(id, at) => move(id, at)}
           onSetParam={(id, key, value) => send([{ k: 'setParam', id, key, value }])}
           onOperate={id => send([{ k: 'operateToggle', id }])}
-          onClearSelection={() => setSelectedDeviceId(null)} />
+          onClearSelection={() => setSelectedDeviceIds([])} />
         </div>}
       </div>
       <div className="p5-simulation-status" role="status" aria-label="Authoritative simulation state">
