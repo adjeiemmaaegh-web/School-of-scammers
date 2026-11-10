@@ -46,6 +46,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-star-delta-browser.cjs
       - name: P3 integrated PLC-feeder-body-sensor browser acceptance
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-plant-browser.cjs
+      - name: P1 integrated multi-selection, duplicate, rotation and undo browser acceptance
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p1-workspace-browser.cjs
       - name: P2 integrated Function Block Diagram PLC worker browser test
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-fbd-browser.cjs
       - name: P2 PLC programming - real multi-rung timers and Structured Text E2E
