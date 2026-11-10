@@ -52,6 +52,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-tank-browser.cjs
       - name: P3 world integrated - real PLC to feeder to body to geometric sensor browser
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-plant-browser.cjs
+      - name: Combined three-conveyor turntable - PLC, two sensors, body transfers, ST and reload
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-three-conveyor-turntable-browser.cjs
       - name: Analog process I/O - numeric tank signal drives ST-controlled pump over isolated wire
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-analog-browser.cjs
       - name: P4 400V starter - real phase conductors, PLC-driven star/delta and thermal telemetry E2E

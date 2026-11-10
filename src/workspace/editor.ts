@@ -14,15 +14,17 @@ import type { WorkspaceEdit, WorkspaceFragment } from './types';
 
 const NONREPEATABLE = new Set(['reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor']);
 /**
- * Existing conveyors, tanks and spatial sensors still use fixed-axis bounded P3 physics.
- * Rotating their meshes without rotating the authoritative geometry would be misleading.
- * P1 therefore rotates electrically positioned equipment only. P3 owns orientation-aware
- * physical models and may expand this whitelist after real plant tests.
+ * Only equipment whose worker-owned geometry and motion honor yaw may be rotated.
+ * Tier 1 conveyors and turntables have orientation-aware carry/footprints; later
+ * robot and process models stay locked until their dynamics support rotation.
  */
 export const ROTATABLE = new Set([
   'plc', 'plc16', 'supply', 'start', 'stop', 'estop', 'reversebutton',
   'contactor', 'forwardcontactor', 'reversecontactor', 'relay', 'timerelay',
   'breaker', 'overload', 'motor', 'revmotor', 'lamp', 'stacklight',
+  // Orientation-aware Tier 1 material handling and square-footprint geometry sensing.
+  'belt-conveyor', 'roller-conveyor', 'turntable', 'geometry-photoeye',
+  'inductive-prox', 'capacitive-prox', 'weigh-cell',
 ]);
 const pinOwner = (pin: string): string => pin.slice(0, pin.indexOf('.'));
 const remapPin = (pin: string, mapped: Map<string, string>): string =>

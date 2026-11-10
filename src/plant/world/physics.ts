@@ -14,9 +14,12 @@ const clampVelocity=(value:number,target:number,dtMs:number,accel=3500):number=>
  q(value+clamp(target-value,-accel*dtMs/1000,accel*dtMs/1000));
 const baseHeight=(item:EquipmentPlacement,state:EquipmentState):number=>
  item.kind==='lift'||item.kind==='scissor-lift'?Math.max(0,state.positionMm):item.originMm.z+120;
+/** Equipment length/width are local axes; 90/270 degree yaw swaps world-space footprint. */
+const worldFootprint=(item:EquipmentPlacement,length:number,width:number):Vec3=>
+ item.yawDeg===90||item.yawDeg===270?vec(width,length,0):vec(length,width,0);
 function chooseCarrier(body:Body,items:readonly EquipmentPlacement[],states:World['model']):EquipmentPlacement|undefined{
  return items.find(item=>CARRIERS.has(item.kind)&&insideFootprint(body.pos,item.originMm,
-  {x:item.params.lengthMm??600,y:item.params.widthMm??300,z:0}) &&
+  worldFootprint(item,item.params.lengthMm??600,item.params.widthMm??300)) &&
   Math.abs(body.pos.z-baseHeight(item,states[item.id]))<150);
 }
 function collide(body:Body,candidates:readonly Body[],move:Vec3):{delta:Vec3;blocked:boolean}{
@@ -43,7 +46,11 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
   if(!carrier||!CARRIERS.has(carrier.kind))carrier=chooseCarrier(body,items,world.model);
   const state=carrier?world.model[carrier.id]:undefined;
   if(carrier&&state){
-   const direction=face(carrier.yawDeg);
+   // Turning a loaded turntable changes the carried body's velocity direction
+   // after the real modeled transfer, not merely the appearance of its mesh.
+   const travelYaw=carrier.kind==='turntable'&&state.done
+     ? (carrier.yawDeg+90)%360 : carrier.yawDeg;
+   const direction=face(travelYaw);
    const speed=state.engaged?state.speedMmS:0;
    const targetX=direction.x*speed,targetY=direction.y*speed;
    body.vel.x=clampVelocity(body.vel.x,targetX,dtMs);
@@ -55,7 +62,8 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    const proposed=vec(body.vel.x*dtMs/1000,body.vel.y*dtMs/1000,0);
    const blocked=items.some(item=>BLOCKERS.has(item.kind)&&world.model[item.id]?.engaged&&
     insideFootprint({x:body.pos.x+proposed.x,y:body.pos.y+proposed.y,z:body.pos.z},
-     item.originMm,{x:Math.max(50,item.params.lengthMm??80),y:Math.max(50,item.params.widthMm??200),z:0}));
+     item.originMm,worldFootprint(item,Math.max(50,item.params.lengthMm??80),
+      Math.max(50,item.params.widthMm??200))));
    if(blocked){
     body.vel.x=0;body.vel.y=0;body.tags={...body.tags,jammed:true};
     if(!prior.tags.jammed)changed=addEvent(changed,{kind:'jam',source:carrier.id,bodyId:body.id,detail:'Body blocked by a gate'});
@@ -69,8 +77,8 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
      if(prior.tags.jammed){const tags={...body.tags};delete tags.jammed;body.tags=tags;}
     }
    }
-   if(!insideFootprint(body.pos,carrier.originMm,{
-     x:carrier.params.lengthMm??600,y:carrier.params.widthMm??300,z:0})){
+   if(!insideFootprint(body.pos,carrier.originMm,
+     worldFootprint(carrier,carrier.params.lengthMm??600,carrier.params.widthMm??300))){
     body.supportedBy=null;body.vel.z=0;
    }
   }else{
