@@ -846,6 +846,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             breakerTripped: false, overloadTripped: false, lampOn: false,
             meter: { positive:null, negative:null, volts:null, status:'select' },
             diagnostics: [], lastError: null, alarms: [], language: 'ladder',
+            fbdSteps:[],debugForces:{},breakpointInstruction:null,
             tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
               Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
             ladderSteps: [], ladderMemory: {}, breakpointScan: null, breakpointHit: null,
