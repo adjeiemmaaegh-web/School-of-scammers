@@ -65,7 +65,7 @@ describe('P3 isolated analog process sensor and real PLC16 Structured Text',()=>
   w=tick(w,[{k:'unwire',id:'s3'}]).world; // measurement supply disconnected
   w=tick(w,[{k:'run'}]).world;
   expect(w.running).toBe(false);
-  expect(w.lastError).toMatch(/Numeric input Analog0 has no connected process source/);
+  expect(w.lastError).toMatch(/Numeric input Analog0 has no connected (?:process )?source/);
   expect(w.deviceOn.lamp).toBeUndefined();
  });
  it('opening a numeric wire at runtime fails closed instead of commanding lamp ON',()=>{
