@@ -19,7 +19,7 @@ export function PlcTagTable({project,snapshot,disabled,io,onLadder}:Props) {
   const nameMap=useMemo(()=>io?{
     inputs:io.inputs.map(p=>p.tag),outputs:io.outputs.map(p=>p.tag),
     requireRun:io.outputs.some(p=>p.tag==='Run'),
-    numericInputs:io.analogInputs?.map(p=>p.tag)??[],
+    numericInputs:io.numericInputs?.map(p=>p.tag)??[],
   }:LEGACY_NAMES,[io]);
   const symbols=project.program.symbols??{};
   const local=Object.keys(symbols);
