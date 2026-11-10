@@ -893,16 +893,21 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           {dockProject && dockSnapshot && <ProgrammingDock project={dockProject} snapshot={dockSnapshot} disabled={!editable}
             showExamples={!scenario}
             io={activePlcView ? { kind: activePlcView.kind, inputs: activePlcView.io.inputs,
-              outputs: activePlcView.io.outputs, analogInputs: activePlcView.io.analogInputs } : undefined}
+              outputs: activePlcView.io.outputs, analogInputs: activePlcView.io.analogInputs,
+               numericInputs:activePlcView.io.analogInputs?.map(x=>({tag:x.tag})) } : undefined}
             onLadder={program => send([{ k: 'loadProgram', program, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onST={source => send([{ k: 'loadST', source, ...(activePlcId ? { plc: activePlcId } : {}) }])}
+            onFBD={document => send([{k:'loadFBD',document,...(activePlcId?{plc:activePlcId}:{})}])}
+            onLocalForce={scenario?undefined:(tag:string,value:boolean|number|null)=>
+              send([{k:'forceLocal',tag,value,...(activePlcId?{plc:activePlcId}:{})}])}
             onLanguage={language => send([{ k: 'activateLanguage', language, ...(activePlcId ? { plc: activePlcId } : {}) }])} />}
           {activePlcId && activePlcView?.kind === 'plc16' && <IoMappingPanel plcId={activePlcId} view={activePlcView} editable={editable} send={send} />}
         </div>
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
-          {snapshot && <LiveMonitor snapshot={snapshot}
+          {snapshot && <LiveMonitor snapshot={snapshot} project={project}
             onBreakpoint={scan => send([{ k: 'breakAtScan', scan }])}
-            onTagBreakpoint={breakpoint => send([{ k: 'breakOnTag', breakpoint }])} />}
+            onTagBreakpoint={breakpoint => send([{ k: 'breakOnTag', breakpoint }])}
+            onInstructionBreakpoint={breakpoint => send([{k:'breakOnInstruction',breakpoint}])} />}
           <span className="eyebrow">Diagnostics</span><h2>Electrical &amp; event trace</h2>
           <p className="sandbox-help">Click a wire's remove button to break a connection and observe what changes. All values come from the simulator.</p>
           {!scenario && <details><summary>Example wiring map</summary><p>{wireGuide}</p>
