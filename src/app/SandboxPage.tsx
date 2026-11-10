@@ -692,7 +692,47 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                 Tank: <strong data-tank-brief>{Math.round(snapshot?.tank.levelMl ?? 0)} ml</strong> ·
                 Pump: <strong>{snapshot?.pumpOn ? 'on' : 'off'}</strong> ·
                 Drain: <strong>{snapshot?.drainOn ? 'open' : 'closed'}</strong></p>}
-              {project?.components.some(c => c.kind === 'revmotor') && <p>
+              {project?.components.filter(c=>c.kind==='star-delta-drive').map(drive=>{
+            const motor=snapshot?.threePhase[drive.id];
+            const meter=snapshot?.phaseMeters[drive.id];
+            return <section key={drive.id} className="sandbox-protection-panel panel"
+              aria-label={'Three-phase star delta motor '+drive.id} data-three-phase={drive.id}>
+              <div className="sandbox-section-head"><div>
+                <span className="eyebrow">P4 · isolated three-phase motor</span>
+                <h2>Star / delta wiring · {drive.id}</h2></div>
+                <span className="status-pill is-idle">Virtual 400V · non-rated teaching model</span>
+              </div>
+              <p className="sandbox-help">L1/L2/L3 and PE belong to a separate educational three-phase domain.
+                Wire the MAIN+, STAR+, DELTA+ and M- 24V control coils to the PLC.
+                The motor cannot run without matching phase conductors and actual energized 24V coils.
+                Simultaneous STAR and DELTA demands are rejected; the PLC program is never automatically corrected.</p>
+              <div className="sandbox-sort-metrics" aria-live="off">
+                <span>Phase supply: <strong data-phase-status>{meter?.status??'isolated'}</strong></span>
+                <span>Motor mode: <strong data-phase-mode>{motor?.motor.mode??'off'}</strong></span>
+                <span>Speed: <strong data-phase-rpm>{Math.round(motor?.motor.speedRpm??0)} rpm</strong></span>
+                <span>Current: <strong data-phase-amps>{(motor?.motor.currentA??0).toFixed(2)} A (estimated)</strong></span>
+                <span>Thermal: <strong data-phase-thermal>{(motor?.motor.temperatureC??20).toFixed(1)} °C</strong></span>
+                <span>Trip: <strong data-phase-trip>{motor?.motor.tripped?'TRIPPED':'CLEAR'}</strong></span>
+                <span>Interlock: <strong data-phase-interlock>{motor?.conflict?'CONFLICT':'OK'}</strong></span>
+              </div>
+              {motor?.motor.diagnostics.length? <p role="status" className="sandbox-help">
+                {motor.motor.diagnostics.slice(-3).join(' · ')}</p>:null}
+              {!scenario&&<details><summary>Three-phase controls and limitations</summary>
+                <p className="sandbox-help">The source can only be isolated while paused. Isolation does not certify safety.
+                  The RESET+ coil is effective only with all three contactor commands deenergized,
+                  after the simplified thermal model has cooled.</p>
+                {project?.components.filter(c=>c.kind==='three-phase-supply').map(source=>
+                  <button key={source.id} type="button" className="btn ghost small"
+                    disabled={!editable} data-phase-source={source.id}
+                    onClick={()=>send([{k:'setThreePhasePower',id:source.id,
+                      enabled:snapshot?.threePhaseSources[source.id]===false}])}>
+                    {snapshot?.threePhaseSources[source.id]===false?'Energize virtual '+source.id:
+                      'Isolate virtual '+source.id}
+                  </button>)}
+              </details>}
+            </section>;
+          })}
+          {project?.components.some(c => c.kind === 'revmotor') && <p>
                 Direction: <strong data-reverse-direction>{snapshot?.motorDirection ?? 'stopped'}</strong> ·
                 Forward: <strong>{snapshot?.forwardContactorOn ? 'on' : 'off'}</strong> ·
                 Reverse: <strong>{snapshot?.reverseContactorOn ? 'on' : 'off'}</strong></p>}
@@ -795,6 +835,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               'Q0.4': false, 'Q0.5': false, PlcPowered: false },
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
             plcs: {}, deviceOn: {}, motorAngles: {}, lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
+             threePhase: {}, phaseMeters: {}, threePhaseSources: {},
              plantWorld: { world: freshWorld(), signals: {} },
             forwardContactorOn: false, reverseContactorOn: false,
             motorDirection: 'stopped', reverseMotorAngleRad: 0, interlockConflict: false,
