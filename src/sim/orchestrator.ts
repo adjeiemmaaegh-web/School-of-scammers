@@ -794,15 +794,17 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       const rt = world.plcs[c.id];
       return [c.id, c.id === legacyPrimaryId(world.project)
         ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
-          { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory })
+          { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory,
+            fbdSteps:world.fbdSteps },[],world.debugForces[c.id]??{})
         : plcView(c.kind, lang, rt?.powered ?? false, ioOf(world.project, c), rt?.tagInputs ?? idle, rt?.coils ?? {},
-          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {} },
+          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {},
+            fbdSteps:rt?.fbdSteps??[] },
           !world.running && ioOf(world.project,c).analogInputs
              ? sampleNumericInputs(world.project,world.plantWorld,c.id,ioOf(world.project,c),
                  rt?.powered??false,new Set(faultsOf(world.project)
                    .filter(f=>f.kind==='wire-open').map(f=>f.target)),
                  ()=>true,world.vessels).points
-             : rt?.analogInputs??[])];
+             : rt?.analogInputs??[],world.debugForces[c.id]??{})];
     })),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
     lanes: Object.fromEntries(Object.entries(world.lanes).map(([id, l]) => [id, { ...l, parcel: l.parcel ? { ...l.parcel } : null }])),
@@ -845,9 +847,10 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     alarms: world.alarms.map(a => ({ ...a })),
     language: world.project.language ?? 'ladder',
     tagValues: { ...world.tagValues }, ladderSteps: [...world.ladderSteps],
-    ladderMemory: { ...world.ladderMemory },
+    ladderMemory: { ...world.ladderMemory },fbdSteps:world.fbdSteps.map(step=>({...step})),
+    debugForces:{...(world.debugForces[primaryPlcId(world.project)??'']??{})},
     breakpointScan: world.breakpointScan, breakpointHit: world.breakpointHit,
-    breakpointTag: world.breakpointTag, scanTrace: world.scanTrace.map(entry => ({
+    breakpointTag: world.breakpointTag,breakpointInstruction:world.breakpointInstruction, scanTrace: world.scanTrace.map(entry => ({
       ...entry, networks: entry.networks.map(network => ({ ...network })),
     })) };
 }
