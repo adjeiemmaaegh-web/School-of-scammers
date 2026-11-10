@@ -62,8 +62,6 @@ export type PlcRuntime = {
   coils: Record<string, boolean>;
   tagValues: Record<string, STValue>;
   ladderMemory: LadderMemory;
-  fbdSteps: FbdStep[];
-  debugForces: Record<string,boolean|number>;
   ladderNumeric: Record<string, number>;
   ladderSteps: LadderStep[];
   stCompiled: STProgram | null;
@@ -88,6 +86,8 @@ export type PlcView = {
   tagValues: Record<string, STValue>;
   ladderSteps: LadderStep[];
   ladderMemory: LadderMemory;
+  fbdSteps: FbdStep[];
+  debugForces: Record<string,boolean|number>;
 };
 export type ProjectFile = {
   formatVersion: 1;
