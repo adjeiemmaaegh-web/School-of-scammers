@@ -1,6 +1,7 @@
 import type { LadderDocument, LadderMemory, LadderStep } from '../engineering/ladder';
 import type { STProgram, STValue } from '../engineering/structured-text';
 import type { ComponentKind } from '../components/registry';
+import type { WorkspaceEdit } from '../workspace/types';
 import type { ScanTrace, TagBreakpoint } from '../program/scan-trace';
 import type { SortingPlant, ParcelKind } from '../plant/sorting-conveyor';
 import type { TankProcess } from '../plant/tank-process';
@@ -11,7 +12,7 @@ import type { SceneRuntime } from '../plant/world/runner';
 import type { AnalogPoint } from './analog';
 
 export type XY = { x: number; y: number };
-export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean };
+export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean; yawDeg?: 0 | 90 | 180 | 270 };
 export type Wire = { id: string; from: string; to: string };
 /** Component/wire failures that alter what the circuit solver sees (P5). */
 export type FaultKind = 'wire-open' | 'contactor-coil-open' | 'contactor-welded' | 'motor-open-winding' | 'button-stuck' | 'sensor-stuck'
@@ -165,6 +166,7 @@ export type WorldState = {
   alarmWatch: AlarmWatch;
 };
 export type Command =
+  | { k: 'editWorkspace'; edit: WorkspaceEdit }
   | { k: 'place'; id: string; kind: ComponentKind; at: XY }
   | { k: 'move'; id: string; to: XY }
   | { k: 'wire'; id: string; from: string; to: string }
@@ -265,5 +267,6 @@ export type RenderSnapshot = {
   breakpointTag: TagBreakpoint | null;
   scanTrace: ScanTrace[];
 };
-export type WorkerRequest = { kind: 'commands'; commands: Command[] };
-export type WorkerResponse = { kind: 'snapshot'; snapshot: RenderSnapshot; events: SimEvent[]; project?: ProjectFile };
+export type WorkerRequest = { kind: 'commands'; commands: Command[]; requestId?: number };
+export type WorkerResponse = { kind: 'snapshot'; snapshot: RenderSnapshot; events: SimEvent[];
+  requestId?: number; requestIds?: number[]; project?: ProjectFile; previousProject?: ProjectFile };
