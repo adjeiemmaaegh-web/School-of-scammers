@@ -209,6 +209,11 @@ export function validateProject(raw: unknown): ProjectFile {
     if (p.language === 'st' && !p.stSource) throw new Error('ST mode requires a compiled source');
     if (p.stSource) compileSandboxST(p.stSource, names);
   }
+  if(p.fbd!==undefined||p.language==='fbd'){
+    const candidate={...p,components,plcIo} as ProjectFile;
+    const config=programOf(candidate,undefined);
+    compileFbd(p.fbd??config.fbd,names);
+  }
   const wires = p.wires.map(w => ({ id: w.id, from: w.from, to: w.to }));
   const faults = validateFaults(p.faults, components, wires);
   const plcPrograms = validatePlcPrograms(p.plcPrograms, components, plcIo);
@@ -280,6 +285,11 @@ function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[
     if (e.stSource !== undefined && typeof e.stSource !== 'string') throw new Error(`PLC ${id}: invalid Structured Text source`);
     if (e.language === 'st' && !e.stSource) throw new Error(`PLC ${id}: ST mode requires a source`);
     if (e.stSource) compileSandboxST(e.stSource, names);
+    if (e.fbd!==undefined||e.language==='fbd'){
+      const component=components.find(c=>c.id===id)!;
+      const cfg=defaultProgramFor(component.kind,ioOf({components,plcIo} as ProjectFile,component));
+      compileFbd(e.fbd??cfg.fbd,names);
+    }
     out[id] = { program: e.program,
       ...(e.language !== undefined ? { language: e.language } : {}),
       ...(e.stSource !== undefined ? { stSource: e.stSource } : {}),
@@ -344,7 +354,8 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           const label = id !== undefined && id !== primaryPlcId(world.project) ? `PLC ${id}: ` : '';
           try {
             const names = namesFor(world.project, id);
-            if (cfg.language === 'st') compileSandboxST(id === undefined || id === primaryPlcId(world.project) ? world.project.stSource ?? '' : cfg.stSource, names);
+            if (cfg.language === 'st') compileSandboxST(cfg.stSource,names);
+            else if(cfg.language === 'fbd')compileFbd(cfg.fbd,names);
             else {
               const issues = validateSandboxProgram(cfg.program, names);
               if (issues.length) throw new Error(issues.join('; '));
@@ -355,7 +366,8 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Program validation failed'); }
     } else if (cmd.k === 'pause') world = { ...world, running: false };
     else if (cmd.k === 'step') { world = { ...world, running: false }; forceStep = true; }
-    else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
+    else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag,
+      breakpointInstruction: world.breakpointInstruction };
     else if (cmd.k === 'clear') world = createWorld();
     else if (cmd.k === 'loadPlantScene') {
       if (world.running) world = setError(world, 'Pause before loading a plant scene');
@@ -560,6 +572,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         let problem: string | null = null;
         try {
           if (cfg.language === 'st') compileSandboxST(cfg.stSource, names);
+          else if(cfg.language==='fbd')compileFbd(cfg.fbd,names);
           else { const issues = validateSandboxProgram(cfg.program, names); if (issues.length) problem = issues.join('; '); }
         } catch (error) { problem = error instanceof Error ? error.message : 'Program no longer compiles'; }
         if (problem) world = setError(world, `Renaming would break the program on ${plc.id}: ${problem}`);
@@ -618,7 +631,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       // Removing a broken conductor is a legitimate repair, and a dangling fault would make the
       // exported project fail validation.
       world = withFaults(world, faultsOf(world.project).filter(f => !(f.kind === 'wire-open' && f.target === cmd.id)));
-    } else if (cmd.k === 'loadProgram' || cmd.k === 'loadST' || cmd.k === 'activateLanguage') {
+    } else if (cmd.k === 'loadProgram' || cmd.k === 'loadST' || cmd.k === 'loadFBD' || cmd.k === 'activateLanguage') {
       // `plc` selects the target controller; omitted means the first PLC, exactly as with one PLC.
       if (cmd.plc !== undefined && !plcComponents(world.project).some(c => c.id === cmd.plc)) {
         world = setError(world, 'Unknown PLC');
@@ -626,6 +639,10 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         const errors = validateSandboxProgram(cmd.program, namesFor(world.project, cmd.plc));
         if (errors.length) world = setError(world, errors.join('; '));
         else world = createWorld(withProgramOf(world.project, cmd.plc, { program: cmd.program, language: 'ladder' }));
+      } else if(cmd.k==='loadFBD'){
+        try{compileFbd(cmd.document,namesFor(world.project,cmd.plc));
+          world=createWorld(withProgramOf(world.project,cmd.plc,{language:'fbd',fbd:cmd.document}));}
+        catch(error){world=setError(world,error instanceof Error?error.message:'Invalid FBD graph');}
       } else if (cmd.k === 'loadST') {
         try {
           compileSandboxST(cmd.source, namesFor(world.project, cmd.plc));
@@ -636,11 +653,12 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           const cfg = programOf(world.project, cmd.plc);
           const names = namesFor(world.project, cmd.plc);
           if (cmd.language === 'st') compileSandboxST(cfg.stSource, names);
+          if(cmd.language==='fbd')compileFbd(cfg.fbd,names);
           if (cmd.language === 'ladder') {
             const errors = validateSandboxProgram(cfg.program, names);
             if (errors.length) throw new Error(errors.join('; '));
           }
-          world = createWorld(withProgramOf(world.project, cmd.plc, { language: cmd.language, stSource: cfg.stSource }));
+          world = createWorld(withProgramOf(world.project, cmd.plc, { language: cmd.language }));
         } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Cannot activate language'); }
       }
     } else if (cmd.k === 'breakAtScan') {
