@@ -913,15 +913,20 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // 4. Execute the learner's exact document in the salvaged bounded LD or ST engine.
   let ladderResult: LadderResult | null = null;
   let stResult: STResult | null = null;
+  let fbdResult: FbdResult | null = null;
   try {
     // Only a classic first PLC runs through this original fixed-name path; every other PLC takes the generic path below.
     if (powered && plc?.kind === 'plc') {
-      if (w.project.language === 'st') {
+      if(w.project.language==='fbd'){
+        fbdResult=executeFbd(compileFbd(programOf(w.project,plc.id).fbd,namesFor(w.project,plc.id)),
+          inputs,w.coils,w.fbdMemory,dtMs);
+      }else if (w.project.language === 'st') {
         const compiled = w.stCompiled ?? compileSandboxST(w.project.stSource ?? '');
         stResult = executeStructuredText(compiled, inputs, w.stMemory);
         const run = Object.entries(stResult.outputs).find(([key]) => key.toLowerCase() === 'run')?.[1];
         if (typeof run !== 'boolean') throw new TypeError('ST Run output must be BOOL');
-      } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs, w.ladderNumeric);
+      } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs,
+        w.ladderNumeric,w.debugForces[plc.id]??{});
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'PLC runtime failed';
@@ -983,9 +988,10 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     ? { ...Object.fromEntries(Object.entries(stResult.outputs).filter(([, value]) => typeof value === 'boolean')),
         Run: stRun === true, Sort: stSort === true, Fill: stFill === true, Drain: stDrain === true,
         Forward: stForward === true, Reverse: stReverse === true }
-    : ladderResult?.outputs ?? {};
+    : fbdResult?.outputs ?? ladderResult?.outputs ?? {};
   const tagValues: Record<string, STValue> = {
-    ...inputs, ...(stResult?.signals ?? {}), ...(ladderResult?.numericValues ?? {}), ...coils,
+    ...inputs, ...(stResult?.signals ?? {}),...(w.debugForces[plc?.id??'']??{}),
+    ...(ladderResult?.numericValues ?? {}), ...coils,
     Run: coils.Run === true, Sort: coils.Sort === true,
     Fill: coils.Fill === true, Drain: coils.Drain === true,
     Forward: coils.Forward === true, Reverse: coils.Reverse === true, Unused: false,
@@ -1008,7 +1014,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
         id=>circuit.reads24(terminal(id,'L+'),terminal(id,'M')),w.vessels);
       const tagInputs={...digitalInputs,...numeric.values};
       nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)),
-        tagInputs, extraPowered, dtMs, numeric.points);
+        tagInputs, extraPowered, dtMs, numeric.points,w.debugForces[extra.id]??{});
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PLC runtime failed';
       const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
@@ -1175,7 +1181,11 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const edgeHit = w.breakpointTag && tagEdge(w.tagValues[w.breakpointTag.tag],
     tagValues[w.breakpointTag.tag], w.breakpointTag.edge)
     ? `Paused at scan ${nextTick}: ${w.breakpointTag.tag} ${w.breakpointTag.edge} edge` : null;
-  const breakpointHit = scanHit ?? edgeHit;
+  const instructionHit=instructionBreakpointHit(w.breakpointInstruction,
+    w.project.language==='fbd'?fbdReadings(w.fbdSteps):ladderReadings(w.ladderSteps),
+    w.project.language==='fbd'?fbdReadings(fbdResult?.steps??[]):ladderReadings(ladderResult?.steps??[]),
+    nextTick);
+  const breakpointHit = scanHit ?? edgeHit ?? instructionHit;
   if (breakpointHit) events.push({ tick: nextTick, kind: 'breakpoint', detail: breakpointHit });
   // Supervisory alarms report commanded-vs-observed symptoms only; they never name a cause.
   const alarmUpdate = updateAlarms({
@@ -1190,6 +1200,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     scan: nextTick, simulatedMs: nextTick * dtMs, language: w.project.language ?? 'ladder',
     start: inputs.Start, stopOK: inputs.StopOK, run: coils.Run === true,
     plcPowered: powered, contactorOn, motorOn, ladderSteps: ladderResult?.steps ?? [],
+    fbdSteps: fbdResult?.steps??[],
     breakpoint: breakpointHit,
   });
   w = {
@@ -1197,6 +1208,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     ladderMemory: ladderResult?.memory ?? {},
     ladderNumeric: ladderResult?.numericValues ?? {},
     ladderSteps: [...(ladderResult?.steps ?? [])],
+    fbdMemory:fbdResult?.memory??{},fbdSteps:[...(fbdResult?.steps??[])],
     stMemory: stResult?.memory ?? {},
     tagValues, powered, inputs, contactorOn, motorOn, motorAngleRad,
     plcs: nextPlcs, deviceOn, motorAngles, threePhase: nextThreePhase,
