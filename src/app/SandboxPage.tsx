@@ -588,6 +588,42 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <button className="btn ghost small" onClick={layout}>Place starter layout</button>
           </div>}
             {!scenario && <PlantScenePanel project={project} snapshot={snapshot} editable={editable} onCommands={send}/>}
+            {project?.components.filter(c=>c.kind==='star-delta-drive').map(c=>{
+              const motor=snapshot?.threePhase[c.id];
+              const meter=snapshot?.phaseMeters[c.id];
+              const sourceId=project.wires.flatMap(w=>{
+                const endpoints=[w.from,w.to];
+                const hasDrive=endpoints.some(e=>e.startsWith(c.id+'.')&&
+                  ['L1','L2','L3','PE'].includes(e.slice(c.id.length+1)));
+                return hasDrive?endpoints.map(e=>e.slice(0,e.indexOf('.')))
+                  .filter(id=>project.components.some(p=>p.id===id&&p.kind==='three-phase-supply')):[];
+              })[0];
+              const sourceOn=sourceId?snapshot?.threePhaseSources[sourceId]!==false:false;
+              return <section key={c.id} className="panel p5-phase-panel" data-three-phase={c.id}
+                aria-label={`Isolated three-phase educational motor ${c.id}`}>
+                <div className="sandbox-section-head"><div>
+                  <span className="eyebrow">P4 · isolated virtual mains</span>
+                  <h2>Three-phase starter · {c.id}</h2>
+                </div><span className="status-pill is-idle" data-phase-status>{meter?.status??'isolated'}</span></div>
+                <p className="sandbox-help">Illustrative 400V domain, separate from the 24V PLC coils.
+                  Not a rated electrical panel or a substitute for protective hardware.</p>
+                <div className="sandbox-sort-metrics">
+                  <span>Contactors: <strong data-phase-mode>{motor?.motor.mode??'off'}</strong></span>
+                  <span>Current: <strong data-phase-amps>{motor?.motor.currentA.toFixed(2)??'0'} A</strong></span>
+                  <span>Speed: <strong>{Math.round(motor?.motor.speedRpm??0)} rpm</strong></span>
+                  <span>Trip: <strong>{motor?.motor.tripped?'TRIPPED':'Clear'}</strong></span>
+                  <span>Line voltage: <strong>{meter?.lineToLine??'—'} V (virtual)</strong></span>
+                </div>
+                <details><summary>Virtual source isolation and motor diagnostics</summary>
+                  {sourceId?<button type="button" className="btn ghost small"
+                    data-phase-source={sourceId} disabled={!editable}
+                    onClick={()=>send([{k:'setThreePhasePower',id:sourceId,enabled:!sourceOn}])}>
+                    {sourceOn?'Isolate':'Energize'} virtual source {sourceId}</button>:
+                    <p>Wire L1, L2, L3 and PE from a virtual three-phase source.</p>}
+                  {motor?.motor.diagnostics.map((d,i)=><p key={i}>{d}</p>)}
+                </details>
+              </section>;
+            })}
           </div>
           <LogicalWiringCanvas project={project} snapshot={snapshot} editable={editable}
             selectedDeviceId={selectedDeviceId} selectedTerminal={selectedTerminal}
@@ -796,6 +832,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
             plcs: {}, deviceOn: {}, motorAngles: {}, lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
             plantWorld: { world: freshWorld(), signals: {} },
+            threePhase: {}, phaseMeters: {}, threePhaseSources: {},
             forwardContactorOn: false, reverseContactorOn: false,
             motorDirection: 'stopped', reverseMotorAngleRad: 0, interlockConflict: false,
             conveyorOn: false, diverterOn: false,
