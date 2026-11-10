@@ -40,6 +40,14 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-browser-acceptance.cjs
       - name: UX-first workbench - workflow, device inspector and responsive design
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux-acceptance.cjs
+      - name: P5-UX organized logical and physical simulator workspace
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-workspace-browser.cjs
+      - name: P4 isolated three-phase/star-delta actual-worker browser acceptance
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-star-delta-browser.cjs
+      - name: P3 integrated PLC-feeder-body-sensor browser acceptance
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-plant-browser.cjs
+      - name: P2 integrated Function Block Diagram PLC worker browser test
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-fbd-browser.cjs
       - name: P2 PLC programming - real multi-rung timers and Structured Text E2E
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-browser-acceptance.cjs
       - name: P2 typed numeric PLC - INT, ADD and comparator 3D motor browser E2E
