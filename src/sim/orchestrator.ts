@@ -24,6 +24,7 @@ import { electricalDevices } from '../components/electrical-defs';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { clearedAlarm, engineFault, freshCylinder, stepCylinder } from '../plant/cylinder';
 import { analogWireError, sampleAnalogInputs } from './analog';
+import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
 import { freshProjectPlant, stepProjectPlant, sensorImage, validatePlantFaults } from './p3-plant-bridge';
 import { makePlantSceneProject } from './p3-scene-import';
 export { MAX_COMPONENTS, MAX_WIRES };
@@ -166,8 +167,11 @@ export function validateProject(raw: unknown): ProjectFile {
     if (!entry || !validId(entry.id) || ids.has(entry.id) || !Object.hasOwn(COMPONENTS, entry.kind) || !validPos(entry)) {
       throw new Error('Invalid component in project');
     }
+    if (entry.yawDeg !== undefined && !([0, 90, 180, 270] as unknown[]).includes(entry.yawDeg))
+      throw new Error('Device orientation must be a quarter turn');
     ids.add(entry.id);
-    components.push({ id: entry.id, kind: entry.kind as ComponentKind, x: entry.x, y: entry.y, pressed: entry.pressed === true });
+    components.push({ id: entry.id, kind: entry.kind as ComponentKind, x: entry.x, y: entry.y,
+      pressed: entry.pressed === true, ...(entry.yawDeg === undefined ? {} : { yawDeg: entry.yawDeg }) });
   }
   // One of each protective branch device per educational circuit: state is
   // explicitly maintained per role, not silently shared among duplicates.
@@ -559,6 +563,16 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           commandEvents.push({ tick: world.tick, kind: 'edit', detail: `Changed the I/O tags of ${plc.id}` });
         }
       }
+    }
+    else if (cmd.k === 'editWorkspace') {
+      if (world.running) world = setError(world, 'Pause the PLC before editing the workspace');
+      else try {
+        const candidate = validateProject(applyWorkspaceEdit(world.project, cmd.edit));
+        if (JSON.stringify(candidate) !== JSON.stringify(world.project)) {
+          world = { ...createWorld(candidate), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
+          commandEvents.push({ tick: world.tick, kind: 'edit', detail: 'Workspace ' + cmd.edit.kind + ' committed' });
+        }
+      } catch (e) { world = setError(world, e instanceof Error ? e.message : 'Invalid workspace edit'); }
     }
     else if (cmd.k === 'place') {
       if (!validId(cmd.id) || !Object.hasOwn(COMPONENTS, cmd.kind) || !validPos(cmd.at) ||
