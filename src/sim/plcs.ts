@@ -14,6 +14,7 @@ import { compileSandboxST, DEFAULT_ST_SOURCE } from '../program/p2-contract';
 import { isPlcKind } from '../components/registry';
 import { defaultIo, ioOf, namesOf, type IoNames, type PlcIoMap } from './plc-io';
 import type { PlacedComponent, PlcInputs, PlcIoPoint, PlcProgram, PlcRuntime, PlcView, ProjectFile } from './signals';
+import type { NumericPoint } from './p3-numeric';
 
 export const MAX_PLCS = 6;
 
@@ -103,13 +104,13 @@ const idleTags = (inputs: PlcInputs): Record<string, STValue> => ({
 export function freshPlcRuntime(cfg: ResolvedProgram, names?: IoNames): PlcRuntime {
   const inputs: PlcInputs = { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false };
   return {
-    powered: false, inputs, tagInputs: {}, coils: {}, tagValues: idleTags(inputs), ladderMemory: {}, ladderNumeric: {}, ladderSteps: [],
+    powered: false, inputs, tagInputs: {}, analogInputs: [], coils: {}, tagValues: idleTags(inputs), ladderMemory: {}, ladderNumeric: {}, ladderSteps: [],
     stCompiled: cfg.language === 'st' ? compileSandboxST(cfg.stSource, names) : null, stMemory: {},
   };
 }
 
 /** The classic five-tag input image, read from any tag-keyed image. */
-export const classicInputs = (tags: Record<string, boolean>): PlcInputs => ({
+export const classicInputs = (tags: Record<string, STValue>): PlcInputs => ({
   Start: tags.Start === true, StopOK: tags.StopOK === true, Photoeye: tags.Photoeye === true,
   TankHigh: tags.TankHigh === true, ReverseRequest: tags.ReverseRequest === true,
 });
@@ -119,15 +120,24 @@ export const classicInputs = (tags: Record<string, boolean>): PlcInputs => ({
  * keyed by tag too. Throws on a runtime fault; the caller fails the whole plant closed.
  */
 export function scanPlc(
-  cfg: ResolvedProgram, io: PlcIoMap, prior: PlcRuntime, tagInputs: Record<string, boolean>, powered: boolean, dtMs: number,
+  cfg: ResolvedProgram, io: PlcIoMap, prior: PlcRuntime, tagInputs: Record<string, STValue>, powered: boolean, dtMs: number,
+  analogInputs: NumericPoint[] = [],
 ): PlcRuntime {
   const names = namesOf(io);
   const inputs = classicInputs(tagInputs);
   const mappedOutputs = (coils: Record<string, boolean>) => Object.fromEntries(names.outputs.map(n => [n, coils[n] === true]));
-  if (!powered) return { ...prior, powered, inputs, tagInputs, coils: {},
+  if (!powered) return { ...prior, powered, inputs, tagInputs, analogInputs, coils: {},
     tagValues: { ...tagInputs, ...mappedOutputs({}), Unused: false }, ladderMemory: {}, ladderNumeric: {}, ladderSteps: [], stMemory: prior.stMemory };
   if (cfg.language === 'st') {
     const compiled = prior.stCompiled ?? compileSandboxST(cfg.stSource, names);
+    // The stored REAL/ LREAL physical input must be wired to a source. The
+    // numerical reading 0 is valid, so disconnect cannot silently mean zero.
+    for(const input of compiled.declarations){
+      if(input.scope!=='input'||!names.numericInputs.some(name=>
+          name.toLowerCase()===input.name.toLowerCase()))continue;
+      if(!analogInputs.some(point=>point.tag.toLowerCase()===input.name.toLowerCase()&&point.connected))
+        throw new Error('Numeric input '+input.name+' has no connected process source');
+    }
     const result = executeStructuredText(compiled, tagInputs, prior.stMemory);
     const out = (name: string) => Object.entries(result.outputs).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1];
     if (names.requireRun && typeof out('Run') !== 'boolean') throw new TypeError('ST Run output must be BOOL');
@@ -141,26 +151,28 @@ export function scanPlc(
       ...Object.fromEntries(Object.entries(result.outputs).filter(([, v]) => typeof v === 'boolean')),
       ...Object.fromEntries(names.outputs.map(n => [n, out(n) === true])),
     } as Record<string, boolean>;
-    return { ...prior, powered, inputs, tagInputs, coils, stCompiled: compiled, stMemory: result.memory, ladderMemory: {}, ladderNumeric: {}, ladderSteps: [],
+    return { ...prior, powered, inputs, tagInputs, analogInputs, coils, stCompiled: compiled, stMemory: result.memory, ladderMemory: {}, ladderNumeric: {}, ladderSteps: [],
       tagValues: { ...tagInputs, ...result.signals, ...coils, ...mappedOutputs(coils), Unused: false } };
   }
   const result = executeLadder(cfg.program, tagInputs, prior.coils, prior.ladderMemory, dtMs, prior.ladderNumeric);
   const coils = result.outputs;
-  return { ...prior, powered, inputs, tagInputs, coils, stMemory: {}, ladderMemory: result.memory, ladderNumeric: result.numericValues, ladderSteps: [...result.steps],
+  return { ...prior, powered, inputs, tagInputs, analogInputs, coils, stMemory: {}, ladderMemory: result.memory, ladderNumeric: result.numericValues, ladderSteps: [...result.steps],
     tagValues: { ...tagInputs, ...result.numericValues, ...coils, ...mappedOutputs(coils), Unused: false } };
 }
 
 /** Publishable summary of one PLC: its I/O points with tags and live state, whatever its I/O map. */
 export function plcView(
-  kind: string, language: 'ladder' | 'st', powered: boolean, io: PlcIoMap, tagInputs: Record<string, boolean>, coils: Record<string, boolean>,
+  kind: string, language: 'ladder' | 'st', powered: boolean, io: PlcIoMap, tagInputs: Record<string, STValue>, coils: Record<string, boolean>,
   live: { tagValues: Record<string, STValue>; ladderSteps: LadderStep[]; ladderMemory: LadderMemory },
+  analogInputs: NumericPoint[] = [],
 ): PlcView {
   const names = namesOf(io);
   const point = (table: Record<string, string>, on: (tag: string) => boolean): PlcIoPoint[] =>
     Object.entries(table).map(([terminal, tag]) => ({ terminal, tag, on: on(tag) }));
   const outputs = point(io.outputs, t => coils[t] === true);
   return {
-    powered, language, kind, io: { inputs: point(io.inputs, t => tagInputs[t] === true), outputs },
+    powered, language, kind, io: { inputs: point(io.inputs, t => tagInputs[t] === true), outputs,
+      ...(io.analogInputs?{analogInputs:analogInputs.map(point=>({...point}))}:{}) },
     inputs: classicInputs(tagInputs), coils: Object.fromEntries(names.outputs.map(c => [c, coils[c] === true])),
     outputs: Object.fromEntries(outputs.map(o => [o.terminal, o.on])),
     tagValues: { ...live.tagValues }, ladderSteps: [...live.ladderSteps], ladderMemory: { ...live.ladderMemory },

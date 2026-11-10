@@ -2,13 +2,17 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, isPlcKind, type ComponentKind } from '../components/registry';
 import { IoMappingPanel } from '../ui/sandbox/IoMappingPanel';
+import { LogicalWiringCanvas } from '../ui/sandbox/LogicalWiringCanvas';
 import { AppHeader } from '../ui/AppHeader';
 import { ProgrammingDock } from '../program/ProgrammingDock';
 import { LiveMonitor } from '../program/LiveMonitor';
 import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
+import {DEVICE_FAMILIES,matchesFamily,supportedFamilies,type DeviceFamily} from '../ui/sandbox/workspace-catalog';
+import { PlantScenePanel } from '../ui/sandbox/PlantScenePanel';
 import { TroubleshootingPanel } from '../ui/sandbox/TroubleshootingPanel';
 import { ScenarioPanel } from '../ui/sandbox/ScenarioPanel';
 import { perDeviceLive } from '../sim/device-state';
+import {freshWorld} from '../plant/world/bodies';
 import { plcComponents, programOf } from '../sim/plcs';
 import { vesselsOf } from '../sim/stations';
 import { appendEvidence, evidenceFromCommand } from '../exercises/evidence';
@@ -17,6 +21,7 @@ import { getScenario } from '../exercises/catalogue';
 import type { AttemptResult, EvidenceEvent, RubricResult } from '../platform/types';
 import type { Command, ProjectFile, RenderSnapshot, WorkerResponse } from '../sim/signals';
 import './sandbox.css';
+import './p5-workspace.css';
 
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
@@ -51,6 +56,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [selectedPlcId, setSelectedPlcId] = useState<string | null>(null);
   const [libraryQuery, setLibraryQuery] = useState('');
+  // View/panel preferences do not belong to PLC or electrical project state.
+  const [libraryFamily,setLibraryFamily] = useState<DeviceFamily>('all');
+  const [workspaceView,setWorkspaceView] = useState<'physical'|'logical'>('physical');
+  const [libraryExpanded,setLibraryExpanded] = useState(true);
+  const [inspectorExpanded,setInspectorExpanded] = useState(true);
+  const [dockExpanded,setDockExpanded] = useState(true);
+  const [dockFocus,setDockFocus] = useState<'program'|'diagnostics'>('program');
+  const [workspaceHelp,setWorkspaceHelp] = useState(false);
   const [activeStage, setActiveStage] = useState<'build' | 'wire' | 'program' | 'test'>('build');
   const [localSave, setLocalSave] = useState<'pending' | 'saved' | 'failed'>('pending');
   const [events, setEvents] = useState<string[]>([]);
@@ -169,6 +182,12 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   };
   const goToStage = (stage: 'build' | 'wire' | 'program' | 'test') => {
     setActiveStage(stage);
+    if(stage==='build')setWorkspaceView('physical');
+    if(stage==='wire')setWorkspaceView('logical');
+    if(stage==='program'||stage==='test'){
+      setDockExpanded(true);
+      setDockFocus(stage==='program'?'program':'diagnostics');
+    }
     document.getElementById(`sandbox-stage-${stage}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const uniqueId = (prefix: string): string => {
@@ -336,17 +355,37 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const visibleKinds = componentKinds.filter(kind => {
     const definition = COMPONENTS[kind];
     const words = `${definition.kind} ${definition.label} ${definition.help}`.toLowerCase();
-    return words.includes(libraryQuery.trim().toLowerCase());
+    return matchesFamily(kind,libraryFamily) &&
+      words.includes(libraryQuery.trim().toLowerCase());
   });
+  const availableFamilies=supportedFamilies(componentKinds);
   const workflow = [
     { id: 'build' as const, label: 'Build', hint: 'Place equipment', count: project?.components.length ?? 0 },
     { id: 'wire' as const, label: 'Wire', hint: 'Connect terminals', count: project?.wires.length ?? 0 },
     { id: 'program' as const, label: 'Program', hint: 'Edit Ladder logic', count: project?.program.rungs.length ?? 0 },
     { id: 'test' as const, label: 'Test', hint: 'Run and troubleshoot', count: snapshot?.tick ?? 0 },
   ];
+  // Shortcuts affect only the active view, except explicit export.
+  useEffect(()=>{
+    const onShortcut=(event:KeyboardEvent)=>{
+      const target=event.target as HTMLElement|null;
+      const typing=!!target&&(/^(input|textarea|select)$/i.test(target.tagName)||target.isContentEditable);
+      if(event.key==='Escape'){setSelectedTerminal(null);setMoveTarget(null);return;}
+      if(typing||event.repeat)return;
+      if(event.altKey&&(event.key==='1'||event.key==='2')){
+        event.preventDefault();setWorkspaceView(event.key==='1'?'logical':'physical');
+      }
+      if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){
+        event.preventDefault();exportProject();
+      }
+    };
+    window.addEventListener('keydown',onShortcut);
+    return ()=>window.removeEventListener('keydown',onShortcut);
+  });
   return <>
     <AppHeader />
-    <main id="main" className="sandbox-page sandbox-ux wrap wrap-wide">
+    <main id="main" className="sandbox-page sandbox-ux p5-organized wrap wrap-wide"
+      data-p5-workspace="organized">
       <header className="sandbox-masthead">
         <div>
           <p className="sandbox-breadcrumb"><Link to="/">Skills Lab</Link><span>/</span> {scenario ? 'Scenario' : 'Simulator'} <span>/</span> {scenario ? scenario.def.title : 'Open workspace'}</p>
@@ -367,6 +406,50 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             localSave === 'failed' ? 'Not saved — export your JSON' : 'Loading local project'}</small>
         </div>
       </header>
+      <nav className="p5-menu-bar" aria-label="Engineering workspace menus" data-p5-menu>
+        <details><summary>Project</summary><div className="p5-menu-content">
+          {!scenario && <button type="button" disabled={!editable} onClick={()=>{
+            setSelectedTerminal(null);setMoveTarget(null);setSelectedDeviceId(null);
+            setWorkspaceView('physical');send([{k:'clear'}]);
+          }}>New empty project</button>}
+          {!scenario && <button type="button" onClick={()=>fileInput.current?.click()}>Open local JSON project</button>}
+          <button type="button" disabled={!project} onClick={exportProject}>Download project JSON</button>
+          <span>Projects stay in this browser unless exported.</span>
+        </div></details>
+        <details><summary>Edit</summary><div className="p5-menu-content">
+          <button type="button" disabled={!editable||!undoStack.length} onClick={undo}>Undo last destructive edit</button>
+          <button type="button" disabled={!editable||!selectedDeviceId}
+            onClick={()=>selectedDeviceId&&removeDevice(selectedDeviceId)}>Remove selected device</button>
+          <button type="button" onClick={()=>{setSelectedTerminal(null);setMoveTarget(null);}}>Cancel tool/terminal</button>
+        </div></details>
+        <details><summary>View</summary><div className="p5-menu-content">
+          <button type="button" onClick={()=>setWorkspaceView('logical')}>Show logical wiring</button>
+          <button type="button" onClick={()=>setWorkspaceView('physical')}>Show physical plant</button>
+          <button type="button" onClick={()=>setLibraryExpanded(v=>!v)}>Toggle device library</button>
+          <button type="button" onClick={()=>setInspectorExpanded(v=>!v)}>Toggle inspector</button>
+          <button type="button" onClick={()=>setDockExpanded(v=>!v)}>Toggle engineering dock</button>
+        </div></details>
+        <details><summary>Simulation</summary><div className="p5-menu-content">
+          <button type="button" onClick={()=>send([{k:snapshot?.running?'pause':'run'}])}>
+            {snapshot?.running?'Pause simulation':'Start simulation'}</button>
+          <button type="button" disabled={!editable} onClick={()=>send([{k:'step'}])}>Advance one PLC scan</button>
+          <button type="button" onClick={()=>send([{k:'reset'}])}>Reset simulated state</button>
+        </div></details>
+        <details><summary>Tools</summary><div className="p5-menu-content">
+          <button type="button" onClick={()=>{setWorkspaceView('logical');setActiveStage('wire');}}>Open terminal wiring</button>
+          <button type="button" onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);}}>Open virtual instruments</button>
+          <button type="button" onClick={()=>{setDockFocus('program');setDockExpanded(true);}}>Open PLC programming</button>
+        </div></details>
+        <details><summary>Help</summary><div className="p5-menu-content">
+          <button type="button" onClick={()=>setWorkspaceHelp(v=>!v)}>Toggle workspace instructions</button>
+          <span>Alt+1 logical · Alt+2 physical · Ctrl+S export · Esc cancel</span>
+        </div></details>
+      </nav>
+      {workspaceHelp&&<aside className="p5-help" aria-label="Workspace instructions">
+        Place supported equipment from the library, connect real terminal pairs in Logical/Wiring,
+        edit the selected PLC program, then Run or Step. Both views share one project and one
+        authoritative worker. Values are illustrative educational simulations, not field ratings.
+      </aside>}
       <nav className="sandbox-workflow" aria-label="Sandbox workflow shortcuts">
         {workflow.map((step, index) => <button type="button" key={step.id}
           onClick={() => goToStage(step.id)} aria-pressed={activeStage === step.id}
@@ -412,11 +495,36 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           {snapshot?.running ? 'Pause' : '▶ Run'}</button>
         <span className="sandbox-scan" aria-live="off">Scan {snapshot?.tick ?? 0}</span>
       </div>
+      <div className="p5-view-tools" role="toolbar" aria-label="Canvas views and active tools">
+        <div className="p5-view-tabs" role="group" aria-label="Project view">
+          <button type="button" data-p5-view="logical" aria-pressed={workspaceView==='logical'}
+            onClick={()=>setWorkspaceView('logical')}>Logical / Wiring</button>
+          <button type="button" data-p5-view="physical" aria-pressed={workspaceView==='physical'}
+            onClick={()=>setWorkspaceView('physical')}>Physical / 3D Plant</button>
+        </div>
+        <div className="p5-tool-actions" role="group" aria-label="Engineering tools">
+          <button type="button" onClick={()=>{setMoveTarget(null);setSelectedTerminal(null);}}>Select</button>
+          <button type="button" disabled={!editable} onClick={()=>{setWorkspaceView('logical');setActiveStage('wire');}}>
+            Wire terminals</button>
+          <button type="button" onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);
+            document.getElementById('sandbox-stage-test')?.scrollIntoView({block:'nearest'});}}>
+            Measure / diagnose</button>
+        </div>
+        <div className="p5-panel-toggles" role="group" aria-label="Workspace panels">
+          <button type="button" aria-pressed={libraryExpanded}
+            onClick={()=>setLibraryExpanded(v=>!v)}>Library</button>
+          <button type="button" aria-pressed={inspectorExpanded}
+            onClick={()=>setInspectorExpanded(v=>!v)}>Inspector</button>
+          <button type="button" aria-pressed={dockExpanded}
+            onClick={()=>setDockExpanded(v=>!v)}>Dock</button>
+        </div>
+      </div>
       {(clientError || snapshot?.lastError) && <div role="alert" className="sandbox-alert">{clientError || snapshot?.lastError}</div>}
       {scenario && <ScenarioPanel session={scenario} project={project} evidence={evidence} result={result}
         onSubmit={submitScenario} onRestart={restartScenario} />}
-      <div className="sandbox-layout">
-        <aside className="sandbox-palette panel" aria-label="Component library">
+      <div className={`sandbox-layout p5-layout ${!libraryExpanded?'p5-no-library':''} ${!inspectorExpanded?'p5-no-inspector':''}`}
+        data-p5-view-active={workspaceView}>
+        {libraryExpanded&&<aside className="sandbox-palette panel" aria-label="Component library" data-p5-library>
           <div className="sandbox-rail-heading"><span className="eyebrow">Device library</span><h2>Components</h2>
             <small>{visibleKinds.length} types available</small></div>
           <label className="sandbox-library-search">
@@ -424,7 +532,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <input type="search" value={libraryQuery} onChange={e => setLibraryQuery(e.target.value)}
               placeholder="Search motors, PLCs…" aria-label="Search component library" />
           </label>
-          <p className="sandbox-library-help">Drag into the 3D floor or select a device to place it. Edits pause while the PLC runs.</p>
+          <div className="p5-device-families" role="group" aria-label="Industrial device families">
+            {DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).map(f=>
+              <button key={f.id} type="button" data-p5-category={f.id}
+                aria-pressed={libraryFamily===f.id} onClick={()=>setLibraryFamily(f.id)}>
+                {f.label}</button>)}
+          </div>
+          <p className="sandbox-library-help">Drag an available device into the 3D floor,
+            or click to place it. The registry determines what really works. Pause to edit.</p>
           <div className="sandbox-palette-list">
             {visibleKinds.map(kind => <button key={kind} draggable={editable}
               onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}
@@ -445,9 +560,15 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             </button>)}
             {!visibleKinds.length && <p className="sandbox-help" role="status">No devices match your search. Try “motor” or “PLC”.</p>}
           </div>
-          <div className="sandbox-library-foot"><strong>Learning scope</strong><span>24V DC · one PLC · educational simulation</span></div>
-        </aside>
+          <div className="sandbox-library-foot"><strong>Educational models</strong>
+            <span>{componentKinds.length} registered kinds · no live equipment</span></div>
+        </aside>}
         <div className="sandbox-main" id="sandbox-stage-build">
+          <div className="p5-logical-heading" aria-hidden={workspaceView!=='logical'}>
+            <strong>Logical / Wiring workspace</strong>
+            <span>Choose the first terminal, then a compatible second terminal. The worker validates each connection.</span>
+          </div>
+          <div className="p5-physical-stage">
           <div className="sandbox-scene-heading"><div><span className="eyebrow">Factory floor</span><h2>3D workspace</h2></div>
             <div><span className="sandbox-scene-stat">{project?.components.length ?? 0} devices</span><span className="sandbox-scene-stat">{project?.wires.length ?? 0} wires</span></div></div>
           <Suspense fallback={<div className="sandbox-3d-loading" role="status">Loading the interactive 3D workbench…</div>}>
@@ -466,7 +587,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <span>Place and wire your own devices or load the starter equipment (without pre-wiring).</span>
             <button className="btn ghost small" onClick={layout}>Place starter layout</button>
           </div>}
-          <details id="sandbox-stage-wire" className="sandbox-patch panel" open>
+          </div>
+          <LogicalWiringCanvas project={project} snapshot={snapshot} editable={editable}
+            selectedDeviceId={selectedDeviceId} selectedTerminal={selectedTerminal}
+            onSelectDevice={id=>selectDevice(id)} onTerminal={connect} />
+          <details id="sandbox-stage-wire" className="sandbox-patch panel p5-logical-stage" open>
             <summary>Component wiring &amp; keyboard controls · {project?.components.length ?? 0} devices</summary>
             <p className="sandbox-help">These controls access the same terminals and states shown in the 3D workbench. Use them on phones, with a keyboard, or when WebGL is unavailable.</p>
             <div className="sandbox-device-list">
@@ -540,7 +665,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             </div>
           </details>
           <div className="sandbox-status panel">
-            <div><span className="eyebrow">Live I/O{plcList.length > 1 && activePlcId ? ` · ${activePlcId}` : ''}</span><div className="sandbox-lamps">
+            <div><span className="eyebrow">Live I/O{plcList.length > 1 && activePlcId ? ` · ${activePlcId}` : ''}</span><div className="sandbox-lamps" tabIndex={0} role="region" aria-label="Live PLC I/O indicators">
               {activePlcView?.kind === 'plc16'
                 ? [...activePlcView.io.inputs, ...activePlcView.io.outputs].map(p =>
                     <span className={p.on ? 'lit' : ''} key={p.terminal} title={p.terminal}><i />{p.tag}</span>)
@@ -549,6 +674,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                   'Q0.0', 'Q0.1', 'Q0.2', 'Q0.3', 'Q0.4', 'Q0.5', 'PlcPowered'] as const).map(k =>
                 <span className={activeIo[k] ? 'lit' : ''} key={k}><i />{k}</span>)}
               </div></div>
+            {!!activePlcView?.io.analogInputs?.length && <div className="sandbox-analog-readings" aria-label="Typed numeric PLC input image">
+              {activePlcView.io.analogInputs.map(point=><p key={point.terminal}
+                data-analog-input={point.terminal}>
+                {point.terminal} · {point.tag}: <strong>{point.connected ? point.value+' '+point.unit : 'No connected numeric source'}</strong>
+                {point.source ? <small> · {point.source}</small> : null}
+              </p>)}
+            </div>}
             <div><span className="eyebrow">Plant</span>
               <p>Contactor: <strong>{snapshot?.contactorOn ? 'energised' : 'off'}</strong> · Motor: <strong>{snapshot?.motorOn ? 'running' : 'stopped'}</strong></p>
               {project?.components.some(c => c.kind === 'conveyor') && <p>
@@ -568,6 +700,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                 Overload: <strong data-overload-status>{snapshot?.overloadTripped ? 'TRIPPED' : 'CLOSED'}</strong> ·
                 Pilot: <strong data-lamp-status>{snapshot?.lampOn ? 'ON' : 'OFF'}</strong></p>}</div>
           </div>
+          {!scenario && <PlantScenePanel project={project} snapshot={snapshot} editable={editable} onCommands={send}/>}
           {snapshot && project?.components.filter(c => c.kind === 'conveyor').map(conv => { const lane = snapshot.lanes[conv.id] ?? snapshot.plant; return <section key={conv.id}
             className="sandbox-sorting-panel panel" aria-label={`Conveyor sorting controls ${conv.id}`} data-lane={conv.id}>
             <div className="sandbox-section-head"><div>
@@ -653,6 +786,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               <p className="sandbox-help">{protectedDOLGuide}</p></details>}
           </section>}
         </div>
+        {inspectorExpanded&&<div className="p5-inspector-slot" data-p5-inspector>
         <WorkbenchInspector project={project ?? { formatVersion: 1, components: [], wires: [], program: { id: 'pending', version: '1', rungs: [] } }}
           snapshot={snapshot ?? { tick: 0, running: false, components: [], wires: [],
             io: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
@@ -661,6 +795,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               'Q0.4': false, 'Q0.5': false, PlcPowered: false },
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
             plcs: {}, deviceOn: {}, motorAngles: {}, lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
+            plantWorld:{world:freshWorld(),signals:{}},
             forwardContactorOn: false, reverseContactorOn: false,
             motorDirection: 'stopped', reverseMotorAngleRad: 0, interlockConflict: false,
             conveyorOn: false, diverterOn: false,
@@ -681,8 +816,29 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onSetParam={(id, key, value) => send([{ k: 'setParam', id, key, value }])}
           onOperate={id => send([{ k: 'operateToggle', id }])}
           onClearSelection={() => setSelectedDeviceId(null)} />
+        </div>}
       </div>
-      <div className="sandbox-bottom">
+      <div className="p5-simulation-status" role="status" aria-label="Authoritative simulation state">
+        <strong data-p5-sim-state>{snapshot?.running?'Running':snapshot?.breakpointHit?'Breakpoint':'Paused / editing'}</strong>
+        <span>Scan <b>{snapshot?.tick??0}</b></span>
+        <span>Model time <b>{((snapshot?.tick??0)*50/1000).toFixed(2)} s</b> · nominal 50 ms scans</span>
+        <span>{project?.components.length??0} devices · {project?.wires.length??0} wires</span>
+        {selectedTerminal&&<span>Wiring from <code>{selectedTerminal}</code></span>}
+        {(clientError||snapshot?.lastError)&&<span className="p5-status-warning">Action error — inspect message above</span>}
+      </div>
+      <section className="p5-engineering-dock" data-p5-dock={dockFocus}>
+        <header className="p5-dock-heading">
+          <strong>Engineering dock</strong>
+          <div role="group" aria-label="Dock panels">
+            <button type="button" data-p5-dock-tab="program" aria-pressed={dockFocus==='program'}
+              onClick={()=>{setDockFocus('program');setDockExpanded(true);}}>PLC program & I/O</button>
+            <button type="button" data-p5-dock-tab="diagnostics" aria-pressed={dockFocus==='diagnostics'}
+              onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);}}>Measurements · faults · events</button>
+          </div>
+          <button type="button" aria-expanded={dockExpanded}
+            onClick={()=>setDockExpanded(v=>!v)}>{dockExpanded?'Collapse dock':'Expand dock'}</button>
+        </header>
+        {dockExpanded&&<div className="sandbox-bottom">
         <div id="sandbox-stage-program" className="sandbox-program-dock">
           {plcList.length > 1 && <div className="sandbox-plc-tabs" role="group" aria-label="Choose which PLC to program">
             <span className="eyebrow">Program</span>
@@ -695,7 +851,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>}
           {dockProject && dockSnapshot && <ProgrammingDock project={dockProject} snapshot={dockSnapshot} disabled={!editable}
             showExamples={!scenario}
-            io={activePlcView ? { kind: activePlcView.kind, inputs: activePlcView.io.inputs, outputs: activePlcView.io.outputs } : undefined}
+            io={activePlcView ? { kind: activePlcView.kind, inputs: activePlcView.io.inputs,
+              outputs: activePlcView.io.outputs, analogInputs: activePlcView.io.analogInputs } : undefined}
             onLadder={program => send([{ k: 'loadProgram', program, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onST={source => send([{ k: 'loadST', source, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onLanguage={language => send([{ k: 'activateLanguage', language, ...(activePlcId ? { plc: activePlcId } : {}) }])} />}
@@ -753,7 +910,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <div className="sandbox-event-list">{events.length ? events.map((e, i) => <p key={i}>{e}</p>) :
             <p className="sandbox-help">No changes recorded yet.</p>}</div>
         </aside>
-      </div>
+      </div>}
+      </section>
       <p className="sandbox-disclaimer">Educational, simplified 24V DC simulation only. Not safety-rated or a substitute for commissioning. This P4 development preview adds a simplified 24V breaker, overload contact, latching NC training E-stop, pilot lamp and virtual DC voltmeter, alongside P3 sorting and tank scenarios. It does not simulate real-world rated fault clearing, certified E-stop circuits or thermal motor protection. The underlying Ladder/ST and 24V circuit models remain educational and bounded; no factory-grade mechanics, automatic object recognition, hardware PLC, certified safety, full IEC coverage or real machinery are claimed.</p>
     </main>
   </>;

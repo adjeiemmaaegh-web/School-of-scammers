@@ -10,7 +10,8 @@ export function ProgrammingDock({ project, snapshot, disabled, onLadder, onST, o
   /** Solved example programs and samples. Off in graded scenarios. */
   showExamples?: boolean;
   /** Selected PLC's I/O points; for a classic controller (or none) the fixed classic names apply. */
-  io?: { kind: string; inputs: { terminal: string; tag: string }[]; outputs: { terminal: string; tag: string }[] };
+  io?: { kind: string; inputs: { terminal: string; tag: string }[]; outputs: { terminal: string; tag: string }[];
+    analogInputs?: {terminal:string;tag:string;value:number;unit:string;connected:boolean}[] };
   onLadder: (program: LadderDocument) => void;
   onST: (source: string) => void;
   onLanguage: (language: 'ladder' | 'st') => void;
