@@ -17,6 +17,11 @@ import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-c
 import { perDeviceLive } from '../sim/device-state';
 import { PlantWorld3D } from './PlantWorld3D';
 
+const additiveSelection = (value: unknown): boolean => {
+  const event = value as { ctrlKey?: boolean; metaKey?: boolean;
+    nativeEvent?: { ctrlKey?: boolean; metaKey?: boolean } };
+  return Boolean(event.ctrlKey || event.metaKey || event.nativeEvent?.ctrlKey || event.nativeEvent?.metaKey);
+};
 const COLORS = {
   chassis: '#35546b', steel: '#829bb0', panel: '#192b3c', light: '#d3e4ef',
   live: '#20d6a6', off: '#52677c', highlight: '#ffa633', cable: '#7793ad',
@@ -239,17 +244,17 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
   </group>;
 }
 
-function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
+function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
   c: PlacedComponent; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean };
-  editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
-  onTerminal: (id: string) => void; onOperate: (id: string) => void; onSelect: (id: string) => void;
+  editable: boolean; selected: boolean; selectedTerminal: string | null; moveTarget: string | null;
+  onTerminal: (id: string) => void; onOperate: (id: string) => void; onSelect: (id: string, additive: boolean) => void;
 }) {
   const [x, y, z] = worldPosition(c);
   const def = COMPONENTS[c.kind];
-  return <group position={[x, y, z]}>
-    <mesh position={[0, 0.035, 0]} onClick={e => { e.stopPropagation(); onSelect(c.id); }}>
+  return <group position={[x, y, z]} rotation={[0, -(c.yawDeg ?? 0) * Math.PI / 180, 0]}>
+    <mesh position={[0, 0.035, 0]} onClick={e => { e.stopPropagation(); onSelect(c.id, additiveSelection(e)); }}>
       <boxGeometry args={[1.5, 0.08, 1.2]} />
-      <meshStandardMaterial color={moveTarget === c.id ? COLORS.highlight : COLORS.panel} />
+      <meshStandardMaterial color={selected || moveTarget === c.id ? COLORS.highlight : COLORS.panel} />
     </mesh>
     <group onClick={e => { e.stopPropagation(); onSelect(c.id); }}>
       <DeviceSculpture kind={c.kind} active={active} pressed={c.pressed} motorAngleRad={motorAngleRad}
@@ -326,11 +331,11 @@ function Cable3D({ project, from, to, live }: { project: ProjectFile; from: stri
   </mesh>;
 }
 
-function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPlaceAt }: {
+function Workbench({ project, snapshot, editable, selectedDeviceIds, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPlaceAt }: {
   project: ProjectFile; snapshot: RenderSnapshot; editable: boolean;
-  selectedTerminal: string | null; moveTarget: string | null;
+  selectedDeviceIds: readonly string[]; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
-  onSelect: (id: string) => void; onPlaceAt: (at: XY) => void;
+  onSelect: (id: string, additive: boolean) => void; onPlaceAt: (at: XY) => void;
 }) {
   return <>
     <color attach="background" args={['#0c1927']} />
@@ -349,6 +354,7 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
       live={snapshot.voltages[w.from] === 24 && snapshot.voltages[w.to] === 24} />)}
     <PlantWorld3D project={project} scene={snapshot.plantWorld} />
     {project.components.map(c => <Device3D key={c.id} c={c} editable={editable}
+       selected={selectedDeviceIds.includes(c.id)}
       motorAngleRad={c.kind === 'revmotor' ? snapshot.reverseMotorAngleRad : snapshot.motorAngles[c.id] ?? snapshot.motorAngleRad}
       direction={c.kind === 'revmotor' ? snapshot.motorDirection : undefined}
       parcel={c.kind === 'conveyor' ? snapshot.lanes[c.id]?.parcel ?? null : null} tankLevelMl={c.kind === 'tank' ? snapshot.vessels[c.id]?.levelMl ?? 0 : 0}
@@ -373,7 +379,8 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
 export type Sandbox3DProps = {
   project: ProjectFile; snapshot: RenderSnapshot;
   editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
-  selectedDeviceId: string | null; onSelectDevice: (id: string) => void;
+  selectedDeviceId: string | null; selectedDeviceIds?: readonly string[];
+  onSelectDevice: (id: string, additive?: boolean) => void;
   onTerminal: (id: string) => void;
   onOperate: (id: string) => void;
   onPlace: (kind: ComponentKind, at: XY) => void;
@@ -410,6 +417,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
       camera={{ position: [7, 8.5, 10], fov: 42, near: 0.1, far: 120 }}
       onCreated={state => { camera.current = state.camera; state.camera.lookAt(0, 0, 0); }}>
       <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
+        selectedDeviceIds={props.selectedDeviceIds ?? []}
         selectedTerminal={props.selectedTerminal} moveTarget={props.moveTarget}
         onTerminal={props.onTerminal} onOperate={props.onOperate}
         onSelect={props.onSelectDevice} onPlaceAt={onPlaceAt} />
