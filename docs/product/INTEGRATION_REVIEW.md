@@ -13,6 +13,17 @@
 - PR #34's verified P5 source build is independent evidence, not automatic evidence that its code works combined with PR #29; PR #41 requires its own CI.
 - No merge of original PRs or `main` has been executed. No backend, cloud, authentication, physical PLC connection or production deployment authorized.
 
+## Exact-head automated evidence
+
+**Verified implementation and handoff head:** `04417a1ff9cfdf4f15fdcc6859c50938558d93a5` (the final source changes were made before this documentation commit).
+
+- [Linux Build and Test — run 42804343440](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/42804343440): **SUCCESS**; TypeScript/Vite/asset build and `npm run verify:full`; **102 test files and 897/897 Vitest cases passed**, including the imported original P3 physics/equipment tests and four tests for the multi-roller/turntable physical core.
+- The integrated P5-UX browser scenario **passed**, as did the numeric tank-to-PLC16 browser scenario using P5 schematic terminals and the real worker; browser evidence includes the threshold-controlled ST pump, reload persistence and real connection trace.
+- Existing P3 3D sorting and tank, P4 protected/reversing 24V, P5 fault/sensor, authored workcell, P6 assessment, P8 editing, no-WebGL, keyboard and layout flows passed in the same run. Automated accessibility: 21 audited routes with zero serious/critical findings. Firefox and Linux WebKit browser smoke passed.
+- [Windows Edge hosted-runner — run 42804343122](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/42804343122): **SUCCESS** on that head.
+- These CI results validate only the code currently wired into PR #41 and the pure imported world modules. **They do not mean that all 25 new P3 machines have been registered in the sandbox or that the 3-conveyor PLC-to-turntable scenario runs.**
+- Later documentation-only changes to this handoff do not change the code tested at the verified head.
+
 ## Evidence-based source and integration matrix
 
 | Workstream | Main (original bounded model) | Original source PR | In this integration branch | Confidence and remaining test |
