@@ -3,6 +3,13 @@ import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, isPlcKind, type ComponentKind } from '../components/registry';
 import { IoMappingPanel } from '../ui/sandbox/IoMappingPanel';
 import { LogicalWiringCanvas } from '../ui/sandbox/LogicalWiringCanvas';
+import { WorkspaceAuthoringBar } from '../ui/sandbox/WorkspaceAuthoringBar';
+import { WorkspaceSelectionPanel } from '../ui/sandbox/WorkspaceSelectionPanel';
+import { makeFragment } from '../workspace/clipboard';
+import { recordChange, emptyHistory, undoHistory, redoHistory } from '../workspace/history';
+import { workspaceShortcut } from '../workspace/keyboard';
+import { emptySelection, selectOne, toggleOne, selectAll, reconcileSelection } from '../workspace/selection';
+import type { GridStep, WorkspaceFragment, WorkspaceEdit, WorkspaceHistory } from '../workspace/types';
 import { PlantScenePanel } from '../ui/sandbox/PlantScenePanel';
 import { freshWorld } from '../plant/world/bodies';
 import { AppHeader } from '../ui/AppHeader';
@@ -49,13 +56,20 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [project, setProject] = useState<ProjectFile | null>(null);
   // Undo for destructive edits (remove / add panel): the project as it was before each one that took effect.
   const projectRef = useRef<ProjectFile | null>(null);
-  const pendingUndo = useRef<ProjectFile | null>(null);
-  const [undoStack, setUndoStack] = useState<ProjectFile[]>([]);
+  const historyRef = useRef<WorkspaceHistory>(emptyHistory());
+  const [history, setHistory] = useState<WorkspaceHistory>(emptyHistory);
+  const requestId = useRef(1);
+  const historyRequests = useRef(new Map<number, 'record' | 'ignore'>());
   const [selectedTerminal, setSelectedTerminal] = useState<string | null>(null);
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
+  const selectedDeviceId = selectedDeviceIds[selectedDeviceIds.length - 1] ?? null;
+  const setSelectedDeviceId = (id: string | null) => setSelectedDeviceIds(id ? [id] : []);
   const [selectedPlcId, setSelectedPlcId] = useState<string | null>(null);
   const [libraryQuery, setLibraryQuery] = useState('');
+  const [grid,setGrid] = useState<GridStep>(5);
+  const [clipboard,setClipboard] = useState<WorkspaceFragment|null>(null);
+  const pasteIndex=useRef(0);
   // View/panel preferences do not belong to PLC or electrical project state.
   const [libraryFamily,setLibraryFamily] = useState<DeviceFamily>('all');
   const [workspaceView,setWorkspaceView] = useState<'physical'|'logical'>('physical');
@@ -77,7 +91,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [result, setResult] = useState<AttemptResult | null>(null);
   const resultRef = useRef<AttemptResult | null>(null);
   const startedAt = useRef(0);
-  const send = useCallback((commands: Command[]) => {
+  const send = useCallback((commands: Command[], historyMode:'record'|'ignore'='record') => {
     if (scenario && resultRef.current) return; // a submitted attempt is frozen
     if (scenario) {
       const at = Date.now() - startedAt.current;
@@ -86,8 +100,12 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         return e ? appendEvidence(log, at, e.action, e.detail) : log;
       }, prev));
     }
-    if (commands.some(c => c.k === 'remove' || c.k === 'addPanel')) pendingUndo.current = projectRef.current;
-    worker.current?.postMessage({ kind: 'commands', commands });
+    const id=requestId.current++;
+    const editKinds = new Set(['place','move','wire','unwire','remove','addPanel','configureIo',
+      'setParam','loadProgram','loadST','activateLanguage','clear','loadProject',
+      'editWorkspace','injectFault','injectSeededFault','clearFault','revealFault','repair','loadPlantScene']);
+    if(commands.some(c=>editKinds.has(c.k)))historyRequests.current.set(id,historyMode);
+    worker.current?.postMessage({kind:'commands',requestId:id,commands});
   }, [scenario]);
   useEffect(() => {
     const engine = new Worker(new URL('../sim/worker.ts', import.meta.url), { type: 'module' });
@@ -95,13 +113,20 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     engine.onmessage = (ev: MessageEvent<WorkerResponse>) => {
       if (ev.data?.kind !== 'snapshot') return;
       setSnapshot(ev.data.snapshot);
-      if (pendingUndo.current) {
-        // The worker answered the destructive command: keep an undo point only if it actually changed the project.
-        const before = pendingUndo.current;
-        pendingUndo.current = null;
-        if (ev.data.project) setUndoStack(stack => [...stack.slice(-9), before]);
+      const acknowledged=ev.data.requestIds??(ev.data.requestId===undefined?[]:[ev.data.requestId]);
+      let record=false;
+      for(const id of acknowledged){
+        if(historyRequests.current.get(id)==='record')record=true;
+        historyRequests.current.delete(id);
       }
-      if (ev.data.project) { projectRef.current = ev.data.project; setProject(ev.data.project); }
+      if(record&&ev.data.previousProject&&ev.data.project){
+        const next=recordChange(historyRef.current,ev.data.previousProject,ev.data.project);
+        historyRef.current=next;setHistory(next);
+      }
+      if(ev.data.project){
+        projectRef.current=ev.data.project;setProject(ev.data.project);
+        setSelectedDeviceIds(current=>reconcileSelection(current,ev.data.project!.components));
+      }
       if (scenario) {
         // Repairs are recorded from the worker's own events, so a rejected attempt is never counted.
         const repairs = ev.data.events.filter(e => e.kind === 'repair');
