@@ -9,6 +9,7 @@
 import type { Device } from '../engineering/electrical';
 import type { FaultKind, PlacedComponent } from '../sim/signals';
 import type { CylinderState } from '../plant/cylinder';
+import type { StarterPanelState } from '../electrical/three-phase-types';
 import { PLANT_EQUIPMENT } from '../plant/equipment';
 
 export type ElectricalContext = {
@@ -16,6 +17,7 @@ export type ElectricalContext = {
   on: boolean;
   hasFault: (kind: FaultKind) => boolean;
   cylinder?: CylinderState;
+  threePhase?: StarterPanelState;
   plantSignals?: Record<string,boolean|number>;
 };
 
@@ -45,6 +47,19 @@ const DEFS: Partial<Record<PlacedComponent['kind'], Def>> = {
       ...(ctx.hasFault('contactor-coil-open') ? [] : [load(c.id, t(c.id, 'A1'), t(c.id, 'A2'))]),
       sw(`${c.id}-NO`, t(c.id, '13'), t(c.id, '14'), transferred),
       sw(`${c.id}-NC`, t(c.id, '21'), t(c.id, '22'), !transferred),
+    ];
+  },
+  // Virtual three-phase motor's 24V *control-coil* domain, completely
+  // separate from L1/L2/L3. All four coils have real DC return conductors.
+  'star-delta-drive': (c, ctx) => {
+    const state=ctx.threePhase;
+    return [
+      ...['MAIN','STAR','DELTA','RESET'].map(name=>load(c.id+'-'+name,
+        t(c.id,name+'+'),t(c.id,'M-'))),
+      ...(['READY','TRIP','STAR','DELTA'] as const).map(signal=>sw(
+        c.id+'-'+signal+'-FB',t(c.id,'L+'),t(c.id,signal+'_OUT'),
+        signal==='READY'?state?.ready===true:signal==='TRIP'?state?.motor.tripped===true:
+          signal==='STAR'?state?.starClosed===true:state?.deltaClosed===true)),
     ];
   },
   // Three signal lamps on one column, each its own load to the common return.
