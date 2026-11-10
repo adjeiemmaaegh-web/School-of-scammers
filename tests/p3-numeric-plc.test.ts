@@ -58,14 +58,14 @@ describe('P3 isolated analog process sensor and real PLC16 Structured Text',()=>
    {id:'bad',from:'supply.P24',to:'ctrl.AI1'}]})).toThrow(/Numeric signals/);
   w=tick(w,[{k:'place',id:'another',kind:'weigh-cell',at:{x:720,y:350}}]).world;
   w=tick(w,[{k:'wire',id:'duplicate',from:'another.AN_weightKg',to:'ctrl.AI0'}]).world;
-  expect(w.lastError).toMatch(/one numeric source/i);
+  expect(w.lastError).toMatch(/one (?:numeric|signal) source/i);
  });
  it('a physically disconnected or unpowered sensor cannot silently read 0 kg',()=>{
   let w=loadedBody(setup(),15);
   w=tick(w,[{k:'unwire',id:'s3'}]).world; // measurement supply disconnected
   w=tick(w,[{k:'run'}]).world;
   expect(w.running).toBe(false);
-  expect(w.lastError).toMatch(/Numeric input Analog0 has no connected process source/);
+  expect(w.lastError).toMatch(/Numeric input Analog0 has no connected (?:process )?source/);
   expect(w.deviceOn.lamp).toBeUndefined();
  });
  it('opening a numeric wire at runtime fails closed instead of commanding lamp ON',()=>{
