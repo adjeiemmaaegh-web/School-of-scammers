@@ -573,7 +573,6 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         try {
           if (cfg.language === 'st') compileSandboxST(cfg.stSource, names);
           else if(cfg.language==='fbd')compileFbd(cfg.fbd,names);
-          else if(cfg.language==='fbd')compileFbd(cfg.fbd,names);
           else { const issues = validateSandboxProgram(cfg.program, names); if (issues.length) problem = issues.join('; '); }
         } catch (error) { problem = error instanceof Error ? error.message : 'Program no longer compiles'; }
         if (problem) world = setError(world, `Renaming would break the program on ${plc.id}: ${problem}`);
