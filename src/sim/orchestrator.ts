@@ -362,7 +362,8 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Program validation failed'); }
     } else if (cmd.k === 'pause') world = { ...world, running: false };
     else if (cmd.k === 'step') { world = { ...world, running: false }; forceStep = true; }
-    else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
+    else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag,
+      breakpointInstruction: world.breakpointInstruction };
     else if (cmd.k === 'clear') world = createWorld();
     else if (cmd.k === 'loadPlantScene') {
       if(world.running)world=setError(world,'Pause before loading a plant scene');
@@ -791,10 +792,12 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       const rt = world.plcs[c.id];
       return [c.id, c.id === legacyPrimaryId(world.project)
         ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
-          { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory })
+          { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory,
+            fbdSteps:world.fbdSteps },[],world.debugForces[c.id]??{})
         : plcView(c.kind, lang, rt?.powered ?? false, ioOf(world.project, c), rt?.tagInputs ?? idle, rt?.coils ?? {},
-          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {} },
-          rt?.analogInputs??[])];
+          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {},
+            fbdSteps:rt?.fbdSteps??[] },
+          rt?.analogInputs??[],world.debugForces[c.id]??{})];
     })),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
     lanes: Object.fromEntries(Object.entries(world.lanes).map(([id, l]) => [id, { ...l, parcel: l.parcel ? { ...l.parcel } : null }])),
@@ -1008,7 +1011,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
         id=>circuit.reads24(terminal(id,'L+'),terminal(id,'M')));
       const tagInputs={...digitalInputs,...numeric.values};
       nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)),
-        tagInputs, extraPowered, dtMs, numeric.points);
+        tagInputs, extraPowered, dtMs, numeric.points,w.debugForces[extra.id]??{});
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PLC runtime failed';
       const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
@@ -1194,6 +1197,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     scan: nextTick, simulatedMs: nextTick * dtMs, language: w.project.language ?? 'ladder',
     start: inputs.Start, stopOK: inputs.StopOK, run: coils.Run === true,
     plcPowered: powered, contactorOn, motorOn, ladderSteps: ladderResult?.steps ?? [],
+    fbdSteps:fbdResult?.steps??[],
     breakpoint: breakpointHit,
   });
   w = {
@@ -1201,6 +1205,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     ladderMemory: ladderResult?.memory ?? {},
     ladderNumeric: ladderResult?.numericValues ?? {},
     ladderSteps: [...(ladderResult?.steps ?? [])],
+    fbdMemory:fbdResult?.memory??{},fbdSteps:[...(fbdResult?.steps??[])],
     stMemory: stResult?.memory ?? {},
     tagValues, powered, inputs, contactorOn, motorOn, motorAngleRad,
     plcs: nextPlcs, deviceOn, motorAngles, threePhase: nextThreePhase,
