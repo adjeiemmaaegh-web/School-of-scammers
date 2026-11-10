@@ -515,7 +515,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <span>Projects stay in this browser unless exported.</span>
         </div></details>
         <details><summary>Edit</summary><div className="p5-menu-content">
-          <button type="button" disabled={!editable||!history.undo.length} onClick={undo}>Undo last destructive edit</button>
+          <button type="button" disabled={!editable||!history.undo.length} onClick={undo}>Undo accepted edit</button>
           <button type="button" disabled={!editable||!selectedDeviceId}
             onClick={()=>selectedDeviceId&&removeDevice(selectedDeviceId)}>Remove selected device</button>
           <button type="button" onClick={()=>{setSelectedTerminal(null);setMoveTarget(null);}}>Cancel tool/terminal</button>
@@ -581,8 +581,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>
         </details>
         </>}
-        <button className="btn ghost small" data-undo onClick={undo}
-          disabled={!editable || !history.undo.length}>Undo</button>
+        {scenario&&<button className="btn ghost small" data-undo onClick={undo}
+          disabled={!editable || !history.undo.length}>Undo</button>}
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         {!scenario && <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>}
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
@@ -617,6 +617,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             onClick={()=>setDockExpanded(v=>!v)}>Dock</button>
         </div>
       </div>
+      {!scenario&&<div className="workspace-editing-strip" aria-label="Workspace tools">
+        <WorkspaceAuthoringBar editable={editable} selectedCount={selectedDeviceIds.length}
+          canUndo={history.undo.length>0} canRedo={history.redo.length>0} canPaste={!!clipboard}
+          grid={grid} onGrid={setGrid} onUndo={undo} onRedo={redo} onCopy={copySelection}
+          onPaste={pasteSelection} onDuplicate={duplicateSelection} onRemove={deleteSelection}
+          onRotate={rotateSelection} onNudge={moveSelection}/>
+      </div>}
       {(clientError || snapshot?.lastError) && <div role="alert" className="sandbox-alert">{clientError || snapshot?.lastError}</div>}
       {scenario && <ScenarioPanel session={scenario} project={project} evidence={evidence} result={result}
         onSubmit={submitScenario} onRestart={restartScenario} />}
@@ -673,13 +680,19 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             {project && snapshot && <Sandbox3D
               project={project} snapshot={snapshot} editable={editable}
               selectedTerminal={selectedTerminal} moveTarget={moveTarget}
-              selectedDeviceId={selectedDeviceId} onSelectDevice={selectDevice}
+              selectedDeviceId={selectedDeviceId} selectedDeviceIds={selectedDeviceIds}
+              onSelectDevice={selectDevice}
               onTerminal={connect}
               onOperate={id => send([{ k: 'operateToggle', id }])}
               onPlace={(kind, at) => place(kind, at.x, at.y)}
               onMove={move} onMoveFinished={() => setMoveTarget(null)}
             />}
           </Suspense>
+          {!scenario&&<WorkspaceSelectionPanel components={project?.components??[]}
+            selected={selectedDeviceIds}
+            onToggle={id=>selectDevice(id,true)}
+            onSelectAll={()=>setSelectedDeviceIds(selectAll(project?.components??[]))}
+            onClear={()=>setSelectedDeviceIds([])}/>}
           {!project?.components.length && <div className="sandbox-3d-empty">
             <strong>Start with an empty 3D factory workbench.</strong>
             <span>Place and wire your own devices or load the starter equipment (without pre-wiring).</span>
@@ -707,7 +720,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                   c.kind === 'start' || c.kind === 'stop' ? c.pressed : false;
                 return <section className={`sandbox-device ${live ? 'active' : ''}`} key={c.id} data-device-id={c.id}>
                   <div className="sandbox-patch-head">
-                    <button type="button" className="sandbox-inspect-link" onClick={() => selectDevice(c.id)}
+                    <button type="button" className="sandbox-inspect-link" onClick={event=>selectDevice(c.id,event.ctrlKey||event.metaKey)}
                       aria-label={`Inspect ${def.label}`}>{def.label}</button>
                     <span className="sandbox-device-status">{c.kind === 'motor' ? (live ? 'RUNNING' : 'STOPPED') :
                       c.kind === 'contactor' || c.kind === 'relay' ? (live ? 'COIL ON' : 'COIL OFF') :
