@@ -16,6 +16,7 @@
  */
 import { COMPONENTS, type ComponentKind } from '../components/registry';
 import { isPlantNumericWire } from './p3-numeric';
+import { isThreePhaseWire } from '../electrical/three-phase-netlist';
 import type { FaultKind, FaultSpec, PlacedComponent, ProjectFile, Wire } from './signals';
 
 export const MAX_FAULTS = 8;
@@ -100,7 +101,7 @@ export function effectiveSensor(project: ProjectFile, c: PlacedComponent, truth:
 /** Wires as the solver sees them: open conductors are present but conduct nothing. */
 export function solverWires(project: ProjectFile): ReadonlyArray<readonly [string, string]> {
   const open = new Set(faultsOf(project).filter(f => f.kind === 'wire-open').map(f => f.target));
-  return project.wires.filter(w => !open.has(w.id) && !isPlantNumericWire(w,project.components))
+  return project.wires.filter(w => !open.has(w.id) && !isPlantNumericWire(w,project.components) && !isThreePhaseWire(w))
     .map(w => [w.from, w.to] as const);
 }
 
