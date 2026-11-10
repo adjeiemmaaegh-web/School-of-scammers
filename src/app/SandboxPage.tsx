@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, isPlcKind, type ComponentKind } from '../components/registry';
 import { IoMappingPanel } from '../ui/sandbox/IoMappingPanel';
 import { LogicalWiringCanvas } from '../ui/sandbox/LogicalWiringCanvas';
+import { PlantScenePanel } from '../ui/sandbox/PlantScenePanel';
+import { freshWorld } from '../plant/world/bodies';
 import { AppHeader } from '../ui/AppHeader';
 import { ProgrammingDock } from '../program/ProgrammingDock';
 import { LiveMonitor } from '../program/LiveMonitor';
@@ -585,6 +587,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <span>Place and wire your own devices or load the starter equipment (without pre-wiring).</span>
             <button className="btn ghost small" onClick={layout}>Place starter layout</button>
           </div>}
+          {!scenario && <PlantScenePanel project={project} snapshot={snapshot} editable={editable} onCommands={send} />}
           </div>
           <LogicalWiringCanvas project={project} snapshot={snapshot} editable={editable}
             selectedDeviceId={selectedDeviceId} selectedTerminal={selectedTerminal}
@@ -792,6 +795,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               'Q0.4': false, 'Q0.5': false, PlcPowered: false },
             voltages: {}, contactorOn: false, motorOn: false, motorAngleRad: 0,
             plcs: {}, deviceOn: {}, motorAngles: {}, lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
+             plantWorld: { world: freshWorld(), signals: {} },
             forwardContactorOn: false, reverseContactorOn: false,
             motorDirection: 'stopped', reverseMotorAngleRad: 0, interlockConflict: false,
             conveyorOn: false, diverterOn: false,
