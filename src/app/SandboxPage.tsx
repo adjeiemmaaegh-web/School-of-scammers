@@ -937,8 +937,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             diagnostics: [], lastError: null, alarms: [], language: 'ladder',
             tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
               Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
-            ladderSteps: [], ladderMemory: {}, breakpointScan: null, breakpointHit: null,
-            breakpointTag: null, scanTrace: [] }}
+            ladderSteps: [], ladderMemory: {}, fbdSteps: [], debugForces: {}, breakpointScan: null, breakpointHit: null,
+            breakpointTag: null, breakpointInstruction: null, scanTrace: [] }}
           selectedDevice={selectedDevice} selectedTerminal={selectedTerminal} editable={editable}
           onTerminal={connect} onCancelWire={() => setSelectedTerminal(null)}
           onMove={id => setMoveTarget(id)}
