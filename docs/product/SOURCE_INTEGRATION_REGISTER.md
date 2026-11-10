@@ -19,7 +19,7 @@ PLC vendor emulation, production-grade factory physics, or hardware connectivity
 | #30 | Draft P1 source implemented, not accepted | **Deferred conflict** | Scene authoring, rotation, clipboard, undo/redo overlap P3's fixed-yaw plant bridge and shared `signals.ts`, `orchestrator.ts`, `Sandbox3D.tsx`, `SandboxPage.tsx` |
 | #31 | Draft P2 source implemented, not accepted | **Deferred conflict** | FBD/Ladder/ST/forcing require coordinated per-PLC runtime and snapshot updates, including `plcs.ts`, `signals.ts`, `orchestrator.ts`, `ProgrammingDock.tsx`, `SandboxPage.tsx` |
 | #32 | Draft P3 source complete | **Incorporated as working engineering base**, retaining its worker, registry, 25 model classes, ten original scenes, PLC numeric bridge and 3D | Test P3 source browser recipe and combined changes; orientation/analog output gaps |
-| #33 | Draft P4 source complete | **Deferred conflict** | 400V supply and star/delta need electrically isolated netlist plus merges in registry, terminals, `signals.ts`, `orchestrator.ts`, `faults.ts`, `Sandbox3D.tsx`; do not substitute nominal 24V behaviors |
+| #33 | Draft P4 source complete | **Reconciled in staging candidate #38; automated verification pending** | P4 400V supply, star/delta motor dynamics and isolated phase conductor wiring merged with P3 numeric domain and worker; CI and review must still pass |
 | #34 | Draft P5-UX source complete | **Incorporated** menu, logical terminal view, categories, inspector and dock; 12/13 JSX patch hunks auto-applied; overlapping import hunk reconciled manually to preserve `PlantScenePanel` | Run full UI/browser/accessibility suites and inspect true P3/P5 panel coexistence |
 
 **Categories:** incorporated source means available **only on this draft integration branch**,
@@ -85,6 +85,18 @@ Record exact run IDs and failures here after checks finish.
 real industrial devices, screen-reader and assistive-technology review on
 owner hardware, cross-platform mobile performance, factory-grade mechanics,
 safety/IEC certification or commercial deployment.
+
+## P4 staged reconciliation awaiting exact-head checks
+
+- Staging branch: `engineering/2026-11-10-p4-reconciliation` (draft PR #38).
+- Preserves existing P3 plant-world and P5 workbench while adding phase source,
+  star/delta drive, virtual phase meter, thermal motor and three-phase source isolation.
+- The 400V conductors are excluded from the existing 24V solver **alongside** P3
+  numeric process wires; the 24V coil commands remain actual netlist loads.
+- Strict P4 model/worker regression tests and new browser E2E are enabled.
+- **No PASS claim until the staging branch's tests and browser gate finish.**
+- PR #38 may temporarily target main solely to trigger its main-only CI workflow;
+  it must be retargeted to the integration branch before review or merge.
 
 ## Legal/operational boundary
 
