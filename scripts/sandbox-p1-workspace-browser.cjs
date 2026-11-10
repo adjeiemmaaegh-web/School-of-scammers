@@ -1,8 +1,8 @@
 /**
  * SOURCE-ONLY P1 browser acceptance recipe for the integration developer.
- * Empty-floor authoring: place, group select, duplicate, undo/redo, rotate,
- * in-app copy/paste and persistence. This script is intentionally NOT added
- * to CI; the integration developer owns execution and approval.
+ * Mandatory combined-branch browser regression: place, group select, duplicate,
+ * undo/redo, rotate, in-app copy/paste and persistence. Physical device and
+ * production acceptance remain separate.
  */
 const assert = require('node:assert/strict');
 const puppeteer = require('puppeteer');

@@ -2,7 +2,7 @@
  * P2 source-only browser acceptance recipe for the integration developer.
  * A learner uses the actual sandbox UI and PLC worker, not a mock engine:
  * pre-wired motor panel -> activate/edit FBD -> run -> stop -> reopen.
- * NOT included in CI automatically; developer owns execution and signoff.
+ * Mandatory combined-branch browser regression; not a hardware acceptance claim.
  */
 const assert=require('node:assert/strict');
 const puppeteer=require('puppeteer');
