@@ -572,6 +572,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         let problem: string | null = null;
         try {
           if (cfg.language === 'st') compileSandboxST(cfg.stSource, names);
+          else if(cfg.language==='fbd')compileFbd(cfg.fbd,names);
           else { const issues = validateSandboxProgram(cfg.program, names); if (issues.length) problem = issues.join('; '); }
         } catch (error) { problem = error instanceof Error ? error.message : 'Program no longer compiles'; }
         if (problem) world = setError(world, `Renaming would break the program on ${plc.id}: ${problem}`);
@@ -623,7 +624,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       // Removing a broken conductor is a legitimate repair, and a dangling fault would make the
       // exported project fail validation.
       world = withFaults(world, faultsOf(world.project).filter(f => !(f.kind === 'wire-open' && f.target === cmd.id)));
-    } else if (cmd.k === 'loadProgram' || cmd.k === 'loadST' || cmd.k === 'activateLanguage') {
+    } else if (cmd.k === 'loadProgram' || cmd.k === 'loadST' || cmd.k === 'loadFBD' || cmd.k === 'activateLanguage') {
       // `plc` selects the target controller; omitted means the first PLC, exactly as with one PLC.
       if (cmd.plc !== undefined && !plcComponents(world.project).some(c => c.id === cmd.plc)) {
         world = setError(world, 'Unknown PLC');
@@ -631,6 +632,11 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         const errors = validateSandboxProgram(cmd.program, namesFor(world.project, cmd.plc));
         if (errors.length) world = setError(world, errors.join('; '));
         else world = createWorld(withProgramOf(world.project, cmd.plc, { program: cmd.program, language: 'ladder' }));
+      } else if(cmd.k==='loadFBD'){
+        try{
+          compileFbd(cmd.document,namesFor(world.project,cmd.plc));
+          world=createWorld(withProgramOf(world.project,cmd.plc,{language:'fbd',fbd:cmd.document}));
+        }catch(error){world=setError(world,error instanceof Error?error.message:'Invalid FBD graph');}
       } else if (cmd.k === 'loadST') {
         try {
           compileSandboxST(cmd.source, namesFor(world.project, cmd.plc));
@@ -641,11 +647,12 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           const cfg = programOf(world.project, cmd.plc);
           const names = namesFor(world.project, cmd.plc);
           if (cmd.language === 'st') compileSandboxST(cfg.stSource, names);
+          if (cmd.language === 'fbd') compileFbd(cfg.fbd, names);
           if (cmd.language === 'ladder') {
             const errors = validateSandboxProgram(cfg.program, names);
             if (errors.length) throw new Error(errors.join('; '));
           }
-          world = createWorld(withProgramOf(world.project, cmd.plc, { language: cmd.language, stSource: cfg.stSource }));
+          world = createWorld(withProgramOf(world.project, cmd.plc, { language: cmd.language }));
         } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Cannot activate language'); }
       }
     } else if (cmd.k === 'breakAtScan') {
@@ -661,6 +668,31 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (cmd.breakpoint !== null && !validateTagBreakpoint(cmd.breakpoint, tags))
         world = setError(world, 'Tag breakpoint requires a known Boolean PLC tag and valid edge');
       else world = { ...world, breakpointTag: cmd.breakpoint, breakpointHit: null };
+    } else if (cmd.k === 'breakOnInstruction') {
+      const cfg = programOf(world.project, undefined);
+      const ids = cfg.language === 'fbd' ? cfg.fbd.nodes.map(node => node.id) :
+        cfg.language === 'ladder' ? cfg.program.rungs.map(rung => rung.id) : [];
+      if (cmd.breakpoint !== null && !validateInstructionBreakpoint(cmd.breakpoint, ids))
+        world = setError(world, 'Instruction breakpoint requires an existing FBD block or Ladder rung, and a bounded edge/threshold');
+      else world = { ...world, breakpointInstruction: cmd.breakpoint, breakpointHit: null };
+    } else if (cmd.k === 'forceLocal') {
+      const selectedPlc = cmd.plc ?? primaryPlcId(world.project);
+      const plc = selectedPlc ? plcComponents(world.project).find(c=>c.id===selectedPlc) : undefined;
+      if(world.running) world = setError(world,'Pause simulation before setting a local debug force');
+      else if(!plc) world = setError(world,'Select a real PLC before forcing local memory');
+      else if(programOf(world.project,plc.id).language!=='ladder')
+        world = setError(world,'Local debug forcing is supported only for Ladder memory tags');
+      else {
+        try {
+          const prior = world.debugForces[plc.id] ?? {};
+          const updated = applyLocalForce(prior,programOf(world.project,plc.id).program,cmd.tag,cmd.value);
+          const all = {...world.debugForces};
+          if(Object.keys(updated).length)all[plc.id]=updated;else delete all[plc.id];
+          world = {...world,debugForces:all};
+          commandEvents.push({tick:world.tick,kind:'debug',
+            detail:'Local memory force '+plc.id+'.'+cmd.tag+(cmd.value===null?' removed':' active')});
+        } catch (error) {world=setError(world,error instanceof Error?error.message:'Invalid local force');}
+      }
     } else if (cmd.k === 'loadProject') {
       try { world = createWorld(validateProject(cmd.project)); } catch (e) { world = setError(world, e instanceof Error ? e.message : 'Invalid project'); }
     }
