@@ -2,9 +2,12 @@
 import { COMPONENTS, isPlcKind, terminalExists, type ComponentKind } from '../components/registry';
 import { solveNetAware, type Device } from '../engineering/electrical';
 import { executeLadder, type LadderDocument, type LadderResult } from '../engineering/ladder';
+import { compileFbd, executeFbd, type FbdResult } from '../engineering/fbd';
 import { executeStructuredText, type STResult, type STValue } from '../engineering/structured-text';
 import { compileSandboxST, DEFAULT_ST_SOURCE, validateSandboxProgram } from '../program/p2-contract';
 import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from '../program/scan-trace';
+import { fbdReadings, instructionBreakpointHit, ladderReadings, validateInstructionBreakpoint } from '../program/instruction-breakpoint';
+import { applyLocalForce } from '../program/local-force';
 import { feedPlant, freshPlant, stepPlant } from '../plant/sorting-conveyor';
 import { freshTank, stepTank } from '../plant/tank-process';
 import {
@@ -127,10 +130,10 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     // Only a classic first PLC (or no PLC at all) uses the legacy compiled-program field; every other PLC compiles in its runtime.
     stCompiled: project.language === 'st' && (legacyPrimaryId(project) !== undefined || plcComponents(project).length === 0)
       ? compileSandboxST(project.stSource ?? '', namesFor(project, undefined)) : null,
-    stMemory: {},
+    stMemory: {},fbdMemory: {},fbdSteps: [],debugForces: {},
     tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
       Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false }, ladderSteps: [],
-    breakpointScan: null, breakpointHit: null, breakpointTag: null, scanTrace: [],
+    breakpointScan: null, breakpointHit: null, breakpointTag: null,breakpointInstruction: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     plcs: Object.fromEntries(runtimePlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id), namesFor(project, c.id))])),
     lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
@@ -194,13 +197,17 @@ export function validateProject(raw: unknown): ProjectFile {
   const names = namesFor({ components, plcIo } as ProjectFile, undefined);
   const programErrors = validateSandboxProgram(p.program, names);
   if (programErrors.length) throw new Error(programErrors.join('; '));
-  if (p.language !== undefined && p.language !== 'ladder' && p.language !== 'st')
+  if (p.language !== undefined && p.language !== 'ladder' && p.language !== 'st' && p.language !== 'fbd')
     throw new Error('Unknown PLC programming language');
   if (p.stSource !== undefined && typeof p.stSource !== 'string')
     throw new Error('Invalid Structured Text source');
   if (p.language === 'st' || p.stSource !== undefined) {
     if (p.language === 'st' && !p.stSource) throw new Error('ST mode requires a compiled source');
     if (p.stSource) compileSandboxST(p.stSource, names);
+  }
+  if(p.fbd!==undefined||p.language==='fbd'){
+    const candidate={...p,components,plcIo} as ProjectFile;
+    compileFbd(p.fbd??programOf(candidate,undefined).fbd,names);
   }
   const wires = p.wires.map(w => ({ id: w.id, from: w.from, to: w.to }));
   const faults = validateFaults(p.faults, components, wires);
@@ -211,6 +218,7 @@ export function validateProject(raw: unknown): ProjectFile {
     formatVersion: 1, components, wires, program: p.program,
     ...(p.language !== undefined ? { language: p.language } : {}),
     ...(p.stSource !== undefined ? { stSource: p.stSource } : {}),
+    ...(p.fbd !== undefined ? { fbd: p.fbd } : {}),
     // Omitted when empty so legacy and fault-free projects keep their exact v1 shape.
     ...(faults.length ? { faults } : {}),
     ...(plcPrograms ? { plcPrograms } : {}),
@@ -268,13 +276,19 @@ function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[
     const names = namesFor({ components, plcIo } as ProjectFile, id);
     const issues = validateSandboxProgram(e.program, names);
     if (issues.length) throw new Error(`PLC ${id}: ${issues.join('; ')}`);
-    if (e.language !== undefined && e.language !== 'ladder' && e.language !== 'st') throw new Error(`PLC ${id}: unknown language`);
+    if (e.language !== undefined && e.language !== 'ladder' && e.language !== 'st' && e.language !== 'fbd') throw new Error(`PLC ${id}: unknown language`);
     if (e.stSource !== undefined && typeof e.stSource !== 'string') throw new Error(`PLC ${id}: invalid Structured Text source`);
     if (e.language === 'st' && !e.stSource) throw new Error(`PLC ${id}: ST mode requires a source`);
     if (e.stSource) compileSandboxST(e.stSource, names);
+    if(e.fbd!==undefined||e.language==='fbd'){
+      const plc=components.find(c=>c.id===id)!;
+      const cfg=defaultProgramFor(plc.kind,ioOf({components,plcIo} as ProjectFile,plc));
+      compileFbd(e.fbd??cfg.fbd,names);
+    }
     out[id] = { program: e.program,
       ...(e.language !== undefined ? { language: e.language } : {}),
-      ...(e.stSource !== undefined ? { stSource: e.stSource } : {}) };
+      ...(e.stSource !== undefined ? { stSource: e.stSource } : {}),
+      ...(e.fbd !== undefined ? { fbd: e.fbd } : {}) };
   }
   return Object.keys(out).length ? out : undefined;
 }
@@ -335,7 +349,8 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           const label = id !== undefined && id !== primaryPlcId(world.project) ? `PLC ${id}: ` : '';
           try {
             const names = namesFor(world.project, id);
-            if (cfg.language === 'st') compileSandboxST(id === undefined || id === primaryPlcId(world.project) ? world.project.stSource ?? '' : cfg.stSource, names);
+            if(cfg.language==='st')compileSandboxST(cfg.stSource,names);
+            else if(cfg.language==='fbd')compileFbd(cfg.fbd,names);
             else {
               const issues = validateSandboxProgram(cfg.program, names);
               if (issues.length) throw new Error(issues.join('; '));
@@ -346,7 +361,8 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Program validation failed'); }
     } else if (cmd.k === 'pause') world = { ...world, running: false };
     else if (cmd.k === 'step') { world = { ...world, running: false }; forceStep = true; }
-    else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
+    else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan,
+      breakpointTag: world.breakpointTag,breakpointInstruction:world.breakpointInstruction };
     else if (cmd.k === 'clear') world = createWorld();
     else if (cmd.k === 'loadPlantScene') {
       if(world.running)world=setError(world,'Pause before loading a plant scene');
