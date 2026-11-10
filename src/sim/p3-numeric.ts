@@ -65,7 +65,7 @@ export function sampleNumericInputs(project:Pick<ProjectFile,'components'|'wires
   const connected=!!source&&(tankSource||!!channel&&isSourcePowered(id));
   let value=0;
   if(powered&&connected){
-   const actual=tankSource?vessels[id]?.levelMl:scene.signals[id]?.[signal];
+   const actual=tankSource?(vessels[id]?.levelMl ?? 0):scene.signals[id]?.[signal];
    if(typeof actual!=='number'||!Number.isFinite(actual)||Math.abs(actual)>1_000_000_000)
     throw new RangeError('Process numeric sensor has an invalid engineering-unit reading');
    if(tankSource&&(actual<0||actual>1000))throw new RangeError('Invalid tank numeric signal');
