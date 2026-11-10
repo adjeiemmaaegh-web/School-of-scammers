@@ -201,6 +201,28 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
     </mesh>)}
     <mesh position={[0, 0.96, 0]}><boxGeometry args={[0.8, 0.09, 0.68]} /><meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.26} /></mesh>
   </group>;
+  if (kind === 'three-phase-supply') return <group>
+    <mesh position={[0,0.55,0]}><boxGeometry args={[1.22,0.96,0.78]}/>
+      <meshStandardMaterial color="#526d87" metalness={0.3}/></mesh>
+    {[-0.26,0,0.26].map((x,i)=><mesh key={i} position={[x,0.78,-0.42]}>
+      <boxGeometry args={[0.18,0.26,0.06]}/>
+      <meshStandardMaterial color={active?'#d7bb76':'#66737e'} emissive={active?'#54401d':'#000000'}/>
+    </mesh>)}
+    <mesh position={[0,1.08,0]}><boxGeometry args={[1.1,0.10,0.74]}/>
+      <meshStandardMaterial color="#ac9b70"/></mesh>
+  </group>;
+  if (kind === 'star-delta-drive') return <group>
+    <mesh position={[0,0.32,0]} rotation={[0,0,Math.PI/2]}>
+      <cylinderGeometry args={[0.42,0.42,1.24,18]}/>
+      <meshStandardMaterial color={active?'#437f92':'#607588'} metalness={0.48}/></mesh>
+    <mesh position={[0,0.80,-0.23]}><boxGeometry args={[0.94,0.45,0.32]}/>
+      <meshStandardMaterial color="#4e617b"/></mesh>
+    {[-0.27,0,0.27].map((x,i)=><mesh key={i} position={[x,0.86,-0.405]}>
+      <boxGeometry args={[0.18,0.16,0.05]}/>
+      <meshStandardMaterial color={active?'#5bcaaa':'#bfa46c'} emissive={active?'#164334':'#000000'}/></mesh>)}
+    <mesh position={[0,0.06,0]}><boxGeometry args={[1.48,0.12,0.9]}/>
+      <meshStandardMaterial color="#6d7480"/></mesh>
+  </group>;
   if (kind === 'supply') return <group>
     <mesh position={[0, 0.43, 0]}><boxGeometry args={[1.04, 0.76, 0.74]} /><meshStandardMaterial color={COLORS.chassis} /></mesh>
     <mesh position={[0, 0.56, -0.38]}><boxGeometry args={[0.73, 0.19, 0.04]} /><meshStandardMaterial color={COLORS.panel} /></mesh>
