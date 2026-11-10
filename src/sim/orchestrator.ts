@@ -14,6 +14,10 @@ import {
 import { LEGACY_IO, defaultIo, ioOf, isConfigurableIo, validateIoMap } from './plc-io';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
+import { threePhaseWireError, threePhaseConnections } from '../electrical/three-phase-netlist';
+import { freshStarterPanel } from '../electrical/three-phase-types';
+import { stepWiredStarter } from '../electrical/wired-star-delta';
+import { readPhaseMeter } from '../electrical/phase-instruments';
 import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
 import { laneOf, lanesOf, vesselOf, vesselsOf } from './stations';
 import { electricalDevices } from '../components/electrical-defs';
@@ -131,6 +135,7 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     plcs: Object.fromEntries(runtimePlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id), namesFor(project, c.id))])),
     lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
     plantWorld:freshProjectPlant(project),
+    threePhase:{}, threePhasePower:{},
     deviceOn: {}, motorAngles: {},
     forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
     reverseMotorAngleRad: 0, interlockConflict: false,
@@ -171,12 +176,15 @@ export function validateProject(raw: unknown): ProjectFile {
   for (const kind of ['reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor'] as const)
     if (components.filter(c => c.kind === kind).length > 1)
       throw new Error(`Only one ${kind} protection device is supported`);
+  const threePhaseOwners=Object.fromEntries(components.map(c=>[c.id,c.kind]));
   const wireIds = new Set<string>();
   const numericChecked: {from:string;to:string}[]=[];
   for (const wire of p.wires) {
     if (!wire || !validId(wire.id) || wireIds.has(wire.id) || typeof wire.from !== 'string' ||
         typeof wire.to !== 'string' || wire.from === wire.to ||
         !terminalExists(wire.from, components) || !terminalExists(wire.to, components)) throw new Error('Invalid wire in project');
+    const phaseError=threePhaseWireError(wire.from,wire.to,threePhaseOwners);
+    if(phaseError)throw new Error(phaseError);
     const domainError=plantNumericWireError(wire.from,wire.to,components,numericChecked);
     if(domainError)throw new Error(domainError);
     numericChecked.push({from:wire.from,to:wire.to});
@@ -406,6 +414,15 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
             detail: `${component.kind} ${cmd.action === 'trip' ? 'opened (manual training trip)' : 'reset by learner'}` });
         }
       }
+    } else if (cmd.k === 'setThreePhasePower') {
+      const source=world.project.components.find(c=>c.id===cmd.id&&c.kind==='three-phase-supply');
+      if(world.running)world=setError(world,'Pause the simulator before isolating three-phase source');
+      else if(!source||typeof cmd.enabled!=='boolean')world=setError(world,'Invalid virtual three-phase source control');
+      else {
+        world={...world,threePhasePower:{...world.threePhasePower,[cmd.id]:cmd.enabled}};
+        commandEvents.push({tick:world.tick,kind:'mains',
+          detail:'Virtual three-phase source '+cmd.id+(cmd.enabled?' energised':' isolated')});
+      }
     } else if (cmd.k === 'setMeterProbe') {
       if ((cmd.lead !== 'positive' && cmd.lead !== 'negative') ||
           (cmd.terminal !== null && (typeof cmd.terminal !== 'string' ||
@@ -573,7 +590,9 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (!validPos(cmd.to) || !world.project.components.some(c => c.id === cmd.id)) world = setError(world, 'Invalid movement');
       else world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, ...cmd.to } : c) } };
     } else if (cmd.k === 'wire') {
-      const domainError=plantNumericWireError(cmd.from,cmd.to,world.project.components,world.project.wires);
+      const phaseError=threePhaseWireError(cmd.from,cmd.to,
+        Object.fromEntries(world.project.components.map(c=>[c.id,c.kind])));
+      const domainError=phaseError??plantNumericWireError(cmd.from,cmd.to,world.project.components,world.project.wires);
       if(domainError)world=setError(world,domainError);
       else if (!validId(cmd.id) || world.project.wires.some(w => w.id === cmd.id || (w.from === cmd.from && w.to === cmd.to) || (w.from === cmd.to && w.to === cmd.from)) ||
           cmd.from === cmd.to || !terminalExists(cmd.from, world.project.components) ||
@@ -635,7 +654,8 @@ function buildCircuit(world: WorldState): Device[] {
   for (const c of world.project.components) {
     // Equipment described as data (relay, cylinder): the definition says which loads and switches it contributes.
     const described = electricalDevices(c, { on: world.deviceOn[c.id] === true, hasFault: kind => hasFault(world.project, kind, c.id),
-      cylinder: world.cylinders[c.id],plantSignals:sensorImage(world.plantWorld,c.id) });
+      cylinder: world.cylinders[c.id],plantSignals:sensorImage(world.plantWorld,c.id),
+      threePhase:world.threePhase[c.id] });
     if (described) { devices.push(...described); continue; }
     if (c.kind === 'supply') devices.push({ id: c.id, kind: 'supply', positive: terminal(c.id, 'P24'), negative: terminal(c.id, 'M0'), volts: 24 });
     if (c.kind === 'breaker') devices.push({
@@ -741,6 +761,15 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     },
     vessels: Object.fromEntries(Object.entries(world.vessels).map(([id, v]) => [id, { ...v }])),
     tripped: { ...world.tripped },
+    threePhase: Object.fromEntries(Object.entries(world.threePhase).map(([id,state])=>
+      [id,{...state,motor:{...state.motor,diagnostics:[...state.motor.diagnostics]},
+        events:[...state.events]}])),
+    threePhaseSources: Object.fromEntries(world.project.components.filter(c=>c.kind==='three-phase-supply')
+      .map(c=>[c.id,world.threePhasePower[c.id]!==false])),
+    phaseMeters: Object.fromEntries(Object.entries(threePhaseConnections(world.project.components,
+      world.project.wires.filter(w=>!faultsOf(world.project).some(f=>f.kind==='wire-open'&&f.target===w.id))))
+      .map(([id,connection])=>[id,readPhaseMeter(connection,
+        world.threePhasePower[connection.supplyId]!==false)])),
     timers: Object.fromEntries(world.project.components.filter(c => c.kind === 'timerelay').map(c => {
       const delayMs = paramValue(world.project.params, c.id, paramSpecsOf('timerelay')[0]);
       const elapsedMs = world.timers[c.id] ?? 0;
@@ -1051,6 +1080,30 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const p3=stepProjectPlant(w.plantWorld,w.project,circuit.energizedLoads,dtMs);
   for(const event of p3.events)events.push({tick:w.tick+1,kind:'plant',
     detail:event.source+': '+event.detail});
+  // P4 three-phase process after the worker's actual 24V coil demand scan.
+  // Three-phase conductors are not supplied by the 24V electrical solver.
+  const connectedThreePhase=threePhaseConnections(w.project.components,w.project.wires.filter(wire=>
+    !faultsOf(w.project).some(f=>f.kind==='wire-open'&&f.target===wire.id)));
+  const nextThreePhase:WorldState['threePhase']={};
+  for(const part of w.project.components.filter(c=>c.kind==='star-delta-drive')){
+    const wired=connectedThreePhase[part.id]??null;
+    const live=wired&&w.threePhasePower[wired.supplyId]!==false?wired:null;
+    const coils={
+      main:circuit.energizedLoads.includes(part.id+'-MAIN'),
+      star:circuit.energizedLoads.includes(part.id+'-STAR'),
+      delta:circuit.energizedLoads.includes(part.id+'-DELTA'),
+      reset:circuit.energizedLoads.includes(part.id+'-RESET'),
+    };
+    const previous=w.threePhase[part.id]??freshStarterPanel();
+    const next=stepWiredStarter(previous,live,coils,dtMs);
+    nextThreePhase[part.id]=next;
+    deviceOn[part.id]=next.mainClosed&&(next.starClosed||next.deltaClosed);
+    if(next.motor.mode!==previous.motor.mode||next.motor.tripped!==previous.motor.tripped)
+      events.push({tick:w.tick+1,kind:'three-phase',detail:part.id+': '+next.motor.mode+
+        (next.motor.tripped?' (thermal trip)':'')});
+    if(next.conflict&&!previous.conflict)events.push({tick:w.tick+1,kind:'interlock',
+      detail:part.id+': STAR/DELTA control conflict; motor inhibited'});
+  }
   // 8. Photoeye state from geometry is sampled by the circuit on NEXT scan.
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
@@ -1090,7 +1143,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     ladderSteps: [...(ladderResult?.steps ?? [])],
     stMemory: stResult?.memory ?? {},
     tagValues, powered, inputs, contactorOn, motorOn, motorAngleRad,
-    plcs: nextPlcs, deviceOn, motorAngles,
+    plcs: nextPlcs, deviceOn, motorAngles, threePhase: nextThreePhase,
     alarms: alarmUpdate.alarms, alarmWatch: alarmUpdate.watch,
     forwardContactorOn, reverseContactorOn, motorDirection,
     reverseMotorAngleRad, interlockConflict,
@@ -1104,6 +1157,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       ...(w.project.components.some(c => c.kind === 'overload' && w.tripped[c.id] === true) ? ['Motor overload auxiliary 95-96 open (manual test trip)'] : []),
       ...(interlockConflict ? ['Reversing contactors demand simultaneous engagement: mechanical interlock active'] : []),
       ...(opposingDrives ? ['Both direction terminals energized: reversible motor inhibited'] : []),
+      ...Object.entries(nextThreePhase).flatMap(([id,state])=>state.motor.diagnostics.map(msg=>id+': '+msg)),
       ...(!powered && plc ? ['PLC is not powered (wire L+ and M to the 24V supply)'] : []),
       ...unpoweredExtras.map(id => `PLC ${id} is not powered (wire L+ and M to a 24V supply)`)],
     breakpointHit,
