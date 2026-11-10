@@ -55,12 +55,30 @@ const STORAGE = 'efo-open-sandbox-project-v1';
     await page.waitForFunction(() =>
       document.querySelectorAll('[data-workspace-selection] input:checked').length === 2);
 
+    const originalIds = (await saved()).components.map(c => c.id);
     await page.click('[data-duplicate]');
     await count(4);
     await page.click('[data-undo]');
     await count(2);
     await page.click('[data-redo]');
     await count(4);
+    // Undo/redo intentionally clears selection to prevent stale IDs controlling
+    // a replaced project. Re-select the original two devices through real
+    // workspace checkboxes before rotating, copying and pasting them.
+    await page.waitForFunction(() =>
+      document.querySelectorAll('[data-workspace-selection] input[type="checkbox"]:checked').length === 0);
+    const selectedAgain = await page.evaluate(ids => {
+      let count = 0;
+      for (const label of document.querySelectorAll('[data-workspace-selection] .workspace-selection-list label')) {
+        const id = label.querySelector('small')?.textContent?.split(' · ')[0];
+        const input = label.querySelector('input[type="checkbox"]');
+        if (input && ids.includes(id) && !input.checked) { input.click(); count++; }
+      }
+      return count;
+    }, originalIds);
+    assert.equal(selectedAgain, 2, 'Original devices must be selectable after redo');
+    await page.waitForFunction(() =>
+      document.querySelectorAll('[data-workspace-selection] input[type="checkbox"]:checked').length === 2);
 
     await clickText('↷ 90°');
     await page.waitForFunction(key => {
