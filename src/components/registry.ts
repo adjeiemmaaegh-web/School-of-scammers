@@ -64,7 +64,8 @@ const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
     { name: 'OUT', side: 'right', y: 75, role: 'output' }] },
   diverter: { kind: 'diverter', label: '24V diverter', help: 'Solenoid/actuator; wired Q0.1 selects reject lane at station', terminals: [
     { name: 'A1', side: 'left', y: 47, role: 'load' }, { name: 'A2', side: 'left', y: 93, role: 'load' }] },
-  tank: { kind: 'tank', label: '3D process tank', help: 'Passive 1000 ml teaching vessel. Locate inlet pump, level probe and outlet valve nearby.', terminals: [] },
+  tank: { kind: 'tank', label: '3D process tank', help: 'Passive 1000 ml teaching vessel; LEVEL is the simulated 0–1000 ml reading, isolated from the 24V circuit.', terminals: [
+    { name: 'LEVEL', side: 'right', y: 75, role: 'analog-output' }] },
   pump: { kind: 'pump', label: '24V inlet pump', help: 'Q0.2 Fill output energises the 180 ml/s illustrative inlet pump', terminals: [
     { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
   levelprobe: { kind: 'levelprobe', label: 'High-level switch', help: '24V high-side switch with 750/600 ml hysteresis, output to PLC I0.3', terminals: [
