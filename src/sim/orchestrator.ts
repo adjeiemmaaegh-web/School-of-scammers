@@ -14,11 +14,18 @@ import {
 import { LEGACY_IO, defaultIo, ioOf, isConfigurableIo, validateIoMap } from './plc-io';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
+import { threePhaseWireError, threePhaseConnections } from '../electrical/three-phase-netlist';
+import { freshStarterPanel } from '../electrical/three-phase-types';
+import { stepWiredStarter } from '../electrical/wired-star-delta';
+import { readPhaseMeter } from '../electrical/phase-instruments';
 import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
 import { laneOf, lanesOf, vesselOf, vesselsOf } from './stations';
 import { electricalDevices } from '../components/electrical-defs';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { clearedAlarm, engineFault, freshCylinder, stepCylinder } from '../plant/cylinder';
+import { freshProjectPlant, stepProjectPlant, sensorImage,validatePlantFaults } from './p3-plant-bridge';
+import { makePlantSceneProject } from './p3-scene-import';
+import { plantNumericWireError, sampleNumericInputs } from './p3-numeric';
 export { MAX_COMPONENTS, MAX_WIRES };
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
@@ -127,6 +134,8 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     plcs: Object.fromEntries(runtimePlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id), namesFor(project, c.id))])),
     lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
+    plantWorld:freshProjectPlant(project),
+    threePhase:{}, threePhasePower:{},
     deviceOn: {}, motorAngles: {},
     forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
     reverseMotorAngleRad: 0, interlockConflict: false,
@@ -167,11 +176,18 @@ export function validateProject(raw: unknown): ProjectFile {
   for (const kind of ['reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor'] as const)
     if (components.filter(c => c.kind === kind).length > 1)
       throw new Error(`Only one ${kind} protection device is supported`);
+  const threePhaseOwners=Object.fromEntries(components.map(c=>[c.id,c.kind]));
   const wireIds = new Set<string>();
+  const numericChecked: {from:string;to:string}[]=[];
   for (const wire of p.wires) {
     if (!wire || !validId(wire.id) || wireIds.has(wire.id) || typeof wire.from !== 'string' ||
         typeof wire.to !== 'string' || wire.from === wire.to ||
         !terminalExists(wire.from, components) || !terminalExists(wire.to, components)) throw new Error('Invalid wire in project');
+    const phaseError=threePhaseWireError(wire.from,wire.to,threePhaseOwners);
+    if(phaseError)throw new Error(phaseError);
+    const domainError=plantNumericWireError(wire.from,wire.to,components,numericChecked);
+    if(domainError)throw new Error(domainError);
+    numericChecked.push({from:wire.from,to:wire.to});
     wireIds.add(wire.id);
   }
   const plcIo = validatePlcIo(p.plcIo, components);
@@ -190,6 +206,7 @@ export function validateProject(raw: unknown): ProjectFile {
   const faults = validateFaults(p.faults, components, wires);
   const plcPrograms = validatePlcPrograms(p.plcPrograms, components, plcIo);
   const params = validateParams(p.params, components);
+  const plantFaults=validatePlantFaults(p.plantFaults,{components});
   return {
     formatVersion: 1, components, wires, program: p.program,
     ...(p.language !== undefined ? { language: p.language } : {}),
@@ -199,6 +216,7 @@ export function validateProject(raw: unknown): ProjectFile {
     ...(plcPrograms ? { plcPrograms } : {}),
     ...(plcIo ? { plcIo } : {}),
     ...(params ? { params } : {}),
+    ...(plantFaults ? {plantFaults} : {}),
   };
 }
 /** Device settings: each key must be a setting its device kind defines, with an allowed value that differs from the default. */
@@ -330,6 +348,30 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
     else if (cmd.k === 'step') { world = { ...world, running: false }; forceStep = true; }
     else if (cmd.k === 'reset') world = { ...createWorld(world.project), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
     else if (cmd.k === 'clear') world = createWorld();
+    else if (cmd.k === 'loadPlantScene') {
+      if(world.running)world=setError(world,'Pause before loading a plant scene');
+      else try {
+        const project=validateProject(makePlantSceneProject(cmd.id));
+        world=createWorld(project);
+        commandEvents.push({tick:world.tick,kind:'scene',
+          detail:'Opened unsolved editable plant scene '+cmd.id});
+      }catch(error){world=setError(world,error instanceof Error?error.message:'Unable to load plant scene');}
+    }
+    else if (cmd.k === 'setPlantFault') {
+      if(world.running)world=setError(world,'Pause before changing a plant equipment fault');
+      else {
+        try {
+          const faults={...(world.project.plantFaults??{})};
+          if(cmd.fault===null)delete faults[cmd.id];
+          else faults[cmd.id]=cmd.fault;
+          const checked=validatePlantFaults(faults,world.project);
+          const {plantFaults:ignored,...rest}=world.project;
+          world={...world,project:checked?{...rest,plantFaults:checked}:rest};
+          commandEvents.push({tick:world.tick,kind:'fault',
+            detail:'Plant fault for '+cmd.id+(cmd.fault?' set: '+cmd.fault:' cleared')});
+        }catch(error){world=setError(world,error instanceof Error?error.message:'Invalid plant fault');}
+      }
+    }
     else if (cmd.k === 'feedParcel') {
       const lane = cmd.conveyor !== undefined
         ? world.project.components.find(c => c.id === cmd.conveyor && c.kind === 'conveyor')
@@ -371,6 +413,15 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           commandEvents.push({ tick: world.tick, kind: 'protection',
             detail: `${component.kind} ${cmd.action === 'trip' ? 'opened (manual training trip)' : 'reset by learner'}` });
         }
+      }
+    } else if (cmd.k === 'setThreePhasePower') {
+      const source=world.project.components.find(c=>c.id===cmd.id&&c.kind==='three-phase-supply');
+      if(world.running)world=setError(world,'Pause the simulator before isolating three-phase source');
+      else if(!source||typeof cmd.enabled!=='boolean')world=setError(world,'Invalid virtual three-phase source control');
+      else {
+        world={...world,threePhasePower:{...world.threePhasePower,[cmd.id]:cmd.enabled}};
+        commandEvents.push({tick:world.tick,kind:'mains',
+          detail:'Virtual three-phase source '+cmd.id+(cmd.enabled?' energised':' isolated')});
       }
     } else if (cmd.k === 'setMeterProbe') {
       if ((cmd.lead !== 'positive' && cmd.lead !== 'negative') ||
@@ -480,7 +531,11 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (!plc || errors.length) world = setError(world, errors.join('; '));
       else {
         const merged = { inputs: { ...defaultIo(plc.kind).inputs, ...cmd.io.inputs }, outputs: { ...defaultIo(plc.kind).outputs, ...cmd.io.outputs } };
-        const isDefault = JSON.stringify(merged) === JSON.stringify(defaultIo(plc.kind));
+        // Fixed analog AI channels must not make an otherwise default digital
+        // map appear customized in the existing saved-project format.
+        const baseIo=defaultIo(plc.kind);
+        const isDefault=JSON.stringify(merged.inputs)===JSON.stringify(baseIo.inputs)&&
+          JSON.stringify(merged.outputs)===JSON.stringify(baseIo.outputs);
         const { plcIo: previous, ...rest } = world.project;
         const nextIo = { ...(previous ?? {}) };
         if (isDefault) delete nextIo[plc.id]; else nextIo[plc.id] = merged;
@@ -535,7 +590,11 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (!validPos(cmd.to) || !world.project.components.some(c => c.id === cmd.id)) world = setError(world, 'Invalid movement');
       else world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, ...cmd.to } : c) } };
     } else if (cmd.k === 'wire') {
-      if (!validId(cmd.id) || world.project.wires.some(w => w.id === cmd.id || (w.from === cmd.from && w.to === cmd.to) || (w.from === cmd.to && w.to === cmd.from)) ||
+      const phaseError=threePhaseWireError(cmd.from,cmd.to,
+        Object.fromEntries(world.project.components.map(c=>[c.id,c.kind])));
+      const domainError=phaseError??plantNumericWireError(cmd.from,cmd.to,world.project.components,world.project.wires);
+      if(domainError)world=setError(world,domainError);
+      else if (!validId(cmd.id) || world.project.wires.some(w => w.id === cmd.id || (w.from === cmd.from && w.to === cmd.to) || (w.from === cmd.to && w.to === cmd.from)) ||
           cmd.from === cmd.to || !terminalExists(cmd.from, world.project.components) ||
           !terminalExists(cmd.to, world.project.components) || world.project.wires.length >= MAX_WIRES)
         world = setError(world, 'Invalid or duplicate terminal connection');
@@ -594,7 +653,9 @@ function buildCircuit(world: WorldState): Device[] {
   const primary = legacyPrimaryId(world.project);
   for (const c of world.project.components) {
     // Equipment described as data (relay, cylinder): the definition says which loads and switches it contributes.
-    const described = electricalDevices(c, { on: world.deviceOn[c.id] === true, hasFault: kind => hasFault(world.project, kind, c.id), cylinder: world.cylinders[c.id] });
+    const described = electricalDevices(c, { on: world.deviceOn[c.id] === true, hasFault: kind => hasFault(world.project, kind, c.id),
+      cylinder: world.cylinders[c.id],plantSignals:sensorImage(world.plantWorld,c.id),
+      threePhase:world.threePhase[c.id] });
     if (described) { devices.push(...described); continue; }
     if (c.kind === 'supply') devices.push({ id: c.id, kind: 'supply', positive: terminal(c.id, 'P24'), negative: terminal(c.id, 'M0'), volts: 24 });
     if (c.kind === 'breaker') devices.push({
@@ -684,12 +745,31 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
         ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
           { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory })
         : plcView(c.kind, lang, rt?.powered ?? false, ioOf(world.project, c), rt?.tagInputs ?? idle, rt?.coils ?? {},
-          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {} })];
+          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {} },
+          rt?.analogInputs??[])];
     })),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
     lanes: Object.fromEntries(Object.entries(world.lanes).map(([id, l]) => [id, { ...l, parcel: l.parcel ? { ...l.parcel } : null }])),
+    plantWorld:{
+      world:{...world.plantWorld.world,
+        bodies:world.plantWorld.world.bodies.map(b=>({...b,pos:{...b.pos},vel:{...b.vel},size:{...b.size},tags:{...b.tags}})),
+        model:Object.fromEntries(Object.entries(world.plantWorld.world.model).map(([id,state])=>
+          [id,{...state,...(state.slots?{slots:{...state.slots}}:{})}])),
+        events:world.plantWorld.world.events.map(e=>({...e}))},
+      signals:Object.fromEntries(Object.entries(world.plantWorld.signals).map(([id,readings])=>
+        [id,{...readings}])),
+    },
     vessels: Object.fromEntries(Object.entries(world.vessels).map(([id, v]) => [id, { ...v }])),
     tripped: { ...world.tripped },
+    threePhase: Object.fromEntries(Object.entries(world.threePhase).map(([id,state])=>
+      [id,{...state,motor:{...state.motor,diagnostics:[...state.motor.diagnostics]},
+        events:[...state.events]}])),
+    threePhaseSources: Object.fromEntries(world.project.components.filter(c=>c.kind==='three-phase-supply')
+      .map(c=>[c.id,world.threePhasePower[c.id]!==false])),
+    phaseMeters: Object.fromEntries(Object.entries(threePhaseConnections(world.project.components,
+      world.project.wires.filter(w=>!faultsOf(world.project).some(f=>f.kind==='wire-open'&&f.target===w.id))))
+      .map(([id,connection])=>[id,readPhaseMeter(connection,
+        world.threePhasePower[connection.supplyId]!==false)])),
     timers: Object.fromEntries(world.project.components.filter(c => c.kind === 'timerelay').map(c => {
       const delayMs = paramValue(world.project.params, c.id, paramSpecsOf('timerelay')[0]);
       const elapsedMs = world.timers[c.id] ?? 0;
@@ -862,12 +942,17 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     const extraPowered = !shorted && circuit.reads24(terminal(extra.id, 'L+'), terminal(extra.id, 'M'));
     const io = ioOf(w.project, extra);
     // A sensor-named input only reads high if some powered sensor of that kind exists (guards a wire straight to P24).
-    const tagInputs = Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => [tag, extraPowered &&
+    const digitalInputs = Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => [tag, extraPowered &&
       (tag === 'Photoeye' ? eyePowered : tag === 'TankHigh' ? probePowered : true) &&
       circuit.reads24(terminal(extra.id, pin), terminal(extra.id, 'M'))]));
     const cfg = programOf(w.project, extra.id);
     try {
-      nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)), tagInputs, extraPowered, dtMs);
+      const openNumeric=new Set(faultsOf(w.project).filter(f=>f.kind==='wire-open').map(f=>f.target));
+      const numeric=sampleNumericInputs(w.project,w.plantWorld,extra.id,io,extraPowered,openNumeric,
+        id=>circuit.reads24(terminal(id,'L+'),terminal(id,'M')));
+      const tagInputs={...digitalInputs,...numeric.values};
+      nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)),
+        tagInputs, extraPowered, dtMs, numeric.points);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PLC runtime failed';
       const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
@@ -989,6 +1074,36 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     nextVessels[vessel.tank.id] = change.tank;
     for (const detail of change.events) events.push({ tick: w.tick + 1, kind: 'tank', detail });
   }
+  // P3: the independent equipment world is stepped using the electrical
+  // solver's already-committed actuator image. Its new geometric sensor values
+  // may only affect PLC inputs at the following 50ms scan.
+  const p3=stepProjectPlant(w.plantWorld,w.project,circuit.energizedLoads,dtMs);
+  for(const event of p3.events)events.push({tick:w.tick+1,kind:'plant',
+    detail:event.source+': '+event.detail});
+  // P4 three-phase process after the worker's actual 24V coil demand scan.
+  // Three-phase conductors are not supplied by the 24V electrical solver.
+  const connectedThreePhase=threePhaseConnections(w.project.components,w.project.wires.filter(wire=>
+    !faultsOf(w.project).some(f=>f.kind==='wire-open'&&f.target===wire.id)));
+  const nextThreePhase:WorldState['threePhase']={};
+  for(const part of w.project.components.filter(c=>c.kind==='star-delta-drive')){
+    const wired=connectedThreePhase[part.id]??null;
+    const live=wired&&w.threePhasePower[wired.supplyId]!==false?wired:null;
+    const coils={
+      main:circuit.energizedLoads.includes(part.id+'-MAIN'),
+      star:circuit.energizedLoads.includes(part.id+'-STAR'),
+      delta:circuit.energizedLoads.includes(part.id+'-DELTA'),
+      reset:circuit.energizedLoads.includes(part.id+'-RESET'),
+    };
+    const previous=w.threePhase[part.id]??freshStarterPanel();
+    const next=stepWiredStarter(previous,live,coils,dtMs);
+    nextThreePhase[part.id]=next;
+    deviceOn[part.id]=next.mainClosed&&(next.starClosed||next.deltaClosed);
+    if(next.motor.mode!==previous.motor.mode||next.motor.tripped!==previous.motor.tripped)
+      events.push({tick:w.tick+1,kind:'three-phase',detail:part.id+': '+next.motor.mode+
+        (next.motor.tripped?' (thermal trip)':'')});
+    if(next.conflict&&!previous.conflict)events.push({tick:w.tick+1,kind:'interlock',
+      detail:part.id+': STAR/DELTA control conflict; motor inhibited'});
+  }
   // 8. Photoeye state from geometry is sampled by the circuit on NEXT scan.
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
@@ -1028,11 +1143,12 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     ladderSteps: [...(ladderResult?.steps ?? [])],
     stMemory: stResult?.memory ?? {},
     tagValues, powered, inputs, contactorOn, motorOn, motorAngleRad,
-    plcs: nextPlcs, deviceOn, motorAngles,
+    plcs: nextPlcs, deviceOn, motorAngles, threePhase: nextThreePhase,
     alarms: alarmUpdate.alarms, alarmWatch: alarmUpdate.watch,
     forwardContactorOn, reverseContactorOn, motorDirection,
     reverseMotorAngleRad, interlockConflict,
     conveyorOn, diverterOn, lanes: nextLanes, vessels: nextVessels, cylinders: nextCylinders, timers: nextTimers,
+    plantWorld:p3.runtime,
     pumpOn, drainOn, lampOn,
     voltages: circuit.voltage,
     meter: measureDC24(circuit.voltage,circuit.diagnostics,w.meter.positive,w.meter.negative,circuit.sameSupply),
@@ -1041,6 +1157,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       ...(w.project.components.some(c => c.kind === 'overload' && w.tripped[c.id] === true) ? ['Motor overload auxiliary 95-96 open (manual test trip)'] : []),
       ...(interlockConflict ? ['Reversing contactors demand simultaneous engagement: mechanical interlock active'] : []),
       ...(opposingDrives ? ['Both direction terminals energized: reversible motor inhibited'] : []),
+      ...Object.entries(nextThreePhase).flatMap(([id,state])=>state.motor.diagnostics.map(msg=>id+': '+msg)),
       ...(!powered && plc ? ['PLC is not powered (wire L+ and M to the 24V supply)'] : []),
       ...unpoweredExtras.map(id => `PLC ${id} is not powered (wire L+ and M to a 24V supply)`)],
     breakpointHit,

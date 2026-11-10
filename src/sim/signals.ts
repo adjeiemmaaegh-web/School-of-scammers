@@ -6,6 +6,9 @@ import type { SortingPlant, ParcelKind } from '../plant/sorting-conveyor';
 import type { TankProcess } from '../plant/tank-process';
 import type { CylinderState } from '../plant/cylinder';
 import type { MeterReading } from '../electrical/panel-meter';
+import type { StarterPanelState, PhaseReading } from '../electrical/three-phase-types';
+import type { SceneRuntime } from '../plant/world/runner';
+import type { NumericPoint } from './p3-numeric';
 
 export type XY = { x: number; y: number };
 export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean };
@@ -51,7 +54,8 @@ export type PlcRuntime = {
   powered: boolean;
   inputs: PlcInputs;
   /** The sampled input image by tag name, for any I/O map (the classic five-tag `inputs` is derived from it). */
-  tagInputs: Record<string, boolean>;
+  tagInputs: Record<string, STValue>;
+  analogInputs: NumericPoint[];
   coils: Record<string, boolean>;
   tagValues: Record<string, STValue>;
   ladderMemory: LadderMemory;
@@ -68,7 +72,7 @@ export type PlcView = {
   /** Component kind: `plc` (fixed 5/6 I/O) or `plc16` (16/16 with nameable tags). */
   kind: string;
   /** Every input and output terminal with the tag bound to it and its live state, whatever the I/O map. */
-  io: { inputs: PlcIoPoint[]; outputs: PlcIoPoint[] };
+  io: { inputs: PlcIoPoint[]; outputs: PlcIoPoint[]; analogInputs?:NumericPoint[] };
   inputs: PlcInputs;
   coils: Record<string, boolean>;
   /** Every output terminal (for example `Q0.0`) -> on. */
@@ -94,6 +98,7 @@ export type ProjectFile = {
   plcIo?: Record<string, { inputs: Record<string, string>; outputs: Record<string, string> }>;
   /** Device settings that differ from the default (a timer relay's delay), by component id then setting key. */
   params?: Record<string, Record<string, number>>;
+  plantFaults?: Record<string,string>;
 };
 export type WorldState = {
   project: ProjectFile;
@@ -117,10 +122,14 @@ export type WorldState = {
   motorAngleRad: number;
   /** Material-handling state of every conveyor lane, by conveyor id (the legacy `plant` mirrors the first). */
   lanes: Record<string, SortingPlant>;
+  /** Deterministic world state and typed measurements owned by the worker. */
+  plantWorld: SceneRuntime;
   /** Process state of every tank, by tank id (the legacy `tank` mirrors the first). */
   vessels: Record<string, TankProcess>;
   /** Trip state of every breaker and overload, by component id (the legacy flags mirror the first of each). */
   tripped: Record<string, boolean>;
+  /** P4 virtual three-phase motor state per separately powered starter. */
+  threePhase: Record<string, StarterPanelState>;
   /** Rod position, limit switches and valve state of every pneumatic cylinder, by component id. */
   cylinders: Record<string, CylinderState>;
   /** Milliseconds each on-delay relay's coil has been energised (capped at its delay), by component id. */
@@ -129,6 +138,8 @@ export type WorldState = {
   plcs: Record<string, PlcRuntime>;
   /** Energised state of every contactor, motor and lamp by component id (the legacy booleans mirror the first). */
   deviceOn: Record<string, boolean>;
+  /** P4 virtual mains sources can be isolated independently of the 24V supplies. */
+  threePhasePower: Record<string, boolean>;
   /** Shaft angle of every motor by component id (the legacy angle mirrors the first). */
   motorAngles: Record<string, number>;
   forwardContactorOn: boolean;
@@ -180,8 +191,12 @@ export type Command =
   | { k: 'addPanel'; template: 'motor-starter'; at?: XY }
   /** `conveyor` names the lane; omitted means the first conveyor (the single-conveyor behaviour). */
   | { k: 'feedParcel'; kind: ParcelKind; conveyor?: string }
+  | { k:'setPlantFault'; id:string; fault:string|null }
+  | { k:'loadPlantScene'; id:string }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
+  /** Toggle only the educational virtual three-phase source while paused. */
+  | { k: 'setThreePhasePower'; id: string; enabled: boolean }
   /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
   /** Rename the tags of a configurable (16/16) PLC. Refused if it would break that PLC's program. Paused only. */
   | { k: 'configureIo'; plc: string; io: { inputs: Record<string, string>; outputs: Record<string, string> } }
@@ -209,6 +224,8 @@ export type RenderSnapshot = {
   plcs: Record<string, PlcView>;
   /** Every conveyor lane (parcel and counters) by conveyor id. */
   lanes: Record<string, SortingPlant>;
+  /** Deterministic world state and typed measurements owned by the worker. */
+  plantWorld: SceneRuntime;
   /** Every tank by tank id. */
   vessels: Record<string, TankProcess>;
   /** Trip state of every breaker and overload by component id. */
@@ -236,6 +253,9 @@ export type RenderSnapshot = {
   overloadTripped: boolean;
   lampOn: boolean;
   meter: MeterReading;
+  threePhase: Record<string, StarterPanelState>;
+  phaseMeters: Record<string, PhaseReading>;
+  threePhaseSources: Record<string, boolean>;
   diagnostics: string[];
   lastError: string | null;
   alarms: AlarmRecord[];
