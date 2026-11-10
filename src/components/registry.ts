@@ -1,8 +1,8 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
 import { EQUIPMENT } from '../plant/equipment';
 import type { EquipmentDef } from '../plant/world/equipment';
-export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper';
-export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' };
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive';
+export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' | 'three-phase' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
 export const isPlcKind = (kind: string): boolean => kind === 'plc' || kind === 'plc16';
@@ -92,6 +92,31 @@ const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
     { name: 'IN', side: 'left', y: 50, role: 'passive' }, { name: 'OUT', side: 'right', y: 50, role: 'passive' }] },
   overload: { kind: 'overload', label: 'Overload NC auxiliary', help: 'Manual instructional trip/reset opens 95-96 in the contactor coil path; no thermal/current curve', terminals: [
     { name: '95', side: 'left', y: 50, role: 'passive' }, { name: '96', side: 'right', y: 50, role: 'passive' }] },
+  'three-phase-supply': { kind: 'three-phase-supply', label: 'Virtual 400V three-phase source',
+    help: 'Separate 400V teaching domain; cannot wire to 24V controls. Original model, no real mains equivalence.',
+    terminals: [
+      { name: 'L1', side: 'right', y: 34, role: 'three-phase' },
+      { name: 'L2', side: 'right', y: 60, role: 'three-phase' },
+      { name: 'L3', side: 'right', y: 86, role: 'three-phase' },
+      { name: 'PE', side: 'right', y: 112, role: 'three-phase' }] },
+  'star-delta-drive': { kind: 'star-delta-drive', label: 'Wired star/delta teaching motor',
+    help: 'Connect matching L1/L2/L3 to a separate virtual three-phase source; wire MAIN+, STAR+, DELTA+ to genuine 24V PLC outputs. Models interlock, speed, current and thermal trip; not rated equipment.',
+    terminals: [
+      { name: 'L1', side: 'left', y: 12, role: 'three-phase' },
+      { name: 'L2', side: 'left', y: 30, role: 'three-phase' },
+      { name: 'L3', side: 'left', y: 48, role: 'three-phase' },
+      { name: 'PE', side: 'left', y: 66, role: 'three-phase' },
+      { name: 'MAIN+', side: 'left', y: 90, role: 'load' },
+      { name: 'STAR+', side: 'left', y: 108, role: 'load' },
+      { name: 'DELTA+', side: 'left', y: 126, role: 'load' },
+      { name: 'RESET+', side: 'left', y: 144, role: 'load' },
+      { name: 'M-', side: 'right', y: 160, role: 'load' },
+      { name: 'L+', side: 'right', y: 16, role: 'supply' },
+      { name: 'M', side: 'right', y: 34, role: 'return' },
+      { name: 'READY_OUT', side: 'right', y: 61, role: 'output' },
+      { name: 'TRIP_OUT', side: 'right', y: 89, role: 'output' },
+      { name: 'STAR_OUT', side: 'right', y: 117, role: 'output' },
+      { name: 'DELTA_OUT', side: 'right', y: 145, role: 'output' }] },
   lamp: { kind: 'lamp', label: '24V pilot lamp', help: 'Illuminates only when its two actual 24V DC terminals are energized', terminals: [
     { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
 };
