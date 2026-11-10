@@ -6,6 +6,7 @@ import type { SortingPlant, ParcelKind } from '../plant/sorting-conveyor';
 import type { TankProcess } from '../plant/tank-process';
 import type { CylinderState } from '../plant/cylinder';
 import type { MeterReading } from '../electrical/panel-meter';
+import type { StarterPanelState, PhaseReading } from '../electrical/three-phase-types';
 import type { SceneRuntime } from '../plant/world/runner';
 import type { AnalogPoint } from './analog';
 
@@ -137,6 +138,8 @@ export type WorldState = {
   deviceOn: Record<string, boolean>;
   /** Shaft angle of every motor by component id (the legacy angle mirrors the first). */
   motorAngles: Record<string, number>;
+  threePhase: Record<string, StarterPanelState>;
+  threePhasePower: Record<string, boolean>;
   forwardContactorOn: boolean;
   reverseContactorOn: boolean;
   motorDirection: 'stopped' | 'forward' | 'reverse';
@@ -190,6 +193,7 @@ export type Command =
   | { k:'loadPlantScene'; id:string }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
+  | { k: 'setThreePhasePower'; id: string; enabled: boolean }
   /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
   /** Rename the tags of a configurable (16/16) PLC. Refused if it would break that PLC's program. Paused only. */
   | { k: 'configureIo'; plc: string; io: { inputs: Record<string, string>; outputs: Record<string, string> } }
@@ -231,6 +235,9 @@ export type RenderSnapshot = {
   deviceOn: Record<string, boolean>;
   /** Shaft angle of every motor by component id. */
   motorAngles: Record<string, number>;
+  threePhase: Record<string, StarterPanelState>;
+  phaseMeters: Record<string, PhaseReading>;
+  threePhaseSources: Record<string, boolean>;
   forwardContactorOn: boolean;
   reverseContactorOn: boolean;
   motorDirection: 'stopped' | 'forward' | 'reverse';
