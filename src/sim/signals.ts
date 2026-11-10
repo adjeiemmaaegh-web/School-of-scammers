@@ -6,6 +6,7 @@ import type { SortingPlant, ParcelKind } from '../plant/sorting-conveyor';
 import type { TankProcess } from '../plant/tank-process';
 import type { CylinderState } from '../plant/cylinder';
 import type { MeterReading } from '../electrical/panel-meter';
+import type { SceneRuntime } from '../plant/world/runner';
 import type { AnalogPoint } from './analog';
 
 export type XY = { x: number; y: number };
@@ -53,7 +54,6 @@ export type PlcRuntime = {
   inputs: PlcInputs;
   /** The sampled input image by tag name, for any I/O map (the classic five-tag `inputs` is derived from it). */
   tagInputs: Record<string, STValue>;
-  /** Typed numeric input readings, sampled from the simulated plant, never from DC voltage. */
   analogInputs: AnalogPoint[];
   coils: Record<string, boolean>;
   tagValues: Record<string, STValue>;
@@ -71,7 +71,7 @@ export type PlcView = {
   /** Component kind: `plc` (fixed 5/6 I/O) or `plc16` (16/16 with nameable tags). */
   kind: string;
   /** Every input and output terminal with the tag bound to it and its live state, whatever the I/O map. */
-  io: { inputs: PlcIoPoint[]; outputs: PlcIoPoint[]; analogInputs?: AnalogPoint[] };
+  io: { inputs: PlcIoPoint[]; outputs: PlcIoPoint[]; analogInputs?:AnalogPoint[] };
   inputs: PlcInputs;
   coils: Record<string, boolean>;
   /** Every output terminal (for example `Q0.0`) -> on. */
@@ -97,6 +97,7 @@ export type ProjectFile = {
   plcIo?: Record<string, { inputs: Record<string, string>; outputs: Record<string, string> }>;
   /** Device settings that differ from the default (a timer relay's delay), by component id then setting key. */
   params?: Record<string, Record<string, number>>;
+  plantFaults?: Record<string,string>;
 };
 export type WorldState = {
   project: ProjectFile;
@@ -120,6 +121,8 @@ export type WorldState = {
   motorAngleRad: number;
   /** Material-handling state of every conveyor lane, by conveyor id (the legacy `plant` mirrors the first). */
   lanes: Record<string, SortingPlant>;
+  /** Deterministic world state and typed measurements owned by the worker. */
+  plantWorld: SceneRuntime;
   /** Process state of every tank, by tank id (the legacy `tank` mirrors the first). */
   vessels: Record<string, TankProcess>;
   /** Trip state of every breaker and overload, by component id (the legacy flags mirror the first of each). */
@@ -183,6 +186,8 @@ export type Command =
   | { k: 'addPanel'; template: 'motor-starter'; at?: XY }
   /** `conveyor` names the lane; omitted means the first conveyor (the single-conveyor behaviour). */
   | { k: 'feedParcel'; kind: ParcelKind; conveyor?: string }
+  | { k:'setPlantFault'; id:string; fault:string|null }
+  | { k:'loadPlantScene'; id:string }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
   /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
@@ -212,6 +217,8 @@ export type RenderSnapshot = {
   plcs: Record<string, PlcView>;
   /** Every conveyor lane (parcel and counters) by conveyor id. */
   lanes: Record<string, SortingPlant>;
+  /** Deterministic world state and typed measurements owned by the worker. */
+  plantWorld: SceneRuntime;
   /** Every tank by tank id. */
   vessels: Record<string, TankProcess>;
   /** Trip state of every breaker and overload by component id. */
