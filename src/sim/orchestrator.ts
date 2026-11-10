@@ -999,9 +999,10 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     ? { ...Object.fromEntries(Object.entries(stResult.outputs).filter(([, value]) => typeof value === 'boolean')),
         Run: stRun === true, Sort: stSort === true, Fill: stFill === true, Drain: stDrain === true,
         Forward: stForward === true, Reverse: stReverse === true }
-    : ladderResult?.outputs ?? {};
+    : fbdResult?.outputs ?? ladderResult?.outputs ?? {};
   const tagValues: Record<string, STValue> = {
-    ...inputs, ...(stResult?.signals ?? {}), ...(ladderResult?.numericValues ?? {}), ...coils,
+    ...inputs, ...(stResult?.signals ?? {}), ...(w.debugForces[plc?.id ?? '']??{}),
+    ...(ladderResult?.numericValues ?? {}), ...coils,
     Run: coils.Run === true, Sort: coils.Sort === true,
     Fill: coils.Fill === true, Drain: coils.Drain === true,
     Forward: coils.Forward === true, Reverse: coils.Reverse === true, Unused: false,
@@ -1025,7 +1026,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       // Physical numeric process inputs come from the preceding settled scan state.
       const tagInputs = { ...digitalInputs, ...numeric.values };
       nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)),
-        tagInputs, extraPowered, dtMs, numeric.points);
+        tagInputs, extraPowered, dtMs, numeric.points, w.debugForces[extra.id] ?? {});
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PLC runtime failed';
       const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
@@ -1192,7 +1193,11 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const edgeHit = w.breakpointTag && tagEdge(w.tagValues[w.breakpointTag.tag],
     tagValues[w.breakpointTag.tag], w.breakpointTag.edge)
     ? `Paused at scan ${nextTick}: ${w.breakpointTag.tag} ${w.breakpointTag.edge} edge` : null;
-  const breakpointHit = scanHit ?? edgeHit;
+  const instructionHit=instructionBreakpointHit(w.breakpointInstruction,
+    w.project.language==='fbd'?fbdReadings(w.fbdSteps):ladderReadings(w.ladderSteps),
+    w.project.language==='fbd'?fbdReadings(fbdResult?.steps??[]):ladderReadings(ladderResult?.steps??[]),
+    nextTick);
+  const breakpointHit = scanHit ?? edgeHit ?? instructionHit;
   if (breakpointHit) events.push({ tick: nextTick, kind: 'breakpoint', detail: breakpointHit });
   // Supervisory alarms report commanded-vs-observed symptoms only; they never name a cause.
   const alarmUpdate = updateAlarms({
@@ -1214,6 +1219,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     ladderMemory: ladderResult?.memory ?? {},
     ladderNumeric: ladderResult?.numericValues ?? {},
     ladderSteps: [...(ladderResult?.steps ?? [])],
+    fbdMemory:fbdResult?.memory??{},fbdSteps:[...(fbdResult?.steps??[])],
     stMemory: stResult?.memory ?? {},
     tagValues, powered, inputs, contactorOn, motorOn, motorAngleRad,
     plcs: nextPlcs, deviceOn, motorAngles, threePhase: nextThreePhase,
