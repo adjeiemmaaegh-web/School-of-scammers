@@ -5,6 +5,8 @@
  * This is an engineering-unit signal, not a modeled 4-20mA/0-10V transducer.
  */
 import { COMPONENTS } from '../components/registry';
+import { PLANT_EQUIPMENT } from '../plant/equipment';
+import type { SceneRuntime } from '../plant/world/runner';
 import type { PlacedComponent, ProjectFile, Wire } from './signals';
 import type { PlcIoMap } from './plc-io';
 
@@ -43,6 +45,7 @@ export function sampleAnalogInputs(
   project: Pick<ProjectFile, 'components' | 'wires'>,
   vessels: Readonly<Record<string, { levelMl: number }>>,
   plcId: string, io: PlcIoMap, powered: boolean, openWireIds: ReadonlySet<string> = new Set(),
+  plant?: SceneRuntime, isPlantSourcePowered: (id: string) => boolean = () => false,
 ): { values: Record<string, number>; points: AnalogPoint[] } {
   const values: Record<string, number> = {};
   const points: AnalogPoint[] = [];
@@ -55,16 +58,26 @@ export function sampleAnalogInputs(
     const id = dot > 0 ? source!.slice(0, dot) : '';
     const part = project.components.find(c => c.id === id);
     const signal = dot > 0 ? source!.slice(dot + 1) : '';
-    const connected = !!source && part?.kind === 'tank' && signal === 'LEVEL';
+    const legacyTank = !!source && part?.kind === 'tank' && signal === 'LEVEL';
+    const model = part && PLANT_EQUIPMENT[part.kind];
+    const channel = model?.signals.find(ch => ch.kind === 'number' && signal === 'AN_' + ch.name);
+    const processSensor = !!source && !!channel && !!plant && isPlantSourcePowered(id);
+    const connected = legacyTank || processSensor;
     let value = 0;
-    if (powered && connected) {
+    if (powered && legacyTank) {
       const reading = vessels[id]?.levelMl ?? 0;
       if (!Number.isFinite(reading) || reading < 0 || reading > 1000)
         throw new RangeError('Invalid tank numeric signal');
       value = reading;
+    } else if (powered && processSensor) {
+      const reading = plant!.signals[id]?.[channel!.name];
+      if (typeof reading !== 'number' || !Number.isFinite(reading) || Math.abs(reading) > 1_000_000_000)
+        throw new RangeError('Invalid physical equipment numeric signal');
+      value = reading;
     }
     values[tag] = value;
-    points.push({ terminal: pin, tag, value, unit: connected ? 'ml' : '', connected, source: connected ? source : null });
+    points.push({ terminal: pin, tag, value, unit: connected ? legacyTank ? 'ml' : channel?.unit ?? '' : '',
+      connected, source: connected ? source : null });
   }
   return { values, points };
 }
