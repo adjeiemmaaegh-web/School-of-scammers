@@ -2,9 +2,12 @@
 import { COMPONENTS, isPlcKind, terminalExists, type ComponentKind } from '../components/registry';
 import { solveNetAware, type Device } from '../engineering/electrical';
 import { executeLadder, type LadderDocument, type LadderResult } from '../engineering/ladder';
+import { compileFbd, executeFbd, type FbdResult } from '../engineering/fbd';
 import { executeStructuredText, type STResult, type STValue } from '../engineering/structured-text';
 import { compileSandboxST, DEFAULT_ST_SOURCE, validateSandboxProgram } from '../program/p2-contract';
 import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from '../program/scan-trace';
+import { fbdReadings, instructionBreakpointHit, ladderReadings, validateInstructionBreakpoint } from '../program/instruction-breakpoint';
+import { applyLocalForce } from '../program/local-force';
 import { feedPlant, freshPlant, stepPlant } from '../plant/sorting-conveyor';
 import { freshTank, stepTank } from '../plant/tank-process';
 import {
@@ -128,10 +131,10 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     // Only a classic first PLC (or no PLC at all) uses the legacy compiled-program field; every other PLC compiles in its runtime.
     stCompiled: project.language === 'st' && (legacyPrimaryId(project) !== undefined || plcComponents(project).length === 0)
       ? compileSandboxST(project.stSource ?? '', namesFor(project, undefined)) : null,
-    stMemory: {},
+    stMemory: {}, fbdMemory: {}, fbdSteps: [], debugForces: {},
     tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
       Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false }, ladderSteps: [],
-    breakpointScan: null, breakpointHit: null, breakpointTag: null, scanTrace: [],
+    breakpointScan: null, breakpointHit: null, breakpointTag: null, breakpointInstruction: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     plcs: Object.fromEntries(runtimePlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id), namesFor(project, c.id))])),
     lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
@@ -198,7 +201,7 @@ export function validateProject(raw: unknown): ProjectFile {
   const names = namesFor({ components, plcIo } as ProjectFile, undefined);
   const programErrors = validateSandboxProgram(p.program, names);
   if (programErrors.length) throw new Error(programErrors.join('; '));
-  if (p.language !== undefined && p.language !== 'ladder' && p.language !== 'st')
+  if (p.language !== undefined && p.language !== 'ladder' && p.language !== 'st' && p.language !== 'fbd')
     throw new Error('Unknown PLC programming language');
   if (p.stSource !== undefined && typeof p.stSource !== 'string')
     throw new Error('Invalid Structured Text source');
@@ -215,6 +218,7 @@ export function validateProject(raw: unknown): ProjectFile {
     formatVersion: 1, components, wires, program: p.program,
     ...(p.language !== undefined ? { language: p.language } : {}),
     ...(p.stSource !== undefined ? { stSource: p.stSource } : {}),
+    ...(p.fbd !== undefined ? { fbd: p.fbd } : {}),
     // Omitted when empty so legacy and fault-free projects keep their exact v1 shape.
     ...(faults.length ? { faults } : {}),
     ...(plcPrograms ? { plcPrograms } : {}),
@@ -272,13 +276,14 @@ function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[
     const names = namesFor({ components, plcIo } as ProjectFile, id);
     const issues = validateSandboxProgram(e.program, names);
     if (issues.length) throw new Error(`PLC ${id}: ${issues.join('; ')}`);
-    if (e.language !== undefined && e.language !== 'ladder' && e.language !== 'st') throw new Error(`PLC ${id}: unknown language`);
+    if (e.language !== undefined && e.language !== 'ladder' && e.language !== 'st' && e.language !== 'fbd') throw new Error(`PLC ${id}: unknown language`);
     if (e.stSource !== undefined && typeof e.stSource !== 'string') throw new Error(`PLC ${id}: invalid Structured Text source`);
     if (e.language === 'st' && !e.stSource) throw new Error(`PLC ${id}: ST mode requires a source`);
     if (e.stSource) compileSandboxST(e.stSource, names);
     out[id] = { program: e.program,
       ...(e.language !== undefined ? { language: e.language } : {}),
-      ...(e.stSource !== undefined ? { stSource: e.stSource } : {}) };
+      ...(e.stSource !== undefined ? { stSource: e.stSource } : {}),
+      ...(e.fbd !== undefined ? { fbd: e.fbd } : {}) };
   }
   return Object.keys(out).length ? out : undefined;
 }
