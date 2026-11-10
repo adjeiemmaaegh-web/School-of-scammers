@@ -143,8 +143,14 @@ export function scanPlc(
     fbdMemory: {}, fbdSteps: [], stMemory: prior.stMemory };
   if (cfg.language === 'fbd') {
     const program = compileFbd(cfg.fbd, names);
-    for(const point of analogInputs)if(!point.connected && cfg.fbd.nodes.some(node => node.kind==='input' && node.tag?.toLowerCase()===point.tag.toLowerCase()))
-      throw new Error('Numeric input ' + point.tag + ' has no connected source');
+    // FBD numerical consumers are COMPARE nodes (BOOL input blocks are separate).
+    // A disconnected sensor samples zero on the electrical-neutral numeric bus;
+    // zero must never silently satisfy an LT/LE comparator and energize a load.
+    for (const node of cfg.fbd.nodes) {
+      if (node.kind !== 'compare' || !node.tag) continue;
+      if (!analogInputs.some(point => point.tag.toLowerCase() === node.tag!.toLowerCase() && point.connected))
+        throw new Error('Numeric input ' + node.tag + ' has no connected source');
+    }
     const result = executeFbd(program, tagInputs, prior.coils, prior.fbdMemory, dtMs);
     const coils = result.outputs;
     return { ...prior, powered, inputs, tagInputs, analogInputs, coils,
