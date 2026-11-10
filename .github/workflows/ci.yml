@@ -46,6 +46,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-browser-acceptance.cjs
       - name: P2 typed numeric PLC - INT, ADD and comparator 3D motor browser E2E
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-numeric-browser.cjs
+      - name: P3 integrated worker - genuine PLC to box feeder, photoeye and lamp browser E2E
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-plant-browser.cjs
       - name: P3 3D sorting - powered conveyor, photoeye, diverter and wrong PLC logic
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-sorting-browser.cjs
       - name: P3 3D tank - wired pump, high-level switch and drain valve browser E2E
