@@ -344,12 +344,19 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     if (selectedTerminal?.startsWith(`${id}.`)) setSelectedTerminal(null);
     send([{ k: 'remove', id }]);
   };
-  const undo = () => {
-    const previous = undoStack[undoStack.length - 1];
-    if (!previous) return;
-    setUndoStack(stack => stack.slice(0, -1));
-    setSelectedDeviceId(null); setSelectedTerminal(null); setMoveTarget(null);
-    send([{ k: 'loadProject', project: previous }]);
+  const undo=()=>{
+    if(!projectRef.current||snapshot?.running)return;
+    const result=undoHistory(historyRef.current,projectRef.current);if(!result)return;
+    historyRef.current=result.history;setHistory(result.history);
+    setSelectedDeviceIds([]);setSelectedTerminal(null);setMoveTarget(null);
+    send([{k:'loadProject',project:result.project}],'ignore');
+  };
+  const redo=()=>{
+    if(!projectRef.current||snapshot?.running)return;
+    const result=redoHistory(historyRef.current,projectRef.current);if(!result)return;
+    historyRef.current=result.history;setHistory(result.history);
+    setSelectedDeviceIds([]);setSelectedTerminal(null);setMoveTarget(null);
+    send([{k:'loadProject',project:result.project}],'ignore');
   };
   // The toolbar is sticky: keep it just below the sticky app header, whatever height the header has.
   useEffect(() => {
@@ -442,7 +449,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <span>Projects stay in this browser unless exported.</span>
         </div></details>
         <details><summary>Edit</summary><div className="p5-menu-content">
-          <button type="button" disabled={!editable||!undoStack.length} onClick={undo}>Undo last destructive edit</button>
+          <button type="button" disabled={!editable||!history.undo.length} onClick={undo}>Undo last destructive edit</button>
           <button type="button" disabled={!editable||!selectedDeviceId}
             onClick={()=>selectedDeviceId&&removeDevice(selectedDeviceId)}>Remove selected device</button>
           <button type="button" onClick={()=>{setSelectedTerminal(null);setMoveTarget(null);}}>Cancel tool/terminal</button>
@@ -509,7 +516,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         </details>
         </>}
         <button className="btn ghost small" data-undo onClick={undo}
-          disabled={!editable || !undoStack.length}>Undo</button>
+          disabled={!editable || !history.undo.length}>Undo</button>
         <button className="btn ghost small" onClick={exportProject}>Export JSON</button>
         {!scenario && <button className="btn ghost small" onClick={() => fileInput.current?.click()}>Import JSON</button>}
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importProject} />
@@ -600,7 +607,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             {project && snapshot && <Sandbox3D
               project={project} snapshot={snapshot} editable={editable}
               selectedTerminal={selectedTerminal} moveTarget={moveTarget}
-              selectedDeviceId={selectedDeviceId} onSelectDevice={selectDevice}
+              selectedDeviceId={selectedDeviceId} selectedDeviceIds={selectedDeviceIds} onSelectDevice={selectDevice}
               onTerminal={connect}
               onOperate={id => send([{ k: 'operateToggle', id }])}
               onPlace={(kind, at) => place(kind, at.x, at.y)}
