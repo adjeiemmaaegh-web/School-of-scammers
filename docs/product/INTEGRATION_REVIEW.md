@@ -21,12 +21,24 @@
 | #29 typed numeric 0–1000 ml tank → PLC16 AI0/AI1, ST and 24V pump | Not in main at audit | Source written/tested on stacked branch | **Integrated** (base) | Browser numeric physical wiring and worker state on #41 |
 | #30 P1 multi-select/group/duplicate/snap/history | Existing basic single selection, move, undo | Source written, open/draft | **Not integrated** | Overlaps `SandboxPage`, `Sandbox3D`, `signals`, `orchestrator`, worker; reconcile intent/history with actual snapshots |
 | #31 P2 FBD, richer Ladder/ST/tag table and debugging | Working bounded LD/ST | Source written, open/draft | **Not integrated** | Reconcile PLC language union, runtime state, IR/trace and per-PLC program storage |
-| #32 P3 25 equipment types, five 10ms world substeps, 10 scenes | Simplified conveyors/tanks and one-off workcells | Source written, open/draft | **Not integrated** | Reconcile numeric bridge & 24V command image in `orchestrator`, `signals`, `plcs`, `plc-io`, `registry`; preserve per-device body IDs and geometry |
+| #32 P3 25 equipment types, five 10ms world substeps, 10 scenes | Simplified conveyors/tanks and one-off workcells | Source written, open/draft | **Deterministic world/equipment/scene core and pure tests imported; worker/UI bridge NOT integrated** | Reconcile numeric bridge & 24V command image in `orchestrator`, `signals`, `plcs`, `plc-io`, `registry`; preserve per-device body IDs and geometry |
 | #33 P4 three-phase star/delta, faults and instruments | Simplified protected **24V** starter / reversing | Source written, open/draft | **Not integrated** | Reconcile distinct 400V/24V types and constraints with #29 and #32; do not overwrite 24V fault model |
 | #34 P5 organized simulator workbench | Earlier Build/Wire/Program/Test UI | Source written, independently CI-verified, open/draft | **Reconciled into #29 base** | Run exact combined branch browser, accessibility, performance and no-WebGL |
 | End-to-end 3 conveyor + turntable authored workcell | Not available at main's equipment breadth | Parts present within independent #32 source | **Missing on combined branch** | Must wait for #32 runtime integration and proper PLC-to-plant wiring; do not substitute scripted motion |
 
 **Distinguish statuses:** “Source written on an unmerged PR” does not mean merged or independently accepted on the combined branch. Main's bounded LD/ST, 24V wiring, small sorting/tank plant, scenarios and troubleshooting are actual existing implemented capabilities, not full IEC or factory-scale mechanics.
+
+## Staged P3 source import (not yet a released integrated plant)
+
+Imported from PR #32 without replacing any existing worker contracts:
+
+- `src/plant/world/` — eight deterministic world types, bodies, events, physics, maths, seed, runner and equipment contract modules.
+- `src/plant/equipment/` — nine original machine-model modules, including roller and belt conveyors, turntable, geometric sensors, feeder, actuator, process, positioning, storage and robot families.
+- `src/plant/scenes/catalogue.ts` — ten educational scene arrangements and learning notes, currently **not exposed in the production sandbox**.
+- `tests/p3-world-physics.test.ts` and `tests/p3-equipment-contract.test.ts` — original pure equipment/physics regressions.
+- `tests/integration-turntable-physics.test.ts` — new physically stepped, deterministic 3-roller/turntable/two-sensor unit scenario proving command isolation and actual 90° body orientation under the deterministic model. **Its commands are test fixtures, not verified PLC-generated outputs; it does not fulfill the full authored workcell acceptance.**
+
+The P3 imports are reusable source while `src/sim/p3-plant-bridge.ts`, `src/sim/p3-numeric.ts`, `src/sim/p3-scene-import.ts`, `PlantWorld3D`, the plant UI panel and their shared runtime wiring are **intentionally deferred** to conflict-by-conflict merging with the #29 analog bus. Do not add the equipment kinds to `COMPONENTS` until that real integration is tested. No Phantom PLC tags, sensor states or animation are added to the current app by this import alone.
 
 ## Important shared-file conflict register
 
