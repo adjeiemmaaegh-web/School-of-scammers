@@ -31,9 +31,9 @@ export function WorkspaceAuthoringBar(props: Props) {
     <button type="button" className="btn ghost small" data-duplicate disabled={!selected}
       onClick={props.onDuplicate} title="Duplicate selection and internal wires (Ctrl+D)">Duplicate</button>
     <button type="button" className="btn ghost small" disabled={!selected}
-      onClick={() => props.onRotate(-1)} title="Rotate selection left by 90° (electrical equipment only)">↶ 90°</button>
+      onClick={() => props.onRotate(-1)} title="Rotate supported equipment left by 90° (orientation-locked machines stay fixed)">↶ 90°</button>
     <button type="button" className="btn ghost small" disabled={!selected}
-      onClick={() => props.onRotate(1)} title="Rotate selection right by 90° (electrical equipment only)">↷ 90°</button>
+      onClick={() => props.onRotate(1)} title="Rotate supported equipment right by 90° (orientation-locked machines stay fixed)">↷ 90°</button>
     <button type="button" className="btn ghost small" data-delete-selection disabled={!selected}
       onClick={props.onRemove} title="Delete selected devices, dependent wires and faults">Delete</button>
     <label className="workspace-grid-label">Snap
