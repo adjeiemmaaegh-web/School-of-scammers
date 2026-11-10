@@ -573,6 +573,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         try {
           if (cfg.language === 'st') compileSandboxST(cfg.stSource, names);
           else if(cfg.language==='fbd')compileFbd(cfg.fbd,names);
+          else if(cfg.language==='fbd')compileFbd(cfg.fbd,names);
           else { const issues = validateSandboxProgram(cfg.program, names); if (issues.length) problem = issues.join('; '); }
         } catch (error) { problem = error instanceof Error ? error.message : 'Program no longer compiles'; }
         if (problem) world = setError(world, `Renaming would break the program on ${plc.id}: ${problem}`);
@@ -808,9 +809,11 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
         : rt?.analogInputs ?? [];
       return [c.id, c.id === legacyPrimaryId(world.project)
         ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
-          { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory })
+          { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory,
+            fbdSteps: world.fbdSteps }, [], world.debugForces[c.id] ?? {})
         : plcView(c.kind, lang, rt?.powered ?? false, io, rt?.tagInputs ?? idle, rt?.coils ?? {},
-          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {} }, analogPoints)];
+          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {},
+            fbdSteps: rt?.fbdSteps ?? [] }, analogPoints, world.debugForces[c.id] ?? {})];
     })),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
     plantWorld: {
@@ -852,9 +855,10 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     alarms: world.alarms.map(a => ({ ...a })),
     language: world.project.language ?? 'ladder',
     tagValues: { ...world.tagValues }, ladderSteps: [...world.ladderSteps],
-    ladderMemory: { ...world.ladderMemory },
+    ladderMemory: { ...world.ladderMemory }, fbdSteps: world.fbdSteps.map(step=>({...step})),
+    debugForces: { ...(world.debugForces[primaryPlcId(world.project) ?? '']??{}) },
     breakpointScan: world.breakpointScan, breakpointHit: world.breakpointHit,
-    breakpointTag: world.breakpointTag, scanTrace: world.scanTrace.map(entry => ({
+    breakpointTag: world.breakpointTag, breakpointInstruction: world.breakpointInstruction, scanTrace: world.scanTrace.map(entry => ({
       ...entry, networks: entry.networks.map(network => ({ ...network })),
     })) };
 }
@@ -920,15 +924,20 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // 4. Execute the learner's exact document in the salvaged bounded LD or ST engine.
   let ladderResult: LadderResult | null = null;
   let stResult: STResult | null = null;
+  let fbdResult: FbdResult | null = null;
   try {
     // Only a classic first PLC runs through this original fixed-name path; every other PLC takes the generic path below.
     if (powered && plc?.kind === 'plc') {
-      if (w.project.language === 'st') {
+      if(w.project.language==='fbd') {
+        fbdResult=executeFbd(compileFbd(programOf(w.project,plc.id).fbd,namesFor(w.project,plc.id)),
+          inputs,w.coils,w.fbdMemory,dtMs);
+      } else if (w.project.language === 'st') {
         const compiled = w.stCompiled ?? compileSandboxST(w.project.stSource ?? '');
         stResult = executeStructuredText(compiled, inputs, w.stMemory);
         const run = Object.entries(stResult.outputs).find(([key]) => key.toLowerCase() === 'run')?.[1];
         if (typeof run !== 'boolean') throw new TypeError('ST Run output must be BOOL');
-      } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs, w.ladderNumeric);
+      } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs, w.ladderNumeric,
+        w.debugForces[plc.id] ?? {});
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'PLC runtime failed';
