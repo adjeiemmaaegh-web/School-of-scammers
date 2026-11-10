@@ -19,6 +19,20 @@ export const CATEGORY_BY_KIND: Record<ComponentKind, WorkspaceCategory> = {
   conveyor: 'Conveyance',
   tank: 'Process', pump: 'Process', drainvalve: 'Process',
   lamp: 'Indicators', stacklight: 'Indicators',
+  'three-phase-supply': 'Power & protection',
+  'star-delta-drive': 'Motors & actuators',
+  'belt-conveyor': 'Conveyance', 'roller-conveyor': 'Conveyance',
+  turntable: 'Conveyance', stopper: 'Conveyance', pusher: 'Motors & actuators',
+  'diverter-gate': 'Conveyance', 'box-feeder': 'Conveyance',
+  'geometry-photoeye': 'Sensors', 'inductive-prox': 'Sensors',
+  'capacitive-prox': 'Sensors', 'light-curtain': 'Sensors',
+  'weigh-cell': 'Sensors',
+  lift: 'Motors & actuators', 'scissor-lift': 'Motors & actuators',
+  'rotary-actuator': 'Motors & actuators', 'pick-and-place': 'Motors & actuators',
+  palletizer: 'Motors & actuators', shelf: 'Conveyance', 'asrs-crane': 'Conveyance',
+  'robot-arm': 'Motors & actuators', 'process-tank': 'Process',
+  mixer: 'Process', heater: 'Process', 'proportional-valve': 'Process',
+  filler: 'Process', capper: 'Process',
 };
 export function searchEquipment(query: string, category: WorkspaceCategory | 'All' = 'All'): ComponentKind[] {
   const tokens = query.trim().toLocaleLowerCase('en').split(/\s+/u).filter(Boolean);
