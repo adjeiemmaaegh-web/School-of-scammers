@@ -27,7 +27,7 @@ export function plantNumericWireError(from:string,to:string,parts:readonly Place
  if(!a&&!b)return null;
  if(!((a==='analog-output'&&b==='analog-input')||
       (b==='analog-output'&&a==='analog-input')))
-  return '24V and numeric wires cannot mix; connect a numeric process-output to an analog-input';
+  return 'Numeric signals: 24V and numeric wires cannot mix; connect a numeric process-output to an analog-input';
  const input=a==='analog-input'?from:to;
  const source=a==='analog-output'?from:to;
  const dot=input.indexOf('.');
@@ -41,7 +41,7 @@ export function plantNumericWireError(from:string,to:string,parts:readonly Place
        'AN_'+ch.name===source.slice(source.indexOf('.')+1))))
   return 'Numeric source is not a typed process measurement';
  if(wires.some(w=>w.from===input||w.to===input))
-  return 'Only one numeric source is allowed per PLC input';
+  return 'Only one numeric source (one signal source) is allowed per PLC input';
  return null;
 }
 export function sampleNumericInputs(project:Pick<ProjectFile,'components'|'wires'>,
