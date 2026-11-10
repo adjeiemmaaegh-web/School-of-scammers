@@ -674,6 +674,31 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (cmd.breakpoint !== null && !validateTagBreakpoint(cmd.breakpoint, tags))
         world = setError(world, 'Tag breakpoint requires a known Boolean PLC tag and valid edge');
       else world = { ...world, breakpointTag: cmd.breakpoint, breakpointHit: null };
+    } else if (cmd.k === 'breakOnInstruction') {
+      const cfg = programOf(world.project, undefined);
+      const ids = cfg.language === 'fbd' ? cfg.fbd.nodes.map(node => node.id) :
+        cfg.language === 'ladder' ? cfg.program.rungs.map(rung => rung.id) : [];
+      if (cmd.breakpoint !== null && !validateInstructionBreakpoint(cmd.breakpoint, ids))
+        world = setError(world, 'Instruction breakpoint requires an existing FBD block or Ladder rung, and a bounded edge/threshold');
+      else world = { ...world, breakpointInstruction: cmd.breakpoint, breakpointHit: null };
+    } else if (cmd.k === 'forceLocal') {
+      const selectedPlc = cmd.plc ?? primaryPlcId(world.project);
+      const plc = selectedPlc ? plcComponents(world.project).find(c=>c.id===selectedPlc) : undefined;
+      if(world.running) world = setError(world,'Pause simulation before setting a local debug force');
+      else if(!plc) world = setError(world,'Select a real PLC before forcing local memory');
+      else if(programOf(world.project,plc.id).language!=='ladder')
+        world = setError(world,'Local debug forcing is supported only for Ladder memory tags');
+      else {
+        try {
+          const prior = world.debugForces[plc.id] ?? {};
+          const updated = applyLocalForce(prior,programOf(world.project,plc.id).program,cmd.tag,cmd.value);
+          const all = {...world.debugForces};
+          if(Object.keys(updated).length)all[plc.id]=updated;else delete all[plc.id];
+          world = {...world,debugForces:all};
+          commandEvents.push({tick:world.tick,kind:'debug',
+            detail:'Local memory force '+plc.id+'.'+cmd.tag+(cmd.value===null?' removed':' active')});
+        } catch (error) {world=setError(world,error instanceof Error?error.message:'Invalid local force');}
+      }
     } else if (cmd.k === 'loadProject') {
       try { world = createWorld(validateProject(cmd.project)); } catch (e) { world = setError(world, e instanceof Error ? e.message : 'Invalid project'); }
     }
