@@ -25,6 +25,10 @@ export function ProgrammingDock({ project, snapshot, disabled, onLadder, onST, o
 }) {
   const language = project.language ?? 'ladder';
   const configurable = io?.kind === 'plc16';
+  // Runtime PLC16 snapshots publish typed analog readings; FBD and tag-table
+  // editors consume the same inputs under the numericInputs programming contract.
+  const mappedIo = io && { ...io,
+    numericInputs: io.numericInputs ?? io.analogInputs?.map(point => ({ tag: point.tag })) };
   return <div className="sandbox-programming-dock">
     <div className="sandbox-language-tabs" role="group" aria-label="PLC programming language">
       <button type="button" disabled={disabled} aria-pressed={language === 'ladder'}
@@ -39,9 +43,9 @@ export function ProgrammingDock({ project, snapshot, disabled, onLadder, onST, o
       ? <StructuredTextEditor source={project.stSource ?? DEFAULT_ST_SOURCE} snapshot={snapshot}
         disabled={disabled} onActivate={onST} showSamples={showExamples && !configurable} io={configurable ? io : undefined} />
       : language === 'fbd' ? <FbdEditor document={project.fbd ?? fbdMotorStarter()} snapshot={snapshot}
-        disabled={disabled} onActivate={onFBD} showExamples={showExamples} io={io} />
+        disabled={disabled} onActivate={onFBD} showExamples={showExamples} io={mappedIo} />
       : <LadderEditor document={project.program} snapshot={snapshot} disabled={disabled} onChange={onLadder} showExamples={showExamples && !configurable} io={configurable ? io : undefined} />}
-    <PlcTagTable project={project} snapshot={snapshot} disabled={disabled} io={io} onLadder={onLadder} />
+    <PlcTagTable project={project} snapshot={snapshot} disabled={disabled} io={mappedIo} onLadder={onLadder} />
     {language==='ladder'&&onLocalForce&&<LocalForcePanel document={project.program} disabled={disabled}
       active={snapshot.debugForces} liveValues={snapshot.tagValues} onForce={onLocalForce}/>}
   </div>;
