@@ -35,9 +35,10 @@ export function plantNumericWireError(from:string,to:string,parts:readonly Place
  if(owner?.kind!=='plc16'||!['AI0','AI1'].includes(input.slice(dot+1)))
   return 'Numeric process sources currently connect only to PLC16 AI0/AI1';
  const sourceOwner=parts.find(c=>c.id===source.slice(0,source.indexOf('.')));
- if(!sourceOwner||!PLANT_EQUIPMENT[sourceOwner.kind]||
-    !PLANT_EQUIPMENT[sourceOwner.kind].signals.some(ch=>ch.kind==='number'&&
-      'AN_'+ch.name===source.slice(source.indexOf('.')+1)))
+ if(!sourceOwner||!(sourceOwner.kind==='tank'&&source.slice(source.indexOf('.')+1)==='LEVEL')&&
+    (!PLANT_EQUIPMENT[sourceOwner.kind]||
+     !PLANT_EQUIPMENT[sourceOwner.kind].signals.some(ch=>ch.kind==='number'&&
+       'AN_'+ch.name===source.slice(source.indexOf('.')+1))))
   return 'Numeric source is not a typed process measurement';
  if(wires.some(w=>w.from===input||w.to===input))
   return 'Only one numeric source is allowed per PLC input';
@@ -45,7 +46,8 @@ export function plantNumericWireError(from:string,to:string,parts:readonly Place
 }
 export function sampleNumericInputs(project:Pick<ProjectFile,'components'|'wires'>,
  scene:SceneRuntime,plcId:string,io:PlcIoMap,powered:boolean,
- openWireIds:ReadonlySet<string>=new Set(),isSourcePowered:(id:string)=>boolean=()=>true):
+ openWireIds:ReadonlySet<string>=new Set(),isSourcePowered:(id:string)=>boolean=()=>true,
+ vessels:Readonly<Record<string,{levelMl:number}>>={}):
  {values:Record<string,number>;points:NumericPoint[]}{
  const values:Record<string,number>={};
  const points:NumericPoint[]=[];
@@ -59,16 +61,18 @@ export function sampleNumericInputs(project:Pick<ProjectFile,'components'|'wires
   const def=part&&PLANT_EQUIPMENT[part.kind];
   const signal=source?.slice(source.indexOf('.')+1).replace(/^AN_/,'')??'';
   const channel=def?.signals.find(ch=>ch.kind==='number'&&ch.name===signal);
-  const connected=!!source&&!!channel&&isSourcePowered(id);
+  const tankSource=part?.kind==='tank'&&source===id+'.LEVEL';
+  const connected=!!source&&(tankSource||!!channel&&isSourcePowered(id));
   let value=0;
   if(powered&&connected){
-   const actual=scene.signals[id]?.[signal];
+   const actual=tankSource?vessels[id]?.levelMl:scene.signals[id]?.[signal];
    if(typeof actual!=='number'||!Number.isFinite(actual)||Math.abs(actual)>1_000_000_000)
     throw new RangeError('Process numeric sensor has an invalid engineering-unit reading');
+   if(tankSource&&(actual<0||actual>1000))throw new RangeError('Invalid tank numeric signal');
    value=actual;
   }
   values[tag]=value;
-  points.push({terminal:pin,tag,value,unit:connected?channel?.unit??'':'',
+  points.push({terminal:pin,tag,value,unit:connected?(tankSource?'ml':channel?.unit??''):'',
     connected,source:connected?source:null});
  }
  return {values,points};
