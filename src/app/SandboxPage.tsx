@@ -379,16 +379,39 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     window.addEventListener('resize', apply);
     return () => { observer?.disconnect(); window.removeEventListener('resize', apply); document.documentElement.style.removeProperty('--app-header-h'); };
   }, []);
-  // Delete removes the selected device (when paused), like a bench tool; never while typing in a field.
-  useEffect(() => {
-    const onKey = (ev: KeyboardEvent) => {
-      if (ev.key !== 'Delete' || !selectedDeviceId || snapshot?.running) return;
-      const el = ev.target as HTMLElement | null;
-      if (el && /^(input|textarea|select)$/i.test(el.tagName)) return;
-      removeDevice(selectedDeviceId);
+  // Editing shortcuts must respect ST/LD/FBD text fields and scored scenarios.
+  useEffect(()=>{
+    const onKey=(event:KeyboardEvent)=>{
+      const target=event.target as HTMLElement|null;
+      const shortcut=workspaceShortcut({key:event.key,ctrlKey:event.ctrlKey,
+        metaKey:event.metaKey,shiftKey:event.shiftKey,altKey:event.altKey,
+        targetTag:target?.tagName,isContentEditable:target?.isContentEditable});
+      if(!shortcut)return;
+      if(shortcut==='clear-selection'){
+        if(selectedDeviceIds.length){event.preventDefault();setSelectedDeviceIds([]);}
+        return;
+      }
+      if(snapshot?.running||scenario)return;
+      if(shortcut==='undo'&&historyRef.current.undo.length){event.preventDefault();undo();return;}
+      if(shortcut==='redo'&&historyRef.current.redo.length){event.preventDefault();redo();return;}
+      if(shortcut==='select-all'&&project?.components.length){
+        event.preventDefault();setSelectedDeviceIds(selectAll(project.components));return;
+      }
+      if(shortcut==='copy'&&selectedDeviceIds.length){event.preventDefault();copySelection();return;}
+      if(shortcut==='paste'&&clipboard){event.preventDefault();pasteSelection();return;}
+      if(!selectedDeviceIds.length)return;
+      if(shortcut==='duplicate'){event.preventDefault();duplicateSelection();return;}
+      if(shortcut==='delete'){event.preventDefault();deleteSelection();return;}
+      if(shortcut==='rotate-left'){event.preventDefault();rotateSelection(-1);return;}
+      if(shortcut==='rotate-right'){event.preventDefault();rotateSelection(1);return;}
+      const directions:Record<string,[number,number]>={
+        'nudge-left':[-grid,0],'nudge-right':[grid,0],
+        'nudge-up':[0,-grid],'nudge-down':[0,grid]};
+      const delta=directions[shortcut];
+      if(delta){event.preventDefault();moveSelection(delta[0],delta[1]);}
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown',onKey);
+    return ()=>window.removeEventListener('keydown',onKey);
   });
   const selectDevice=(id:string|null,additive=false)=>{
     setSelectedDeviceIds(curr=>id?(additive?toggleOne(curr,id):selectOne(id)):emptySelection());
