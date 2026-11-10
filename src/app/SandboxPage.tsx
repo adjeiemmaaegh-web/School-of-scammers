@@ -573,6 +573,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           {snapshot?.running ? 'Pause' : '▶ Run'}</button>
         <span className="sandbox-scan" aria-live="off">Scan {snapshot?.tick ?? 0}</span>
       </div>
+      {!scenario && <div className="workspace-editing-strip" aria-label="Workspace tools">
+        <WorkspaceAuthoringBar editable={editable} selectedCount={selectedDeviceIds.length}
+          canUndo={history.undo.length>0} canRedo={history.redo.length>0} canPaste={!!clipboard}
+          grid={grid} onGrid={setGrid} onUndo={undo} onRedo={redo} onCopy={copySelection}
+          onPaste={pasteSelection} onDuplicate={duplicateSelection} onRemove={deleteSelection}
+          onRotate={rotateSelection} onNudge={moveSelection}/>
+      </div>}
       <div className="p5-view-tools" role="toolbar" aria-label="Canvas views and active tools">
         <div className="p5-view-tabs" role="group" aria-label="Project view">
           <button type="button" data-p5-view="logical" aria-pressed={workspaceView==='logical'}
@@ -660,6 +667,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               onMove={move} onMoveFinished={() => setMoveTarget(null)}
             />}
           </Suspense>
+          {!scenario && <WorkspaceSelectionPanel components={project?.components??[]} selected={selectedDeviceIds}
+            onToggle={id=>selectDevice(id,true)}
+            onSelectAll={()=>setSelectedDeviceIds(selectAll(project?.components??[]))}
+            onClear={()=>setSelectedDeviceIds([])}/>}
           {!project?.components.length && <div className="sandbox-3d-empty">
             <strong>Start with an empty 3D factory workbench.</strong>
             <span>Place and wire your own devices or load the starter equipment (without pre-wiring).</span>
