@@ -15,6 +15,12 @@ import type { Parcel } from '../plant/sorting-conveyor';
 import { supportsWebGL } from '../components/SceneShell';
 import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-coordinates';
 import { perDeviceLive } from '../sim/device-state';
+/** Read keyboard modifiers carried by fiber's native pointer event. */
+const additiveSelection=(value:unknown):boolean=>{
+  const e=value as {ctrlKey?:boolean;metaKey?:boolean;
+    nativeEvent?:{ctrlKey?:boolean;metaKey?:boolean}};
+  return !!(e.ctrlKey||e.metaKey||e.nativeEvent?.ctrlKey||e.nativeEvent?.metaKey);
+};
 import { PlantWorld3D } from './PlantWorld3D';
 
 const COLORS = {
@@ -349,6 +355,7 @@ function Workbench({ project, snapshot, editable, selectedDeviceIds, selectedTer
       live={snapshot.voltages[w.from] === 24 && snapshot.voltages[w.to] === 24} />)}
     <PlantWorld3D project={project} scene={snapshot.plantWorld}/>
     {project.components.map(c => <Device3D key={c.id} c={c} editable={editable}
+      selected={selectedDeviceIds.includes(c.id)}
       motorAngleRad={c.kind === 'revmotor' ? snapshot.reverseMotorAngleRad : snapshot.motorAngles[c.id] ?? snapshot.motorAngleRad}
       direction={c.kind === 'revmotor' ? snapshot.motorDirection : undefined}
       parcel={c.kind === 'conveyor' ? snapshot.lanes[c.id]?.parcel ?? null : null} tankLevelMl={c.kind === 'tank' ? snapshot.vessels[c.id]?.levelMl ?? 0 : 0}
