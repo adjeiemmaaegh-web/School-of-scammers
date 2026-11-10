@@ -310,7 +310,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const activePlcView = activePlcId ? snapshot?.plcs[activePlcId] : undefined;
   const dockProject = project && activePlcId ? { ...project, ...programOf(project, activePlcId) } : project;
   const dockSnapshot = snapshot && activePlcView ? { ...snapshot, language: activePlcView.language,
-    tagValues: activePlcView.tagValues, ladderSteps: activePlcView.ladderSteps, ladderMemory: activePlcView.ladderMemory } : snapshot;
+    tagValues: activePlcView.tagValues, ladderSteps: activePlcView.ladderSteps, ladderMemory: activePlcView.ladderMemory,
+    fbdSteps:activePlcView.fbdSteps,debugForces:activePlcView.debugForces } : snapshot;
   const activeIo: Record<string, boolean> = { ...(snapshot?.io ?? {}), ...(activePlcView ? {
     ...activePlcView.inputs, ...activePlcView.coils, ...activePlcView.outputs, PlcPowered: activePlcView.powered } : {}) };
   const selectedDevice = project?.components.find(c => c.id === selectedDeviceId) ?? null;
@@ -844,8 +845,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             diagnostics: [], lastError: null, alarms: [], language: 'ladder',
             tagValues: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
               Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
-            ladderSteps: [], ladderMemory: {}, breakpointScan: null, breakpointHit: null,
-            breakpointTag: null, scanTrace: [] }}
+            ladderSteps: [], ladderMemory: {}, fbdSteps:[], debugForces:{}, breakpointScan: null, breakpointHit: null,
+            breakpointTag: null, breakpointInstruction:null, scanTrace: [] }}
           selectedDevice={selectedDevice} selectedTerminal={selectedTerminal} editable={editable}
           onTerminal={connect} onCancelWire={() => setSelectedTerminal(null)}
           onMove={id => setMoveTarget(id)}
@@ -892,11 +893,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               analogInputs: activePlcView.io.analogInputs } : undefined}
             onLadder={program => send([{ k: 'loadProgram', program, ...(activePlcId ? { plc: activePlcId } : {}) }])}
             onST={source => send([{ k: 'loadST', source, ...(activePlcId ? { plc: activePlcId } : {}) }])}
+            onFBD={document=>send([{k:'loadFBD',document,...(activePlcId?{plc:activePlcId}:{})}])}
+            onLocalForce={(tag,value)=>send([{k:'forceLocal',tag,value,...(activePlcId?{plc:activePlcId}:{})}])}
             onLanguage={language => send([{ k: 'activateLanguage', language, ...(activePlcId ? { plc: activePlcId } : {}) }])} />}
           {activePlcId && activePlcView?.kind === 'plc16' && <IoMappingPanel plcId={activePlcId} view={activePlcView} editable={editable} send={send} />}
         </div>
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
-          {snapshot && <LiveMonitor snapshot={snapshot}
+          {snapshot && <LiveMonitor snapshot={snapshot} project={project}
+             onInstructionBreakpoint={breakpoint=>send([{k:'breakOnInstruction',breakpoint}])}
             onBreakpoint={scan => send([{ k: 'breakAtScan', scan }])}
             onTagBreakpoint={breakpoint => send([{ k: 'breakOnTag', breakpoint }])} />}
           <span className="eyebrow">Diagnostics</span><h2>Electrical &amp; event trace</h2>
