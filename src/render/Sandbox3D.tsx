@@ -256,7 +256,7 @@ function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, ro
       <boxGeometry args={[1.5, 0.08, 1.2]} />
       <meshStandardMaterial color={selected || moveTarget === c.id ? COLORS.highlight : COLORS.panel} />
     </mesh>
-    <group onClick={e => { e.stopPropagation(); onSelect(c.id); }}>
+    <group onClick={e => { e.stopPropagation(); onSelect(c.id, additiveSelection(e)); }}>
       <DeviceSculpture kind={c.kind} active={active} pressed={c.pressed} motorAngleRad={motorAngleRad}
         parcel={c.kind === 'conveyor' ? parcel : null}
         tankLevelMl={c.kind === 'tank' ? tankLevelMl : undefined}
