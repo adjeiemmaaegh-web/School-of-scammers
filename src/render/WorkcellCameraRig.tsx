@@ -24,11 +24,12 @@ const KEY_FIELD:Readonly<Record<string,keyof CameraKeys>> = {
 };
 type Props = {
   mode:WorkcellCameraMode;
+  editableCamera:boolean;
   project:ProjectFile;
   interest:[number,number,number];
   onPose:(pose:CameraPose)=>void;
 };
-export function WorkcellCameraRig({mode,project,interest,onPose}:Props){
+export function WorkcellCameraRig({mode,editableCamera,project,interest,onPose}:Props){
   const {camera,gl}=useThree();
   const keys=useRef<CameraKeys>({...INITIAL_KEYS});
   const pose=useRef<CameraPose>(initialNavigationPose('fly'));
@@ -123,7 +124,7 @@ export function WorkcellCameraRig({mode,project,interest,onPose}:Props){
   });
 
   return mode==='orbit'
-    ? <OrbitControls makeDefault enablePan enableZoom enableRotate
+    ? <OrbitControls makeDefault enabled={editableCamera} enablePan enableZoom enableRotate
         minDistance={2.2} maxDistance={24} minPolarAngle={0.05}
         maxPolarAngle={Math.PI/2.03} target={interest} />
     : null;
