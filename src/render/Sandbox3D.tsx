@@ -332,8 +332,11 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
       const selected = selectedTerminal === fullId;
       const position: [number, number, number] = [t.side === 'left' ? -0.64 : 0.64, 0.35, (t.y - 65) / 120];
       return <group key={t.name} position={position}>
-        <mesh onPointerDown={e => e.stopPropagation()}
-          onClick={e => { e.stopPropagation(); if (editable) onTerminal(fullId); }}>
+        <mesh onPointerDown={e => {
+            e.stopPropagation();
+            if(placeKind)onPress(e,c.id);
+          }}
+          onClick={e => { e.stopPropagation(); if (editable&&!placeKind) onTerminal(fullId); }}>
           <sphereGeometry args={[0.105, 12, 8]} />
           <meshStandardMaterial color={selected ? COLORS.highlight : COLORS.light}
             emissive={selected ? COLORS.highlight : '#000000'} emissiveIntensity={0.35} />
