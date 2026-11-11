@@ -20,19 +20,24 @@ const optical=(kind:string,label:string,predicate:(b:Body)=>boolean):EquipmentDe
   // Legacy forward detection stays unchanged. Explicit opt-in enables a
   // bounded LOS check against shelves and process tanks in the worker.
   spec('occlusionMode','Line of sight','0=off, 1=fixed, 2=fixed+bodies',0,2,1,0),
-  spec('targetMode','Target geometry','0=centre, 1=body volume',0,1,1,0)],
+  spec('targetMode','Target geometry','0=centre, 1=body volume',0,1,1,0),
+  spec('detectOperator','Virtual person sensing','0=off, 1=on',0,1,1,0)],
  faults:['sensor-stuck-on','sensor-stuck-off','dirty-lens',
   'sensor-misaligned','sensor-intermittent'], 
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
   const zone=opticalZoneOf(kind,ctx,f);
-  const seen=w.bodies.some(body=>predicate(body)&&
+  // The explicit classroom actor is worker data, never camera geometry.
+  // Every historical sensor and project remains unaffected by default.
+  const candidates=ctx.params.detectOperator===1&&w.trainingOperator?
+   [...w.bodies,w.trainingOperator]:w.bodies;
+  const seen=candidates.some(body=>predicate(body)&&
    (zone.shape==='forward'&&ctx.params.targetMode===1?
     opticalZoneIntersectsBody(body,ctx,zone):opticalZoneContains(body.pos,ctx,zone))&&
    (zone.shape!=='forward'||(ctx.params.occlusionMode??0)===0||
     (hasUnobstructedSightline(ctx.originMm,body.pos,ctx.occluders??[],ctx.id)&&
      (ctx.params.occlusionMode!==2||
-      sightlineClearOfBodies(ctx.originMm,body,w.bodies)))));
+      sightlineClearOfBodies(ctx.originMm,body,candidates)))));
   const response=param(ctx,'responseMs',40);
   const elapsedMs=seen?s.elapsedMs+dt:0;
   // Fault pulses follow simulated worker time, never wall clock or an
