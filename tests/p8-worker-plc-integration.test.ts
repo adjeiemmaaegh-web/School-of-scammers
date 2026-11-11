@@ -16,7 +16,7 @@ const parts:Command[]=[
  {k:'place',id:'eye',kind:'geometry-photoeye',at:{x:500,y:250}},
  {k:'place',id:'rack',kind:'shelf',at:{x:540,y:290}},
  {k:'place',id:'lamp',kind:'lamp',at:{x:890,y:250}},
- {k:'editWorkspace',edit:{kind:'rotate',ids:['rack'],degrees:90}},
+ {k:'editWorkspace',edit:{kind:'rotate',ids:['rack'],quarterTurns:1}},
 ];
 const links:Command[]=[
  ['supply.P24','plc16.L+'],['supply.M0','plc16.M'],
