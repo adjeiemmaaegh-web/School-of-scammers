@@ -3,6 +3,7 @@ import type {ProjectFile,XY} from '../../sim/signals';
 import type {GridStep,WorkspaceFragment} from '../../workspace/types';
 import {makeFragment} from '../../workspace/clipboard';
 import {clampPlacement} from '../../workspace/geometry';
+import {rotateAssemblyFragment,type AssemblyTurns} from '../../workspace/assembly-transform';
 import {
  ASSEMBLY_STORAGE_KEY,readAssemblyLibrary,encodeAssemblyLibrary,
  saveAssembly,deleteAssembly,type SavedAssembly,
@@ -31,6 +32,7 @@ export function AssemblyLibrary({project,selectedIds,editable,grid,onInsert}:Pro
  const [name,setName]=useState('');
  const [chosen,setChosen]=useState<number>(entries[0]?.id??0);
  const [x,setX]=useState('240'),[y,setY]=useState('170');
+ const [quarterTurns,setQuarterTurns]=useState<AssemblyTurns>(0);
  const [confirmDelete,setConfirmDelete]=useState(false);
  const [message,setMessage]=useState('');
  const current=entries.find(e=>e.id===chosen);
@@ -57,9 +59,12 @@ export function AssemblyLibrary({project,selectedIds,editable,grid,onInsert}:Pro
    setError('Enter valid insertion coordinates');return;
   }
   const at=clampPlacement({x:rawX,y:rawY},grid);
-  onInsert(current.fragment,at);
-  setError(null);setMessage('Requested '+current.name+' at '+at.x+', '+at.y+
-   '; worker validation determines whether the paste is accepted.');
+  try{
+   const oriented=rotateAssemblyFragment(current.fragment,quarterTurns);
+   onInsert(oriented,at);
+   setError(null);setMessage('Requested '+current.name+' at '+at.x+', '+at.y+
+    ' with '+quarterTurns*90+'° rotation; worker validation determines whether the paste is accepted.');
+  }catch(e){setError(e instanceof Error?e.message:'Assembly rotation could not be applied');}
  };
  const remove=()=>{
   if(storageCorrupt)return;
@@ -85,7 +90,8 @@ export function AssemblyLibrary({project,selectedIds,editable,grid,onInsert}:Pro
    <summary>Reusable 3D assemblies · {entries.length} saved locally</summary>
    <p className="sandbox-help">Select equipment in the workcell, then save it as an offline assembly.
      Internal wires, device settings and PLC programs travel with it.
-     Inserting uses the same worker-validated paste command as normal editing.</p>
+     Inserting uses the same worker-validated paste command as normal editing.
+     Rotate the entire reusable cell in quarter turns only when all saved machines support rotation.</p>
    <div className="sandbox-assembly-fields">
      <label>Assembly name
        <input data-assembly-name value={name} maxLength={48}
@@ -112,6 +118,13 @@ export function AssemblyLibrary({project,selectedIds,editable,grid,onInsert}:Pro
      <label>Y
        <input data-assembly-y type="number" min={0} max={450}
          value={y} onChange={e=>setY(e.target.value)}/>
+     </label>
+     <label>Assembly orientation
+       <select data-assembly-rotation value={quarterTurns}
+         onChange={e=>setQuarterTurns(Number(e.target.value) as AssemblyTurns)}>
+         <option value={0}>Original</option><option value={1}>90° clockwise</option>
+         <option value={2}>180°</option><option value={3}>270° clockwise</option>
+       </select>
      </label>
      <button data-assembly-insert type="button" className="btn ghost small"
        disabled={!current||!editable} onClick={insert}>Insert into workcell</button>
