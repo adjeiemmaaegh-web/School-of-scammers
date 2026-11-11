@@ -85,6 +85,15 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
    const c=p?.components?.find(c=>c.id===id);
    return c&&c.x===455&&c.y===225;
   },{timeout:12000},id);
+  // Inspector placement selects the part already. Clear first so the test
+  // must establish selection by clicking the *actual 3D mesh*, not the list.
+  await page.$eval('[data-workspace-selection] summary',el=>el.click());
+  await page.$eval('[data-workspace-selection]',panel=>{
+    const button=[...panel.querySelectorAll('button')].find(b=>b.textContent.trim()==='Clear selection');
+    if(!button)throw Error('Selection clear action missing');button.click();
+  });
+  await page.waitForFunction(()=>
+    document.querySelectorAll('[data-workspace-selection] input:checked').length===0);
   const canvas=await page.$('.sandbox-three-canvas canvas');
   await page.$eval('.sandbox-three-canvas',el=>el.scrollIntoView({block:'center'}));
   const box=await canvas.boundingBox();assert.ok(box&&box.width>200&&box.height>200);
@@ -94,7 +103,8 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   // ray hits the actual worker-owned roller model, not the 2D canvas.
   await page.mouse.move(cx,cy);
   await page.mouse.down();
-  await page.waitForFunction(()=>document.querySelector('[data-workspace-selection] input:checked')!==null,
+  await page.waitForFunction(()=>
+    document.querySelectorAll('[data-workspace-selection] input:checked').length===1,
     {timeout:12000});
   await page.mouse.move(cx+65,cy+18,{steps:14});
   await page.mouse.up();
