@@ -586,6 +586,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       </div>
       {!scenario && <div className="workspace-editing-strip" aria-label="Workspace tools"
         data-history-undo-depth={history.undo.length} data-history-redo-depth={history.redo.length}
+        data-history-undo-sizes={history.undo.map(p=>p.components.length).join(',')}
+        data-history-redo-sizes={history.redo.map(p=>p.components.length).join(',')}
         data-history-pending={historyPending?'true':'false'}>
         <WorkspaceAuthoringBar editable={editable} selectedCount={selectedDeviceIds.length}
           canUndo={!historyPending&&history.undo.length>0} canRedo={!historyPending&&history.redo.length>0} canPaste={!!clipboard}
