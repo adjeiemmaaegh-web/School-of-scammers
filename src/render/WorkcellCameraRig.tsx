@@ -1,7 +1,8 @@
 /**
  * FACTORY I/O-style 3D navigation: Orbit, Fly and an eye-height First Person
  * inspection camera. These are original camera controls, NOT real PLC signals.
- * First Person is deliberately not sensor detected; no camera pose is fed
+ * First Person supports view-only jump and tall-solid collisions; it is not sensor detected.
+ * No camera pose is fed
  * into the authoritative Web Worker or into equipment sensors.
  */
 import { useEffect, useMemo, useRef } from 'react';
@@ -15,12 +16,12 @@ import {
 } from './workcell-camera';
 
 const INITIAL_KEYS:CameraKeys = {
-  forward:false,back:false,left:false,right:false,rise:false,descend:false,
+  forward:false,back:false,left:false,right:false,rise:false,descend:false,jump:false,
 };
 const KEY_FIELD:Readonly<Record<string,keyof CameraKeys>> = {
   w:'forward',arrowup:'forward',s:'back',arrowdown:'back',
   a:'left',arrowleft:'left',d:'right',arrowright:'right',
-  e:'rise',q:'descend',
+  e:'rise',q:'descend',' ':'jump',
 };
 type Props = {
   mode:WorkcellCameraMode;
