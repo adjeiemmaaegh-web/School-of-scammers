@@ -1,0 +1,192 @@
+/**
+ * 3D-FIRST, physical browser acceptance (software WebGL): Orbit / Fly /
+ * First Person, true worker-owned P3 equipment drawn as 3D meshes and direct
+ * pointer selection/drag. The saved project is the only mutation evidence.
+ * The camera is an inspection view; it is not an input to the PLC.
+ */
+const assert=require('node:assert/strict');
+const puppeteer=require('puppeteer');
+const base=process.env.PLC_BASE_URL||'http://127.0.0.1:4173';
+const KEY='efo-open-sandbox-project-v1';
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+(async()=>{
+ const browser=await puppeteer.launch({headless:true,args:[
+  '--no-sandbox','--disable-setuid-sandbox','--enable-webgl',
+  '--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'
+ ]});
+ const page=await browser.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(String(e)));
+ const saved=()=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),KEY);
+ const cameraPosition=async()=>{
+  const text=await page.$eval('[data-3d-camera-status]',el=>el.textContent||'');
+  const match=/Camera ([-.0-9]+), ([-.0-9]+), ([-.0-9]+) m/.exec(text);
+  assert.ok(match,'Camera pose must be projected from the real Three.js camera: '+text);
+  return match.slice(1).map(Number);
+ };
+ const setNumber=async(selector,value)=>{
+  await page.$eval(selector,el=>el.scrollIntoView({block:'center'}));
+  await page.click(selector,{clickCount:3});
+  await page.keyboard.type(String(value));
+  await page.keyboard.press('Enter');
+ };
+ try{
+  await page.setViewport({width:1440,height:940,deviceScaleFactor:1});
+  await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:30000});
+  await page.evaluate(()=>localStorage.clear());
+  await page.reload({waitUntil:'networkidle0'});
+  await page.waitForSelector('.sandbox-three-canvas',{timeout:20000});
+  assert.equal(await page.$eval('[data-p5-view-active]',el=>el.getAttribute('data-p5-view-active')),'physical',
+   'An industrial scene opens in 3D by default, not a 2D plan');
+  assert.equal(await page.$eval('[data-3d-camera-mode="orbit"]',el=>el.getAttribute('aria-pressed')),'true');
+  await page.click('[data-3d-camera-mode="fly"]');
+  await page.waitForFunction(()=>document.querySelector('[data-3d-camera-status]')?.textContent.includes('Camera '));
+  const flyBefore=await cameraPosition();
+  assert.equal(await page.$eval('.sandbox-three-canvas canvas',canvas=>{canvas.focus();return document.activeElement===canvas;}),true,'Keyboard must focus the active 3D canvas');
+  await page.keyboard.down('w');
+  await sleep(750);
+  await page.keyboard.up('w');
+  await page.waitForFunction(before=>{
+   const text=document.querySelector('[data-3d-camera-status]')?.textContent||'';
+   const m=/Camera ([-.0-9]+), ([-.0-9]+), ([-.0-9]+) m/.exec(text);
+   return m&&Math.abs(Number(m[1])-before[0])+Math.abs(Number(m[3])-before[2])>.02;
+  },{timeout:12000},flyBefore);
+  const flyAfter=await cameraPosition();
+  assert.notDeepEqual(flyAfter,flyBefore,'Fly must move the actual Three.js camera');
+  await page.click('[data-3d-camera-mode="first-person"]');
+  await page.waitForFunction(()=>document.querySelector('[data-3d-camera-status]')?.textContent.includes('Eye height 1.8 m'));
+  await page.waitForFunction(()=>/Camera [^,]+, 1.80,/.test(document.querySelector('[data-3d-camera-status]')?.textContent||''));
+  const first=await cameraPosition();
+  assert.equal(first[1],1.8);
+  assert.equal(await page.$eval('.sandbox-three-canvas canvas',canvas=>{canvas.focus();return document.activeElement===canvas;}),true,'Keyboard must focus the active 3D canvas');
+  await page.keyboard.down('w');await sleep(350);await page.keyboard.up('w');
+  const walking=await cameraPosition();
+  assert.equal(walking[1],1.8,'Walking must remain at the documented eye height');
+  await page.click('[data-3d-camera-mode="orbit"]');
+  await page.waitForFunction(()=>document.querySelector('[data-3d-camera-mode="orbit"]')?.getAttribute('aria-pressed')==='true');
+
+  const placed=await page.evaluate(()=>{
+   const btn=[...document.querySelectorAll('.sandbox-palette-item')]
+     .find(el=>el.querySelector('strong')?.textContent.trim()==='Powered/gravity rollers');
+   if(!btn||btn.disabled)return false;btn.click();return true;
+  });
+  assert.ok(placed,'Real original worker-physics roller conveyor in the library');
+  await page.waitForFunction(key=>{
+   const p=JSON.parse(localStorage.getItem(key)||'null');
+   return p?.components?.length===1;
+  },{timeout:15000},KEY);
+  const id=(await saved()).components[0].id;
+  assert.equal((await saved()).components[0].kind,'roller-conveyor');
+  await page.$eval(`[data-device-id="${id}"] .sandbox-inspect-link`,el=>el.scrollIntoView({block:'center'}));
+  await page.click(`[data-device-id="${id}"] .sandbox-inspect-link`);
+  await page.waitForSelector('[data-pos-x]');
+  await setNumber('[data-pos-x]',455);await setNumber('[data-pos-y]',225);
+  await page.waitForFunction(id=>{
+   const p=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null');
+   const c=p?.components?.find(c=>c.id===id);
+   return c&&c.x===455&&c.y===225;
+  },{timeout:12000},id);
+  // Inspector placement selects the part already. Clear first so the test
+  // must establish selection in the *3D scene*, not the list.
+  await page.$eval('[data-workspace-selection] summary',el=>el.click());
+  await page.$eval('[data-workspace-selection]',panel=>{
+    const button=[...panel.querySelectorAll('button')].find(b=>b.textContent.trim()==='Clear selection');
+    if(!button)throw Error('Selection clear action missing');button.click();
+  });
+  await page.waitForFunction(()=>
+    document.querySelectorAll('[data-workspace-selection] input:checked').length===0);
+  await page.$eval('.sandbox-three-canvas',el=>el.scrollIntoView({block:'center'}));
+  const label=await page.$(`[data-3d-drag-handle="${id}"]`);
+  assert.ok(label,'The selected P3 machine has a 3D-anchored direct manipulation handle');
+  const box=await label.boundingBox();assert.ok(box&&box.width>20&&box.height>20);
+  const cx=box.x+box.width/2,cy=box.y+box.height/2;
+  const before=(await saved()).components[0];
+  // Real pointer drag of the label fixed above the 3D machine: coordinates
+  // are projected back onto the 3D factory floor and sent to the worker.
+  // The label is a visual 3D interaction aid, not an independent 2D plant.
+  await page.mouse.move(cx,cy);
+  await page.mouse.down();
+  await page.waitForFunction(()=>
+    document.querySelectorAll('[data-workspace-selection] input:checked').length===1,
+    {timeout:12000});
+  await page.mouse.move(cx+65,cy+18,{steps:14});
+  await page.mouse.up();
+  await page.waitForFunction((id,oldX)=>{
+   const p=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null');
+   return p?.components?.find(c=>c.id===id)?.x!==oldX;
+  },{timeout:15000},id,before.x);
+  const moved=(await saved()).components[0];
+  assert.equal(moved.yawDeg??0,0);
+  assert.notEqual(moved.x,before.x,'Direct 3D drag must issue an accepted worker move');
+  assert.equal((await saved()).components.length,1,'Direct 3D drag cannot create duplicate objects');
+  await page.evaluate(()=>{
+   const button=[...document.querySelectorAll('.workspace-authoring-bar button')]
+     .find(b=>b.textContent.trim()==='↷ 90°');
+   if(!button||button.disabled)throw Error('3D selected equipment lacks rotate command');
+   button.click();
+  });
+  await page.waitForFunction(id=>{
+   const p=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null');
+   return p?.components?.find(c=>c.id===id)?.yawDeg===90;
+  },{timeout:15000},id);
+  // The authoritative worker must acknowledge the previous placement,
+  // inspector move, 3D drag and 90-degree rotation before Undo can start.
+  // A stale event must never collapse the history to only the blank project.
+  await page.waitForFunction(()=>{
+    const h=document.querySelector('[data-history-undo-depth]');
+    return h&&h.getAttribute('data-history-pending')==='false'&&
+      Number(h.getAttribute('data-history-undo-depth'))>=3&&
+      !!document.querySelector('.workspace-authoring-bar [data-undo]:not(:disabled)');
+  },{timeout:12000});
+  console.log('P6 HISTORY BEFORE UNDO',JSON.stringify(await page.evaluate(key=>({
+    project:JSON.parse(localStorage.getItem(key)||'null')?.components,
+    history:{undo:document.querySelector('[data-history-undo-depth]')?.getAttribute('data-history-undo-sizes'),
+             redo:document.querySelector('[data-history-redo-depth]')?.getAttribute('data-history-redo-sizes'),
+             pending:document.querySelector('[data-history-pending]')?.getAttribute('data-history-pending')},
+  }),KEY)));
+  const undoHit=await page.$eval('.workspace-authoring-bar [data-undo]',el=>{
+    const rect=el.getBoundingClientRect();
+    const x=rect.left+rect.width/2,y=rect.top+rect.height/2;
+    const hit=document.elementFromPoint(x,y);
+    return {position:{x,y,width:rect.width,height:rect.height},
+      hit:hit?.outerHTML.slice(0,480),same:hit===el,
+      nearest:hit?.closest('button')?.textContent?.trim()||null};
+  });
+  console.log('P6 UNDO HIT TEST',JSON.stringify(undoHit));
+  assert.ok(undoHit.same,'Undo control is visually occluded by '+undoHit.nearest+
+    ' at '+JSON.stringify(undoHit.position)+'; clicking it would be destructive');
+  await page.click('.workspace-authoring-bar [data-undo]');
+  await page.waitForFunction(()=>
+    !!document.querySelector('.workspace-authoring-bar [data-redo]:not(:disabled)'),
+    {timeout:10000}).catch(async error=>{
+      const state=await page.evaluate(key=>({
+        undo:[...document.querySelectorAll('.workspace-authoring-bar [data-undo]')]
+          .map(b=>({disabled:b.disabled,visible:b.getClientRects().length>0})),
+        redo:[...document.querySelectorAll('.workspace-authoring-bar [data-redo]')]
+          .map(b=>({disabled:b.disabled,visible:b.getClientRects().length>0})),
+        project:JSON.parse(localStorage.getItem(key)||'null')?.components,
+        stack:{undo:document.querySelector('[data-history-undo-depth]')?.getAttribute('data-history-undo-sizes'),
+               redo:document.querySelector('[data-history-redo-depth]')?.getAttribute('data-history-redo-sizes'),
+               pending:document.querySelector('[data-history-pending]')?.getAttribute('data-history-pending')},
+        alerts:[...document.querySelectorAll('[role="alert"]')].map(e=>e.textContent),
+        events:[...document.querySelectorAll('.sandbox-event-log li')].slice(-8).map(e=>e.textContent),
+        historyButtons:[...document.querySelectorAll('.workspace-authoring-bar button')]
+          .map(b=>({name:b.textContent?.trim(),disabled:b.disabled})).slice(0,8),
+      }),KEY);
+      console.error('P6 UNDO HISTORY DEBUG',JSON.stringify(state));
+      throw error;
+    });
+  // A newly placed component has no yawDeg property; the worker's undo
+  // correctly restores this implicit zero. Compare effective orientation,
+  // not the optional JSON field's presence.
+  await page.waitForFunction(id=>{
+   const p=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null');
+   return (p?.components?.find(c=>c.id===id)?.yawDeg??0)===0;
+  },{timeout:15000},id);
+  await page.reload({waitUntil:'networkidle0'});
+  await page.waitForSelector('.sandbox-three-canvas');
+  assert.equal((await saved()).components[0].x,moved.x,'3D authored geometry round-trips on reload');
+  assert.equal((await saved()).components[0].yawDeg??0,0);
+  assert.deepEqual(errors.filter(s=>!/WebGL|GPU stall|favicon|swiftshader/i.test(s)),[]);
+  console.log('3D WORKCELL BUILDER PASS: 3D default, Fly movement, First Person eye height, physical worker roller 3D drag, yaw undo and persistence');
+ }finally{await browser.close();}
+})().catch(e=>{console.error('3D WORKCELL BUILDER FAIL',e.stack||String(e));process.exitCode=1;});
