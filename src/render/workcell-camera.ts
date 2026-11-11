@@ -18,7 +18,7 @@ export const CAMERA_RADIUS_M = 0.13;
 export const initialNavigationPose = (mode:Exclude<WorkcellCameraMode,'orbit'>):CameraPose =>
   mode==='first-person'
     ? {x:4.75,y:FIRST_PERSON_HEIGHT_M,z:2.48,yaw:-0.9,pitch:-0.08}
-    : {x:5.5,y:3.5,z:5.0,yaw:-0.85,pitch:-0.32};
+    : {x:4.5,y:3.5,z:2.55,yaw:-0.85,pitch:-0.32};
 
 /** P3 dimensions and yaw are used, not a separate fixed 2D collider list. */
 export function sceneCameraObstacles(project:Pick<ProjectFile,'components'|'params'>):CameraObstacle[] {
