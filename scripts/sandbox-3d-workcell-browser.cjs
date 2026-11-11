@@ -152,6 +152,8 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
       nearest:hit?.closest('button')?.textContent?.trim()||null};
   });
   console.log('P6 UNDO HIT TEST',JSON.stringify(undoHit));
+  assert.ok(undoHit.same,'Undo control is visually occluded by '+undoHit.nearest+
+    ' at '+JSON.stringify(undoHit.position)+'; clicking it would be destructive');
   await page.click('.workspace-authoring-bar [data-undo]');
   await page.waitForFunction(()=>
     !!document.querySelector('.workspace-authoring-bar [data-redo]:not(:disabled)'),
