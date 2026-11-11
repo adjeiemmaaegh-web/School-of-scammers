@@ -97,12 +97,12 @@ function Drawing({drawing,kind}:{drawing:EquipmentDrawing;kind:string}){
 function OpticalSensingVolume({rangeMm,on}:{rangeMm:number;on:boolean}){
  const radius=metres(rangeMm);
  return <group>
-   <mesh position={[0,.3,0]}>
+   <mesh raycast={()=>{}} position={[0,.3,0]}>
      <boxGeometry args={[radius*2,.6,radius*2]}/>
      <meshBasicMaterial color={on?'#49dfb5':'#48b4e2'}
        transparent opacity={on?.095:.035} depthWrite={false}/>
    </mesh>
-   <mesh position={[0,.3,0]}>
+   <mesh raycast={()=>{}} position={[0,.3,0]}>
      <boxGeometry args={[radius*2,.6,radius*2]}/>
      <meshBasicMaterial color={on?'#72eec3':'#5b9dc5'}
        transparent opacity={on?.43:.20} wireframe depthWrite={false}/>
