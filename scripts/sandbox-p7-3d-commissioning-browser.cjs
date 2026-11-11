@@ -93,7 +93,16 @@ const ST = [
    const ny=dot(rel,up)/(depth*tan);
    assert.ok(Math.abs(nx)<.95&&Math.abs(ny)<.95,
      'The target is visible in the 3D scene: '+x+','+y);
-   await page.mouse.click(box.x+(nx+1)*box.w/2,box.y+(1-ny)*box.h/2);
+   const clickX=box.x+(nx+1)*box.w/2,clickY=box.y+(1-ny)*box.h/2;
+   const target=await page.evaluate((cx,cy)=>{
+     const el=document.elementFromPoint(cx,cy);
+     return {tag:el?.tagName,className:typeof el?.className==='string'?el.className:'',
+       sample:el?.outerHTML?.slice(0,125)};
+   },clickX,clickY);
+   console.log('P7 PERSPECTIVE CLICK TARGET',x,y,JSON.stringify(target));
+   await page.mouse.move(clickX,clickY);
+   await new Promise(resolve=>setTimeout(resolve,80));
+   await page.mouse.down();await page.mouse.up();
  };
  const clickTerminal=async terminal=>{
   const sel=`[data-terminal-id="${terminal}"]`;
