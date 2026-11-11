@@ -62,8 +62,10 @@ const project=(blocking)=>({
     if(blocked){
      const belt=[...document.querySelectorAll('.sandbox-p3-signal-list section')]
       .find(s=>s.textContent.includes('Variable-speed belt conveyor · belt'));
+     const first=document.querySelector('[data-p3-body-id="b1"]')?.textContent||'';
+     const x=Number(first.match(/x\s+(-?\d+)\s*mm/)?.[1]);
      return belt?.textContent?.includes('jam = true')&&
-      bodies.some(t=>t.includes('jammed'));
+      first.includes('jammed')&&Number.isFinite(x)&&x<100;
     }
     return bodies.some(t=>Number(t.match(/x\s+(-?\d+)\s*mm/)?.[1])>100);
    },{timeout:24000},blocked);
@@ -79,7 +81,9 @@ const project=(blocking)=>({
   assert.ok(observed.raw.length,'A physical worker parcel must exist');
   if(blocked){
    assert.equal(observed.jam,true,'The worker belt must publish a real jam');
-   assert.ok(observed.raw.some(t=>t.includes('jammed')),'A moving body must be blocked');
+   assert.ok(observed.raw.some(t=>t.includes('b1')&&t.includes('jammed')&&
+    Number(t.match(/x\s+(-?\d+)\s*mm/)?.[1])<100),
+    'The FIRST moving body must jam before crossing the configured static rack');
   }else{
    // Ordinary body-to-body queuing can still produce a legitimate jam if
    // the feeder creates subsequent parcels. This branch asserts free flow
