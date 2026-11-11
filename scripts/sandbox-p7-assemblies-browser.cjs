@@ -59,6 +59,7 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   assert.ok(selected);
   await page.waitForFunction(()=>
    document.querySelectorAll('[data-workspace-selection] input:checked').length===2);
+  await page.waitForSelector('[data-p7-assembly-library] summary',{timeout:15000});
   await page.click('[data-p7-assembly-library] summary');
   await page.type('[data-assembly-name]','Reusable inspection station');
   await page.click('[data-assembly-save]');
@@ -71,6 +72,7 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   assert.equal(libraryBefore[0].name,'Reusable inspection station');
   await page.reload({waitUntil:'domcontentloaded',timeout:45000});
   await count(2);
+  await page.waitForSelector('[data-p7-assembly-library] summary',{timeout:15000});
   await page.click('[data-p7-assembly-library] summary');
   await page.waitForSelector('[data-assembly-select]');
   assert.equal(await page.$eval('[data-assembly-select]',el=>el.options.length),2);
@@ -93,6 +95,7 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   // Invalid local storage must be preserved, never silently overwritten.
   await page.evaluate(key=>localStorage.setItem(key,'{broken'),ASSEMBLIES);
   await page.reload({waitUntil:'domcontentloaded',timeout:45000});
+  await page.waitForSelector('[data-p7-assembly-library] summary',{timeout:15000});
   await page.click('[data-p7-assembly-library] summary');
   await page.waitForSelector('[data-assembly-reset]');
   assert.equal(await page.$eval('[data-assembly-save]',button=>button.disabled),true);
