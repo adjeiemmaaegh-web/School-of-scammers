@@ -62,6 +62,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [history, setHistory] = useState<WorkspaceHistory>(emptyHistory);
   const requestId = useRef(1);
   const historyRequests = useRef(new Map<number, 'record' | 'ignore'>());
+  // Keep Undo/Redo unavailable while any document edit awaits its worker ACK.
+  // Otherwise an old in-flight snapshot can clear the redo stack or restore
+  // a stale project when the learner edits rapidly in a crowded 3D scene.
+  const [historyPending,setHistoryPending] = useState(false);
   const [selectedTerminal, setSelectedTerminal] = useState<string | null>(null);
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
@@ -106,7 +110,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     const editKinds = new Set(['place','move','wire','unwire','remove','addPanel','configureIo',
       'setParam','loadProgram','loadST','activateLanguage','clear','loadProject',
       'editWorkspace','injectFault','injectSeededFault','clearFault','revealFault','repair','loadPlantScene']);
-    if(commands.some(c=>editKinds.has(c.k)))historyRequests.current.set(id,historyMode);
+    if(commands.some(c=>editKinds.has(c.k))){
+      historyRequests.current.set(id,historyMode);
+      setHistoryPending(true);
+    }
     worker.current?.postMessage({kind:'commands',requestId:id,commands});
   }, [scenario]);
   useEffect(() => {
@@ -121,6 +128,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         if(historyRequests.current.get(id)==='record')record=true;
         historyRequests.current.delete(id);
       }
+      if(acknowledged.length)setHistoryPending(historyRequests.current.size>0);
       if(record&&ev.data.previousProject&&ev.data.project){
         const next=recordChange(historyRef.current,ev.data.previousProject,ev.data.project);
         historyRef.current=next;setHistory(next);
@@ -347,14 +355,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     send([{ k: 'remove', id }]);
   };
   const undo=()=>{
-    if(!projectRef.current||snapshot?.running)return;
+    if(!projectRef.current||snapshot?.running||historyRequests.current.size>0)return;
     const result=undoHistory(historyRef.current,projectRef.current);if(!result)return;
     historyRef.current=result.history;setHistory(result.history);
     setSelectedDeviceIds([]);setSelectedTerminal(null);setMoveTarget(null);
     send([{k:'loadProject',project:result.project}],'ignore');
   };
   const redo=()=>{
-    if(!projectRef.current||snapshot?.running)return;
+    if(!projectRef.current||snapshot?.running||historyRequests.current.size>0)return;
     const result=redoHistory(historyRef.current,projectRef.current);if(!result)return;
     historyRef.current=result.history;setHistory(result.history);
     setSelectedDeviceIds([]);setSelectedTerminal(null);setMoveTarget(null);
@@ -415,8 +423,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       if(!shortcut)return;
       if(shortcut==='clear-selection'){if(selectedDeviceIds.length){event.preventDefault();setSelectedDeviceIds([]);}return;}
       if(snapshot?.running||scenario)return;
-      if(shortcut==='undo'&&historyRef.current.undo.length){event.preventDefault();undo();return;}
-      if(shortcut==='redo'&&historyRef.current.redo.length){event.preventDefault();redo();return;}
+      if(shortcut==='undo'&&!historyPending&&historyRef.current.undo.length){event.preventDefault();undo();return;}
+      if(shortcut==='redo'&&!historyPending&&historyRef.current.redo.length){event.preventDefault();redo();return;}
       if(shortcut==='select-all'&&project?.components.length){event.preventDefault();setSelectedDeviceIds(selectAll(project.components));return;}
       if(shortcut==='copy'&&selectedDeviceIds.length){event.preventDefault();copySelection();return;}
       if(shortcut==='paste'&&clipboard){event.preventDefault();pasteSelection();return;}
@@ -576,9 +584,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           {snapshot?.running ? 'Pause' : '▶ Run'}</button>
         <span className="sandbox-scan" aria-live="off">Scan {snapshot?.tick ?? 0}</span>
       </div>
-      {!scenario && <div className="workspace-editing-strip" aria-label="Workspace tools">
+      {!scenario && <div className="workspace-editing-strip" aria-label="Workspace tools"
+        data-history-undo-depth={history.undo.length} data-history-redo-depth={history.redo.length}
+        data-history-pending={historyPending?'true':'false'}>
         <WorkspaceAuthoringBar editable={editable} selectedCount={selectedDeviceIds.length}
-          canUndo={history.undo.length>0} canRedo={history.redo.length>0} canPaste={!!clipboard}
+          canUndo={!historyPending&&history.undo.length>0} canRedo={!historyPending&&history.redo.length>0} canPaste={!!clipboard}
           grid={grid} onGrid={setGrid} onUndo={undo} onRedo={redo} onCopy={copySelection}
           onPaste={pasteSelection} onDuplicate={duplicateSelection} onRemove={deleteSelection}
           onRotate={rotateSelection} onNudge={moveSelection}/>
