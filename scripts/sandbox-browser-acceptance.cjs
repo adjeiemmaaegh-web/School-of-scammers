@@ -40,7 +40,14 @@ const pairs = [
     { timeout: 5000 }, running ? 'RUNNING' : 'STOPPED');
   try {
     await page.goto(baseUrl + '/sandbox', { waitUntil: 'networkidle0', timeout: 15000 });
-    await page.waitForSelector('.sandbox-3d-shell');
+    await page.waitForSelector('.sandbox-3d-shell',{timeout:12000}).catch(async error=>{
+      console.error('P7 STARTUP DIAGNOSTICS',JSON.stringify({
+        pageErrors:errors,
+        screen:await page.evaluate(()=>document.body?.innerText?.slice(0,2200)??''),
+        location:page.url(),
+      }));
+      throw error;
+    });
     try {
       await page.waitForFunction(() => !!document.querySelector('.sandbox-three-canvas canvas') ||
         !!document.querySelector('.sandbox-3d-fallback'), { timeout: 15000 });
