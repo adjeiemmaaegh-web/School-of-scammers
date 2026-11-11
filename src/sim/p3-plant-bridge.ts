@@ -45,6 +45,23 @@ export function freshProjectPlant(project:Pick<ProjectFile,'components'|'params'
  seed=1):SceneRuntime{
  return freshRuntime(freshWorld(seed),plantPlacements(project),PLANT_EQUIPMENT);
 }
+/** Deterministic no-analog-wire command defaults for the supported P3 models.
+ * A missing numeric terminal connection does not mean an arbitrary zero:
+ * crane bay 0 is invalid; heater 0°C is below its configured ambient.
+ * These values are teaching-model defaults, NOT externally sourced PLC data.
+ */
+export function defaultUnwiredPlantNumber(
+ kind:string,name:string,params:Readonly<Record<string,number>>,
+):number{
+ if(name==='speed')return params.speedMmS??250;
+ if(name==='inletPct')return 100;
+ if(name==='bay')return 1;
+ if(name==='setpointC')return Math.max(params.ambientC??20,
+  Math.min(80,params.maxC??120));
+ if(name==='openingPct')return 0;
+ return 0;
+}
+
 export type PlantTick={runtime:SceneRuntime;events:WorldEvent[]};
 export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
  energizedLoads:readonly string[],dtMs:number):PlantTick{
@@ -56,13 +73,10 @@ export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
  for(const item of placements){
   const def=PLANT_EQUIPMENT[item.kind];
   inputs[item.id]=Object.fromEntries(def.commands.map(ch=>[
-   ch.name,ch.kind==='bool'?set.has(item.id+'-CMD_'+ch.name): // analog command I/O is wired in a separate domain
-     // An unwired numeric speed channel is NOT a real zero-speed command.
-   // The previous blanket 0 made a PLC-powered belt report "moving" while
-   // keeping parcels stationary. Use the worker-validated speed dial until
-   // an explicit, typed numeric channel is actually mapped into the bridge.
-   ch.name==='speed'?(item.params.speedMmS??250):
-     ch.name==='openingPct'?0:ch.name==='inletPct'?100:0,
+   ch.name,ch.kind==='bool'?set.has(item.id+'-CMD_'+ch.name):
+    // A numeric command without a mapped analogue wire uses that MODEL'S
+    // safe parameter-bound default, never invented zero in every case.
+    defaultUnwiredPlantNumber(item.kind,ch.name,item.params),
   ]));
  }
  const updated=stepScene(previous,placements,PLANT_EQUIPMENT,inputs,project.plantFaults??{});
