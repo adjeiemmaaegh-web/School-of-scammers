@@ -334,7 +334,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
       return <group key={t.name} position={position}>
         <mesh onPointerDown={e => {
             e.stopPropagation();
-            if(placeKind)onPress(e,c.id);
+            // Parent shell owns placement; clicking a terminal cannot emit a second place.
           }}
           onClick={e => { e.stopPropagation(); if (editable&&!placeKind) onTerminal(fullId); }}>
           <sphereGeometry args={[0.105, 12, 8]} />
@@ -347,7 +347,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
             aria-label={`Connect ${fullId} in 3D`}
             onPointerDown={e => {
               e.stopPropagation();
-              if(placeKind)onPlaceFromHtml(e);
+              // Parent shell owns placement; never place on both pointer-down and click.
             }}
             onClick={e => { e.stopPropagation(); if(!placeKind)onTerminal(fullId); }}>{t.name}</button>
         </Html>
@@ -469,11 +469,7 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
   const start=(event:ThreeEvent<PointerEvent>,id:string)=>{
     if(event.button!==0)return;
     event.stopPropagation();
-    if(placeKind){
-      const point=floorPoint(event);
-      if(point)placeAtPoint(point);
-      return;
-    }
+    if(placeKind)return; // Shell click capture owns placement exactly once.
     const additive=additiveSelection(event);
     onSelect(id,additive);
     if(!editable||mode!=='orbit'||additive)return;
@@ -492,11 +488,7 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
   const startLabel=(event:ReactPointerEvent<HTMLDivElement>,id:string)=>{
     if(event.button!==0)return;
     event.stopPropagation();
-    if(placeKind){
-      const point=floorFromClient(event.clientX,event.clientY);
-      if(point)placeAtPoint(point);
-      return;
-    }
+    if(placeKind)return; // Shell click capture owns placement exactly once.
     const additive=event.ctrlKey||event.metaKey;
     onSelect(id,additive);
     if(!editable||mode!=='orbit'||additive)return;
@@ -591,8 +583,8 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
     <mesh position={[0, -0.09, 0]} rotation={[-Math.PI / 2, 0, 0]}
       onPointerMove={event=>{if(placeKind)previewAtPoint(event.point);}}
       onClick={event => {
-        if(placeKind&&editable){event.stopPropagation();placeAtPoint(event.point);}
-        else if(moveTarget&&editable){event.stopPropagation();onPlaceAt(projectPlacement(event.point));}
+        if(placeKind)return; // Parent shell owns the whole 3D viewport click.
+        if(moveTarget&&editable){event.stopPropagation();onPlaceAt(projectPlacement(event.point));}
       }}
       onDoubleClick={event=>{if(mode==='orbit'){event.stopPropagation();setInterest([event.point.x,0,event.point.z]);}}}>
       <planeGeometry args={[11.3, 6.3]} />
