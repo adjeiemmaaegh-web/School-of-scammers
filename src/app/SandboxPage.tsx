@@ -368,16 +368,28 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     setSelectedDeviceIds([]);setSelectedTerminal(null);setMoveTarget(null);
     send([{k:'loadProject',project:result.project}],'ignore');
   };
-  // The toolbar is sticky: keep it just below the sticky app header, whatever height the header has.
+  // Measure both sticky rows: Undo must remain below the main "New blank"
+  // toolbar. Previously clicking a visually obscured Undo cleared the project.
   useEffect(() => {
     const header = document.querySelector('.app-header');
-    if (!header) return;
-    const apply = () => document.documentElement.style.setProperty('--app-header-h', `${Math.round(header.getBoundingClientRect().height)}px`);
-    apply();
-    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(apply) : null;
+    const toolbar = document.querySelector('.sandbox-ux .sandbox-toolbar');
+    if(!header)return;
+    const apply=()=>{
+      document.documentElement.style.setProperty('--app-header-h',
+        `${Math.round(header.getBoundingClientRect().height)}px`);
+      if(toolbar)document.documentElement.style.setProperty('--sandbox-toolbar-h',
+        `${Math.round(toolbar.getBoundingClientRect().height)}px`);
+    };
+    const observer=typeof ResizeObserver==='function'?new ResizeObserver(apply):null;
     observer?.observe(header);
-    window.addEventListener('resize', apply);
-    return () => { observer?.disconnect(); window.removeEventListener('resize', apply); document.documentElement.style.removeProperty('--app-header-h'); };
+    if(toolbar)observer?.observe(toolbar);
+    apply();
+    window.addEventListener('resize',apply);
+    return ()=>{
+      observer?.disconnect();window.removeEventListener('resize',apply);
+      document.documentElement.style.removeProperty('--app-header-h');
+      document.documentElement.style.removeProperty('--sandbox-toolbar-h');
+    };
   }, []);
   const selectDevice=(id:string|null,additive=false)=>{
     setSelectedDeviceIds(current=>id?additive?toggleOne(current,id):selectOne(id):emptySelection());
