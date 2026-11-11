@@ -164,7 +164,7 @@ const ST = [
   // frontend-generated animation. The body location comes from the worker.
   await page.waitForFunction(()=>
    [...document.querySelectorAll('[data-plan-parcel]')].some(el=>{
-    const m=/translate\\(([-.0-9]+),([-.0-9]+)\\)/.exec(el.getAttribute('transform')||'');
+    const m=/translate\(([-.0-9]+),([-.0-9]+)\)/.exec(el.getAttribute('transform')||'');
     return m&&Number(m[2])>315;
    }),{timeout:50000});
   await clickText('Pause');
