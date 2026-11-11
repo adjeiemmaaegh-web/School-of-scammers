@@ -90,6 +90,18 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
    JSON.parse(localStorage.getItem(key)||'[]').length===0,{timeout:12000},ASSEMBLIES);
   assert.equal((await saved()).components.length,4,
    'Deleting a template must not delete commissioned machines');
+  // Invalid local storage must be preserved, never silently overwritten.
+  await page.evaluate(key=>localStorage.setItem(key,'{broken'),ASSEMBLIES);
+  await page.reload({waitUntil:'networkidle0'});
+  await page.click('[data-p7-assembly-library] summary');
+  await page.waitForSelector('[data-assembly-reset]');
+  assert.equal(await page.$eval('[data-assembly-save]',button=>button.disabled),true);
+  assert.equal(await page.evaluate(key=>localStorage.getItem(key),ASSEMBLIES),'{broken');
+  await page.click('[data-assembly-reset]');
+  assert.equal(await page.evaluate(key=>localStorage.getItem(key),ASSEMBLIES),'{broken');
+  await page.click('[data-assembly-reset]');
+  await page.waitForFunction(key=>localStorage.getItem(key)===null,{timeout:10000},ASSEMBLIES);
+  assert.equal((await saved()).components.length,4,'Reset library may not reset current workcell');
   assert.deepEqual(errors.filter(e=>!/WebGL|GPU stall|favicon|swiftshader/i.test(e)),[]);
   console.log('P7 REUSABLE ASSEMBLY PASS: real machines and wire -> local shelf -> restart -> worker paste -> delete; no cloud');
  }finally{await browser.close();}
