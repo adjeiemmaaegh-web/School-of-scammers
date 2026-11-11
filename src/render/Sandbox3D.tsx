@@ -21,7 +21,7 @@ import { footprintOf } from '../workspace/floor-plan';
 import { clampPlacement } from '../workspace/geometry';
 import type { GridStep } from '../workspace/types';
 import { WorkcellCameraRig } from './WorkcellCameraRig';
-import { type CameraPose, type WorkcellCameraMode } from './workcell-camera';
+import { frameEntireWorkcell, type CameraPose, type WorkcellCameraMode } from './workcell-camera';
 import {
   assess3DPlacement, placementMessage, previewDimensions,
   type PlacementAssessment,
@@ -413,11 +413,11 @@ type DeviceDrag = {
 /** This scene owns camera and pointer gestures, NEVER PLC or physics state.
  * A dragged machine is a temporary ghost until the worker acknowledges 'move'.
  */
-function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSensor,
+function Workbench({ project, snapshot, editable, grid, mode, fitRequest, placeKind, alignSensor,
   showZones, showSignals, hover, selectedDeviceIds, selectedTerminal, moveTarget,
   onTerminal, onOperate, onSelect, onPlaceAt, onPreview, onMove, onRotate, onCameraPose }: {
   project: ProjectFile; snapshot: RenderSnapshot; editable: boolean; grid: GridStep;
-  mode:WorkcellCameraMode;
+  mode:WorkcellCameraMode;fitRequest:number;
   placeKind:ComponentKind | ''; alignSensor:boolean;
   showZones:boolean; showSignals:boolean;
   hover:PlacementAssessment|null;
@@ -431,6 +431,15 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
 }) {
   const { camera, gl } = useThree();
   const [interest,setInterest]=useState<[number,number,number]>([0,0,0]);
+  useEffect(()=>{
+    if(!fitRequest||mode!=='orbit')return;
+    const framing=frameEntireWorkcell(project);
+    setInterest(framing.target);
+    camera.position.set(...framing.position);
+    camera.lookAt(...framing.target);
+  // Explicit user-triggered fit only: subsequent PLC scans, equipment motion
+  // and rerenders must not unexpectedly move the learner's 3D camera.
+  },[fitRequest]);
   const [drag,setDrag]=useState<DeviceDrag|null>(null);
   const currentDrag=useRef<DeviceDrag|null>(null);
   const poseCallback=useRef(onCameraPose);
@@ -656,6 +665,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
   const available = useMemo(supportsWebGL, []);
   const camera = useRef<Camera | null>(null);
   const [cameraMode,setCameraMode]=useState<WorkcellCameraMode>('orbit');
+  const [fitRequest,setFitRequest]=useState(0);
   const [cameraPose,setCameraPose]=useState<CameraPose|null>(null);
   const [placementKind,setPlacementKind]=useState<ComponentKind | ''>('');
   const [alignSensor,setAlignSensor]=useState(true);
@@ -729,6 +739,11 @@ export function Sandbox3D(props: Sandbox3DProps) {
         data-3d-camera-mode={id} aria-pressed={cameraMode===id}
         disabled={!available} onClick={()=>{setCameraMode(id);setCameraPose(null);}}>
         {label}</button>)}
+      <button type="button" data-3d-fit-scene
+        disabled={!available} title="Frame all placed equipment in the real 3D camera"
+        onClick={()=>{setCameraMode('orbit');setFitRequest(n=>n+1);}}>
+        Fit scene
+      </button>
     </div>
     <div className="p7-3d-authoring" role="group" aria-label="3D factory authoring" data-p7-3d-authoring>
       <label>3D placement
@@ -755,7 +770,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
       camera={{ position: [7, 8.5, 10], fov: 42, near: 0.1, far: 120 }}
       onCreated={state => { camera.current = state.camera; state.camera.lookAt(0, 0, 0); }}>
       <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
-        grid={props.grid??5} mode={cameraMode} onMove={props.onMove}
+        grid={props.grid??5} mode={cameraMode} fitRequest={fitRequest} onMove={props.onMove}
         placeKind={placementKind} alignSensor={alignSensor} showZones={showZones}
         showSignals={showSignals} hover={hover} onPreview={onPreview}
         onRotate={props.onRotate}
