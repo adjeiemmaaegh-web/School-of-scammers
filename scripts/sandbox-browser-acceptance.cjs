@@ -41,8 +41,17 @@ const pairs = [
   try {
     await page.goto(baseUrl + '/sandbox', { waitUntil: 'networkidle0', timeout: 15000 });
     await page.waitForSelector('.sandbox-3d-shell',{timeout:12000}).catch(async error=>{
+      const snippet=await page.evaluate(async stack=>{
+        const match=/\((https?:[^)]+\.js):(\d+):(\d+)\)/.exec(stack??'');
+        if(!match)return null;
+        const code=await fetch(match[1]).then(r=>r.text());
+        const line=code.split('\n')[Number(match[2])-1]??'';
+        const col=Number(match[3])-1;
+        return {file:match[1],line:Number(match[2]),column:Number(match[3]),
+          surrounding:line.slice(Math.max(0,col-420),col+420)};
+      },errors.find(x=>x.includes("reading 'p7'"))).catch(e=>String(e));
       console.error('P7 STARTUP DIAGNOSTICS',JSON.stringify({
-        pageErrors:errors,
+        pageErrors:errors,sourceSnippet:snippet,
         screen:await page.evaluate(()=>document.body?.innerText?.slice(0,2200)??''),
         location:page.url(),
       }));
