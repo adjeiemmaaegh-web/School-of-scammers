@@ -56,7 +56,7 @@ describe('P8 authoritative moving-body optical occlusion',()=>{
    yawDeg:0 as const,params:{beamMode:1,occlusionMode:mode},
   }];
   expect(()=>validatePlacements(p(2),PLANT_EQUIPMENT)).not.toThrow();
-  expect(()=>validatePlacements(p(3),PLANT_EQUIPMENT)).toThrow(/parameter/);
+  expect(()=>validatePlacements(p(4),PLANT_EQUIPMENT)).toThrow(/parameter/);
   expect(()=>validatePlacements(p(-1),PLANT_EQUIPMENT)).toThrow(/parameter/);
  });
 });
