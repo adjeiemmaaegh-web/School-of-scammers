@@ -444,7 +444,10 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
     );
     const ray=new Raycaster(); ray.setFromCamera(pointer,camera);
     const hit=new Vector3();
-    return ray.ray.intersectPlane(new Plane(new Vector3(0,1,0),0),hit)
+    // HTML labels and terminal controls float above the machine. Project
+    // their pointer back to the ACTUAL 3D factory click surface at y=-0.09 m
+    // so an overlaid terminal does not offset the equipment being placed.
+    return ray.ray.intersectPlane(new Plane(new Vector3(0,1,0),.09),hit)
       ? {x:hit.x,z:hit.z} : null;
   };
   const floorPoint=(event:ThreeEvent<PointerEvent>)=>
