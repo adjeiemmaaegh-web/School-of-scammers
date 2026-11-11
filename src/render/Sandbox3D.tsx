@@ -254,14 +254,13 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
   </group>;
 }
 
-function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPress, onLabelPress, onPlaceFromHtml, placeKind, onMoveDrag, onEndDrag, onFocus }: {
+function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPress, onLabelPress, placeKind, onMoveDrag, onEndDrag, onFocus }: {
   c: PlacedComponent; project: ProjectFile; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean };
   editable: boolean; selected: boolean; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
   onSelect: (id: string, additive: boolean) => void;
   onPress: (event: ThreeEvent<PointerEvent>, id: string) => void;
   onLabelPress: (event: ReactPointerEvent<HTMLDivElement>, id: string) => void;
-  onPlaceFromHtml:(event:ReactPointerEvent<HTMLButtonElement>)=>void;
   placeKind:ComponentKind | '';
   onMoveDrag: (event: ThreeEvent<PointerEvent>) => void;
   onEndDrag: (event: ThreeEvent<PointerEvent>) => void;
@@ -413,7 +412,7 @@ type DeviceDrag = {
  */
 function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSensor,
   showZones, showSignals, hover, selectedDeviceIds, selectedTerminal, moveTarget,
-  onTerminal, onOperate, onSelect, onPlaceAt, onPlace, onPreview, onMove, onRotate, onCameraPose }: {
+  onTerminal, onOperate, onSelect, onPlaceAt, onPreview, onMove, onRotate, onCameraPose }: {
   project: ProjectFile; snapshot: RenderSnapshot; editable: boolean; grid: GridStep;
   mode:WorkcellCameraMode;
   placeKind:ComponentKind | ''; alignSensor:boolean;
@@ -423,7 +422,6 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
   onSelect: (id: string, additive: boolean) => void; onPlaceAt: (at: XY) => void;
   onMove: (id:string,at:XY)=>void;
-  onPlace:(kind:ComponentKind,at:XY)=>void;
   onPreview:(assessment:PlacementAssessment|null)=>void;
   onRotate:(turns:-1|1)=>void;
   onCameraPose:(pose:CameraPose)=>void;
@@ -454,10 +452,6 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
     floorFromClient(event.nativeEvent.clientX,event.nativeEvent.clientY);
   const assessPoint=(point:{x:number;z:number}):PlacementAssessment|null=>
     placeKind?assess3DPlacement(project,placeKind,projectPlacement(point),grid,alignSensor):null;
-  const placeAtPoint=(point:{x:number;z:number})=>{
-    const decision=assessPoint(point);
-    if(decision&&placeKind&&editable)onPlace(placeKind,decision.at);
-  };
   const previewAtPoint=(point:{x:number;z:number}|null)=>
     onPreview(point?assessPoint(point):null);
   const focus=(id:string)=>{
@@ -617,10 +611,6 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect}
       onPress={start} onLabelPress={startLabel}
       placeKind={placeKind}
-      onPlaceFromHtml={event=>{
-        const point=floorFromClient(event.clientX,event.clientY);
-        if(point)placeAtPoint(point);
-      }}
       onMoveDrag={moveGesture} onEndDrag={endGesture} onFocus={focus} />)}
     {placeKind&&hover&&<mesh raycast={()=>{}}
       position={[worldPosition(hover.at)[0],.055,worldPosition(hover.at)[2]]}>
@@ -764,7 +754,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
       <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
         grid={props.grid??5} mode={cameraMode} onMove={props.onMove}
         placeKind={placementKind} alignSensor={alignSensor} showZones={showZones}
-        showSignals={showSignals} hover={hover} onPlace={props.onPlace} onPreview={onPreview}
+        showSignals={showSignals} hover={hover} onPreview={onPreview}
         onRotate={props.onRotate}
         onCameraPose={setCameraPose}
         selectedDeviceIds={props.selectedDeviceIds ?? []}
