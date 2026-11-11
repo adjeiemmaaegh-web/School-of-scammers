@@ -379,7 +379,7 @@ function Cable3D({ project, from, to, live }: { project: ProjectFile; from: stri
  */
 function SceneTransformGizmo({component,grid,onMove,onRotate}:{
   component:PlacedComponent;grid:GridStep;
-  onMove:(id:string,to:XY)=>void;onRotate:(turns:-1|1)=>void;
+  onMove:(id:string,to:XY)=>void;onRotate:(id:string,turns:-1|1)=>void;
 }){
  const [x,,z]=worldPosition(component);
  const move=(dx:number,dy:number)=>onMove(component.id,
@@ -396,7 +396,7 @@ function SceneTransformGizmo({component,grid,onMove,onRotate}:{
        title="Move south by one grid interval">↓</button>
      <button type="button" data-p7-transform="east" onClick={e=>{e.stopPropagation();move(grid,0);}}
        title="Move east by one grid interval">→</button>
-     <button type="button" data-p7-transform="rotate" onClick={e=>{e.stopPropagation();onRotate(1);}}
+     <button type="button" data-p7-transform="rotate" onClick={e=>{e.stopPropagation();onRotate(component.id,1);}}
        title="Rotate selected machine by exactly 90 degrees">↻90°</button>
    </div>
  </Html>;
@@ -423,7 +423,7 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
   onSelect: (id: string, additive: boolean) => void; onPlaceAt: (at: XY) => void;
   onMove: (id:string,at:XY)=>void;
   onPreview:(assessment:PlacementAssessment|null)=>void;
-  onRotate:(turns:-1|1)=>void;
+  onRotate:(id:string,turns:-1|1)=>void;
   onCameraPose:(pose:CameraPose)=>void;
 }) {
   const { camera, gl } = useThree();
@@ -646,7 +646,7 @@ export type Sandbox3DProps = {
   onPlace: (kind: ComponentKind, at: XY) => void;
   onMove: (id: string, at: XY) => void;
   onMoveFinished: () => void;
-  onRotate: (turns:-1|1)=>void;
+  onRotate: (id:string,turns:-1|1)=>void;
   onOpenWiring:()=>void;
 };
 export function Sandbox3D(props: Sandbox3DProps) {
