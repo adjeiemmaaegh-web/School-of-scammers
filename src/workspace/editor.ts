@@ -25,6 +25,9 @@ export const ROTATABLE = new Set([
   // Orientation-aware Tier 1 material handling and square-footprint geometry sensing.
   'belt-conveyor', 'roller-conveyor', 'turntable', 'geometry-photoeye',
   'inductive-prox', 'capacitive-prox', 'weigh-cell',
+  // P8 fixed opaque solids now have worker-validated yaw-aware intersection.
+  // Unlike a moving robot, a stationary rack/vessel has no orientation-sensitive kinematics.
+  'shelf', 'process-tank',
 ]);
 const pinOwner = (pin: string): string => pin.slice(0, pin.indexOf('.'));
 const remapPin = (pin: string, mapped: Map<string, string>): string =>
