@@ -6,6 +6,7 @@ import type {Body,EquipmentPlacement,EquipmentState,World,Vec3} from './types';
 import {G_MM_S2} from './types';
 import {clamp,face,footprintOverlap,insideFootprint,q,vec} from './math';
 import {addEvent} from './events';
+import {newlyContactsStaticSolid} from './solid-geometry';
 
 const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','lift','scissor-lift',
  'pick-and-place','palletizer','asrs-crane']);
@@ -64,9 +65,12 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
     insideFootprint({x:body.pos.x+proposed.x,y:body.pos.y+proposed.y,z:body.pos.z},
      item.originMm,worldFootprint(item,Math.max(50,item.params.lengthMm??80),
       Math.max(50,item.params.widthMm??200))));
-   if(blocked){
+   const moved={...body,pos:vec(body.pos.x+proposed.x,body.pos.y+proposed.y,body.pos.z)};
+   const solidBlocked=newlyContactsStaticSolid(body,moved,items);
+   if(blocked||solidBlocked){
     body.vel.x=0;body.vel.y=0;body.tags={...body.tags,jammed:true};
-    if(!prior.tags.jammed)changed=addEvent(changed,{kind:'jam',source:carrier.id,bodyId:body.id,detail:'Body blocked by a gate'});
+    if(!prior.tags.jammed)changed=addEvent(changed,{kind:'jam',source:carrier.id,bodyId:body.id,
+     detail:solidBlocked?'Body contacted a fixed solid':'Body blocked by a gate'});
    }else{
     const contact=collide(body,[...next,...sorted.filter(o=>Number(o.id.slice(1))>Number(body.id.slice(1)))],proposed);
     if(contact.blocked){
