@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Grid, Html, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { CatmullRomCurve3, Plane, Raycaster, Vector2, Vector3, type Camera } from 'three';
-import { COMPONENTS, type ComponentKind } from '../components/registry';
+import { COMPONENTS, componentKinds, type ComponentKind } from '../components/registry';
 import type { PlacedComponent, ProjectFile, RenderSnapshot, XY } from '../sim/signals';
 import type { Parcel } from '../plant/sorting-conveyor';
 import { supportsWebGL } from '../components/SceneShell';
@@ -22,6 +22,7 @@ import { clampPlacement } from '../workspace/geometry';
 import type { GridStep } from '../workspace/types';
 import { WorkcellCameraRig } from './WorkcellCameraRig';
 import { type CameraPose, type WorkcellCameraMode } from './workcell-camera';
+import { placementFrom3DFloor, precise3DPlacement, propose3DPlacement, type AuthoringProposal } from './scene-authoring';
 
 const additiveSelection = (value: unknown): boolean => {
   const event = value as { ctrlKey?: boolean; metaKey?: boolean;
@@ -371,9 +372,11 @@ type DeviceDrag = {
 /** This scene owns camera and pointer gestures, NEVER PLC or physics state.
  * A dragged machine is a temporary ghost until the worker acknowledges 'move'.
  */
-function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPlaceAt, onMove, onCameraPose }: {
+function Workbench({ project, snapshot, editable, grid, mode, placementKind, scenePreview, selectedDeviceIds, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPlaceAt, onMove, onCameraPose }: {
   project: ProjectFile; snapshot: RenderSnapshot; editable: boolean; grid: GridStep;
   mode:WorkcellCameraMode;
+  placementKind:ComponentKind | '';
+  scenePreview:AuthoringProposal|null;
   selectedDeviceIds: readonly string[]; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
   onSelect: (id: string, additive: boolean) => void; onPlaceAt: (at: XY) => void;
@@ -408,7 +411,7 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
     setInterest([x,0.3,z]);
   };
   const start=(event:ThreeEvent<PointerEvent>,id:string)=>{
-    if(event.button!==0)return;
+    if(event.button!==0||placementKind)return;
     event.stopPropagation();
     const additive=additiveSelection(event);
     onSelect(id,additive);
@@ -426,7 +429,7 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
       target.setPointerCapture(event.pointerId);
   };
   const startLabel=(event:ReactPointerEvent<HTMLDivElement>,id:string)=>{
-    if(event.button!==0)return;
+    if(event.button!==0||placementKind)return;
     event.stopPropagation();
     const additive=event.ctrlKey||event.metaKey;
     onSelect(id,additive);
@@ -546,6 +549,17 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
         c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false)}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect}
       onPress={start} onLabelPress={startLabel} onMoveDrag={moveGesture} onEndDrag={endGesture} onFocus={focus} />)}
+    {scenePreview&&placementKind&&<mesh
+       position={worldPosition(scenePreview.at).map((v,i)=>i===1?0.085:v) as [number,number,number]}
+       raycast={()=>undefined}>
+      <boxGeometry args={[placementKind in PLANT_EQUIPMENT
+        ? (PLANT_EQUIPMENT[placementKind].footprint.x/1000) : 1.0,0.09,
+        placementKind in PLANT_EQUIPMENT
+          ? (PLANT_EQUIPMENT[placementKind].footprint.y/1000) : .65]} />
+      <meshBasicMaterial color={!scenePreview.valid?'#e86a6a':
+        scenePreview.advisory?'#e7ab58':scenePreview.mount?'#36e4c0':'#62c7f0'}
+        transparent opacity={.48} depthWrite={false} wireframe />
+    </mesh>}
     {ghost&&preview&&plan&&<mesh position={[ghost[0],0.075,ghost[2]]}>
       <boxGeometry args={[plan.width/100,.06,plan.depth/100]} />
       <meshBasicMaterial color="#ffa633" transparent opacity={.42} depthWrite={false} wireframe />
@@ -568,6 +582,9 @@ export type Sandbox3DProps = {
   onPlace: (kind: ComponentKind, at: XY) => void;
   onMove: (id: string, at: XY) => void;
   onMoveFinished: () => void;
+  onRotateSelected?: () => void;
+  onDuplicateSelected?: () => void;
+  onOpenWiring?: () => void;
 };
 export function Sandbox3D(props: Sandbox3DProps) {
   const available = useMemo(supportsWebGL, []);
