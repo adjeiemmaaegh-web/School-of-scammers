@@ -11,6 +11,7 @@ import { workspaceShortcut } from '../workspace/keyboard';
 import { emptySelection, selectOne, toggleOne, selectAll, reconcileSelection } from '../workspace/selection';
 import type { GridStep, WorkspaceFragment, WorkspaceEdit, WorkspaceHistory } from '../workspace/types';
 import { PlantScenePanel } from '../ui/sandbox/PlantScenePanel';
+import { FloorPlanCanvas } from '../ui/sandbox/FloorPlanCanvas';
 import { freshWorld } from '../plant/world/bodies';
 import { AppHeader } from '../ui/AppHeader';
 import { ProgrammingDock } from '../program/ProgrammingDock';
@@ -72,7 +73,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const pasteIndex=useRef(0);
   // View/panel preferences do not belong to PLC or electrical project state.
   const [libraryFamily,setLibraryFamily] = useState<DeviceFamily>('all');
-  const [workspaceView,setWorkspaceView] = useState<'physical'|'logical'>('physical');
+  const [workspaceView,setWorkspaceView] = useState<'physical'|'logical'|'plan'>('physical');
   const [libraryExpanded,setLibraryExpanded] = useState(true);
   const [inspectorExpanded,setInspectorExpanded] = useState(true);
   const [dockExpanded,setDockExpanded] = useState(true);
@@ -450,8 +451,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       const typing=!!target&&(/^(input|textarea|select)$/i.test(target.tagName)||target.isContentEditable);
       if(event.key==='Escape'){setSelectedTerminal(null);setMoveTarget(null);return;}
       if(typing||event.repeat)return;
-      if(event.altKey&&(event.key==='1'||event.key==='2')){
-        event.preventDefault();setWorkspaceView(event.key==='1'?'logical':'physical');
+      if(event.altKey&&['1','2','3'].includes(event.key)){
+        event.preventDefault();setWorkspaceView(event.key==='1'?'logical':event.key==='2'?'physical':'plan');
       }
       if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){
         event.preventDefault();exportProject();
@@ -502,7 +503,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         </div></details>
         <details><summary>View</summary><div className="p5-menu-content">
           <button type="button" onClick={()=>setWorkspaceView('logical')}>Show logical wiring</button>
-          <button type="button" onClick={()=>setWorkspaceView('physical')}>Show physical plant</button>
+          <button type="button" onClick={()=>setWorkspaceView('physical')}>Show 3D plant</button>
+          <button type="button" onClick={()=>setWorkspaceView('plan')}>Show editable 2D floor plan</button>
           <button type="button" onClick={()=>setLibraryExpanded(v=>!v)}>Toggle device library</button>
           <button type="button" onClick={()=>setInspectorExpanded(v=>!v)}>Toggle inspector</button>
           <button type="button" onClick={()=>setDockExpanded(v=>!v)}>Toggle engineering dock</button>
@@ -520,7 +522,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         </div></details>
         <details><summary>Help</summary><div className="p5-menu-content">
           <button type="button" onClick={()=>setWorkspaceHelp(v=>!v)}>Toggle workspace instructions</button>
-          <span>Alt+1 logical · Alt+2 physical · Ctrl+S export · Esc cancel</span>
+          <span>Alt+1 logical · Alt+2 3D · Alt+3 plan · Ctrl+S export · Esc cancel</span>
         </div></details>
       </nav>
       {workspaceHelp&&<aside className="p5-help" aria-label="Workspace instructions">
@@ -586,6 +588,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             onClick={()=>setWorkspaceView('logical')}>Logical / Wiring</button>
           <button type="button" data-p5-view="physical" aria-pressed={workspaceView==='physical'}
             onClick={()=>setWorkspaceView('physical')}>Physical / 3D Plant</button>
+          <button type="button" data-p5-view="plan" aria-pressed={workspaceView==='plan'}
+            onClick={()=>setWorkspaceView('plan')}>Floor Plan / 2D</button>
         </div>
         <div className="p5-tool-actions" role="group" aria-label="Engineering tools">
           <button type="button" onClick={()=>{setMoveTarget(null);setSelectedTerminal(null);}}>Select</button>
@@ -623,7 +627,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                 aria-pressed={libraryFamily===f.id} onClick={()=>setLibraryFamily(f.id)}>
                 {f.label}</button>)}
           </div>
-          <p className="sandbox-library-help">Drag an available device into the 3D floor,
+          <p className="sandbox-library-help">Drag an available device onto the 3D floor or 2D plan,
             or click to place it. The registry determines what really works. Pause to edit.</p>
           <div className="sandbox-palette-list">
             {visibleKinds.map(kind => <button key={kind} draggable={editable}
@@ -657,7 +661,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <div className="sandbox-scene-heading"><div><span className="eyebrow">Factory floor</span><h2>3D workspace</h2></div>
             <div><span className="sandbox-scene-stat">{project?.components.length ?? 0} devices</span><span className="sandbox-scene-stat">{project?.wires.length ?? 0} wires</span></div></div>
           <Suspense fallback={<div className="sandbox-3d-loading" role="status">Loading the interactive 3D workbench…</div>}>
-            {project && snapshot && <Sandbox3D
+            {workspaceView==='physical' && project && snapshot && <Sandbox3D
               project={project} snapshot={snapshot} editable={editable}
               selectedTerminal={selectedTerminal} moveTarget={moveTarget}
               selectedDeviceId={selectedDeviceId} selectedDeviceIds={selectedDeviceIds} onSelectDevice={selectDevice}
@@ -677,6 +681,18 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <button className="btn ghost small" onClick={layout}>Place starter layout</button>
           </div>}
           {!scenario && <PlantScenePanel project={project} snapshot={snapshot} editable={editable} onCommands={send} />}
+          </div>
+          <div className="p5-floor-stage" data-p5-plan-stage>
+            {workspaceView==='plan' && project && snapshot && <FloorPlanCanvas
+              project={project} snapshot={snapshot} editable={editable}
+              grid={grid} selectedIds={selectedDeviceIds} onSelect={selectDevice}
+              onPlace={(kind, at)=>place(kind, at.x, at.y)}
+              onMove={move}
+              onOpenWiring={()=>{setWorkspaceView('logical');setActiveStage('wire');}} />}
+            {!scenario && <WorkspaceSelectionPanel components={project?.components??[]} selected={selectedDeviceIds}
+              onToggle={id=>selectDevice(id,true)}
+              onSelectAll={()=>setSelectedDeviceIds(selectAll(project?.components??[]))}
+              onClear={()=>setSelectedDeviceIds([])}/>}
           </div>
           <LogicalWiringCanvas project={project} snapshot={snapshot} editable={editable}
             selectedDeviceId={selectedDeviceId} selectedTerminal={selectedTerminal}
