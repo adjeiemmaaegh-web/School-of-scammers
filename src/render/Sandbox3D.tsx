@@ -357,19 +357,98 @@ function Cable3D({ project, from, to, live }: { project: ProjectFile; from: stri
   </mesh>;
 }
 
-function Workbench({ project, snapshot, editable, selectedDeviceIds, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPlaceAt }: {
-  project: ProjectFile; snapshot: RenderSnapshot; editable: boolean;
+type DeviceDrag = {
+  id: string; pointerId: number; start: {x:number;z:number};
+  origin: XY; preview: XY;
+};
+
+/** This scene owns camera and pointer gestures, NEVER PLC or physics state.
+ * A dragged machine is a temporary ghost until the worker acknowledges 'move'.
+ */
+function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPlaceAt, onMove }: {
+  project: ProjectFile; snapshot: RenderSnapshot; editable: boolean; grid: GridStep;
+  mode:WorkcellCameraMode;
   selectedDeviceIds: readonly string[]; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
   onSelect: (id: string, additive: boolean) => void; onPlaceAt: (at: XY) => void;
+  onMove: (id:string,at:XY)=>void;
 }) {
+  const { camera, gl } = useThree();
+  const [interest,setInterest]=useState<[number,number,number]>([0,0,0]);
+  const [drag,setDrag]=useState<DeviceDrag|null>(null);
+  const currentDrag=useRef<DeviceDrag|null>(null);
+  const onCameraPose=useRef<((pose:CameraPose)=>void)|null>(null);
+  // Direct, mouse-driven drag uses a ray through the current perspective camera.
+  // The worker's project is unchanged until pointer release and acknowledgement.
+  const floorPoint=(event:ThreeEvent<PointerEvent>):{x:number;z:number}|null=>{
+    const bounds=gl.domElement.getBoundingClientRect();
+    const pointer=new Vector2(
+      ((event.nativeEvent.clientX-bounds.left)/bounds.width)*2-1,
+      -((event.nativeEvent.clientY-bounds.top)/bounds.height)*2+1,
+    );
+    const ray=new Raycaster(); ray.setFromCamera(pointer,camera);
+    const hit=new Vector3();
+    return ray.ray.intersectPlane(new Plane(new Vector3(0,1,0),0),hit)
+      ? {x:hit.x,z:hit.z} : null;
+  };
+  const focus=(id:string)=>{
+    const item=project.components.find(c=>c.id===id);
+    if(!item)return;
+    const [x,,z]=worldPosition(item);
+    setInterest([x,0.3,z]);
+  };
+  const start=(event:ThreeEvent<PointerEvent>,id:string)=>{
+    if(event.button!==0)return;
+    event.stopPropagation();
+    const additive=additiveSelection(event);
+    onSelect(id,additive);
+    if(!editable||mode!=='orbit'||additive)return;
+    const item=project.components.find(c=>c.id===id);
+    const point=floorPoint(event);
+    if(!item||!point)return;
+    const next:DeviceDrag={
+      id,pointerId:event.pointerId,start:point,
+      origin:{x:item.x,y:item.y},preview:{x:item.x,y:item.y},
+    };
+    currentDrag.current=next;setDrag(next);
+    event.target.setPointerCapture(event.pointerId);
+  };
+  const translated=(gesture:DeviceDrag,point:{x:number;z:number}):XY=>
+    clampPlacement({
+      x:gesture.origin.x+(point.x-gesture.start.x)*100,
+      y:gesture.origin.y+(point.z-gesture.start.z)*100,
+    },grid);
+  const moveGesture=(event:ThreeEvent<PointerEvent>)=>{
+    const active=currentDrag.current;
+    if(!active||active.pointerId!==event.pointerId)return;
+    event.stopPropagation();
+    const point=floorPoint(event);if(!point)return;
+    const next={...active,preview:translated(active,point)};
+    currentDrag.current=next;setDrag(next);
+  };
+  const endGesture=(event:ThreeEvent<PointerEvent>)=>{
+    const active=currentDrag.current;
+    if(!active||active.pointerId!==event.pointerId)return;
+    event.stopPropagation();
+    const point=floorPoint(event);
+    const to=point?translated(active,point):active.preview;
+    currentDrag.current=null;setDrag(null);
+    if(event.target.hasPointerCapture(event.pointerId))
+      event.target.releasePointerCapture(event.pointerId);
+    if(editable&&(to.x!==active.origin.x||to.y!==active.origin.y))
+      onMove(active.id,to);
+  };
+  const preview=drag&&project.components.find(c=>c.id===drag.id);
+  const plan=preview?footprintOf(preview,project.params):null;
+  const ghost=drag?worldPosition(drag.preview):null;
   return <>
     <color attach="background" args={['#0c1927']} />
     <ambientLight intensity={1.1} />
     <directionalLight position={[-4, 9, 6]} intensity={1.7} />
     <directionalLight position={[8, 4, -5]} intensity={0.6} color="#a5d5ff" />
     <mesh position={[0, -0.09, 0]} rotation={[-Math.PI / 2, 0, 0]}
-      onClick={event => { if (moveTarget && editable) { event.stopPropagation(); onPlaceAt(projectPlacement(event.point)); } }}>
+      onClick={event => { if (moveTarget && editable) { event.stopPropagation(); onPlaceAt(projectPlacement(event.point)); } }}
+      onDoubleClick={event=>{if(mode==='orbit'){event.stopPropagation();setInterest([event.point.x,0,event.point.z]);}}}>
       <planeGeometry args={[11.3, 6.3]} />
       <meshStandardMaterial color="#152a3d" />
     </mesh>
@@ -378,8 +457,10 @@ function Workbench({ project, snapshot, editable, selectedDeviceIds, selectedTer
       fadeDistance={35} infiniteGrid={false} />
     {project.wires.map(w => <Cable3D key={w.id} project={project} from={w.from} to={w.to}
       live={snapshot.voltages[w.from] === 24 && snapshot.voltages[w.to] === 24} />)}
-    <PlantWorld3D project={project} scene={snapshot.plantWorld} />
-    {project.components.map(c => <Device3D key={c.id} c={c} editable={editable}
+    <PlantWorld3D project={project} scene={snapshot.plantWorld}
+      onPointerDownPart={start} onPointerMovePart={moveGesture}
+      onPointerUpPart={endGesture} onFocusPart={focus} />
+    {project.components.map(c => <Device3D key={c.id} c={c} project={project} editable={editable}
        selected={selectedDeviceIds.includes(c.id)}
       motorAngleRad={c.kind === 'revmotor' ? snapshot.reverseMotorAngleRad : snapshot.motorAngles[c.id] ?? snapshot.motorAngleRad}
       direction={c.kind === 'revmotor' ? snapshot.motorDirection : undefined}
@@ -394,11 +475,18 @@ function Workbench({ project, snapshot, editable, selectedDeviceIds, selectedTer
         c.kind === 'levelprobe' ? snapshot.io.TankHigh :
         c.kind === 'estop' ? !c.pressed :
         c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false)}
-      onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect} />)}
-    <OrbitControls makeDefault enablePan enableZoom enableRotate
-      minDistance={4.4} maxDistance={23} minPolarAngle={0.1} maxPolarAngle={Math.PI / 2.05}
-      target={[0, 0, 0]} />
-    <GizmoHelper alignment="bottom-right" margin={[76, 76]}><GizmoViewport axisColors={['#d45b59', '#4db987', '#549fea']} labelColor="#ffffff" /></GizmoHelper>
+      onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect}
+      onPress={start} onMoveDrag={moveGesture} onEndDrag={endGesture} onFocus={focus} />)}
+    {ghost&&preview&&plan&&<mesh position={[ghost[0],0.075,ghost[2]]}
+      rotation={[0,-(preview.yawDeg??0)*Math.PI/180,0]}>
+      <boxGeometry args={[plan.width/100,.06,plan.depth/100]} />
+      <meshBasicMaterial color="#ffa633" transparent opacity={.42} depthWrite={false} wireframe />
+    </mesh>}
+    <WorkcellCameraRig mode={mode} editableCamera={!drag} project={project}
+      interest={interest} onPose={pose=>onCameraPose.current?.(pose)} />
+    <GizmoHelper alignment="bottom-right" margin={[76, 76]}>
+      <GizmoViewport axisColors={['#d45b59', '#4db987', '#549fea']} labelColor="#ffffff" />
+    </GizmoHelper>
   </>;
 }
 
