@@ -86,7 +86,7 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
    return c&&c.x===455&&c.y===225;
   },{timeout:12000},id);
   // Inspector placement selects the part already. Clear first so the test
-  // must establish selection by clicking the *actual 3D mesh*, not the list.
+  // must establish selection in the *3D scene*, not the list.
   await page.$eval('[data-workspace-selection] summary',el=>el.click());
   await page.$eval('[data-workspace-selection]',panel=>{
     const button=[...panel.querySelectorAll('button')].find(b=>b.textContent.trim()==='Clear selection');
@@ -94,13 +94,15 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   });
   await page.waitForFunction(()=>
     document.querySelectorAll('[data-workspace-selection] input:checked').length===0);
-  const canvas=await page.$('.sandbox-three-canvas canvas');
   await page.$eval('.sandbox-three-canvas',el=>el.scrollIntoView({block:'center'}));
-  const box=await canvas.boundingBox();assert.ok(box&&box.width>200&&box.height>200);
+  const label=await page.$(`[data-3d-drag-handle="${id}"]`);
+  assert.ok(label,'The selected P3 machine has a 3D-anchored direct manipulation handle');
+  const box=await label.boundingBox();assert.ok(box&&box.width>20&&box.height>20);
   const cx=box.x+box.width/2,cy=box.y+box.height/2;
   const before=(await saved()).components[0];
-  // The model is exactly at (0,0,0) in real Three coordinates. The centre
-  // ray hits the actual worker-owned roller model, not the 2D canvas.
+  // Real pointer drag of the label fixed above the 3D machine: coordinates
+  // are projected back onto the 3D factory floor and sent to the worker.
+  // The label is a visual 3D interaction aid, not an independent 2D plant.
   await page.mouse.move(cx,cy);
   await page.mouse.down();
   await page.waitForFunction(()=>
