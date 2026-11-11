@@ -9,7 +9,8 @@ export const beltConveyor:EquipmentDef={
  commands:[{name:'run',kind:'bool'},{name:'reverse',kind:'bool'},{name:'speed',kind:'number',unit:'mm/s'}],
  signals:[{name:'moving',kind:'bool'},{name:'jam',kind:'bool'},{name:'speed',kind:'number',unit:'mm/s'}],
  params:[spec('lengthMm','Belt length','mm',200,2400,50,600),spec('widthMm','Belt width','mm',150,600,50,300),
- spec('speedMmS','Surface speed','mm/s',50,1000,10,250)],
+ spec('speedMmS','Surface speed','mm/s',50,1000,10,250),
+ spec('contactMode','Body collision','0=legacy, 1=swept 3D',0,1,1,0)],
  faults:['belt-slip','belt-jammed','motor-dead'],
  fresh:()=>initial({}),
  step:(state,world,commands,dt,fault,ctx)=>{
@@ -32,7 +33,8 @@ export const rollerConveyor:EquipmentDef={
  params:[spec('lengthMm','Roller length','mm',200,2400,50,600),
  spec('widthMm','Roller width','mm',150,600,50,300),
  spec('speedMmS','Roller speed','mm/s',20,800,10,180),
- spec('gravityMode','Gravity feed','bool',0,1,1,0)],
+ spec('gravityMode','Gravity feed','bool',0,1,1,0),
+ spec('contactMode','Body collision','0=legacy, 1=swept 3D',0,1,1,0)],
  faults:['bearing-seized','roller-slip'],
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
