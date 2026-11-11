@@ -15,3 +15,18 @@
 .sandbox-p3-signal-list label { display:grid;gap:5px;font-size:11px; }
 .sandbox-p3-signal-list select { background:var(--surface);color:var(--ink);padding:6px;border:1px solid var(--line); }
 @media(max-width:530px){.sandbox-plant-scene-grid,.sandbox-p3-signal-list{grid-template-columns:1fr}}
+
+/* P9 original scene explorer: compact filters and accessible 21-scene cards. */
+.sandbox-p9-scene-filter {display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;
+  margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:8px;}
+.sandbox-p9-scene-filter label {display:grid;gap:4px;flex:1 1 185px;font-size:12px;}
+.sandbox-p9-scene-filter input,.sandbox-p9-scene-filter select {
+  width:100%;min-height:36px;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink);border-radius:6px;padding:7px 9px;font:inherit;
+}
+.sandbox-p9-scene-filter [data-p9-scene-count] {flex:1 1 100%;margin:0;}
+.sandbox-p9-scene-meta {font-size:11px;line-height:1.4;color:var(--muted);}
+.sandbox-plant-scene-choice [data-p9-scene-confirm-warning] {color:var(--ink);
+  border-left:3px solid var(--line);padding-left:8px;margin:0;}
+.sandbox-plant-scene-choice .sandbox-actions {display:flex;flex-wrap:wrap;gap:6px;}
+@media(max-width:530px) {.sandbox-p9-scene-filter label{flex-basis:100%;}}
