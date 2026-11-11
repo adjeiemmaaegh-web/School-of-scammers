@@ -173,9 +173,15 @@ export function validateProject(raw: unknown): ProjectFile {
     }
     if (entry.yawDeg !== undefined && !([0, 90, 180, 270] as unknown[]).includes(entry.yawDeg))
       throw new Error('Device orientation must be a quarter turn');
+    if (entry.elevationMm !== undefined &&
+        (!Object.hasOwn(PLANT_EQUIPMENT, entry.kind) ||
+         !Number.isSafeInteger(entry.elevationMm) ||
+         entry.elevationMm < 0 || entry.elevationMm > 2500))
+      throw new Error('Invalid supported plant elevation');
     ids.add(entry.id);
     components.push({ id: entry.id, kind: entry.kind as ComponentKind, x: entry.x, y: entry.y,
-      pressed: entry.pressed === true, ...(entry.yawDeg === undefined ? {} : { yawDeg: entry.yawDeg }) });
+      pressed: entry.pressed === true, ...(entry.yawDeg === undefined ? {} : { yawDeg: entry.yawDeg }),
+      ...(entry.elevationMm === undefined ? {} : { elevationMm: entry.elevationMm }) });
   }
   // One of each protective branch device per educational circuit: state is
   // explicitly maintained per role, not silently shared among duplicates.
