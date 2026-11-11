@@ -134,7 +134,21 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   await page.click('.workspace-authoring-bar [data-undo]');
   await page.waitForFunction(()=>
     !!document.querySelector('.workspace-authoring-bar [data-redo]:not(:disabled)'),
-    {timeout:10000});
+    {timeout:10000}).catch(async error=>{
+      const state=await page.evaluate(key=>({
+        undo:[...document.querySelectorAll('.workspace-authoring-bar [data-undo]')]
+          .map(b=>({disabled:b.disabled,visible:b.getClientRects().length>0})),
+        redo:[...document.querySelectorAll('.workspace-authoring-bar [data-redo]')]
+          .map(b=>({disabled:b.disabled,visible:b.getClientRects().length>0})),
+        project:JSON.parse(localStorage.getItem(key)||'null')?.components,
+        alerts:[...document.querySelectorAll('[role="alert"]')].map(e=>e.textContent),
+        events:[...document.querySelectorAll('.sandbox-event-log li')].slice(-8).map(e=>e.textContent),
+        historyButtons:[...document.querySelectorAll('.workspace-authoring-bar button')]
+          .map(b=>({name:b.textContent?.trim(),disabled:b.disabled})).slice(0,8),
+      }),KEY);
+      console.error('P6 UNDO HISTORY DEBUG',JSON.stringify(state));
+      throw error;
+    });
   // A newly placed component has no yawDeg property; the worker's undo
   // correctly restores this implicit zero. Compare effective orientation,
   // not the optional JSON field's presence.
