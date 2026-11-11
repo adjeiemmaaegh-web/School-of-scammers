@@ -2,10 +2,12 @@
 import type {EquipmentDef} from '../world/equipment';
 import {draw,flag,initial,numeric,param,spec} from '../world/equipment';
 import {insideFootprint,q,vec} from '../world/math';
+import {SHELF_SOLID_SIZE} from '../world/solid-geometry';
 export const shelf:EquipmentDef={
- kind:'shelf',label:'3 by 5 storage rack',footprint:vec(1100,600,3000),
+ kind:'shelf',label:'3 by 5 storage rack',footprint:SHELF_SOLID_SIZE,
  commands:[],signals:[{name:'occupiedCount',kind:'number',unit:'bays'}],
- params:[],faults:[],fresh:()=>initial({}),
+ params:[spec('blockMaterialFlow','Block material flow','0=off, 1=on',0,1,1,0)],
+ faults:[],fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>({world:w,state:s}),
  read:(s,w,ctx)=>({occupiedCount:Object.keys(s.slots??{}).length}),
  describe:(s,ctx)=>[draw(ctx,'rack','box',vec(1060,580,2900),1450,'#597d98')],
