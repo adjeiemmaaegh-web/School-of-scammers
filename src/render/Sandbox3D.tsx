@@ -384,7 +384,8 @@ function SceneTransformGizmo({component,grid,onMove,onRotate}:{
  const [x,,z]=worldPosition(component);
  const move=(dx:number,dy:number)=>onMove(component.id,
    clampPlacement({x:component.x+dx,y:component.y+dy},grid));
- return <Html position={[x,.48,z]} center distanceFactor={10}
+ return <Html position={[x,1.7,z]} center distanceFactor={10}
+   zIndexRange={[20000000,19000000]}
    style={{pointerEvents:'auto'}}>
    <div className="p7-3d-gizmo" data-p7-gizmo={component.id}
       role="group" aria-label={`Transform ${component.id} in 3D scene`}
