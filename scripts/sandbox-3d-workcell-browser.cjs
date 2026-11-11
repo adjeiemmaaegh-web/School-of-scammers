@@ -128,7 +128,13 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
    const p=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null');
    return p?.components?.find(c=>c.id===id)?.yawDeg===90;
   },{timeout:15000},id);
-  await page.click('[data-undo]');
+  await page.waitForFunction(()=>
+    !!document.querySelector('.workspace-authoring-bar [data-undo]:not(:disabled)'),
+    {timeout:10000});
+  await page.click('.workspace-authoring-bar [data-undo]');
+  await page.waitForFunction(()=>
+    !!document.querySelector('.workspace-authoring-bar [data-redo]:not(:disabled)'),
+    {timeout:10000});
   await page.waitForFunction(id=>{
    const p=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null');
    return p?.components?.find(c=>c.id===id)?.yawDeg===0;
