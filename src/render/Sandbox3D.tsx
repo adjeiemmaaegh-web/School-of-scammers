@@ -5,9 +5,9 @@
  *
  * Original low-poly equipment geometry, no proprietary meshes or trademarks.
  */
-import { useMemo, useRef, type DragEvent } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { Grid, Html, OrbitControls, GizmoHelper, GizmoViewport } from '@react-three/drei';
+import { useMemo, useRef, useState, type DragEvent } from 'react';
+import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
+import { Grid, Html, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { CatmullRomCurve3, Plane, Raycaster, Vector2, Vector3, type Camera } from 'three';
 import { COMPONENTS, type ComponentKind } from '../components/registry';
 import type { PlacedComponent, ProjectFile, RenderSnapshot, XY } from '../sim/signals';
@@ -16,6 +16,12 @@ import { supportsWebGL } from '../components/SceneShell';
 import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-coordinates';
 import { perDeviceLive } from '../sim/device-state';
 import { PlantWorld3D } from './PlantWorld3D';
+import { PLANT_EQUIPMENT } from '../plant/equipment';
+import { footprintOf } from '../workspace/floor-plan';
+import { clampPlacement } from '../workspace/geometry';
+import type { GridStep } from '../workspace/types';
+import { WorkcellCameraRig } from './WorkcellCameraRig';
+import { type CameraPose, type WorkcellCameraMode } from './workcell-camera';
 
 const additiveSelection = (value: unknown): boolean => {
   const event = value as { ctrlKey?: boolean; metaKey?: boolean;
@@ -244,24 +250,43 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
   </group>;
 }
 
-function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
-  c: PlacedComponent; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean };
+function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPress, onMoveDrag, onEndDrag, onFocus }: {
+  c: PlacedComponent; project: ProjectFile; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean };
   editable: boolean; selected: boolean; selectedTerminal: string | null; moveTarget: string | null;
-  onTerminal: (id: string) => void; onOperate: (id: string) => void; onSelect: (id: string, additive: boolean) => void;
+  onTerminal: (id: string) => void; onOperate: (id: string) => void;
+  onSelect: (id: string, additive: boolean) => void;
+  onPress: (event: ThreeEvent<PointerEvent>, id: string) => void;
+  onMoveDrag: (event: ThreeEvent<PointerEvent>) => void;
+  onEndDrag: (event: ThreeEvent<PointerEvent>) => void;
+  onFocus: (id: string) => void;
 }) {
   const [x, y, z] = worldPosition(c);
   const def = COMPONENTS[c.kind];
+  const plant = Boolean(PLANT_EQUIPMENT[c.kind]);
+  const footprint = plant ? footprintOf(c, project.params) : null;
+  // P3 equipment uses the real worker-owned 3D shapes, not duplicated large
+  // placeholder housings. Its outline is only a selection/drag affordance.
   return <group position={[x, y, z]} rotation={[0, -(c.yawDeg ?? 0) * Math.PI / 180, 0]}>
-    <mesh position={[0, 0.035, 0]} onClick={e => { e.stopPropagation(); onSelect(c.id, additiveSelection(e)); }}>
-      <boxGeometry args={[1.5, 0.08, 1.2]} />
-      <meshStandardMaterial color={selected || moveTarget === c.id ? COLORS.highlight : COLORS.panel} />
+    <mesh position={[0, plant ? 0.02 : 0.035, 0]}
+      onPointerDown={e => onPress(e, c.id)}
+      onPointerMove={onMoveDrag} onPointerUp={onEndDrag}
+      onDoubleClick={e => { e.stopPropagation(); onFocus(c.id); }}>
+      <boxGeometry args={[plant ? (footprint!.yawDeg === 90 || footprint!.yawDeg === 270 ? footprint!.depth : footprint!.width)/100 : 1.5,
+        plant ? 0.025 : 0.08,
+        plant ? (footprint!.yawDeg === 90 || footprint!.yawDeg === 270 ? footprint!.width : footprint!.depth)/100 : 1.2]} />
+      {plant
+        ? <meshStandardMaterial color={selected || moveTarget === c.id ? COLORS.highlight : COLORS.panel}
+            transparent opacity={selected || moveTarget === c.id ? 0.55 : 0.15} depthWrite={false} />
+        : <meshStandardMaterial color={selected || moveTarget === c.id ? COLORS.highlight : COLORS.panel} />}
     </mesh>
-    <group onClick={e => { e.stopPropagation(); onSelect(c.id, additiveSelection(e)); }}>
+    {!plant && <group onPointerDown={e => onPress(e, c.id)}
+      onPointerMove={onMoveDrag} onPointerUp={onEndDrag}
+      onDoubleClick={e => { e.stopPropagation(); onFocus(c.id); }}>
       <DeviceSculpture kind={c.kind} active={active} pressed={c.pressed} motorAngleRad={motorAngleRad}
         parcel={c.kind === 'conveyor' ? parcel : null}
         tankLevelMl={c.kind === 'tank' ? tankLevelMl : undefined}
         rod={c.kind === 'cylinder' ? rod : undefined} lamps={c.kind === 'stacklight' ? lamps : undefined} />
-    </group>
+    </group>}
     <Html position={[0, 1.22, 0]} center distanceFactor={11}>
       <div className="sandbox-3d-label">
         <strong>{def.label}</strong>
@@ -295,7 +320,8 @@ function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, ro
       const selected = selectedTerminal === fullId;
       const position: [number, number, number] = [t.side === 'left' ? -0.64 : 0.64, 0.35, (t.y - 65) / 120];
       return <group key={t.name} position={position}>
-        <mesh onClick={e => { e.stopPropagation(); if (editable) onTerminal(fullId); }}>
+        <mesh onPointerDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); if (editable) onTerminal(fullId); }}>
           <sphereGeometry args={[0.105, 12, 8]} />
           <meshStandardMaterial color={selected ? COLORS.highlight : COLORS.light}
             emissive={selected ? COLORS.highlight : '#000000'} emissiveIntensity={0.35} />
