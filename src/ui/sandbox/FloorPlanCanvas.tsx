@@ -140,7 +140,7 @@ export function FloorPlanCanvas({
       selection; use the editing toolbar for group movement, duplication and 90° rotation.
       Snap: {grid} plan units. Arrows show nominal equipment orientation, not powered state.</p>
     <svg viewBox={`0 0 ${PLAN_WIDTH} ${PLAN_DEPTH}`} className="floor-plan-svg"
-      role="img" aria-label="Top-down factory floor with movable equipment and worker-tracked parcels"
+      role="group" aria-label="Top-down factory floor with movable equipment and worker-tracked parcels"
       onPointerMove={onPointerMove} onPointerUp={onPointerUp}
       onPointerCancel={() => setDrag(null)}
       onDragOver={event => { if (editable) event.preventDefault(); }} onDrop={onDrop}>
