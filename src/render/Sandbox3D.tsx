@@ -5,7 +5,7 @@
  *
  * Original low-poly equipment geometry, no proprietary meshes or trademarks.
  */
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Grid, Html, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { CatmullRomCurve3, Plane, Raycaster, Vector2, Vector3, type Camera } from 'three';
@@ -250,12 +250,13 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
   </group>;
 }
 
-function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPress, onMoveDrag, onEndDrag, onFocus }: {
+function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPress, onLabelPress, onMoveDrag, onEndDrag, onFocus }: {
   c: PlacedComponent; project: ProjectFile; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean };
   editable: boolean; selected: boolean; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
   onSelect: (id: string, additive: boolean) => void;
   onPress: (event: ThreeEvent<PointerEvent>, id: string) => void;
+  onLabelPress: (event: ReactPointerEvent<HTMLDivElement>, id: string) => void;
   onMoveDrag: (event: ThreeEvent<PointerEvent>) => void;
   onEndDrag: (event: ThreeEvent<PointerEvent>) => void;
   onFocus: (id: string) => void;
@@ -288,7 +289,12 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
         rod={c.kind === 'cylinder' ? rod : undefined} lamps={c.kind === 'stacklight' ? lamps : undefined} />
     </group>}
     <Html position={[0, 1.22, 0]} center distanceFactor={11}>
-      <div className="sandbox-3d-label">
+      <div className="sandbox-3d-label" data-3d-drag-handle={c.id}
+        title="Select the machine; drag this 3D-anchored label to reposition it while paused"
+        onPointerDown={event=>{
+          if((event.target as HTMLElement).closest('button'))return;
+          onLabelPress(event,c.id);
+        }}>
         <strong>{def.label}</strong>
         <small>{c.kind === 'revmotor' ? (direction ?? 'stopped').toUpperCase() :
           c.kind === 'forwardcontactor' || c.kind === 'reversecontactor' ? (active ? 'CLOSED' : 'OPEN') :
@@ -419,6 +425,22 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
     if(target && 'setPointerCapture' in target && typeof target.setPointerCapture==='function')
       target.setPointerCapture(event.pointerId);
   };
+  const startLabel=(event:ReactPointerEvent<HTMLDivElement>,id:string)=>{
+    if(event.button!==0)return;
+    event.stopPropagation();
+    const additive=event.ctrlKey||event.metaKey;
+    onSelect(id,additive);
+    if(!editable||mode!=='orbit'||additive)return;
+    const item=project.components.find(c=>c.id===id);
+    const point=floorFromClient(event.clientX,event.clientY);
+    if(!item||!point)return;
+    const next:DeviceDrag={
+      id,pointerId:event.pointerId,start:point,
+      origin:{x:item.x,y:item.y},preview:{x:item.x,y:item.y},
+    };
+    currentDrag.current=next;setDrag(next);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
   const translated=(gesture:DeviceDrag,point:{x:number;z:number}):XY=>
     clampPlacement({
       x:gesture.origin.x+(point.x-gesture.start.x)*100,
@@ -523,9 +545,8 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
         c.kind === 'estop' ? !c.pressed :
         c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false)}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect}
-      onPress={start} onMoveDrag={moveGesture} onEndDrag={endGesture} onFocus={focus} />)}
-    {ghost&&preview&&plan&&<mesh position={[ghost[0],0.075,ghost[2]]}
-      rotation={[0,-(preview.yawDeg??0)*Math.PI/180,0]}>
+      onPress={start} onLabelPress={startLabel} onMoveDrag={moveGesture} onEndDrag={endGesture} onFocus={focus} />)}
+    {ghost&&preview&&plan&&<mesh position={[ghost[0],0.075,ghost[2]]}>
       <boxGeometry args={[plan.width/100,.06,plan.depth/100]} />
       <meshBasicMaterial color="#ffa633" transparent opacity={.42} depthWrite={false} wireframe />
     </mesh>}
