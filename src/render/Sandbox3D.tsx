@@ -254,13 +254,15 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
   </group>;
 }
 
-function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPress, onLabelPress, onMoveDrag, onEndDrag, onFocus }: {
+function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPress, onLabelPress, onPlaceFromHtml, placeKind, onMoveDrag, onEndDrag, onFocus }: {
   c: PlacedComponent; project: ProjectFile; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean };
   editable: boolean; selected: boolean; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
   onSelect: (id: string, additive: boolean) => void;
   onPress: (event: ThreeEvent<PointerEvent>, id: string) => void;
   onLabelPress: (event: ReactPointerEvent<HTMLDivElement>, id: string) => void;
+  onPlaceFromHtml:(event:ReactPointerEvent<HTMLButtonElement>)=>void;
+  placeKind:ComponentKind | '';
   onMoveDrag: (event: ThreeEvent<PointerEvent>) => void;
   onEndDrag: (event: ThreeEvent<PointerEvent>) => void;
   onFocus: (id: string) => void;
@@ -340,8 +342,11 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
           <button type="button" className={`sandbox-3d-terminal ${selected ? 'selected' : ''}`}
             data-scene-terminal-id={fullId} disabled={!editable}
             aria-label={`Connect ${fullId} in 3D`}
-            onPointerDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onTerminal(fullId); }}>{t.name}</button>
+            onPointerDown={e => {
+              e.stopPropagation();
+              if(placeKind)onPlaceFromHtml(e);
+            }}
+            onClick={e => { e.stopPropagation(); if(!placeKind)onTerminal(fullId); }}>{t.name}</button>
         </Html>
       </group>;
     })}
@@ -612,7 +617,13 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
         c.kind === 'estop' ? !c.pressed :
         c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false)}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect}
-      onPress={start} onLabelPress={startLabel} onMoveDrag={moveGesture} onEndDrag={endGesture} onFocus={focus} />)}
+      onPress={start} onLabelPress={startLabel}
+      placeKind={placeKind}
+      onPlaceFromHtml={event=>{
+        const point=floorFromClient(event.clientX,event.clientY);
+        if(point)placeAtPoint(point);
+      }}
+      onMoveDrag={moveGesture} onEndDrag={endGesture} onFocus={focus} />)}
     {placeKind&&hover&&<mesh raycast={()=>{}}
       position={[worldPosition(hover.at)[0],.055,worldPosition(hover.at)[2]]}>
       <boxGeometry args={[previewDimensions(hover.footprint)[0],.075,
