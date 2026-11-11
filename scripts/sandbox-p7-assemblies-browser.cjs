@@ -21,7 +21,16 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   const p=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null');
   return p?.components?.length===number;
  },{timeout:15000},n);
+ const waitEnabled=selector=>page.waitForFunction(s=>{
+  const button=document.querySelector(s);
+  return !!button&&!button.disabled&&button.getClientRects().length>0;
+ },{timeout:15000},selector);
  const place=async label=>{
+  await page.waitForFunction(value=>{
+   const button=[...document.querySelectorAll('.sandbox-palette-item')]
+    .find(el=>el.querySelector('strong')?.textContent.trim()===value);
+   return !!button&&!button.disabled;
+  },{timeout:15000},label);
   const ok=await page.evaluate(value=>{
    const button=[...document.querySelectorAll('.sandbox-palette-item')]
      .find(el=>el.querySelector('strong')?.textContent.trim()===value);
@@ -61,7 +70,9 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
    document.querySelectorAll('[data-workspace-selection] input:checked').length===2);
   await page.waitForSelector('[data-p7-assembly-library] summary',{timeout:15000});
   await page.click('[data-p7-assembly-library] summary');
+  await page.waitForSelector('[data-assembly-name]',{visible:true});
   await page.type('[data-assembly-name]','Reusable inspection station');
+  await waitEnabled('[data-assembly-save]');
   await page.click('[data-assembly-save]');
   await page.waitForFunction(key=>{
    const items=JSON.parse(localStorage.getItem(key)||'[]');
@@ -76,6 +87,7 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   await page.click('[data-p7-assembly-library] summary');
   await page.waitForSelector('[data-assembly-select]');
   assert.equal(await page.$eval('[data-assembly-select]',el=>el.options.length),2);
+  await waitEnabled('[data-assembly-insert]');
   await page.click('[data-assembly-insert]');
   await count(4);
   await page.waitForFunction(()=>{
@@ -87,6 +99,8 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   assert.equal(new Set(after.wires.map(w=>w.id)).size,2);
   assert.equal(after.wires.length,2,'Internal electrical connection must be duplicated');
   await page.click('[data-assembly-delete]');
+  await page.waitForFunction(()=>document.querySelector('[data-assembly-delete]')
+   ?.textContent?.trim()==='Confirm delete',{timeout:10000});
   await page.click('[data-assembly-delete]');
   await page.waitForFunction(key=>
    JSON.parse(localStorage.getItem(key)||'[]').length===0,{timeout:12000},ASSEMBLIES);
@@ -101,6 +115,8 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   assert.equal(await page.$eval('[data-assembly-save]',button=>button.disabled),true);
   assert.equal(await page.evaluate(key=>localStorage.getItem(key),ASSEMBLIES),'{broken');
   await page.click('[data-assembly-reset]');
+  await page.waitForFunction(()=>document.querySelector('[data-assembly-reset]')
+   ?.textContent?.trim()==='Confirm local reset',{timeout:10000});
   assert.equal(await page.evaluate(key=>localStorage.getItem(key),ASSEMBLIES),'{broken');
   await page.click('[data-assembly-reset]');
   await page.waitForFunction(key=>localStorage.getItem(key)===null,{timeout:10000},ASSEMBLIES);
