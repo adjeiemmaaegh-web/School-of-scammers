@@ -131,7 +131,7 @@ export function FloorPlanCanvas({
         <input type="checkbox" checked={showWires} onChange={event => setShowWires(event.target.checked)} />
         Show wire routes
       </label>
-      <button type="button" className="btn ghost small" onClick={onOpenWiring}>
+      <button type="button" className="btn ghost small" data-floor-open-wiring onClick={onOpenWiring}>
         Open terminal wiring
       </button>
     </div>
