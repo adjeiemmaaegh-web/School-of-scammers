@@ -46,7 +46,7 @@ describe('P9 21 original editable factory scenes — source and worker truth',()
   ]);
   expect(searchSceneIds('nonexistent-operator', 'All',SCENES)).toEqual([]);
   expect(searchSceneIds('valve','Process & fluids',SCENES))
-   .toEqual(['flow-valve-diagnostics']);
+   .toEqual(['mixing-tank','flow-valve-diagnostics']);
  });
  it.each(SCENES.map(scene=>[scene.id,scene] as const))(
   '%s creates an unsolved, valid, deterministic 24V/PLC workcell on the real worker',
