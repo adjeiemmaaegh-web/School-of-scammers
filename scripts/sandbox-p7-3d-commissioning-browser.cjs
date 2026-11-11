@@ -117,10 +117,18 @@ const ST = [
   for(const [role,kind,x,y] of PARTS) {
     await page.select('[data-p7-place-kind]',kind);
     await position(x,y);
-    await count(Object.keys(ids).length+1);
+    await count(Object.keys(ids).length+1).catch(async error=>{
+      console.error('P7 SCENE CLICK DIAGNOSTICS',JSON.stringify({
+        role,kind,expected:{x,y},parts:(await saved())?.components?.map(c=>({id:c.id,kind:c.kind,x:c.x,y:c.y})),
+        errorText:await page.evaluate(()=>document.querySelector('[role="alert"]')?.textContent??null),
+        pageErrors:errors,
+      }));
+      throw error;
+    });
     const parts=(await saved()).components;
     const newest=parts[parts.length-1];
     ids[role]=newest.id;
+    console.log('P7 3D PLACED',role,kind,newest.id,newest.x,newest.y);
     assert.equal(newest.kind,kind);
     assert.ok(Math.abs(newest.x-x)<=2&&Math.abs(newest.y-y)<=2,
       `Placed ${role} on true 3D floor ray: ${newest.x}, ${newest.y}`);
