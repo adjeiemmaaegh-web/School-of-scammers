@@ -517,7 +517,10 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         const mine = { ...(nextParams[part.id] ?? {}) };
         if (cmd.value === spec.default) delete mine[spec.key]; else mine[spec.key] = cmd.value;
         if (Object.keys(mine).length) nextParams[part.id] = mine; else delete nextParams[part.id];
-        world = { ...world, project: Object.keys(nextParams).length ? { ...rest, params: nextParams } : rest, lastError: null };
+        const candidate:ProjectFile=Object.keys(nextParams).length?{...rest,params:nextParams}:rest;
+        const overlap=firstNewCarrierSuperposition(world.project,candidate);
+        world=overlap?setError(world,carrierSuperpositionError(overlap)):
+          {...world,project:candidate,lastError:null};
       }
     }
     else if (cmd.k === 'remove') {
