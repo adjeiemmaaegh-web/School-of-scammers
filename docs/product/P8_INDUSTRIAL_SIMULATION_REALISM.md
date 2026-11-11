@@ -11,9 +11,17 @@ A new worker-owned `occlusionMode=1` option for directional photoeye, inductive 
 
 Focused automated tests: `tests/p8-optical-occlusion.test.ts`; must pass with all existing P7 and earlier 3D/PLC regressions.
 
+## Implemented software slice: opt-in fixed-solid material-flow contacts
+
+A `blockMaterialFlow=1` setting on the original shelf and process vessel makes their 3D upright solid envelopes an obstacle to **conveyor-carried** parcels. The worker resolves a new contact, stops the material, records a real `jam` event, and exposes conveyor jam telemetry through the existing PLC signal path. World yaw 90/270 rotates equipment footprint, and the material's 3D height is checked. The solids use the same bounded static dimensions as their equipment registry. Already-overlapping historic bodies are not trapped. With the default `blockMaterialFlow=0`, historical scenes behave as before.
+
+This is limited new-contact handling against two explicit fixed equipment kinds. It does **not** claim collision completeness, angular dynamics, moving barrier sweeps, friction, body deformation, or general rigid-body physics.
+
+Focused automated tests: `tests/p8-fixed-solid-collisions.test.ts`.
+
 ## Full P8 work still open
 
-- Broader body-to-body/3D solids contact and continuous-angle mechanics, realistic machine/material transfers and deadlocks.
+- Broader body-to-body/general 3D solids contact and continuous-angle mechanics, realistic machine/material transfers and deadlocks beyond the two new opt-in stationary solids.
 - Body silhouette/beam volume or ray bundle, moving occluders, reflective and refractive surfaces, calibrated sensing/false triggers, explicit sensor fault phenomenology.
 - First-person avatar mechanics and sensor interaction, accessible editing ergonomics, hierarchy/prefab deep edit and richer original 3D machine art.
 - An integrated 3D browser E2E confirming occlusion affects a genuinely programmed/wired PLC signal as well as source-level deterministic unit tests.
