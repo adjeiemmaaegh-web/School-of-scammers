@@ -5,7 +5,8 @@
  */
 import { PLANT_EQUIPMENT } from '../plant/equipment';
 import type { ProjectFile, PlacedComponent, XY } from '../sim/signals';
-import { clampPlacement, DEVICE_DEPTH, DEVICE_WIDTH, type GridStep } from './geometry';
+import { clampPlacement, DEVICE_DEPTH, DEVICE_WIDTH } from './geometry';
+import type { GridStep } from './types';
 
 export const PLAN_WIDTH = 1080;
 export const PLAN_DEPTH = 580;
