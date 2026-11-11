@@ -151,7 +151,26 @@ const ST = [
   await page.$eval(`[data-3d-drag-handle="${ids.north}"]`,
     el=>el.scrollIntoView({block:'center'}));
   await page.click(`[data-3d-drag-handle="${ids.north}"]`);
-  await page.waitForSelector(`[data-p7-gizmo="${ids.north}"]`);
+  // Dense 3D layouts can have a terminal label projected over a machine
+  // label. The accessible group selector is a genuine learner workflow, not
+  // project injection; the gizmo must still rotate the real 3D machine.
+  const gizmoSelector=`[data-p7-gizmo="${ids.north}"]`;
+  const direct=await page.waitForSelector(gizmoSelector,{timeout:1500}).catch(()=>null);
+  if(!direct){
+    console.log('P7 DENSE LABEL: using accessible 3D component selection');
+    await page.$eval('[data-workspace-selection] > summary',
+      el=>{if(!el.parentElement.open)el.click();});
+    await page.evaluate(id=>{
+      const clear=[...document.querySelectorAll('.workspace-selection-actions button')]
+        .find(b=>b.textContent.trim()==='Clear selection');
+      if(clear&&!clear.disabled)clear.click();
+      const row=[...document.querySelectorAll('.workspace-selection-list label')]
+        .find(el=>el.textContent.includes(id));
+      if(!row)throw Error('North conveyor missing from selection panel');
+      row.querySelector('input').click();
+    },ids.north);
+    await page.waitForSelector(gizmoSelector,{timeout:10000});
+  }
   await page.click(`[data-p7-gizmo="${ids.north}"] [data-p7-transform="rotate"]`);
   await new Promise(resolve=>setTimeout(resolve,300));
   console.log('P7 GIZMO ROTATE DIAGNOSTIC',JSON.stringify({
