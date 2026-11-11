@@ -134,7 +134,7 @@ export function PlantWorld3D({project,scene,onPointerDownPart,onPointerMovePart,
   showZones?:boolean;showSignals?:boolean;
 }){
  const stations=plantPlacements(project);
- return <group name="worker-authored-plant-world" data-p7-p3-scene>
+ return <group name="worker-authored-plant-world">
   {stations.map(item=>{
     const def=PLANT_EQUIPMENT[item.kind];
     const state=scene.world.model[item.id]??def.fresh(item.params);
