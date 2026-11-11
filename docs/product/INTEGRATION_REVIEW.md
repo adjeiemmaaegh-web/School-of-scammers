@@ -1,5 +1,7 @@
 # PLC Skills Lab — engineering integration review
 
+> **Historical handoff (2026-11-10):** The P1–P4/P5 status matrix below describes PR #41 at the time it was written; the missing integration rows are **not** current. PR #43 subsequently reconciled P1–P4, numeric PLC and P5 at head `f52dbf948c322a1ab56145de489481a8b16324d3`, with 979/979 unit tests and completed successful Linux/Windows CI. The next unmerged branch `engineering/visual-workcell-builder-2026-11-11` adds the editable 2D plant plan and its own acceptance gates. See [P6 Visual Workcell Builder](./P6_VISUAL_WORKCELL_BUILDER.md). No physical PLC or commercial release signoff is implied.
+
 **Date:** 2026-11-10 · **Integration PR:** [#41](https://github.com/adjeiemmaaegh-web/School-of-scammers/pull/41) · **Branch:** `engineering/integration-industrial-workcell-2026-11-10`
 
 **Decision:** IN PROGRESS / NO MERGE / NO RELEASE. This file is the single reconciliation and acceptance handoff, not a claim of a finished broad industrial simulator. It supplements the existing canonical PRD and architecture. The only acceptable source of operational truth is the validated Web Worker; the 3D renderer and controls are views/actions.
