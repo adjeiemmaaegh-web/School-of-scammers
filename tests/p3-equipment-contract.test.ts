@@ -25,9 +25,14 @@ describe('P3 all equipment source contracts',()=>{
    expect(conserved(step.world)).toBe(true);
   }
  });
- it('covers ten authored starting plants with unique IDs and valid model placements',()=>{
-  expect(SCENES).toHaveLength(10);
-  expect(new Set(SCENES.map(x=>x.id)).size).toBe(10);
+ it('preserves ten legacy scenes and validates all twenty-one original worker-backed plants',()=>{
+  expect(SCENES).toHaveLength(21);
+  expect(new Set(SCENES.map(x=>x.id)).size).toBe(21);
+  expect(SCENES.slice(0,10).map(s=>s.id)).toEqual([
+   'sorting-line','gate-accumulation','weigh-reject','two-level-lift',
+   'gantry-transfer','palletizing','mini-warehouse','robot-sort',
+   'mixing-tank','bottle-line',
+  ]);
   for(const scene of SCENES){
    expect(scene.referenceST).toContain('VAR_OUTPUT');
    expect(scene.equipment.length).toBeGreaterThanOrEqual(3);
