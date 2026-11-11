@@ -15,6 +15,9 @@ export type World={
  bodies:Body[];nextBodyId:number;timeMs:number;rngState:number;
  spawnedCount:number;despawnedCount:number;droppedEventCount:number;
  events:WorldEvent[];model:Record<string,EquipmentState>;
+ /** Explicit transient classroom operator used only for opt-in worker sensing.
+  * It is never a camera inference, real human detector or physical collision body. */
+ trainingOperator?:Body;
 };
 export type EquipmentState={
  positionMm:number;speedMmS:number;progress:number;count:number;
