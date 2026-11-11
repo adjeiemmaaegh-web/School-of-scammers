@@ -5,6 +5,7 @@ import { IoMappingPanel } from '../ui/sandbox/IoMappingPanel';
 import { LogicalWiringCanvas } from '../ui/sandbox/LogicalWiringCanvas';
 import { WorkspaceAuthoringBar } from '../ui/sandbox/WorkspaceAuthoringBar';
 import { WorkspaceSelectionPanel } from '../ui/sandbox/WorkspaceSelectionPanel';
+import { AssemblyLibrary } from '../ui/sandbox/AssemblyLibrary';
 import { makeFragment } from '../workspace/clipboard';
 import { recordChange, emptyHistory, undoHistory, redoHistory } from '../workspace/history';
 import { workspaceShortcut } from '../workspace/keyboard';
@@ -582,6 +583,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onPaste={pasteSelection} onDuplicate={duplicateSelection} onRemove={deleteSelection}
           onRotate={rotateSelection} onNudge={moveSelection}/>
       </div>}
+      {!scenario && <AssemblyLibrary project={project} selectedIds={selectedDeviceIds}
+        editable={editable} grid={grid}
+        onInsert={(fragment,at)=>edit({kind:'paste',fragment,at,grid})}/>}
       <div className="p5-view-tools" role="toolbar" aria-label="Canvas views and active tools">
         <div className="p5-view-tabs" role="group" aria-label="Project view">
           <button type="button" data-p5-view="logical" aria-pressed={workspaceView==='logical'}
