@@ -85,7 +85,8 @@ const ST = [
    const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
    const dot=(a,b)=>a.reduce((total,v,i)=>total+v*b[i],0);
    const f=norm(camera.map(v=>-v)),right=norm(cross(f,[0,1,0])),up=cross(right,f);
-   const rel=[wx-camera[0],-camera[1],wz-camera[2]];
+   // The actual R3F click surface is 9 cm below its nominal zero plane.
+   const rel=[wx-camera[0],-.09-camera[1],wz-camera[2]];
    const depth=dot(rel,f),tan=Math.tan(42*Math.PI/360);
    assert.ok(depth>0,'The 3D pointer target is in front of the camera');
    const nx=dot(rel,right)/(depth*tan*box.w/box.h);
