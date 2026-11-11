@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Grid, Html, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { CatmullRomCurve3, Plane, Raycaster, Vector2, Vector3, type Camera } from 'three';
-import { COMPONENTS, type ComponentKind } from '../components/registry';
+import { COMPONENTS, componentKinds, type ComponentKind } from '../components/registry';
 import type { PlacedComponent, ProjectFile, RenderSnapshot, XY } from '../sim/signals';
 import type { Parcel } from '../plant/sorting-conveyor';
 import { supportsWebGL } from '../components/SceneShell';
@@ -22,6 +22,10 @@ import { clampPlacement } from '../workspace/geometry';
 import type { GridStep } from '../workspace/types';
 import { WorkcellCameraRig } from './WorkcellCameraRig';
 import { type CameraPose, type WorkcellCameraMode } from './workcell-camera';
+import {
+  assess3DPlacement, placementMessage, previewDimensions,
+  type PlacementAssessment,
+} from './scene-authoring';
 
 const additiveSelection = (value: unknown): boolean => {
   const event = value as { ctrlKey?: boolean; metaKey?: boolean;
@@ -363,6 +367,34 @@ function Cable3D({ project, from, to, live }: { project: ProjectFile; from: stri
   </mesh>;
 }
 
+/** Accessible, camera-anchored move/rotate handles. The renderer never
+ * changes project state itself: every click dispatches existing worker edits.
+ */
+function SceneTransformGizmo({component,grid,onMove,onRotate}:{
+  component:PlacedComponent;grid:GridStep;
+  onMove:(id:string,to:XY)=>void;onRotate:(turns:-1|1)=>void;
+}){
+ const [x,,z]=worldPosition(component);
+ const move=(dx:number,dy:number)=>onMove(component.id,
+   clampPlacement({x:component.x+dx,y:component.y+dy},grid));
+ return <Html position={[x,.48,z]} center distanceFactor={10}
+   style={{pointerEvents:'auto'}}>
+   <div className="p7-3d-gizmo" data-p7-gizmo={component.id}
+      role="group" aria-label={`Transform ${component.id} in 3D scene`}>
+     <button type="button" data-p7-transform="west" onClick={e=>{e.stopPropagation();move(-grid,0);}}
+       title="Move west by one selected grid interval">←</button>
+     <button type="button" data-p7-transform="north" onClick={e=>{e.stopPropagation();move(0,-grid);}}
+       title="Move north by one grid interval">↑</button>
+     <button type="button" data-p7-transform="south" onClick={e=>{e.stopPropagation();move(0,grid);}}
+       title="Move south by one grid interval">↓</button>
+     <button type="button" data-p7-transform="east" onClick={e=>{e.stopPropagation();move(grid,0);}}
+       title="Move east by one grid interval">→</button>
+     <button type="button" data-p7-transform="rotate" onClick={e=>{e.stopPropagation();onRotate(1);}}
+       title="Rotate selected machine by exactly 90 degrees">↻90°</button>
+   </div>
+ </Html>;
+}
+
 type DeviceDrag = {
   id: string; pointerId: number; start: {x:number;z:number};
   origin: XY; preview: XY;
@@ -371,13 +403,20 @@ type DeviceDrag = {
 /** This scene owns camera and pointer gestures, NEVER PLC or physics state.
  * A dragged machine is a temporary ghost until the worker acknowledges 'move'.
  */
-function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPlaceAt, onMove, onCameraPose }: {
+function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSensor,
+  showZones, showSignals, selectedDeviceIds, selectedTerminal, moveTarget,
+  onTerminal, onOperate, onSelect, onPlaceAt, onPlace, onPreview, onMove, onRotate, onCameraPose }: {
   project: ProjectFile; snapshot: RenderSnapshot; editable: boolean; grid: GridStep;
   mode:WorkcellCameraMode;
+  placeKind:ComponentKind | ''; alignSensor:boolean;
+  showZones:boolean; showSignals:boolean;
   selectedDeviceIds: readonly string[]; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
   onSelect: (id: string, additive: boolean) => void; onPlaceAt: (at: XY) => void;
   onMove: (id:string,at:XY)=>void;
+  onPlace:(kind:ComponentKind,at:XY)=>void;
+  onPreview:(assessment:PlacementAssessment|null)=>void;
+  onRotate:(turns:-1|1)=>void;
   onCameraPose:(pose:CameraPose)=>void;
 }) {
   const { camera, gl } = useThree();
@@ -401,6 +440,14 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
   };
   const floorPoint=(event:ThreeEvent<PointerEvent>)=>
     floorFromClient(event.nativeEvent.clientX,event.nativeEvent.clientY);
+  const assessPoint=(point:{x:number;z:number}):PlacementAssessment|null=>
+    placeKind?assess3DPlacement(project,placeKind,projectPlacement(point),grid,alignSensor):null;
+  const placeAtPoint=(point:{x:number;z:number})=>{
+    const decision=assessPoint(point);
+    if(decision&&placeKind&&editable)onPlace(placeKind,decision.at);
+  };
+  const previewAtPoint=(point:{x:number;z:number}|null)=>
+    onPreview(point?assessPoint(point):null);
   const focus=(id:string)=>{
     const item=project.components.find(c=>c.id===id);
     if(!item)return;
@@ -410,6 +457,11 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
   const start=(event:ThreeEvent<PointerEvent>,id:string)=>{
     if(event.button!==0)return;
     event.stopPropagation();
+    if(placeKind){
+      const point=floorPoint(event);
+      if(point)placeAtPoint(point);
+      return;
+    }
     const additive=additiveSelection(event);
     onSelect(id,additive);
     if(!editable||mode!=='orbit'||additive)return;
@@ -428,6 +480,11 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
   const startLabel=(event:ReactPointerEvent<HTMLDivElement>,id:string)=>{
     if(event.button!==0)return;
     event.stopPropagation();
+    if(placeKind){
+      const point=floorFromClient(event.clientX,event.clientY);
+      if(point)placeAtPoint(point);
+      return;
+    }
     const additive=event.ctrlKey||event.metaKey;
     onSelect(id,additive);
     if(!editable||mode!=='orbit'||additive)return;
@@ -447,6 +504,9 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
       y:gesture.origin.y+(point.z-gesture.start.z)*100,
     },grid);
   const moveGesture=(event:ThreeEvent<PointerEvent>)=>{
+    if(placeKind){
+      previewAtPoint(floorPoint(event));return;
+    }
     const active=currentDrag.current;
     if(!active||active.pointerId!==event.pointerId)return;
     event.stopPropagation();
@@ -507,6 +567,7 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
   // Hook applies to one active gesture. Geometry and grid are locked at
   // pointer down; a project update can occur only after release.
   },[drag?.pointerId,grid,editable,camera,gl,onMove]);
+  useEffect(()=>{if(!placeKind)onPreview(null);},[placeKind,onPreview]);
   const preview=drag&&project.components.find(c=>c.id===drag.id);
   const plan=preview?footprintOf(preview,project.params):null;
   const ghost=drag?worldPosition(drag.preview):null;
@@ -516,7 +577,11 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
     <directionalLight position={[-4, 9, 6]} intensity={1.7} />
     <directionalLight position={[8, 4, -5]} intensity={0.6} color="#a5d5ff" />
     <mesh position={[0, -0.09, 0]} rotation={[-Math.PI / 2, 0, 0]}
-      onClick={event => { if (moveTarget && editable) { event.stopPropagation(); onPlaceAt(projectPlacement(event.point)); } }}
+      onPointerMove={event=>{if(placeKind)previewAtPoint(event.point);}}
+      onClick={event => {
+        if(placeKind&&editable){event.stopPropagation();placeAtPoint(event.point);}
+        else if(moveTarget&&editable){event.stopPropagation();onPlaceAt(projectPlacement(event.point));}
+      }}
       onDoubleClick={event=>{if(mode==='orbit'){event.stopPropagation();setInterest([event.point.x,0,event.point.z]);}}}>
       <planeGeometry args={[11.3, 6.3]} />
       <meshStandardMaterial color="#152a3d" />
@@ -527,6 +592,7 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
     {project.wires.map(w => <Cable3D key={w.id} project={project} from={w.from} to={w.to}
       live={snapshot.voltages[w.from] === 24 && snapshot.voltages[w.to] === 24} />)}
     <PlantWorld3D project={project} scene={snapshot.plantWorld}
+      selectedIds={selectedDeviceIds} showZones={showZones} showSignals={showSignals}
       onPointerDownPart={start} onPointerMovePart={moveGesture}
       onPointerUpPart={endGesture} onFocusPart={focus} />
     {project.components.map(c => <Device3D key={c.id} c={c} project={project} editable={editable}
@@ -546,6 +612,10 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
         c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false)}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect}
       onPress={start} onLabelPress={startLabel} onMoveDrag={moveGesture} onEndDrag={endGesture} onFocus={focus} />)}
+    {selectedDeviceIds.length===1&&editable&&mode==='orbit'&&
+      project.components.filter(c=>c.id===selectedDeviceIds[0]).map(c=>
+        <SceneTransformGizmo key={c.id} component={c} grid={grid}
+          onMove={onMove} onRotate={onRotate}/>)}
     {ghost&&preview&&plan&&<mesh position={[ghost[0],0.075,ghost[2]]}>
       <boxGeometry args={[plan.width/100,.06,plan.depth/100]} />
       <meshBasicMaterial color="#ffa633" transparent opacity={.42} depthWrite={false} wireframe />
@@ -568,12 +638,31 @@ export type Sandbox3DProps = {
   onPlace: (kind: ComponentKind, at: XY) => void;
   onMove: (id: string, at: XY) => void;
   onMoveFinished: () => void;
+  onRotate: (turns:-1|1)=>void;
+  onOpenWiring:()=>void;
 };
 export function Sandbox3D(props: Sandbox3DProps) {
   const available = useMemo(supportsWebGL, []);
   const camera = useRef<Camera | null>(null);
   const [cameraMode,setCameraMode]=useState<WorkcellCameraMode>('orbit');
   const [cameraPose,setCameraPose]=useState<CameraPose|null>(null);
+  const [placementKind,setPlacementKind]=useState<ComponentKind | ''>('');
+  const [alignSensor,setAlignSensor]=useState(true);
+  const [showZones,setShowZones]=useState(true);
+  const [showSignals,setShowSignals]=useState(true);
+  const [hover,setHover]=useState<PlacementAssessment|null>(null);
+  const onPreview=(assessment:PlacementAssessment|null)=>{
+    setHover(previous=>previous?.at.x===assessment?.at.x&&
+      previous?.at.y===assessment?.at.y&&previous?.footprint.kind===assessment?.footprint.kind&&
+      previous?.mountedTo===assessment?.mountedTo?previous:assessment);
+  };
+  useEffect(()=>{
+    const cancel=(event:KeyboardEvent)=>{
+      if(event.key==='Escape')setPlacementKind('');
+    };
+    window.addEventListener('keydown',cancel);
+    return ()=>window.removeEventListener('keydown',cancel);
+  },[]);
   const onPlaceAt = (at: XY) => {
     if (!props.moveTarget) return;
     props.onMove(props.moveTarget, at);
@@ -591,7 +680,9 @@ export function Sandbox3D(props: Sandbox3DProps) {
     ray.setFromCamera(mouse, camera.current);
     const point = new Vector3();
     if (ray.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), 0), point)) {
-      props.onPlace(kind, projectPlacement(point));
+      const assessment=assess3DPlacement(props.project,kind,projectPlacement(point),
+        props.grid??5,alignSensor);
+      props.onPlace(kind,assessment.at);
     }
   };
   return <div className="sandbox-3d-shell" aria-label="Interactive 3D industrial automation workspace"
@@ -604,12 +695,35 @@ export function Sandbox3D(props: Sandbox3DProps) {
         disabled={!available} onClick={()=>{setCameraMode(id);setCameraPose(null);}}>
         {label}</button>)}
     </div>
+    <div className="p7-3d-authoring" role="group" aria-label="3D factory authoring" data-p7-3d-authoring>
+      <label>3D placement
+        <select data-p7-place-kind aria-label="3D equipment placement tool"
+          disabled={!props.editable||!available} value={placementKind}
+          onChange={event=>{setPlacementKind(event.target.value as ComponentKind | '');setHover(null);}}>
+          <option value="">Select / drag machines</option>
+          {componentKinds.map(kind=><option key={kind} value={kind}>{COMPONENTS[kind].label}</option>)}
+        </select>
+      </label>
+      <label className="p7-3d-check"><input type="checkbox" data-p7-align-sensor
+        checked={alignSensor} onChange={event=>setAlignSensor(event.target.checked)}/>
+        Align sensing zone to carrier</label>
+      <label className="p7-3d-check"><input type="checkbox" data-p7-zones
+        checked={showZones} onChange={event=>setShowZones(event.target.checked)}/>
+        Sensor regions</label>
+      <label className="p7-3d-check"><input type="checkbox" data-p7-live-signals
+        checked={showSignals} onChange={event=>setShowSignals(event.target.checked)}/>
+        Selected I/O</label>
+      <button type="button" data-p7-wire onClick={props.onOpenWiring}>Wire PLC terminals</button>
+    </div>
     {available ? <Canvas className="sandbox-three-canvas" dpr={[1, 1.5]}
       gl={{ antialias: true, powerPreference: 'low-power' }}
       camera={{ position: [7, 8.5, 10], fov: 42, near: 0.1, far: 120 }}
       onCreated={state => { camera.current = state.camera; state.camera.lookAt(0, 0, 0); }}>
       <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
         grid={props.grid??5} mode={cameraMode} onMove={props.onMove}
+        placeKind={placementKind} alignSensor={alignSensor} showZones={showZones}
+        showSignals={showSignals} onPlace={props.onPlace} onPreview={onPreview}
+        onRotate={props.onRotate}
         onCameraPose={setCameraPose}
         selectedDeviceIds={props.selectedDeviceIds ?? []}
         selectedTerminal={props.selectedTerminal} moveTarget={props.moveTarget}
@@ -619,6 +733,10 @@ export function Sandbox3D(props: Sandbox3DProps) {
       <strong>3D renderer unavailable on this device</strong>
       <p>The PLC simulator still runs. Use the component patch panel below to wire, operate and inspect devices without WebGL.</p>
     </div>}
+    {placementKind&&hover&&available&&<div className="p7-3d-preview"
+      role="status" data-p7-place-feedback>{placementMessage(hover)}
+      <span> · {Math.round(hover.at.x)}, {Math.round(hover.at.y)}</span>
+    </div>}
     <div className="sandbox-3d-hud">
       <span data-3d-camera-status>{cameraMode==='orbit'
         ? '3D ORBIT · Drag to rotate · Right drag to pan · Wheel zoom · Double-click to focus'
@@ -627,7 +745,8 @@ export function Sandbox3D(props: Sandbox3DProps) {
         : '3D FIRST PERSON · Eye height 1.8 m · Focus scene, WASD to walk · Right drag to look'}
         {cameraMode!=='orbit'&&cameraPose
           ? ` · Camera ${cameraPose.x.toFixed(2)}, ${cameraPose.y.toFixed(2)}, ${cameraPose.z.toFixed(2)} m` : ''}</span>
-      <span>{props.moveTarget ? 'Move selected: click the 3D workbench floor' :
+      <span>{placementKind?'Click the 3D floor or existing machinery to place '+COMPONENTS[placementKind].label :
+        props.moveTarget ? 'Move selected: click the 3D workbench floor' :
         props.selectedDeviceId ? `Selected: ${props.selectedDeviceId} · Drag the model to move (paused)`
         : 'Select a 3D machine or terminal · paused editing'}</span>
     </div>
