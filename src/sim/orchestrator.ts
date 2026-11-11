@@ -28,6 +28,7 @@ import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { clearedAlarm, engineFault, freshCylinder, stepCylinder } from '../plant/cylinder';
 import { analogWireError, sampleAnalogInputs } from './analog';
 import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
+import {firstNewCarrierSuperposition,carrierSuperpositionError} from '../workspace/carrier-clearance';
 import { freshProjectPlant, stepProjectPlant, sensorImage, validatePlantFaults } from './p3-plant-bridge';
 import { makePlantSceneProject } from './p3-scene-import';
 export { MAX_COMPONENTS, MAX_WIRES };
@@ -586,6 +587,8 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (world.running) world = setError(world, 'Pause the PLC before editing the workspace');
       else try {
         const candidate = validateProject(applyWorkspaceEdit(world.project, cmd.edit));
+        const invalid=firstNewCarrierSuperposition(world.project,candidate);
+        if(invalid)throw new Error(carrierSuperpositionError(invalid));
         if (JSON.stringify(candidate) !== JSON.stringify(world.project)) {
           world = { ...createWorld(candidate), breakpointScan: world.breakpointScan, breakpointTag: world.breakpointTag };
           commandEvents.push({ tick: world.tick, kind: 'edit', detail: 'Workspace ' + cmd.edit.kind + ' committed' });
@@ -611,11 +614,17 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           const fresh = defaultProgramFor('plc16');
           project = { ...project, program: fresh.program, stSource: fresh.stSource };
         }
-        world = { ...world, project };
+        const overlap=firstNewCarrierSuperposition(world.project,project);
+        world = overlap?setError(world,carrierSuperpositionError(overlap)):{...world,project};
       }
     } else if (cmd.k === 'move') {
       if (!validPos(cmd.to) || !world.project.components.some(c => c.id === cmd.id)) world = setError(world, 'Invalid movement');
-      else world = { ...world, project: { ...world.project, components: world.project.components.map(c => c.id === cmd.id ? { ...c, ...cmd.to } : c) } };
+      else {
+        const project={...world.project,
+          components:world.project.components.map(c=>c.id===cmd.id?{...c,...cmd.to}:c)};
+        const overlap=firstNewCarrierSuperposition(world.project,project);
+        world=overlap?setError(world,carrierSuperpositionError(overlap)):{...world,project};
+      }
     } else if (cmd.k === 'wire') {
       const phaseError = threePhaseWireError(cmd.from, cmd.to,
         Object.fromEntries(world.project.components.map(c => [c.id, c.kind])));
