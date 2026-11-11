@@ -78,3 +78,29 @@ export function advanceCamera(
  if(canMove(x,pose.z+dz))z=pose.z+dz;
  return {...pose,x,y:nextY,z};
 }
+
+
+/** Frame saved 3D equipment without zooming to a fake viewport extent.
+ * All positions are metres. Reading project coordinates has no effect on
+ * PLC states or simulation time; requested framing never mutates the model.
+ */
+export function frameEntireWorkcell(
+ project:Pick<ProjectFile,'components'|'params'>,
+):{target:[number,number,number];position:[number,number,number]}{
+ if(!project.components.length)
+  return {target:[0,0,0],position:[7,8.5,10]};
+ let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+ for(const component of project.components){
+  const bounds=footprintOf(component,project.params);
+  const x=(bounds.x-540)/100,z=(bounds.y-290)/100;
+  const halfX=bounds.width/200,halfZ=bounds.depth/200;
+  minX=Math.min(minX,x-halfX);maxX=Math.max(maxX,x+halfX);
+  minZ=Math.min(minZ,z-halfZ);maxZ=Math.max(maxZ,z+halfZ);
+ }
+ const cx=(minX+maxX)/2,cz=(minZ+maxZ)/2;
+ // Include the vertical viewing angle and a comfortable border for labels.
+ const sceneSpan=Math.max(maxX-minX,(maxZ-minZ)*1.8,2.5);
+ const distance=Math.min(14,Math.max(4,sceneSpan*1.05));
+ return {target:[cx,0,cz],position:[cx+distance*.65,
+  1+distance*.95,cz+distance]};
+}
