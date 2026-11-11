@@ -1,11 +1,14 @@
 /**
- * P3 original scene gallery, telemetry and fault inspector.
- * The page sends commands; the worker validates/executes them.
- * No hidden pre-wiring or auto-solved PLC program.
+ * P9 original, searchable factory scene library, telemetry and fault inspector.
+ * No hidden pre-wiring, reference-program injection, or synthetic PLC results.
+ * The worker alone replaces a project after a user-confirmed request.
  */
+import {useMemo,useState} from 'react';
 import type {ProjectFile,RenderSnapshot,Command} from '../../sim/signals';
 import {SCENES} from '../../plant/scenes/catalogue';
 import {PLANT_EQUIPMENT} from '../../plant/equipment';
+import {SCENE_CATEGORIES,SCENE_METADATA,searchSceneIds,
+ type SceneCategory} from '../../plant/scenes/metadata';
 import './plant-scene.css';
 
 type Props={project:ProjectFile|null;snapshot:RenderSnapshot|null;editable:boolean;
@@ -14,23 +17,73 @@ type Props={project:ProjectFile|null;snapshot:RenderSnapshot|null;editable:boole
 export function PlantScenePanel({project,snapshot,editable,onCommands}:Props){
  const parts=project?.components.filter(c=>PLANT_EQUIPMENT[c.kind])??[];
  const readings=snapshot?.plantWorld.signals??{};
+ const [query,setQuery]=useState('');
+ const [category,setCategory]=useState<SceneCategory|'All'>('All');
+ const [pendingId,setPendingId]=useState<string|null>(null);
+ const visible=useMemo(()=>{
+  const ids=new Set(searchSceneIds(query,category,SCENES));
+  return SCENES.filter(scene=>ids.has(scene.id));
+ },[query,category]);
+ const startScene=(id:string)=>{
+  if(!editable)return;
+  if(project?.components.length&&pendingId!==id){setPendingId(id);return;}
+  onCommands([{k:'loadPlantScene',id}]);
+  setPendingId(null);
+ };
  return <>
-  <details className="sandbox-plant-scenes panel" data-p3-scene-gallery>
-   <summary>Plant Library · 10 editable industrial learning scenes</summary>
-   <p className="sandbox-help">Original unsolved layouts. Place and wire your PLC, sensors and actuators, then write your own logic. Opening a scene replaces the current project; export your work first.</p>
-   <div className="sandbox-plant-scene-grid">
-    {SCENES.map(scene=><section key={scene.id} className="sandbox-plant-scene-choice">
-     <strong>{scene.title}</strong><p>{scene.description}</p>
-     <button type="button" className="btn ghost small" disabled={!editable}
-       onClick={()=>onCommands([{k:'loadPlantScene',id:scene.id}])}
-       data-load-plant-scene={scene.id}>Create editable scene</button>
-     <details><summary>Suggested wiring and PLC reasoning</summary>
-      <p>{scene.acceptance}</p>
-      <p>Suggested source → destination: {scene.recommendedLinks.map(link=>
-        link.source+' → '+link.target).join(' · ')}</p>
-      <pre className="sandbox-plant-st">{scene.referenceST}</pre>
-     </details>
-    </section>)}
+  <details className="sandbox-plant-scenes panel" data-p3-scene-gallery data-p9-scene-gallery>
+   <summary>Plant Library · {SCENES.length} original editable learning scenes</summary>
+   <p className="sandbox-help">Every scene starts unsolved: equipment and a blank wiring harness only.
+    The learner must connect the 24 V supply, wire PLC I/O and author the program.
+    All sensing, motion, faults and results come from the simulation worker.
+    This is an original training library, not a copy of a vendor's commercial scenes.</p>
+   <div className="sandbox-p9-scene-filter">
+    <label>Find a factory scene
+      <input type="search" data-p9-scene-search value={query}
+       placeholder="Try sensing, lift or warehouse"
+       onChange={event=>{setQuery(event.target.value);setPendingId(null);}}/>
+    </label>
+    <label>Focus area
+      <select data-p9-scene-category value={category}
+       onChange={event=>{setCategory(event.target.value as SceneCategory|'All');setPendingId(null);}}>
+       <option value="All">All learning areas</option>
+       {SCENE_CATEGORIES.map(v=><option key={v} value={v}>{v}</option>)}
+      </select>
+    </label>
+    <span className="sandbox-help" data-p9-scene-count aria-live="polite">
+      {visible.length} of {SCENES.length} original scenes</span>
+   </div>
+   <div className="sandbox-plant-scene-grid" data-p9-scene-results>
+    {visible.map(scene=>{
+     const meta=SCENE_METADATA[scene.id];
+     return <section key={scene.id} className="sandbox-plant-scene-choice"
+       data-p9-scene-card={scene.id} data-p9-scene-category={meta.category}>
+      <strong>{scene.title}</strong>
+      <span className="sandbox-p9-scene-meta">{meta.category} · {meta.difficulty}</span>
+      <p>{scene.description}</p>
+      <p className="sandbox-help">Practice: {meta.skills.join(' · ')}</p>
+      {pendingId===scene.id&&<p role="status" data-p9-scene-confirm-warning>
+       This replaces your current project. Save or export it before confirming.</p>}
+      <div className="sandbox-actions">
+       <button type="button" className="btn ghost small" disabled={!editable}
+         onClick={()=>startScene(scene.id)}
+         data-load-plant-scene={scene.id}>
+         {pendingId===scene.id?'Confirm replacement':'Create editable scene'}
+       </button>
+       {pendingId===scene.id&&<button type="button" className="btn ghost small"
+         data-p9-scene-cancel onClick={()=>setPendingId(null)}>Cancel</button>}
+      </div>
+      <details><summary>Learning goal and wiring guidance</summary>
+       <p>{scene.acceptance}</p>
+       <p>Suggested source → destination: {scene.recommendedLinks.map(link=>
+         link.source+' → '+link.target).join(' · ')}</p>
+       <pre className="sandbox-plant-st">{scene.referenceST}</pre>
+       <p className="sandbox-help">Guidance is for reference only; it never loads a solved PLC program.</p>
+      </details>
+     </section>;
+    })}
+    {!visible.length&&<p className="sandbox-help" data-p9-scene-empty>
+      No matching scene. Clear the search or choose another area.</p>}
    </div>
   </details>
   {snapshot&&parts.length>0&&<section className="sandbox-p3-world panel" aria-label="Shared plant physics and equipment">
