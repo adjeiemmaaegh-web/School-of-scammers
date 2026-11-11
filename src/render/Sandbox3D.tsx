@@ -747,6 +747,13 @@ export function Sandbox3D(props: Sandbox3DProps) {
       <span> · {Math.round(hover.at.x)}, {Math.round(hover.at.y)}</span>
     </div>}
     <div className="sandbox-3d-hud">
+      <output data-p7-worker-bodies aria-label="Bodies in authoritative simulated plant">
+        {props.snapshot.plantWorld.world.bodies.length} worker bodies
+        {props.snapshot.plantWorld.world.bodies.map(body=>
+          <span key={body.id} data-p7-worker-body={body.id}
+            data-p7-body-mm-x={body.pos.x} data-p7-body-mm-y={body.pos.y}
+            aria-label={`Simulated body ${body.id} at ${Math.round(body.pos.x)} by ${Math.round(body.pos.y)} millimetres`}/>)}
+      </output>
       <span data-3d-camera-status>{cameraMode==='orbit'
         ? '3D ORBIT · Drag to rotate · Right drag to pan · Wheel zoom · Double-click to focus'
         : cameraMode==='fly'
