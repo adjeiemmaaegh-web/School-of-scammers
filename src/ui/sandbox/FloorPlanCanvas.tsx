@@ -67,10 +67,17 @@ export function FloorPlanCanvas({
   const onDevicePointerDown = (event: PointerEvent<SVGGElement>, id: string) => {
     if (event.button !== 0) return;
     event.stopPropagation();
+    const svg = event.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    // Sensors often mount ON conveyor footprints. Clicking a visible device in
+    // placement mode still places the new part at that floor coordinate.
+    if (placementKind) {
+      if (editable) placeAt(placementKind, pointOf(event, svg));
+      return;
+    }
     const additive = event.ctrlKey || event.metaKey;
     onSelect(id, additive);
-    const svg = event.currentTarget.ownerSVGElement;
-    if (!editable || !svg || additive || placementKind) return;
+    if (!editable || additive) return;
     const device = project.components.find(c => c.id === id);
     if (!device) return;
     const pos = pointOf(event, svg);
