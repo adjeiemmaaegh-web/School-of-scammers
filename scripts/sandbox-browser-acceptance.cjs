@@ -22,7 +22,7 @@ const pairs = [
       await page.$eval(selector, el => el.scrollIntoView({ block: 'center', inline: 'center' }));
       return original(selector, options);
     }; }
-  page.on('pageerror', error => errors.push(String(error)));
+  page.on('pageerror', error => errors.push(error?.stack ?? String(error)));
   page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
   const clickText = async text => {
     const found = await page.evaluate(label => {
