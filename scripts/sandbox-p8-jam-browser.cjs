@@ -55,8 +55,14 @@ const project=(blocking)=>({
   assert.ok(clicked,'Real worker Run control must be usable');
   // Wait for the actual modeled condition rather than an arbitrary time:
   // CI browser frame pacing does not imply a fixed number of worker scans.
+  let witnessed;
   try{
-   await page.waitForFunction(blocked=>{
+   // This function atomically captures a REAL worker-derived DOM snapshot
+   // while the first parcel and belt JAM agree. Previously we awaited a
+   // true condition, then sampled a DIFFERENT worker scan after expanding
+   // the diagnostics; transient jam telemetry could clear between those
+   // scans and cause an intermittent false failure.
+   const handle=await page.waitForFunction(blocked=>{
     const bodies=[...document.querySelectorAll('.sandbox-p3-body-list li')]
      .map(li=>li.textContent||'');
     if(blocked){
@@ -65,10 +71,13 @@ const project=(blocking)=>({
      const first=document.querySelector('[data-p3-body-id="b1"]')?.textContent||'';
      const x=Number(first.match(/x\s+(-?\d+)\s*mm/)?.[1]);
      return belt?.textContent?.includes('jam = true')&&
-      first.includes('jammed')&&Number.isFinite(x)&&x<100;
+      first.includes('jammed')&&Number.isFinite(x)&&x<100?
+       {jam:true,first,x}:false;
     }
-    return bodies.some(t=>Number(t.match(/x\s+(-?\d+)\s*mm/)?.[1])>100);
+    const body=bodies.find(t=>Number(t.match(/x\s+(-?\d+)\s*mm/)?.[1])>100);
+    return body?{free:true,body}:false;
    },{timeout:24000},blocked);
+   witnessed=await handle.jsonValue();
   }catch(error){
    console.error('P8 real worker browser diagnostics:',blocked,await inspect());
    throw error;
@@ -80,16 +89,16 @@ const project=(blocking)=>({
   const observed=await inspect();
   assert.ok(observed.raw.length,'A physical worker parcel must exist');
   if(blocked){
-   assert.equal(observed.jam,true,'The worker belt must publish a real jam');
-   assert.ok(observed.raw.some(t=>t.includes('b1')&&t.includes('jammed')&&
-    Number(t.match(/x\s+(-?\d+)\s*mm/)?.[1])<100),
-    'The FIRST moving body must jam before crossing the configured static rack');
+   assert.equal(witnessed?.jam,true,'The worker belt must publish a real jam');
+   assert.ok(witnessed?.first?.includes('b1')&&
+    witnessed.first.includes('jammed')&&witnessed.x<100,
+    'The FIRST physical worker body must jam before crossing the configured rack');
   }else{
-   // Ordinary body-to-body queuing can still produce a legitimate jam if
-   // the feeder creates subsequent parcels. This branch asserts free flow
-   // beyond the rack, not absence of *every other kind* of real jam.
-   assert.ok(observed.raw.some(t=>Number(t.match(/x\s+(-?\d+)\s*mm/)?.[1])>100),
+   // Real body-to-body queuing may legitimately jam later. This branch
+   // records a free-moving real parcel crossing the rack in one scan.
+   assert.equal(witnessed?.free,true,
     'An unblocked parcel must move past the fixed-solid threshold');
+   assert.ok(Number(witnessed.body.match(/x\s+(-?\d+)\s*mm/)?.[1])>100);
   }
   const saved=await page.evaluate(name=>JSON.parse(localStorage.getItem(name)||'null'),storage);
   assert.equal(saved?.components?.length,5);
