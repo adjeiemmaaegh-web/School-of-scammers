@@ -98,3 +98,43 @@
 @media(max-width:550px) {
   .sandbox-ux .sandbox-numeric-operand,.sandbox-ux .sandbox-numeric-target { flex-basis:100%; }
 }
+
+
+/* P2 Function Block Diagram: original 2D signal graph with accessible connection selectors. */
+.sandbox-fbd-editor { display:grid; gap:12px; min-width:0; padding:16px; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
+.sandbox-fbd-editor h2 { margin-top:5px; font-size:19px; }
+.sandbox-fbd-actions { display:flex; flex-wrap:wrap; align-items:end; gap:8px; }
+.sandbox-fbd-actions label,.sandbox-fbd-block label { display:grid; gap:4px; font-size:11px; color:var(--muted); }
+.sandbox-fbd-actions select,.sandbox-fbd-block :is(select,input) {
+  padding:6px 7px; border:1px solid var(--line); border-radius:6px; background:var(--surface);
+  color:var(--ink); font:12px var(--mono); min-width:0; max-width:100%;
+}
+.sandbox-fbd-canvas { overflow:auto; border:1px solid var(--line); background:#0c1927; border-radius:9px; max-height:530px; }
+.sandbox-fbd-canvas svg { display:block; min-width:900px; color:#709eb8; }
+.sandbox-fbd-blocks { display:grid; grid-template-columns:repeat(auto-fill,minmax(205px,1fr)); gap:9px; max-height:520px; overflow:auto; }
+.sandbox-fbd-block { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;
+  align-content:start; padding:10px; border:1px solid var(--line); border-radius:8px;
+  background:var(--surface-2); min-width:0;
+}
+.sandbox-fbd-block legend { font:600 11px var(--mono); padding:0 4px; }
+.sandbox-fbd-block label:nth-of-type(-n+3),.sandbox-fbd-block button { grid-column:1/-1; }
+.sandbox-fbd-validation { padding:10px; font:12px var(--mono); border:1px solid var(--line); border-radius:8px; background:var(--surface-2); overflow-wrap:anywhere; }
+.sandbox-fbd-block :disabled { opacity:.6; }
+@media(max-width:560px){.sandbox-fbd-blocks{grid-template-columns:1fr}.sandbox-fbd-editor{padding:10px}}
+
+/* P2 per-PLC tag-table; authoritative runtime values, metadata-only local addresses. */
+.sandbox-p2-tag-table { border:1px solid var(--line); border-radius:9px; padding:11px; background:var(--surface-2); display:grid; gap:12px; }
+.sandbox-p2-tag-table summary { cursor:pointer; font-size:13px; font-weight:700; }
+.sandbox-p2-tag-table h3 { font-size:13px; padding-top:8px; }
+.sandbox-p2-tag-grid { display:grid; gap:2px; max-height:250px; overflow:auto; }
+.sandbox-p2-tag-grid [role=row] { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); align-items:center; gap:8px;
+  border:1px solid var(--line); background:var(--surface); padding:7px 9px; border-radius:5px; font-size:11px; color:var(--ink);
+}
+.sandbox-p2-tag-grid button[role=row] { text-align:left; cursor:pointer; width:100%; }
+.sandbox-p2-tag-grid button[role=row].selected { outline:2px solid var(--accent); }
+.sandbox-p2-tag-grid code { overflow-wrap:anywhere; }
+.sandbox-p2-tag-settings { display:flex; flex-wrap:wrap; gap:7px; align-items:end; margin-top:10px; }
+.sandbox-p2-tag-settings label { display:grid; gap:4px; flex:1 1 140px; min-width:0; font-size:11px; }
+.sandbox-p2-tag-settings input { background:var(--surface); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:7px; width:100%; font:12px var(--mono); }
+.sandbox-p2-tag-table [role=alert] { color:var(--crit); font-size:12px; }
+@media(max-width:600px){.sandbox-p2-tag-grid [role=row]{grid-template-columns:repeat(2,minmax(0,1fr))}}
