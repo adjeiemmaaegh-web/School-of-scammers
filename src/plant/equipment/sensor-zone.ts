@@ -10,7 +10,7 @@
  * sensor families. The render layer never performs detection itself.
  */
 import type {EquipmentContext} from '../world/equipment';
-import type {Vec3} from '../world/types';
+import type {Body,Vec3} from '../world/types';
 import {face} from '../world/math';
 
 export type OpticalZone={
@@ -35,7 +35,9 @@ export function opticalZoneOf(kind:string,ctx:EquipmentContext,fault:string|null
   rangeMm,
   beamWidthMm:directional?(ctx.params.beamWidthMm??100):rangeMm,
   heightMm:1200,
-  yawDeg:ctx.yawDeg,
+  // Training fault shifts a directional head by a full quarter-turn.
+  // The read-only beam display uses this same descriptor as the worker.
+  yawDeg:fault==='sensor-misaligned'?(((ctx.yawDeg+90)%360) as 0|90|180|270):ctx.yawDeg,
  };
 }
 /** Body-centre detection matches the existing bounded P3 teaching physics.
@@ -54,4 +56,30 @@ export function opticalZoneContains(
  const transverse=-dx*direction.y+dy*direction.x;
  return longitudinal>=0&&longitudinal<=zone.rangeMm&&
   Math.abs(transverse)<=zone.beamWidthMm/2;
+}
+
+/** Optional P8 beam-volume contact: sensor yaw and body yaw are cardinal, so
+ * projecting the body's outer bounds onto the beam's local axes is exact for
+ * rectangular teaching boxes. Cylinder bodies use their circumscribed bounds.
+ * Material classification and visibility are handled separately by the worker.
+ * Disabled by default so historical centre-point sensing never changes.
+ */
+export function opticalZoneIntersectsBody(
+ body:Body,ctx:EquipmentContext,zone:OpticalZone,
+):boolean{
+ if(zone.shape!=='forward')return opticalZoneContains(body.pos,ctx,zone);
+ const direction=face(zone.yawDeg);
+ const dx=body.pos.x-ctx.originMm.x,dy=body.pos.y-ctx.originMm.y;
+ const long=dx*direction.x+dy*direction.y;
+ const lateral=-dx*direction.y+dy*direction.x;
+ const quarter=body.yawDeg===90||body.yawDeg===270;
+ const sx=quarter?body.size.y:body.size.x;
+ const sy=quarter?body.size.x:body.size.y;
+ const longitudinalHalf=Math.abs(direction.x)*sx/2+Math.abs(direction.y)*sy/2;
+ const lateralHalf=Math.abs(direction.y)*sx/2+Math.abs(direction.x)*sy/2;
+ const zoneMinZ=ctx.originMm.z-zone.heightMm/2;
+ const zoneMaxZ=ctx.originMm.z+zone.heightMm/2;
+ return long+longitudinalHalf>=0&&long-longitudinalHalf<=zone.rangeMm&&
+  Math.abs(lateral)<=lateralHalf+zone.beamWidthMm/2&&
+  body.pos.z+body.size.z>=zoneMinZ&&body.pos.z<=zoneMaxZ;
 }
