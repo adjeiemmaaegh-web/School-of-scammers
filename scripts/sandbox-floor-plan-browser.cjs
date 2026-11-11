@@ -132,7 +132,7 @@ const ST = [
   },{timeout:12000},ids.pilot,before.x);
   assert.equal((await saved()).components.length,10,'No duplicate device on move');
   // Plan is an editing view; switch into the real terminal board to wire it.
-  await page.click('[data-floor-plan] button:last-child');
+  await page.click('[data-floor-open-wiring]');
   await page.waitForFunction(()=>document.querySelector('[data-p5-view-active]')?.
    getAttribute('data-p5-view-active')==='logical',{timeout:10000});
   for(const [first,second] of LINKS){
