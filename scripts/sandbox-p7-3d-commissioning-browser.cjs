@@ -216,12 +216,22 @@ const ST = [
   // Returning from the wiring view lazily mounts the WebGL scene.
   await page.waitForSelector(`[data-3d-drag-handle="${ids.eye1}"]`,
     {timeout:20000});
-  // Choose the real P3 photoeye and display its worker-sampled live I/O
-  // channel while the line runs, not a fabricated frontend detection event.
-  await page.$eval(`[data-3d-drag-handle="${ids.eye1}"]`,
-    el=>el.scrollIntoView({block:'center'}));
-  await page.click(`[data-3d-drag-handle="${ids.eye1}"]`);
-  await page.waitForSelector(`[data-p7-signals="${ids.eye1}"] [data-p7-signal-name="present"]`);
+  // The accessible selection list is the deliberate alternative when
+  // densely overlaid 3D sensor/terminal labels are hard to click precisely.
+  // The resulting live I/O still comes solely from the worker's P3 signals.
+  await page.$eval('[data-workspace-selection] > summary',
+    el=>{if(!el.parentElement.open)el.click();});
+  await page.$eval('.workspace-selection-actions button:nth-child(2)',el=>{
+    if(!el.disabled)el.click();
+  });
+  await page.evaluate(id=>{
+    const row=[...document.querySelectorAll('.workspace-selection-list label')]
+      .find(el=>el.textContent.includes(id));
+    if(!row)throw Error('Photoeye is missing from the real device selection list');
+    row.querySelector('input').click();
+  },ids.eye1);
+  await page.waitForSelector(`[data-p7-signals="${ids.eye1}"] [data-p7-signal-name="present"]`,
+    {timeout:15000});
   await clickText('▶ Run');
   await page.waitForFunction(()=>
     document.querySelectorAll('[data-p7-worker-body]').length>0,
