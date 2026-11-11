@@ -5,7 +5,7 @@
  *
  * Original low-poly equipment geometry, no proprietary meshes or trademarks.
  */
-import { useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Grid, Html, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { CatmullRomCurve3, Plane, Raycaster, Vector2, Vector3, type Camera } from 'three';
@@ -694,6 +694,29 @@ export function Sandbox3D(props: Sandbox3DProps) {
     props.onMove(props.moveTarget, at);
     props.onMoveFinished();
   };
+  // A machine may project an HTML terminal on top of the factory floor.
+  // While placing, the whole scene area is one hit surface: resolve the
+  // actual perspective ray once in the capture phase instead of depending on
+  // which mesh or floating label receives the click.
+  const clickPlacement = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if(!available || !props.editable || !placementKind || event.button!==0 || !camera.current)return;
+    const target=event.target as HTMLElement;
+    if(target.closest('.sandbox-3d-camera-controls, .p7-3d-authoring, .p7-3d-preview, .p7-3d-gizmo'))return;
+    const canvas=event.currentTarget.querySelector<HTMLCanvasElement>('.sandbox-three-canvas canvas');
+    if(!canvas)return;
+    const rect=canvas.getBoundingClientRect();
+    if(event.clientX<rect.left || event.clientX>rect.right ||
+       event.clientY<rect.top || event.clientY>rect.bottom)return;
+    const pointer=new Vector2((event.clientX-rect.left)/rect.width*2-1,
+      -((event.clientY-rect.top)/rect.height*2-1));
+    const ray=new Raycaster();ray.setFromCamera(pointer,camera.current);
+    const hit=new Vector3();
+    if(!ray.ray.intersectPlane(new Plane(new Vector3(0,1,0),.09),hit))return;
+    event.preventDefault();event.stopPropagation();
+    const assessment=assess3DPlacement(props.project,placementKind,
+      projectPlacement(hit),props.grid??5,alignSensor);
+    props.onPlace(placementKind,assessment.at);
+  };
   const drop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     if (!props.editable || !available) return;
@@ -712,6 +735,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
     }
   };
   return <div className="sandbox-3d-shell" aria-label="Interactive 3D industrial automation workspace"
+    onClickCapture={clickPlacement}
     onDragOver={event => { if (props.editable && available) event.preventDefault(); }} onDrop={drop}>
     <div className="sandbox-3d-camera-controls" role="group" aria-label="3D navigation camera">
       {([
