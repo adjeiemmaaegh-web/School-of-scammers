@@ -50,6 +50,13 @@ export function sweptBoxEntry(moving:Box,target:Box,delta:Vec3):number|null{
  return exits>TOL&&enters<=1+TOL?Math.max(0,Math.min(1,enters)):null;
 }
 
+/** True 3D volume overlap under the cardinal-yaw educational model. */
+export function bodyVolumeOverlap(a:Body,b:Body):boolean{
+ const x=bodyEnvelope(a),y=bodyEnvelope(b);
+ return Math.abs(x.center.x-y.center.x)<x.half.x+y.half.x-TOL&&
+  Math.abs(x.center.y-y.center.y)<x.half.y+y.half.y-TOL&&
+  Math.abs(x.center.z-y.center.z)<x.half.z+y.half.z-TOL;
+}
 export function sweptBodyContact(a:Body,b:Body,delta:Vec3):number|null{
  if(a.id===b.id)return null;
  return sweptBoxEntry(bodyEnvelope(a),bodyEnvelope(b),delta);
