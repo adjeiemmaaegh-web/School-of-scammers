@@ -143,6 +143,15 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
              redo:document.querySelector('[data-history-redo-depth]')?.getAttribute('data-history-redo-sizes'),
              pending:document.querySelector('[data-history-pending]')?.getAttribute('data-history-pending')},
   }),KEY)));
+  const undoHit=await page.$eval('.workspace-authoring-bar [data-undo]',el=>{
+    const rect=el.getBoundingClientRect();
+    const x=rect.left+rect.width/2,y=rect.top+rect.height/2;
+    const hit=document.elementFromPoint(x,y);
+    return {position:{x,y,width:rect.width,height:rect.height},
+      hit:hit?.outerHTML.slice(0,480),same:hit===el,
+      nearest:hit?.closest('button')?.textContent?.trim()||null};
+  });
+  console.log('P6 UNDO HIT TEST',JSON.stringify(undoHit));
   await page.click('.workspace-authoring-bar [data-undo]');
   await page.waitForFunction(()=>
     !!document.querySelector('.workspace-authoring-bar [data-redo]:not(:disabled)'),
