@@ -1,14 +1,20 @@
 import type { LadderDocument, LadderMemory, LadderStep } from '../engineering/ladder';
+import type { FbdDocument, FbdMemory, FbdStep } from '../engineering/fbd';
 import type { STProgram, STValue } from '../engineering/structured-text';
 import type { ComponentKind } from '../components/registry';
+import type { WorkspaceEdit } from '../workspace/types';
 import type { ScanTrace, TagBreakpoint } from '../program/scan-trace';
+import type { InstructionBreakpoint } from '../program/instruction-breakpoint';
 import type { SortingPlant, ParcelKind } from '../plant/sorting-conveyor';
 import type { TankProcess } from '../plant/tank-process';
 import type { CylinderState } from '../plant/cylinder';
 import type { MeterReading } from '../electrical/panel-meter';
+import type { StarterPanelState, PhaseReading } from '../electrical/three-phase-types';
+import type { SceneRuntime } from '../plant/world/runner';
+import type { AnalogPoint } from './analog';
 
 export type XY = { x: number; y: number };
-export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean };
+export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean; yawDeg?: 0 | 90 | 180 | 270 };
 export type Wire = { id: string; from: string; to: string };
 /** Component/wire failures that alter what the circuit solver sees (P5). */
 export type FaultKind = 'wire-open' | 'contactor-coil-open' | 'contactor-welded' | 'motor-open-winding' | 'button-stuck' | 'sensor-stuck'
@@ -41,8 +47,9 @@ export type AlarmWatch = { noResponse: number; uncommanded: number; nextId: numb
 /** The program of one additional PLC. The first PLC's program stays in the legacy top-level fields. */
 export type PlcProgram = {
   program: LadderDocument;
-  language?: 'ladder' | 'st';
+  language?: 'ladder' | 'st' | 'fbd';
   stSource?: string;
+  fbd?: FbdDocument;
 };
 /** The five physical input tags a PLC samples (I0.0..I0.4) and its six output coils (Q0.0..Q0.5). */
 export type PlcInputs = { Start: boolean; StopOK: boolean; Photoeye: boolean; TankHigh: boolean; ReverseRequest: boolean };
@@ -51,7 +58,8 @@ export type PlcRuntime = {
   powered: boolean;
   inputs: PlcInputs;
   /** The sampled input image by tag name, for any I/O map (the classic five-tag `inputs` is derived from it). */
-  tagInputs: Record<string, boolean>;
+  tagInputs: Record<string, STValue>;
+  analogInputs: AnalogPoint[];
   coils: Record<string, boolean>;
   tagValues: Record<string, STValue>;
   ladderMemory: LadderMemory;
@@ -59,16 +67,18 @@ export type PlcRuntime = {
   ladderSteps: LadderStep[];
   stCompiled: STProgram | null;
   stMemory: Record<string, STValue>;
+  fbdMemory: FbdMemory;
+  fbdSteps: FbdStep[];
 };
 /** What the UI may show about any one PLC (first or additional). */
 export type PlcIoPoint = { terminal: string; tag: string; on: boolean };
 export type PlcView = {
   powered: boolean;
-  language: 'ladder' | 'st';
+  language: 'ladder' | 'st' | 'fbd';
   /** Component kind: `plc` (fixed 5/6 I/O) or `plc16` (16/16 with nameable tags). */
   kind: string;
   /** Every input and output terminal with the tag bound to it and its live state, whatever the I/O map. */
-  io: { inputs: PlcIoPoint[]; outputs: PlcIoPoint[] };
+  io: { inputs: PlcIoPoint[]; outputs: PlcIoPoint[]; analogInputs?:AnalogPoint[] };
   inputs: PlcInputs;
   coils: Record<string, boolean>;
   /** Every output terminal (for example `Q0.0`) -> on. */
@@ -77,6 +87,8 @@ export type PlcView = {
   tagValues: Record<string, STValue>;
   ladderSteps: LadderStep[];
   ladderMemory: LadderMemory;
+  fbdSteps: FbdStep[];
+  debugForces: Record<string, boolean|number>;
 };
 export type ProjectFile = {
   formatVersion: 1;
@@ -84,8 +96,9 @@ export type ProjectFile = {
   wires: Wire[];
   program: LadderDocument;
   /** Optional in v1 JSON for backwards compatibility. Defaults to ladder. */
-  language?: 'ladder' | 'st';
+  language?: 'ladder' | 'st' | 'fbd';
   stSource?: string;
+  fbd?: FbdDocument;
   /** Optional in v1 JSON for backwards compatibility. Defaults to no faults. */
   faults?: FaultSpec[];
   /** Programs of PLCs beyond the first, keyed by PLC component id. Omitted for single-PLC projects. */
@@ -94,6 +107,7 @@ export type ProjectFile = {
   plcIo?: Record<string, { inputs: Record<string, string>; outputs: Record<string, string> }>;
   /** Device settings that differ from the default (a timer relay's delay), by component id then setting key. */
   params?: Record<string, Record<string, number>>;
+  plantFaults?: Record<string,string>;
 };
 export type WorldState = {
   project: ProjectFile;
@@ -106,17 +120,23 @@ export type WorldState = {
   /** Validated AST cached in authoritative worker state, never persisted in ProjectFile. */
   stCompiled: STProgram | null;
   stMemory: Record<string, STValue>;
+  fbdMemory: FbdMemory;
+  fbdSteps: FbdStep[];
+  debugForces: Record<string,Record<string,boolean|number>>;
   tagValues: Record<string, STValue>;
   ladderSteps: LadderStep[];
   breakpointScan: number | null;
   breakpointHit: string | null;
   breakpointTag: TagBreakpoint | null;
+  breakpointInstruction: InstructionBreakpoint | null;
   scanTrace: ScanTrace[];
   contactorOn: boolean;
   motorOn: boolean;
   motorAngleRad: number;
   /** Material-handling state of every conveyor lane, by conveyor id (the legacy `plant` mirrors the first). */
   lanes: Record<string, SortingPlant>;
+  /** Deterministic world state and typed measurements owned by the worker. */
+  plantWorld: SceneRuntime;
   /** Process state of every tank, by tank id (the legacy `tank` mirrors the first). */
   vessels: Record<string, TankProcess>;
   /** Trip state of every breaker and overload, by component id (the legacy flags mirror the first of each). */
@@ -131,6 +151,8 @@ export type WorldState = {
   deviceOn: Record<string, boolean>;
   /** Shaft angle of every motor by component id (the legacy angle mirrors the first). */
   motorAngles: Record<string, number>;
+  threePhase: Record<string, StarterPanelState>;
+  threePhasePower: Record<string, boolean>;
   forwardContactorOn: boolean;
   reverseContactorOn: boolean;
   motorDirection: 'stopped' | 'forward' | 'reverse';
@@ -156,6 +178,7 @@ export type WorldState = {
   alarmWatch: AlarmWatch;
 };
 export type Command =
+  | { k: 'editWorkspace'; edit: WorkspaceEdit }
   | { k: 'place'; id: string; kind: ComponentKind; at: XY }
   | { k: 'move'; id: string; to: XY }
   | { k: 'wire'; id: string; from: string; to: string }
@@ -180,16 +203,22 @@ export type Command =
   | { k: 'addPanel'; template: 'motor-starter'; at?: XY }
   /** `conveyor` names the lane; omitted means the first conveyor (the single-conveyor behaviour). */
   | { k: 'feedParcel'; kind: ParcelKind; conveyor?: string }
+  | { k:'setPlantFault'; id:string; fault:string|null }
+  | { k:'loadPlantScene'; id:string }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
+  | { k: 'setThreePhasePower'; id: string; enabled: boolean }
   /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
   /** Rename the tags of a configurable (16/16) PLC. Refused if it would break that PLC's program. Paused only. */
   | { k: 'configureIo'; plc: string; io: { inputs: Record<string, string>; outputs: Record<string, string> } }
   | { k: 'loadProgram'; program: LadderDocument; plc?: string }
   | { k: 'loadST'; source: string; plc?: string }
-  | { k: 'activateLanguage'; language: 'ladder' | 'st'; plc?: string }
+  | { k: 'loadFBD'; document: FbdDocument; plc?: string }
+  | { k: 'activateLanguage'; language: 'ladder' | 'st' | 'fbd'; plc?: string }
   | { k: 'breakAtScan'; scan: number | null }
   | { k: 'breakOnTag'; breakpoint: TagBreakpoint | null }
+  | { k: 'breakOnInstruction'; breakpoint: InstructionBreakpoint | null }
+  | { k: 'forceLocal'; plc?:string; tag:string; value:boolean|number|null }
   | { k: 'loadProject'; project: unknown }
   | { k: 'run' | 'pause' | 'step' | 'reset' | 'clear' };
 export type SimEvent = { tick: number; kind: string; detail: string };
@@ -209,6 +238,8 @@ export type RenderSnapshot = {
   plcs: Record<string, PlcView>;
   /** Every conveyor lane (parcel and counters) by conveyor id. */
   lanes: Record<string, SortingPlant>;
+  /** Deterministic world state and typed measurements owned by the worker. */
+  plantWorld: SceneRuntime;
   /** Every tank by tank id. */
   vessels: Record<string, TankProcess>;
   /** Trip state of every breaker and overload by component id. */
@@ -221,6 +252,9 @@ export type RenderSnapshot = {
   deviceOn: Record<string, boolean>;
   /** Shaft angle of every motor by component id. */
   motorAngles: Record<string, number>;
+  threePhase: Record<string, StarterPanelState>;
+  phaseMeters: Record<string, PhaseReading>;
+  threePhaseSources: Record<string, boolean>;
   forwardContactorOn: boolean;
   reverseContactorOn: boolean;
   motorDirection: 'stopped' | 'forward' | 'reverse';
@@ -239,14 +273,18 @@ export type RenderSnapshot = {
   diagnostics: string[];
   lastError: string | null;
   alarms: AlarmRecord[];
-  language: 'ladder' | 'st';
+  language: 'ladder' | 'st' | 'fbd';
   tagValues: Record<string, STValue>;
   ladderSteps: LadderStep[];
   ladderMemory: LadderMemory;
+  fbdSteps: FbdStep[];
+  debugForces: Record<string,boolean|number>;
   breakpointScan: number | null;
   breakpointHit: string | null;
   breakpointTag: TagBreakpoint | null;
+  breakpointInstruction: InstructionBreakpoint | null;
   scanTrace: ScanTrace[];
 };
-export type WorkerRequest = { kind: 'commands'; commands: Command[] };
-export type WorkerResponse = { kind: 'snapshot'; snapshot: RenderSnapshot; events: SimEvent[]; project?: ProjectFile };
+export type WorkerRequest = { kind: 'commands'; commands: Command[]; requestId?: number };
+export type WorkerResponse = { kind: 'snapshot'; snapshot: RenderSnapshot; events: SimEvent[];
+  requestId?: number; requestIds?: number[]; project?: ProjectFile; previousProject?: ProjectFile };

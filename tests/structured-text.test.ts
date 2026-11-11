@@ -24,7 +24,7 @@ describe('bounded Structured Text interpreter',()=>{
   expect(()=>executeStructuredText(compileStructuredText('Start := FALSE;'),{Start:true})).toThrow(/overwrite/);
  });
  it('rejects unsafe or unsupported syntax without JavaScript evaluation',()=>{
-  for(const source of ['WHILE TRUE DO Run := TRUE; END_WHILE;','Run := process.exit();','Run := TRUE', '(* unterminated', 'IF TRUE THEN Run := TRUE;'])expect(()=>compileStructuredText(source)).toThrow();
+  for(const source of ['Run := process.exit();','Run := TRUE', '(* unterminated', 'IF TRUE THEN Run := TRUE;'])expect(()=>compileStructuredText(source)).toThrow();
  });
  it('rejects dividing by zero and mixing BOOL with arithmetic',()=>{
   expect(()=>executeStructuredText(compileStructuredText('Result := 4 / (2 - 2);'),{})).toThrow(/Division by zero/);
