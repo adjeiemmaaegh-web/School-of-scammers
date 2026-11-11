@@ -669,7 +669,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               onOperate={id => send([{ k: 'operateToggle', id }])}
               onPlace={(kind, at) => place(kind, at.x, at.y)}
               onMove={move} onMoveFinished={() => setMoveTarget(null)}
-              onRotate={rotateSelection}
+              onRotate={(id,turns)=>edit({kind:'rotate',ids:[id],quarterTurns:turns})}
               onOpenWiring={()=>{setWorkspaceView('logical');setActiveStage('wire');}}
             />}
           </Suspense>
