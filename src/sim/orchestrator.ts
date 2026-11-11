@@ -378,6 +378,28 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         commandEvents.push({ tick: world.tick, kind: 'scene', detail: 'Opened unsolved editable plant scene ' + cmd.id });
       } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Unable to load plant scene'); }
     }
+    else if (cmd.k === 'setTrainingOperator') {
+      // A learner explicitly opts into an ephemeral, worker-owned classroom
+      // person target. The camera does not itself set PLC input values.
+      const valid=(n:number,min:number,max:number)=>Number.isSafeInteger(n)&&
+        n>=min&&n<=max;
+      if(typeof cmd.enabled!=='boolean'||
+        !valid(cmd.xMm,-6000,6000)||!valid(cmd.yMm,-6000,6000)||
+        !valid(cmd.feetMm,0,2500)){
+        world=setError(world,'Invalid simulated operator position');
+      }else{
+        const next={...world.plantWorld.world};
+        if(cmd.enabled)next.trainingOperator={
+          id:'training-operator',shape:'cylinder',
+          size:{x:400,y:400,z:1800},massKg:75,
+          pos:{x:cmd.xMm,y:cmd.yMm,z:cmd.feetMm},yawDeg:0,
+          vel:{x:0,y:0,z:0},supportedBy:null,
+          tags:{material:'person',trainingOperator:true},
+        };
+        else delete next.trainingOperator;
+        world={...world,plantWorld:{...world.plantWorld,world:next}};
+      }
+    }
     else if (cmd.k === 'setPlantFault') {
       if (world.running) world = setError(world, 'Pause before changing a plant equipment fault');
       else try {
