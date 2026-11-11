@@ -31,6 +31,7 @@ import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
 import {firstNewCarrierSuperposition,carrierSuperpositionError} from '../workspace/carrier-clearance';
 import { freshProjectPlant, stepProjectPlant, sensorImage, validatePlantFaults } from './p3-plant-bridge';
 import { makePlantSceneProject } from './p3-scene-import';
+import { PLANT_EQUIPMENT } from '../plant/equipment';
 export { MAX_COMPONENTS, MAX_WIRES };
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
