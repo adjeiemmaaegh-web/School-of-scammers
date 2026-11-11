@@ -137,6 +137,12 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
       Number(h.getAttribute('data-history-undo-depth'))>=3&&
       !!document.querySelector('.workspace-authoring-bar [data-undo]:not(:disabled)');
   },{timeout:12000});
+  console.log('P6 HISTORY BEFORE UNDO',JSON.stringify(await page.evaluate(key=>({
+    project:JSON.parse(localStorage.getItem(key)||'null')?.components,
+    history:{undo:document.querySelector('[data-history-undo-depth]')?.getAttribute('data-history-undo-sizes'),
+             redo:document.querySelector('[data-history-redo-depth]')?.getAttribute('data-history-redo-sizes'),
+             pending:document.querySelector('[data-history-pending]')?.getAttribute('data-history-pending')},
+  }),KEY)));
   await page.click('.workspace-authoring-bar [data-undo]');
   await page.waitForFunction(()=>
     !!document.querySelector('.workspace-authoring-bar [data-redo]:not(:disabled)'),
@@ -147,6 +153,9 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         redo:[...document.querySelectorAll('.workspace-authoring-bar [data-redo]')]
           .map(b=>({disabled:b.disabled,visible:b.getClientRects().length>0})),
         project:JSON.parse(localStorage.getItem(key)||'null')?.components,
+        stack:{undo:document.querySelector('[data-history-undo-depth]')?.getAttribute('data-history-undo-sizes'),
+               redo:document.querySelector('[data-history-redo-depth]')?.getAttribute('data-history-redo-sizes'),
+               pending:document.querySelector('[data-history-pending]')?.getAttribute('data-history-pending')},
         alerts:[...document.querySelectorAll('[role="alert"]')].map(e=>e.textContent),
         events:[...document.querySelectorAll('.sandbox-event-log li')].slice(-8).map(e=>e.textContent),
         historyButtons:[...document.querySelectorAll('.workspace-authoring-bar button')]
