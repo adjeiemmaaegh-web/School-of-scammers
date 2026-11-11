@@ -1,54 +1,60 @@
-# P8 — 3D Industrial Simulation Realism: source and verification register
+# PLC Skills Lab — P8 Industrial Simulation Realism
 
-**Source branch:** `engineering/p8-industrial-simulation-realism-2026-11-11` (draft PR #48, stacked on verified P7 commit `adb7cd53a3ba8e85d576d4968874924b03822110`).  
-**Date:** 2026-11-11. **Status:** P8 source development in progress; exact-head acceptance pending. **Do not merge or deploy.**
+**Engineering continuation:** 2026-11-11. **Review:** draft PR #48, `engineering/p8-industrial-simulation-realism-2026-11-11`, stacked on verified P7 PR #47 (`adb7cd53a3ba8e85d576d4968874924b03822110`). Source work is **implemented, with exact-head CI acceptance to be recorded in the PR**. No merge, release, staging, server, account, database, cloud, payments or machine control is authorized.
 
-## Scope and architectural invariants
+## Architecture and nonnegotiable behaviors
 
-P8 is an *original, bounded educational 3D simulation* increment, not a clone of FACTORY I/O, certified mechanical physics, calibrated industrial optics, or hardware controller equivalence. The original 50 ms worker PLC scan and five deterministic 10 ms material-flow substeps remain authoritative. WebGL graphics and camera pose do not produce fake PLC inputs or override a saved sensor reading. The core app remains offline-first with no backend, database, accounts, cloud, payments or real PLC network controls.
+The browser-based educational simulator remains offline-first. The genuine typed Web Worker owns the PLC scan, electrical circuit, material bodies, sensor output, equipment faults, simulation events and 3D physical model. Each 50 ms PLC scan advances five fixed 10 ms material steps. Three.js and First Person camera movement cannot independently forge PLC truth. History and assembly paste still use authoritative worker validation; legacy saved workspaces retain their existing behavior unless the user explicitly opts into new realism settings.
 
-The full educational P8 code deliverable includes **(1)** active static/dynamic sensor occlusion, **(2)** fixed-obstacle material flow, **(3)** physically scoped first-person inspection, **(4)** reusable offline assembly rotation, and **(5)** recognizably distinct 3D machinery, followed by whole-app browser and Windows verification.
+This is an **original bounded simulation, not certified hardware control or proven equivalence to Factory I/O, Solink, proprietary industrial CAD, or a general rigid-body engine**.
 
-## Implemented capabilities and model limits
+## Implemented P8 workstreams
 
-| Workstream | Worker or UI implementation | Explicit model limitation |
+| Capability | Authoritative behavior and user control | Deliberate limitation |
 |---|---|---|
-| Directional sensing and mounting | Inherited P7 forward-sensing `beamMode=1` and worker-owned yaw-aligned detection zone | Quarter-turn directions and idealized body reference points, not optics calibration |
-| Fixed-structure occlusion | `occlusionMode=1` checks 3D line-of-sight through registered opaque shelf/process-vessel envelopes using the worker scene's geometry | Both solids treated as fully opaque, even when a real rack might have openings; no reflection or transparent materials |
-| Moving parcel occlusion | `occlusionMode=2` additionally considers real saved-world body envelopes between sensor and qualified target; inductive proximity can be blocked by nonmetal parcel | Conservative bounded body envelopes, not per-pixel rays or beam intensity; defaults preserve previous scenes |
-| Material-flow contacts | `blockMaterialFlow=1` on shelf/process vessel stops a carrier-driven parcel at a new 3D contact; logs worker jam event and exposes real conveyor jam signal | Only opted-in, stationary solids; existing queue/contact logic remains; no general mesh solver or continuous-angle contact |
-| PLC-powered variable belt speed | The worker bridge now respects the saved `speedMmS` dial when no numeric speed wire is mapped, instead of incorrectly injecting a 0 mm/s demand into an energized belt | Still not a calibrated external analog-speed I/O protocol; explicit typed numeric control needs a separate bridge |
-| 3D scene rotations | Shelf and process tank gain valid worker quarter-turn editing; original P7 carrier rotations remain | Other orientation-locked process/robot mechanisms still disallow unsupported yaw |
-| First-person camera | Space initiates gravity-limited jump with no repeated jump on held key; navigation collision height uses actual equipment registry footprints; tall racks remain obstacles and low conveyors can be cleared | Camera is view-only, **not** a physical person body or sensor input. No camera-triggered I/O or human-safety claims |
-| Reusable assemblies | Offline saved workcells rotate together by 0/90/180/270 degrees before insertion; each wire, device settings and PLC data preserved; worker owns paste validation | No live linked hierarchical prefabs, CAD import or multi-select bones/rigging |
-| Original 3D machinery | Structural rack decks/posts/opaque back, vessel fittings and visible turntable indexing use source-defined equipment / worker progress | Rendering is a truthful teaching illustration, not mesh-level industrial CAD or physics engine |
+| Directional target volume | `beamMode=1`, `targetMode=1` check worker-owned 3D body bounds, sensor yaw and beam width/elevation; old body-centre model remains default | Idealized box/cylinder envelopes, not measured beam intensity |
+| Optical occlusion | `occlusionMode=1` detects fixed opaque machinery, `2` includes moving parcels and `3` treats explicitly transparent glass as transmissive | Fixed registry envelopes, simplified one-segment line of sight; no glass refraction, calibrated reflectivity or ray-tracing |
+| Sensor faults and material specificity | Simulation-clock intermittent failures, quarter-turn sensor misalignment and dirty-lens short-range effects; `materialMode=1` optionally excludes transparent targets from photoeyes, while inductive still classifies metal | Fault cadence and material taxonomy are classroom approximations |
+| Machine obstacles | `blockMaterialFlow=1` enables yaw-aware 3D swept parcel contact and jam reporting for rack, vessel and eight further registered stationary machine envelopes | Installed opt-in bounding volumes only; not arbitrary mesh or articulated-arm collision |
+| Parcel contact | `contactMode=1` on belt and roller opts into continuous 3D body-to-body broad-phase, including yaw/elevation; default queue model unchanged | Conservative rectangular/cylindrical envelopes, not momentum, friction or deformation |
+| Powered conveyors | Fixed a real worker bridge defect that incorrectly injected a zero numeric speed on an electrically enabled belt with only a configured speed setting | No external analog I/O calibration claim |
+| Continuous indexing | `rotateCargo=1` on the turntable rotates actual carried world-body position over PLC-driven time, records visual yaw and preserves orientation phase between cycles; angle telemetered from worker | Opt-in quarter-turn teaching kinematics, not arbitrary 6-DoF dynamics |
+| First Person movement | WASD/Fly/Orbit and gravity-limited Space jump use original equipment height/footprints for view collision | Not a safety-rated collision/person simulator; no automatic camera-to-PLC input |
+| Classroom operator detection | Explicit First Person toggle sends validated, bounded, ephemeral operator position into worker; sensors require `detectOperator=1` and can drive real PLC/ST/wired outputs. Leaving mode disables the actor | Intentional *virtual person proxy*, not camera/computer-vision tracking or real-human presence detection; never saved to projects |
+| Reusable workcell composition | Offline assembly shelf preserves wiring, parameters and PLC programs; bounded rotation and two-to-four-cell composition flatten safely with unique IDs, nested snapshots and worker-validated placement | No linked parametric CAD/prefab updates, external files, or unsandboxed scripting |
+| Original visual machinery | More distinctive rack decks/structure, vessel details, worker-indexed turntable cargo visualization and read-only worker sensor regions | Low-poly classroom art; not vendor geometry or production mesh contact |
 
-All new behavior that could change a historical scene is explicitly opt-in or edit-requested. Project save/load continues to omit default settings. A user-created plant is never modified by moving the camera.
+## Test and acceptance matrix
 
-## Mandatory software verification matrix
+### Source-level regression
+- `tests/p8-optical-occlusion.test.ts`
+- `tests/p8-moving-body-occlusion.test.ts`
+- `tests/p8-optical-body-volume-faults.test.ts`
+- `tests/p8-optical-materials.test.ts`
+- `tests/p8-fixed-solid-collisions.test.ts`
+- `tests/p8-swept-3d-contact.test.ts`
+- `tests/p8-wired-belt-motion.test.ts`
+- `tests/p8-worker-plc-integration.test.ts`
+- `tests/p8-continuous-turntable.test.ts`
+- `tests/p8-first-person-jump.test.ts`
+- `tests/p8-training-operator-plc.test.ts`
+- `tests/p8-assembly-transform.test.ts`
+- `tests/p8-assembly-composition.test.ts`
 
-- `tests/p8-optical-occlusion.test.ts`: yaw, sensor zones, fixed occlusion, invalid parameters and compatibility.
-- `tests/p8-moving-body-occlusion.test.ts`: opt-in second-body sightline, material classification, height, target-ID exclusion and immutability.
-- `tests/p8-fixed-solid-collisions.test.ts`: worker jam, actual conveyor status, yaw/elevation, no legacy opt-in, contact conservation.
-- `tests/p8-worker-plc-integration.test.ts`: genuine supply → PLC16 ST → feeder → body → photoeye → PLC input/output → lamp, with blocked/unblocked target.
-- `tests/p8-wired-belt-motion.test.ts`: physically moving parcel with real PLC-wired belt, saved speed command fallback, and no invented movement when unpowered.
-- `tests/p8-first-person-jump.test.ts`: camera-only gravity, key hold, height-aware collision, Fly compatibility.
-- `tests/p8-assembly-transform.test.ts`: bounded 90-degree workcell transform, preservation of inner wires/settings/programs and authoritative worker paste.
-- `scripts/sandbox-p8-optical-browser.cjs`: real browser, worker-spawned body and PLC sensor in both modes.
-- `scripts/sandbox-p8-jam-browser.cjs`: real browser, worker-driven conveyor versus a rack, with genuine jam/legacy comparison.
-- `scripts/sandbox-p8-assembly-rotation-browser.cjs`: browser-local assembly shelf, reload, quarter-turn insertion, real worker paste/wiring and corrupt-reset handling.
-- All P7 3D commissioning, Undo/Redo, editable machine, assemblies and clearance tests, earlier PLC/electrical/fault/sorting/assessment browsers, offline/no-WebGL/keyboard accessibility, Firefox/WebKit smoke and native hosted Windows Edge must be green **on the final source head**.
+### Mandatory real-browser CI
+- `scripts/sandbox-p8-optical-browser.cjs` — worker/photoeye/PLC with physical fixed obstruction
+- `scripts/sandbox-p8-jam-browser.cjs` — genuine belt jam and legacy free flow
+- `scripts/sandbox-p8-assembly-rotation-browser.cjs` — saved cell rotated and worker-pasted
+- `scripts/sandbox-p8-training-operator-browser.cjs` — explicitly enabled First Person virtual operator → worker sensor → PLC → disabled on exit
+- `scripts/sandbox-p8-composed-assembly-browser.cjs` — independent cells/wires combined and accepted by worker
+- Every earlier P1–P7 browser/Undo/Redo/commissioning exercise, Linux Firefox/WebKit smoke, no-WebGL fallback, TypeScript/Vitest/Vite/offline budgets and genuine hosted Windows Edge CI are regression gates.
 
-Do not infer success for a changed commit from CI for an older head. The Linux workflow can be cancelled or blocked during Firefox/WebKit installation; that is an open CI gate until it finishes.
+**Software exit:** exact final commit must have both fully successful Linux and Windows hosted Actions workflows. One failing/aborted test is not software acceptance, even when all unit cases pass. Earlier sporadic P6/P7 mouse/assembly acceptance timeouts are tracked as reliability observations, not hidden.
 
-## Deferred realism that must not be claimed as completed P8
+## Deferred real-world and scope-specific acceptance
 
-General arbitrary-angle 3D rigid-body physics and swept mesh contacts; calibrated reflection/refraction/beam ray bundles; moving robot-arm geometry collision and real manipulator kinematics; person-avatar collision and camera-driven sensor activation; high-resolution CAD/FBX imports, true linked hierarchical assemblies, and full 21-scene FACTORY I/O-inspired catalogue are *substantial separate engineering stages*, not acceptable claims for this bounded educational source.
+1. Owner-operated **physical low-spec Windows 11 / 8 GB RAM, integrated-GPU and no-GPU fallback** performance and browser sessions; actual input devices and PLC-connected equipment must be evaluated independently.
+2. Wider general-purpose arbitrary-angle rigid-body solver, friction and calibrated optical reflection/refraction, dynamic 3D robot-link contact/kinematics, high-fidelity CAD/mesh imports, linked editable parametric prefab hierarchy, and full Factory I/O-inspired scene catalogue **are not implemented or certified in this engineering stage**; treat these as separate larger R&D/scene-library phases rather than falsely claiming P8 includes them.
+3. Human safety, industrial integration, legal/licensing, owner UX and commercial deployment review remain **NO-GO**.
 
-Real low-cost/8 GB Windows PC performance measurements, actual physical PLC/hardware connectivity, owner visual/UX signoff and product safety, standards, licensing or production reviews also remain outside automated CI. **No industrial safety or full Factory I/O parity claims.**
-
-## Exit decision
-
-**P8 software engineering:** may be marked source-complete only when final-head Linux + Windows workflows both finish successfully, including all new P8 and legacy tests.  
-**P8 owner/device acceptance:** deferred to real physical hardware and visual review; cannot be marked accepted based solely on hosted CI.  
-**Release:** NO-GO and unmerged until expressly authorized. Preserve PR #48 and the verified P7 baseline.
+P8's eligible milestone is **educational source engineering and CI**, not certified industrial product acceptance. Keep PR #48 draft/open/unmerged and do not proceed with production deployment without owner authorization.
