@@ -57,6 +57,11 @@ export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
   const def=PLANT_EQUIPMENT[item.kind];
   inputs[item.id]=Object.fromEntries(def.commands.map(ch=>[
    ch.name,ch.kind==='bool'?set.has(item.id+'-CMD_'+ch.name): // analog command I/O is wired in a separate domain
+     // An unwired numeric speed channel is NOT a real zero-speed command.
+   // The previous blanket 0 made a PLC-powered belt report "moving" while
+   // keeping parcels stationary. Use the worker-validated speed dial until
+   // an explicit, typed numeric channel is actually mapped into the bridge.
+   ch.name==='speed'?(item.params.speedMmS??250):
      ch.name==='openingPct'?0:ch.name==='inletPct'?100:0,
   ]));
  }
