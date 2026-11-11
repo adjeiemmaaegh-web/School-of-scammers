@@ -1,4 +1,4 @@
-# Visual Industrial Workcell Builder — P6 source development
+# 3D Industrial Workcell Builder — P6 source development
 
 **Date:** 2026-11-11
 **Development branch:** `engineering/visual-workcell-builder-2026-11-11`
@@ -7,14 +7,30 @@
 
 ## Goal
 
-A learner must be able to create, inspect, position and program an original
-industrial workcell from a blank browser workspace without editing JSON. 2D
-and 3D views must describe the same authoritative worker project; rendering
-must not manufacture physical events, PLC I/O or simulated success. The 2D
-authoring view must work without a graphics processor or WebGL.
+FACTORY I/O is a **3D industrial scene editor and simulation environment**.
+PLC Skills Lab must therefore be **3D-first**, not a 2D drawing program.
+A learner should create, place, rotate, wire, program and commission an original
+workcell using actual 3D models and the authoritative worker. 2D is an optional
+precise/fallback viewport for low-spec machines, not the central experience.
+Neither renderer can invent a PLC input or physical event.
 
 ## Implemented in this increment
 
+- **Primary, actual 3D scene authoring:** the existing scene remains the
+  default. Its P3 conveyors, turntable, sensors and mechanisms use the actual
+  worker-backed 3D drawings rather than duplicate generic placeholder bodies.
+  Users can click/drag these meshes directly; the visual drag ghost remains
+  provisional until the authoritative worker accepts the saved `move` edit.
+  Double-click on a model or floor changes the Orbit interest point.
+- **Three real 3D camera controls:** Orbit, Fly and First Person appear inside
+  the 3D viewport. Fly uses WASD and Q/E height, First Person is restricted to
+  1.8 m eye height and WASD walking; right-drag turns the view. Both share
+  bounded inspection navigation and simplified obstacle-footprint collision.
+  Camera positions are display-only; First Person is *not* a PLC sensor input.
+- **3D verification:** `tests/workcell-camera.test.ts` checks movement,
+  bounds and collision models; the mandatory
+  `scripts/sandbox-3d-workcell-browser.cjs` tests actual 3D
+  camera navigation and direct 3D machine dragging, saved yaw and undo.
 - **Third view — Floor Plan / 2D:** responsive vector factory floor, with
   exact mm-to-floor conversion for the registered P3 equipment and live
   body markers projected from the worker snapshot.
@@ -51,8 +67,9 @@ authoring view must work without a graphics processor or WebGL.
 3. `scripts/sandbox-floor-plan-browser.cjs` — physical operator UI only for
    building, wiring and programming; no prewired fixture. Runs with WebGL
    disabled and verifies a real worker body on the northbound route.
-4. All existing P1–P5 browser CI tests, accessibility, responsive views and
-   Firefox/WebKit smoke remain green on the exact branch head.
+4. The genuine WebGL 3D workflow has its own mandatory browser gate and all
+   existing P1–P5 browser CI, accessibility, Firefox and WebKit checks must
+   remain green on the exact branch head.
 5. Windows Edge acceptance and real 8 GB device review are independently
    tracked. No browser CI result can claim physical PLC integration.
 
@@ -65,12 +82,14 @@ illegal. The drawn route segments are connection previews, not exact
 terminal-layout cables or evidence that electrical power flows. Device
 footprints are model-level dimensions rather than photorealistic assets.
 
-FACTORY I/O material provided by the owner is a design benchmark; its scene
-editor, camera collision, sensor effects and Siemens networking have not been
-replicated or hardware-verified here. True orbit/fly/first-person navigation
-with matching collision semantics remains a separate subsequent engineering
-increment; this stage does not claim that pressing a camera button enables
-physical-body detection.
+FACTORY I/O material provided by the owner is a design benchmark, not the
+application's source. The three camera modes above are functional original
+inspection controls, but they do **not** claim exact FACTORY I/O collision,
+navigation, First Person sensor detection, full scene-editor feature parity or
+hardware equivalence. Full camera-vs-part collision geometry, real sensor
+response to a walking avatar, advanced placing/grouping gizmos and high-fidelity
+model assets require further authoring/physics development. Siemens networking
+and physical PLC integration remain unimplemented/unverified.
 
 Formal owner UI review, browser/platform acceptance and real low-spec hardware
 testing remain open, and no cloud/backend, authentication, payments or
