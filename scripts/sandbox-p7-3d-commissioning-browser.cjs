@@ -213,6 +213,9 @@ const ST = [
   await clickText('Compile & activate ST');
   await page.click('[data-p5-view="physical"]');
   await page.waitForSelector('[data-p7-worker-bodies]');
+  // Returning from the wiring view lazily mounts the WebGL scene.
+  await page.waitForSelector(`[data-3d-drag-handle="${ids.eye1}"]`,
+    {timeout:20000});
   // Choose the real P3 photoeye and display its worker-sampled live I/O
   // channel while the line runs, not a fabricated frontend detection event.
   await page.$eval(`[data-3d-drag-handle="${ids.eye1}"]`,
