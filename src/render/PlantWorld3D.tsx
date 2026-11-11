@@ -99,8 +99,8 @@ function Drawing({drawing,kind}:{drawing:EquipmentDrawing;kind:string}){
  */
 function OpticalSensingVolume({zone,on}:{zone:OpticalZone;on:boolean}){
  const directional=zone.shape==='forward';
- const length=directional?metres(zone.rangeMm):metres(zone.rangeMm*2);
- const width=directional?metres(zone.beamWidthMm):metres(zone.rangeMm*2);
+ const length=metres(zone.rangeMm);
+ const width=directional?metres(zone.beamWidthMm):metres(zone.rangeMm);
  const height=metres(zone.heightMm/2);
  const offsetX=directional?length/2:0;
  return <group rotation={[0,-zone.yawDeg*Math.PI/180,0]}
