@@ -40,6 +40,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-browser-acceptance.cjs
       - name: P1 advanced authoring - select, duplicate, undo, redo, rotate, copy, paste and reload
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p1-workspace-browser.cjs
+      - name: P6 primary 3D workcell - Fly First Person and direct worker validated model dragging
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-3d-workcell-browser.cjs
       - name: P6 visual workcell - build PLC conveyor/turntable line from empty 2D floor without WebGL
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-floor-plan-browser.cjs
       - name: UX-first workbench - workflow, device inspector and responsive design
