@@ -35,6 +35,7 @@ export function WorkcellCameraRig({mode,editableCamera,project,interest,onPose}:
   const pose=useRef<CameraPose>(initialNavigationPose('fly'));
   const movingRight=useRef(false);
   const frame=useRef(0);
+  const reported=useRef<CameraPose|null>(null);
   const obstacles=useMemo(()=>sceneCameraObstacles(project),[project.components,project.params]);
   const poseCallback=useRef(onPose);
   poseCallback.current=onPose;
@@ -42,6 +43,7 @@ export function WorkcellCameraRig({mode,editableCamera,project,interest,onPose}:
   useEffect(()=>{
     keys.current={...INITIAL_KEYS};
     movingRight.current=false;
+    reported.current=null;
     if(mode==='orbit'){
       camera.position.set(7,8.5,10);
       camera.lookAt(interest[0],interest[1],interest[2]);
@@ -51,6 +53,7 @@ export function WorkcellCameraRig({mode,editableCamera,project,interest,onPose}:
       camera.position.set(start.x,start.y,start.z);
       camera.lookAt(start.x+Math.sin(start.yaw),start.y+Math.sin(start.pitch),
         start.z-Math.cos(start.yaw));
+      reported.current=start;
       poseCallback.current(start);
     }
   // Mode changes intentionally reset the inspection camera; changes to project
@@ -126,7 +129,17 @@ export function WorkcellCameraRig({mode,editableCamera,project,interest,onPose}:
     const dir=new Vector3(Math.cos(next.pitch)*Math.sin(next.yaw),
       Math.sin(next.pitch),-Math.cos(next.pitch)*Math.cos(next.yaw));
     camera.lookAt(camera.position.clone().add(dir));
-    if(++frame.current%12===0)poseCallback.current(next);
+    if(++frame.current%12===0){
+      const old=reported.current;
+      // Do not rerender the entire React workbench five times a second when
+      // a low-spec shop PC has an idle camera.
+      if(!old || Math.abs(old.x-next.x)+Math.abs(old.y-next.y)+
+        Math.abs(old.z-next.z)+Math.abs(old.yaw-next.yaw)+
+        Math.abs(old.pitch-next.pitch)>0.004){
+        reported.current=next;
+        poseCallback.current(next);
+      }
+    }
   });
 
   return mode==='orbit'
