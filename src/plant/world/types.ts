@@ -8,6 +8,9 @@ export type BodyShape='box'|'cylinder';
 export type Body={
  id:string;shape:BodyShape;size:Vec3;massKg:number;pos:Vec3;
  yawDeg:0|90|180|270;vel:Vec3;supportedBy:string|null;
+ /** Worker-owned smooth quarter-turn payload orientation. Only visual yaw;
+  * collision broad phase remains conservative until discrete index completion. */
+ visualYawDeg?:number;
  tags:Record<string,string|number|boolean>;
 };
 export type WorldEvent={atMs:number;kind:'spawn'|'despawn'|'jam'|'contact'|'motion'|'fault'|'limit'|'process';source:string;bodyId?:string;detail:string};
