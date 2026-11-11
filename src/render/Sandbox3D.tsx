@@ -5,7 +5,7 @@
  *
  * Original low-poly equipment geometry, no proprietary meshes or trademarks.
  */
-import { useMemo, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Grid, Html, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { CatmullRomCurve3, Plane, Raycaster, Vector2, Vector3, type Camera } from 'three';
@@ -382,17 +382,19 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
   poseCallback.current=onCameraPose;
   // Direct, mouse-driven drag uses a ray through the current perspective camera.
   // The worker's project is unchanged until pointer release and acknowledgement.
-  const floorPoint=(event:ThreeEvent<PointerEvent>):{x:number;z:number}|null=>{
+  const floorFromClient=(clientX:number,clientY:number):{x:number;z:number}|null=>{
     const bounds=gl.domElement.getBoundingClientRect();
     const pointer=new Vector2(
-      ((event.nativeEvent.clientX-bounds.left)/bounds.width)*2-1,
-      -((event.nativeEvent.clientY-bounds.top)/bounds.height)*2+1,
+      ((clientX-bounds.left)/bounds.width)*2-1,
+      -((clientY-bounds.top)/bounds.height)*2+1,
     );
     const ray=new Raycaster(); ray.setFromCamera(pointer,camera);
     const hit=new Vector3();
     return ray.ray.intersectPlane(new Plane(new Vector3(0,1,0),0),hit)
       ? {x:hit.x,z:hit.z} : null;
   };
+  const floorPoint=(event:ThreeEvent<PointerEvent>)=>
+    floorFromClient(event.nativeEvent.clientX,event.nativeEvent.clientY);
   const focus=(id:string)=>{
     const item=project.components.find(c=>c.id===id);
     if(!item)return;
@@ -445,6 +447,44 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
     if(editable&&(to.x!==active.origin.x||to.y!==active.origin.y))
       onMove(active.id,to);
   };
+  // R3F object hits are useful for starting the gesture, but listeners at the
+  // viewport/window level own the continuation. Dragging outside a small
+  // photoeye/roller should not silently lose the final authoritative edit.
+  useEffect(()=>{
+    if(!drag)return;
+    const pointerId=drag.pointerId;
+    const follow=(event:PointerEvent)=>{
+      const active=currentDrag.current;
+      if(!active||event.pointerId!==pointerId)return;
+      const point=floorFromClient(event.clientX,event.clientY);
+      if(!point)return;
+      const next={...active,preview:translated(active,point)};
+      currentDrag.current=next;setDrag(next);
+    };
+    const release=(event:PointerEvent)=>{
+      const active=currentDrag.current;
+      if(!active||event.pointerId!==pointerId)return;
+      const point=floorFromClient(event.clientX,event.clientY);
+      const target=point?translated(active,point):active.preview;
+      currentDrag.current=null;setDrag(null);
+      if(editable&&(target.x!==active.origin.x||target.y!==active.origin.y))
+        onMove(active.id,target);
+    };
+    const cancel=(event:PointerEvent)=>{
+      if(event.pointerId!==pointerId)return;
+      currentDrag.current=null;setDrag(null);
+    };
+    window.addEventListener('pointermove',follow);
+    window.addEventListener('pointerup',release);
+    window.addEventListener('pointercancel',cancel);
+    return ()=>{
+      window.removeEventListener('pointermove',follow);
+      window.removeEventListener('pointerup',release);
+      window.removeEventListener('pointercancel',cancel);
+    };
+  // Hook applies to one active gesture. Geometry and grid are locked at
+  // pointer down; a project update can occur only after release.
+  },[drag?.pointerId,grid,editable,camera,gl,onMove]);
   const preview=drag&&project.components.find(c=>c.id===drag.id);
   const plan=preview?footprintOf(preview,project.params):null;
   const ghost=drag?worldPosition(drag.preview):null;
