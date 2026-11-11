@@ -3,7 +3,7 @@
  * Equipment reads previous settled body/plant state; commands are the mapped PLC
  * output image. No setTimeout, renderer state, Date.now or Math.random.
  */
-import type {EquipmentDef} from './equipment';
+import type {EquipmentDef,SceneOccluder} from './equipment';
 import {ctxOf} from './equipment';
 import type {EquipmentPlacement,LiveSignal,World,WorldInputs} from './types';
 import {MAX_SCENE_EQUIPMENT,SCAN_MS,SUBSTEP_MS} from './types';
@@ -59,9 +59,16 @@ export function stepScene(previous:SceneRuntime,placements:readonly EquipmentPla
  library:EquipmentLibrary,inputs:WorldInputs={},faults:Readonly<Record<string,string|null>>={}):SceneRuntime{
  validatePlacements(placements,library);
  let world=previous.world;
+ // Only explicitly modelled opaque fixed solids cast sight shadows. Belt and
+ // roller conveyor envelopes remain non-occluding so mounted sensors work.
+ // Footprints come from the authoritative equipment registry, not the renderer.
+ const occluders:readonly SceneOccluder[]=placements
+  .filter(item=>item.kind==='shelf'||item.kind==='process-tank')
+  .map(item=>({id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,
+   sizeMm:library[item.kind].footprint}));
  for(let i=0;i<SCAN_MS/SUBSTEP_MS;i++){
   for(const item of placements){
-   const def=library[item.kind],ctx=ctxOf(item);
+   const def=library[item.kind],ctx=ctxOf(item,occluders);
    const state=world.model[item.id]??def.fresh(item.params);
    const command=inputs[item.id]??{};
    for(const channel of def.commands){
