@@ -59,9 +59,11 @@ export function advanceCamera(
  const dz=(-Math.cos(pose.yaw)*fwd+Math.sin(pose.yaw)*side)*speed*dt/norm;
  const nextY=mode==='first-person'?FIRST_PERSON_HEIGHT_M:
    Math.max(.4,Math.min(11,pose.y+(Number(keys.rise)-Number(keys.descend))*3*dt));
+ const collisionHeight=mode==='first-person' ? .2 : nextY;
+ const previousCollisionHeight=mode==='first-person' ? .2 : pose.y;
  const canMove=(x:number,z:number):boolean=>within(x,z)&&(
-  !occupied(x,nextY,z,obstacles) ||
-  (occupied(pose.x,pose.y,pose.z,obstacles) &&
+  !occupied(x,collisionHeight,z,obstacles) ||
+  (occupied(pose.x,previousCollisionHeight,pose.z,obstacles) &&
    // A reloaded camera inside scenery must still be allowed to escape.
    obstacles.every(o=>{
     const prior=Math.hypot((pose.x-o.x)/(o.halfX+CAMERA_RADIUS_M),
