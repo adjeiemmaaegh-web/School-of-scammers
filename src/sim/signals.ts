@@ -14,7 +14,11 @@ import type { SceneRuntime } from '../plant/world/runner';
 import type { AnalogPoint } from './analog';
 
 export type XY = { x: number; y: number };
-export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean; yawDeg?: 0 | 90 | 180 | 270 };
+export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean;
+ yawDeg?: 0 | 90 | 180 | 270;
+ /** Optional P9 saved factory elevation in millimetres; legacy devices remain at zero. */
+ elevationMm?: number;
+};
 export type Wire = { id: string; from: string; to: string };
 /** Component/wire failures that alter what the circuit solver sees (P5). */
 export type FaultKind = 'wire-open' | 'contactor-coil-open' | 'contactor-welded' | 'motor-open-winding' | 'button-stuck' | 'sensor-stuck'
