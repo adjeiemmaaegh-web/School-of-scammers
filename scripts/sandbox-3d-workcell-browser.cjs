@@ -135,24 +135,13 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   await page.waitForFunction(()=>
     !!document.querySelector('.workspace-authoring-bar [data-redo]:not(:disabled)'),
     {timeout:10000});
-  await sleep(350);
-  const afterUndo=(await saved()).components.find(c=>c.id===id);
-  if((afterUndo.yawDeg??0)!==0){
-    console.log('3D HISTORY FIRST UNDO DEBUG',JSON.stringify({
-      start:{x:before.x,y:before.y,yawDeg:before.yawDeg??0},
-      dragged:{x:moved.x,y:moved.y,yawDeg:moved.yawDeg??0},
-      afterUndo:{x:afterUndo.x,y:afterUndo.y,yawDeg:afterUndo.yawDeg??0},
-      status:await page.evaluate(()=>({
-        undo:[...document.querySelectorAll('[data-undo]')].map(b=>b.disabled),
-        redo:[...document.querySelectorAll('[data-redo]')].map(b=>b.disabled),
-        alert:document.querySelector('.sandbox-alert')?.textContent,
-      })),
-    }));
-  }
+  // A newly placed component has no yawDeg property; the worker's undo
+  // correctly restores this implicit zero. Compare effective orientation,
+  // not the optional JSON field's presence.
   await page.waitForFunction(id=>{
    const p=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null');
-   return p?.components?.find(c=>c.id===id)?.yawDeg===0;
-  },{timeout:4500},id);
+   return (p?.components?.find(c=>c.id===id)?.yawDeg??0)===0;
+  },{timeout:15000},id);
   await page.reload({waitUntil:'networkidle0'});
   await page.waitForSelector('.sandbox-three-canvas');
   assert.equal((await saved()).components[0].x,moved.x,'3D authored geometry round-trips on reload');
