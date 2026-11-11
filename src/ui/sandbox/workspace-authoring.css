@@ -21,3 +21,22 @@
 .workspace-selection-panel [type="checkbox"]:focus-visible,.workspace-authoring-bar button:focus-visible,.workspace-library-filter select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 @media(max-width:750px){.workspace-authoring-bar{gap:4px}.workspace-authoring-bar .btn{min-height:32px}.workspace-selection-list{grid-template-columns:1fr 1fr}.workspace-nudges{flex-basis:100%;}}
 @media(max-width:420px){.workspace-selection-list{grid-template-columns:1fr;}}
+
+
+/* Prevent a visible but occluded Undo/Redo from sending a click to the sticky
+ * main toolbar's destructive "New blank project" button. Desktop editing
+ * controls are kept immediately below the measured main toolbar height.
+ * On compact viewports we retain natural document scrolling to preserve
+ * vertical space for the 3D scene and screen-reader navigation.
+ */
+@media (min-width: 920px) and (min-height: 700px) {
+  .sandbox-ux .workspace-editing-strip {
+    position:sticky;
+    top:calc(var(--app-header-h, 64px) + var(--sandbox-toolbar-h, 80px) + 8px);
+    z-index:8;
+    box-shadow:0 3px 12px var(--scene-shadow);
+  }
+}
+.workspace-authoring-bar button {
+  scroll-margin-top:calc(var(--app-header-h, 64px) + var(--sandbox-toolbar-h, 80px) + 12px);
+}
