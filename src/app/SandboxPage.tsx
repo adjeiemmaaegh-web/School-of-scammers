@@ -671,7 +671,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               onMove={move} onMoveFinished={() => setMoveTarget(null)}
             />}
           </Suspense>
-          {!scenario && <WorkspaceSelectionPanel components={project?.components??[]} selected={selectedDeviceIds}
+          {!scenario && workspaceView==='physical' && <WorkspaceSelectionPanel components={project?.components??[]} selected={selectedDeviceIds}
             onToggle={id=>selectDevice(id,true)}
             onSelectAll={()=>setSelectedDeviceIds(selectAll(project?.components??[]))}
             onClear={()=>setSelectedDeviceIds([])}/>}
@@ -689,7 +689,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               onPlace={(kind, at)=>place(kind, at.x, at.y)}
               onMove={move}
               onOpenWiring={()=>{setWorkspaceView('logical');setActiveStage('wire');}} />}
-            {!scenario && <WorkspaceSelectionPanel components={project?.components??[]} selected={selectedDeviceIds}
+            {!scenario && workspaceView==='plan' && <WorkspaceSelectionPanel components={project?.components??[]} selected={selectedDeviceIds}
               onToggle={id=>selectDevice(id,true)}
               onSelectAll={()=>setSelectedDeviceIds(selectAll(project?.components??[]))}
               onClear={()=>setSelectedDeviceIds([])}/>}
