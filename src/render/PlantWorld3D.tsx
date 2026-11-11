@@ -5,6 +5,7 @@
  * World millimetres map to THREE metres. Plant x/y floor -> THREE x/z.
  */
 import type {SceneRuntime} from '../plant/world/runner';
+import type { ThreeEvent } from '@react-three/fiber';
 import type {ProjectFile} from '../sim/signals';
 import {PLANT_EQUIPMENT} from '../plant/equipment';
 import {plantPlacements} from '../sim/p3-plant-bridge';
@@ -38,14 +39,23 @@ function Drawing({drawing}:{drawing:EquipmentDrawing}){
   <meshStandardMaterial color={drawing.colour} metalness={0.25} roughness={0.6}/>
  </mesh>;
 }
-export function PlantWorld3D({project,scene}:{project:ProjectFile;scene:SceneRuntime}){
+export function PlantWorld3D({project,scene,onPointerDownPart,onPointerMovePart,onPointerUpPart,onFocusPart}:{
+  project:ProjectFile;scene:SceneRuntime;
+  onPointerDownPart:(event:ThreeEvent<PointerEvent>,id:string)=>void;
+  onPointerMovePart:(event:ThreeEvent<PointerEvent>)=>void;
+  onPointerUpPart:(event:ThreeEvent<PointerEvent>)=>void;
+  onFocusPart:(id:string)=>void;
+}){
  const stations=plantPlacements(project);
  return <group name="worker-authored-plant-world">
   {stations.map(item=>{
     const def=PLANT_EQUIPMENT[item.kind];
     const state=scene.world.model[item.id]??def.fresh(item.params);
     const ctx={id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,params:item.params};
-    return <group key={item.id}>
+    return <group key={item.id}
+      onPointerDown={e=>onPointerDownPart(e,item.id)}
+      onPointerMove={onPointerMovePart} onPointerUp={onPointerUpPart}
+      onDoubleClick={e=>{e.stopPropagation();onFocusPart(item.id);}}>
       {def.describe(state,ctx).map((drawing,index)=>
         <Drawing key={drawing.part+'-'+index} drawing={drawing}/>)}
     </group>;
