@@ -30,7 +30,7 @@ const clampPositive=(n:number)=>Math.max(.015,n);
 function PhysicalBody({body}:{body:Body}){
  const colour=body.tags.jammed===true?'#d6785c':body.tags.material==='metal'?'#a1afbb':
   body.tags.marked===true?'#bd9758':'#c9ad79';
- return <mesh position={bodyPosition(body)} rotation={[0,-body.yawDeg*Math.PI/180,0]}>
+ return <mesh position={bodyPosition(body)} rotation={[0,-(body.visualYawDeg??body.yawDeg)*Math.PI/180,0]}>
    {body.shape==='box'?<boxGeometry args={boxSize(body.size)}/>:
     <cylinderGeometry args={[metres(body.size.x/2),metres(body.size.x/2),metres(body.size.z),14]}/>}
    <meshStandardMaterial color={colour} roughness={0.78} metalness={body.tags.material==='metal'?.48:.05}/>
@@ -111,7 +111,7 @@ function Drawing({drawing,kind,progress=0}:{drawing:EquipmentDrawing;kind:string
      </mesh>)}
    </group> : kind==='turntable'&&drawing.shape==='cylinder' ? <>
      {/* The worker publishes continuous index progress; body transfer occurs at completion. */}
-     <group rotation={[0,-Math.PI/2*Math.max(0,Math.min(1,progress)),0]}>
+     <group rotation={[0,-Math.PI/2*Math.max(0,Math.min(4,progress)),0]}>
      <mesh><cylinderGeometry args={[len/2,len/2,height,28]}/>
        <meshStandardMaterial color={drawing.colour} metalness={.32} roughness={.65}/></mesh>
      <mesh position={[0,height/2+.008,0]} rotation={[-Math.PI/2,0,0]}>
@@ -194,7 +194,9 @@ export function PlantWorld3D({project,scene,onPointerDownPart,onPointerMovePart,
       onDoubleClick={e=>{e.stopPropagation();onFocusPart(item.id);}}>
       {def.describe(state,ctx).map((drawing,index)=>
         <Drawing kind={item.kind} key={drawing.part+'-'+index} drawing={drawing}
-         progress={item.kind==='turntable'?state.progress:0}/>)}
+         progress={item.kind==='turntable'?(item.params.rotateCargo===1?
+          ((state.phase??0)-(state.done?1:0)+state.progress+4)%4:
+          state.progress):0}/>)}
       {showZones&&optical&&<group
         position={[metres(item.originMm.x),0,metres(item.originMm.y)]}>
         {zone&&<OpticalSensingVolume zone={zone} on={active}/>}
