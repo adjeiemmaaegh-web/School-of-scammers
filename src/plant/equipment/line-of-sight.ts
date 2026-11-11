@@ -52,13 +52,20 @@ export function bodySightOccluder(body:Body):SceneOccluder{
  },yawDeg:body.yawDeg,sizeMm:body.size};
 }
 
+/** An explicitly labelled transparent training material can pass the idealized
+ * optical beam when material-aware mode is deliberately enabled. This is a
+ * teaching classification, not a real spectral/refraction calculation. */
+export const opticallyOpaque=(body:Body):boolean=>
+ body.tags.transparent!==true&&body.tags.material!=='glass';
+
 /** Opt-in dynamic visibility: another body only blocks the line if it lies
  * strictly between a sensor and the chosen target, and is not that target.
  * The target is always considered, not the closest random box in a scene. */
 export function sightlineClearOfBodies(
- start:Vec3,target:Body,bodies:readonly Body[],
+ start:Vec3,target:Body,bodies:readonly Body[],materialAware=false,
 ):boolean{
  return !bodies.some(other=>other.id!==target.id&&
+  (!materialAware||opticallyOpaque(other))&&
   sightlineHitsSolid(start,target.pos,bodySightOccluder(other)));
 }
 
