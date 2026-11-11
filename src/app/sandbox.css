@@ -478,3 +478,10 @@ html:has(.sandbox-ux) { scroll-padding-top: calc(var(--app-header-h, 64px) + 110
   .sandbox-3d-camera-controls button{padding:5px 7px;font-size:10px}
   .sandbox-3d-hud [data-3d-camera-status]{max-width:100%}
 }
+
+
+/* The label is anchored in the genuine 3D scene, not an alternative 2D object.
+ * Its hit target supplements tiny sensors and thin conveyor geometry. */
+.sandbox-3d-label[data-3d-drag-handle] {cursor:grab;touch-action:none}
+.sandbox-3d-label[data-3d-drag-handle]:active {cursor:grabbing}
+.sandbox-3d-label[data-3d-drag-handle] button {cursor:pointer}
