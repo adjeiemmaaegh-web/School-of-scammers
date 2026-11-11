@@ -53,13 +53,14 @@ const project=(blocking)=>({
    if(!button)return false;button.click();return true;
   });
   assert.ok(clicked,'Real worker Run control must be usable');
-  // Wait for worker-generated material flow and actual simulation time, not
-  // only an assumed wall-clock delay or decorative mesh movement.
+  // Inspect the first parcel before the next 1250 ms feeder interval creates
+  // a second parcel. A normal body-to-body queue jam must not be mistaken
+  // for a fixed-solid obstruction (this test isolates the specific cause).
   await page.waitForFunction(()=>{
    const count=Number(document.querySelector('[data-p3-bodies]')?.textContent||0);
    const text=document.querySelector('.sandbox-p3-world')?.textContent||'';
    const time=Number(text.match(/World time:\s*(\d+)\s*ms/)?.[1]||0);
-   return count>0&&time>=2850;
+   return count>0&&time>=2200;
   },{timeout:24000});
   await page.evaluate(()=>{
    const details=[...document.querySelectorAll('.sandbox-p3-world details')];
