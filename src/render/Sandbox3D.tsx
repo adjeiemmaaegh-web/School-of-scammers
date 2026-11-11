@@ -591,6 +591,50 @@ export function Sandbox3D(props: Sandbox3DProps) {
   const camera = useRef<Camera | null>(null);
   const [cameraMode,setCameraMode]=useState<WorkcellCameraMode>('orbit');
   const [cameraPose,setCameraPose]=useState<CameraPose|null>(null);
+  const [placementKind,setPlacementKind]=useState<ComponentKind|''>('');
+  const [cursorPoint,setCursorPoint]=useState<XY|null>(null);
+  const [coordinateX,setCoordinateX]=useState('455');
+  const [coordinateY,setCoordinateY]=useState('225');
+  const [authoringMessage,setAuthoringMessage]=useState('');
+  const canvasElement=useRef<HTMLCanvasElement|null>(null);
+  const rawFloorFromClient=(clientX:number,clientY:number):XY|null=>{
+    const rect=canvasElement.current?.getBoundingClientRect();
+    if(!camera.current||!rect||!rect.width||!rect.height)return null;
+    const mouse=new Vector2(
+      (clientX-rect.left)/rect.width*2-1,
+      -(clientY-rect.top)/rect.height*2+1,
+    );
+    const ray=new Raycaster();ray.setFromCamera(mouse,camera.current);
+    const hit=new Vector3();
+    return ray.ray.intersectPlane(new Plane(new Vector3(0,1,0),0),hit)
+      ? placementFrom3DFloor(hit.x,hit.z):null;
+  };
+  const preview=useMemo(()=>
+    placementKind&&cursorPoint?propose3DPlacement(
+      placementKind,cursorPoint,props.project,props.grid??5):null,
+    [placementKind,cursorPoint,props.project,props.grid]);
+  const placeFrom3D=(kind:ComponentKind,raw:XY)=>{
+    if(!props.editable)return;
+    const decision=propose3DPlacement(kind,raw,props.project,props.grid??5);
+    if(!decision.valid){
+      setAuthoringMessage(decision.reason??'Invalid location');return;
+    }
+    props.onPlace(kind,decision.at);
+    setAuthoringMessage(decision.mount
+      ? `Mounted sensor beside ${decision.mount.carrierId}; use real I/O wiring to operate it.`
+      : decision.advisory??`${COMPONENTS[kind].label} sent to the worker.`);
+  };
+  const precisePlace=()=>{
+    if(!placementKind||!props.editable)return;
+    const x=Number(coordinateX),y=Number(coordinateY);
+    if(!Number.isFinite(x)||!Number.isFinite(y)){
+      setAuthoringMessage('Enter finite X and Y floor coordinates.');return;
+    }
+    if(x<0||x>910||y<0||y>450){
+      setAuthoringMessage('Coordinates are outside the editable 3D floor.');return;
+    }
+    placeFrom3D(placementKind,precise3DPlacement(x,y,props.grid??5));
+  };
   const onPlaceAt = (at: XY) => {
     if (!props.moveTarget) return;
     props.onMove(props.moveTarget, at);
@@ -601,15 +645,8 @@ export function Sandbox3D(props: Sandbox3DProps) {
     if (!props.editable || !available) return;
     const kind = event.dataTransfer.getData('text/plain').replace(/^add:/, '') as ComponentKind;
     if (!Object.hasOwn(COMPONENTS, kind) || !camera.current) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const mouse = new Vector2((event.clientX - rect.left) / rect.width * 2 - 1,
-      -((event.clientY - rect.top) / rect.height * 2 - 1));
-    const ray = new Raycaster();
-    ray.setFromCamera(mouse, camera.current);
-    const point = new Vector3();
-    if (ray.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), 0), point)) {
-      props.onPlace(kind, projectPlacement(point));
-    }
+    const raw=rawFloorFromClient(event.clientX,event.clientY);
+    if(raw)placeFrom3D(kind,raw);
   };
   return <div className="sandbox-3d-shell" aria-label="Interactive 3D industrial automation workspace"
     onDragOver={event => { if (props.editable && available) event.preventDefault(); }} onDrop={drop}>
@@ -621,21 +658,73 @@ export function Sandbox3D(props: Sandbox3DProps) {
         disabled={!available} onClick={()=>{setCameraMode(id);setCameraPose(null);}}>
         {label}</button>)}
     </div>
-    {available ? <Canvas className="sandbox-three-canvas" dpr={[1, 1.5]}
-      gl={{ antialias: true, powerPreference: 'low-power' }}
-      camera={{ position: [7, 8.5, 10], fov: 42, near: 0.1, far: 120 }}
-      onCreated={state => { camera.current = state.camera; state.camera.lookAt(0, 0, 0); }}>
-      <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
-        grid={props.grid??5} mode={cameraMode} onMove={props.onMove}
-        onCameraPose={setCameraPose}
-        selectedDeviceIds={props.selectedDeviceIds ?? []}
-        selectedTerminal={props.selectedTerminal} moveTarget={props.moveTarget}
-        onTerminal={props.onTerminal} onOperate={props.onOperate}
-        onSelect={props.onSelectDevice} onPlaceAt={onPlaceAt} />
-    </Canvas> : <div className="sandbox-3d-fallback" role="status">
-      <strong>3D renderer unavailable on this device</strong>
-      <p>The PLC simulator still runs. Use the component patch panel below to wire, operate and inspect devices without WebGL.</p>
-    </div>}
+    <div className="sandbox-3d-scene-tools" data-p7-tools role="group"
+      aria-label="3D factory scene building tools">
+      <label>Place in 3D
+        <select data-p7-tool aria-label="3D scene placement tool"
+          disabled={!props.editable||!available}
+          value={placementKind}
+          onChange={event=>{setPlacementKind(event.target.value as ComponentKind|'');setAuthoringMessage('');}}>
+          <option value="">Select / drag machines</option>
+          {componentKinds.map(kind=><option key={kind} value={kind}>{COMPONENTS[kind].label}</option>)}
+        </select>
+      </label>
+      <div className="sandbox-3d-coordinate-tools" role="group" aria-label="Precise 3D factory placement">
+        <label>X <input type="number" data-p7-x min={0} max={910}
+          value={coordinateX} onChange={e=>setCoordinateX(e.target.value)}
+          disabled={!props.editable||!placementKind} /></label>
+        <label>Y <input type="number" data-p7-y min={0} max={450}
+          value={coordinateY} onChange={e=>setCoordinateY(e.target.value)}
+          disabled={!props.editable||!placementKind} /></label>
+        <button type="button" data-p7-place-precise
+          disabled={!props.editable||!placementKind} onClick={precisePlace}>Place at X/Y</button>
+      </div>
+      <div className="sandbox-3d-scene-actions">
+        <button type="button" data-p7-rotate-3d disabled={!props.editable||!props.selectedDeviceId}
+          onClick={props.onRotateSelected}>Rotate 90°</button>
+        <button type="button" data-p7-duplicate-3d disabled={!props.editable||!props.selectedDeviceId}
+          onClick={props.onDuplicateSelected}>Duplicate</button>
+        <button type="button" data-p7-wire onClick={props.onOpenWiring}>Wire PLC I/O</button>
+      </div>
+      {placementKind&&<small>Click the 3D floor to place · snap {props.grid??5} · sensors align to nearby roller/belt rails</small>}
+    </div>
+    <div className="sandbox-three-stage" data-p7-3d-stage
+      onPointerMove={event=>{
+        if(!placementKind)return;
+        const raw=rawFloorFromClient(event.clientX,event.clientY);
+        if(raw)setCursorPoint(last=>last&&Math.abs(last.x-raw.x)<.9&&Math.abs(last.y-raw.y)<.9?last:raw);
+      }}
+      onPointerLeave={()=>setCursorPoint(null)}
+      onClick={event=>{
+        if(!placementKind||!props.editable)return;
+        const raw=rawFloorFromClient(event.clientX,event.clientY);
+        if(raw)placeFrom3D(placementKind,raw);
+      }}>
+      {available ? <Canvas className="sandbox-three-canvas" dpr={[1, 1.5]}
+        gl={{ antialias: true, powerPreference: 'low-power' }}
+        camera={{ position: [7, 8.5, 10], fov: 42, near: 0.1, far: 120 }}
+        onCreated={state => {
+          camera.current=state.camera;canvasElement.current=state.gl.domElement;
+          state.camera.lookAt(0,0,0);
+        }}>
+        <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
+          grid={props.grid??5} mode={cameraMode} onMove={props.onMove}
+          placementKind={placementKind} scenePreview={preview}
+          onCameraPose={setCameraPose}
+          selectedDeviceIds={props.selectedDeviceIds ?? []}
+          selectedTerminal={props.selectedTerminal} moveTarget={props.moveTarget}
+          onTerminal={props.onTerminal} onOperate={props.onOperate}
+          onSelect={props.onSelectDevice} onPlaceAt={onPlaceAt} />
+      </Canvas> : <div className="sandbox-3d-fallback" role="status">
+        <strong>3D renderer unavailable on this device</strong>
+        <p>The PLC simulator still runs. Use the component patch panel below to wire, operate and inspect devices without WebGL.</p>
+      </div>}
+    </div>
+    {(authoringMessage || preview?.mount || preview?.advisory || (preview&&!preview.valid))&&
+      <div className="sandbox-3d-authoring-status" data-p7-authoring-status role="status">
+        {preview?.mount ? `Rail mount: ${preview.mount.carrierId}. ` : ''}
+        {preview?.advisory??preview?.reason??authoringMessage}
+      </div>}
     <div className="sandbox-3d-hud">
       <span data-3d-camera-status>{cameraMode==='orbit'
         ? '3D ORBIT · Drag to rotate · Right drag to pan · Wheel zoom · Double-click to focus'
