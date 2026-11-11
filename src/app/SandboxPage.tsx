@@ -698,6 +698,12 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               onPlace={(kind, at) => place(kind, at.x, at.y)}
               onMove={move} onMoveFinished={() => setMoveTarget(null)}
               onRotate={(id,turns)=>edit({kind:'rotate',ids:[id],quarterTurns:turns})}
+              onTrainingOperator={(enabled,pose)=>send([{
+                k:'setTrainingOperator',enabled,
+                xMm:Math.round((pose?.x??0)*1000),
+                yMm:Math.round((pose?.z??0)*1000),
+                feetMm:Math.round(Math.max(0,(pose?.y??1.8)-1.8)*1000),
+              }],'ignore')}
               onOpenWiring={()=>{setWorkspaceView('logical');setActiveStage('wire');}}
             />}
           </Suspense>
