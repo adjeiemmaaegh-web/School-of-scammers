@@ -207,5 +207,15 @@ export function PlantWorld3D({project,scene,onPointerDownPart,onPointerMovePart,
     </group>;
   })}
   {scene.world.bodies.map(body=><PhysicalBody key={body.id} body={body}/>)}
+  {/* View-only ground marker of the explicitly enabled WORKER person proxy.
+      This renders saved simulation state; it does not author PLC signals. */}
+  {scene.world.trainingOperator&&<mesh name="p8-worker-training-operator"
+    position={[metres(scene.world.trainingOperator.pos.x),.015,
+      metres(scene.world.trainingOperator.pos.y)]}
+    rotation={[-Math.PI/2,0,0]} raycast={()=>{}}>
+    <ringGeometry args={[.15,.24,20]}/>
+    <meshBasicMaterial color="#e7c86b" transparent opacity={.85}
+      depthWrite={false} side={2}/>
+  </mesh>}
  </group>;
 }
