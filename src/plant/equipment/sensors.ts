@@ -4,7 +4,7 @@ import {draw,initial,param,spec} from '../world/equipment';
 import type {Body,World} from '../world/types';
 import {insideFootprint,q,vec} from '../world/math';
 import {nextSeed} from '../world/seed';
-import {opticalZoneContains,opticalZoneOf} from './sensor-zone';
+import {opticalZoneContains,opticalZoneIntersectsBody,opticalZoneOf} from './sensor-zone';
 import {hasUnobstructedSightline,sightlineClearOfBodies} from './line-of-sight';
 const bodiesNear=(world:World,ctx:EquipmentContext,range:number):Body[]=>
  world.bodies.filter(b=>insideFootprint(b.pos,ctx.originMm,vec(range,range,0))&&
@@ -19,19 +19,27 @@ const optical=(kind:string,label:string,predicate:(b:Body)=>boolean):EquipmentDe
   spec('beamWidthMm','Forward beam width','mm',20,400,10,100),
   // Legacy forward detection stays unchanged. Explicit opt-in enables a
   // bounded LOS check against shelves and process tanks in the worker.
-  spec('occlusionMode','Line of sight','0=off, 1=fixed, 2=fixed+bodies',0,2,1,0)],
- faults:['sensor-stuck-on','sensor-stuck-off','dirty-lens'],
+  spec('occlusionMode','Line of sight','0=off, 1=fixed, 2=fixed+bodies',0,2,1,0),
+  spec('targetMode','Target geometry','0=centre, 1=body volume',0,1,1,0)],
+ faults:['sensor-stuck-on','sensor-stuck-off','dirty-lens',
+  'sensor-misaligned','sensor-intermittent'], 
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
   const zone=opticalZoneOf(kind,ctx,f);
-  const seen=w.bodies.some(body=>predicate(body)&&opticalZoneContains(body.pos,ctx,zone)&&
+  const seen=w.bodies.some(body=>predicate(body)&&
+   (zone.shape==='forward'&&ctx.params.targetMode===1?
+    opticalZoneIntersectsBody(body,ctx,zone):opticalZoneContains(body.pos,ctx,zone))&&
    (zone.shape!=='forward'||(ctx.params.occlusionMode??0)===0||
     (hasUnobstructedSightline(ctx.originMm,body.pos,ctx.occluders??[],ctx.id)&&
      (ctx.params.occlusionMode!==2||
       sightlineClearOfBodies(ctx.originMm,body,w.bodies)))));
   const response=param(ctx,'responseMs',40);
   const elapsedMs=seen?s.elapsedMs+dt:0;
-  const on=f==='sensor-stuck-on'?true:f==='sensor-stuck-off'?false:seen&&elapsedMs>=response;
+  // Fault pulses follow simulated worker time, never wall clock or an
+  // unseeded browser random generator. PLC observability is reproducible.
+  const intermittent=f==='sensor-intermittent'&&Math.floor(w.timeMs/150)%2===1;
+  const on=f==='sensor-stuck-on'?true:f==='sensor-stuck-off'||intermittent?
+   false:seen&&elapsedMs>=response;
   return {world:w,state:{...s,elapsedMs:q(elapsedMs),engaged:on,faulted:!!f}};
  },
  read:(s)=>({present:s.engaged}),
