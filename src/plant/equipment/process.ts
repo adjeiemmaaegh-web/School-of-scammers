@@ -5,16 +5,18 @@
 import type {EquipmentDef} from '../world/equipment';
 import {draw,flag,initial,numeric,param,spec} from '../world/equipment';
 import {q,clamp,vec,insideFootprint} from '../world/math';
+import {PROCESS_TANK_SOLID_SIZE} from '../world/solid-geometry';
 
 export const processTank:EquipmentDef={
- kind:'process-tank',label:'Analog process vessel',footprint:vec(700,700,1350),
+ kind:'process-tank',label:'Analog process vessel',footprint:PROCESS_TANK_SOLID_SIZE,
  commands:[{name:'fill',kind:'bool'},{name:'drain',kind:'bool'},
   {name:'inletPct',kind:'number',unit:'%'}],
  signals:[{name:'levelMl',kind:'number',unit:'ml'},{name:'high',kind:'bool'},
   {name:'empty',kind:'bool'},{name:'full',kind:'bool'}],
  params:[spec('capacityMl','Tank volume','ml',1000,100000,100,10000),
   spec('fillMlS','Inlet flow','ml/s',50,5000,50,1000),
-  spec('drainMlS','Outlet flow','ml/s',50,5000,50,1300)],
+  spec('drainMlS','Outlet flow','ml/s',50,5000,50,1300),
+  spec('blockMaterialFlow','Block material flow','0=off, 1=on',0,1,1,0)],
  faults:['inlet-blocked','valve-stuck','leak'],
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
