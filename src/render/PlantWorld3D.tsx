@@ -11,6 +11,7 @@ import type {ProjectFile} from '../sim/signals';
 import {PLANT_EQUIPMENT} from '../plant/equipment';
 import {plantPlacements} from '../sim/p3-plant-bridge';
 import {P7_SENSOR_KINDS} from './scene-authoring';
+import {opticalZoneOf,type OpticalZone} from '../plant/equipment/sensor-zone';
 import type {Body,EquipmentDrawing,LiveSignal} from '../plant/world/types';
 
 const metres=(mm:number)=>mm/1000;
@@ -90,20 +91,27 @@ function Drawing({drawing,kind}:{drawing:EquipmentDrawing;kind:string}){
    </mesh>}
  </group>;
 }
-/** The P3 optical models detect bodies inside an axis-aligned +/-rangeMm
- * square and +/-600mm vertically. This shows that ORIGINAL region rather
- * than inventing a directional red laser that the physics does not implement.
+/** This volume is projected from the *same* sensor-zone descriptor read
+ * by the authoritative worker. Area mode shows the historical square.
+ * Directional mode shows a forward-facing bounded sensing strip, not a
+ * decorative beam with sensing semantics the worker does not implement.
+ * The visible above-floor part is 0..600mm, matching the bounded body world.
  */
-function OpticalSensingVolume({rangeMm,on}:{rangeMm:number;on:boolean}){
- const radius=metres(rangeMm);
- return <group>
-   <mesh raycast={()=>{}} position={[0,.3,0]}>
-     <boxGeometry args={[radius*2,.6,radius*2]}/>
+function OpticalSensingVolume({zone,on}:{zone:OpticalZone;on:boolean}){
+ const directional=zone.shape==='forward';
+ const length=directional?metres(zone.rangeMm):metres(zone.rangeMm*2);
+ const width=directional?metres(zone.beamWidthMm):metres(zone.rangeMm*2);
+ const height=metres(zone.heightMm/2);
+ const offsetX=directional?length/2:0;
+ return <group rotation={[0,-zone.yawDeg*Math.PI/180,0]}
+     name={directional?'worker-forward-sensing-region':'worker-area-sensing-region'}>
+   <mesh raycast={()=>{}} position={[offsetX,height/2,0]}>
+     <boxGeometry args={[length,height,width]}/>
      <meshBasicMaterial color={on?'#49dfb5':'#48b4e2'}
        transparent opacity={on?.095:.035} depthWrite={false}/>
    </mesh>
-   <mesh raycast={()=>{}} position={[0,.3,0]}>
-     <boxGeometry args={[radius*2,.6,radius*2]}/>
+   <mesh raycast={()=>{}} position={[offsetX,height/2,0]}>
+     <boxGeometry args={[length,height,width]}/>
      <meshBasicMaterial color={on?'#72eec3':'#5b9dc5'}
        transparent opacity={on?.43:.20} wireframe depthWrite={false}/>
    </mesh>
@@ -141,7 +149,7 @@ export function PlantWorld3D({project,scene,onPointerDownPart,onPointerMovePart,
     const ctx={id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,params:item.params};
     const optical=P7_SENSOR_KINDS.has(item.kind);
     const active=Object.values(scene.signals[item.id]??{}).some(v=>v===true);
-    const rangeMm=item.kind==='light-curtain'?500:item.params.rangeMm??200;
+    const zone=optical?opticalZoneOf(item.kind,ctx,project.plantFaults?.[item.id]??null):null;
     return <group key={item.id}
       onPointerDown={e=>onPointerDownPart(e,item.id)}
       onPointerMove={onPointerMovePart} onPointerUp={onPointerUpPart}
@@ -150,7 +158,7 @@ export function PlantWorld3D({project,scene,onPointerDownPart,onPointerMovePart,
         <Drawing kind={item.kind} key={drawing.part+'-'+index} drawing={drawing}/>)}
       {showZones&&optical&&<group
         position={[metres(item.originMm.x),0,metres(item.originMm.y)]}>
-        <OpticalSensingVolume rangeMm={rangeMm} on={active}/>
+        {zone&&<OpticalSensingVolume zone={zone} on={active}/>}
       </group>}
       {showSignals&&selectedIds.includes(item.id)&&<group
         position={[metres(item.originMm.x),0,metres(item.originMm.y)]}>
