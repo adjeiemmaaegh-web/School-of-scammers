@@ -204,6 +204,8 @@ export type Command =
   /** `conveyor` names the lane; omitted means the first conveyor (the single-conveyor behaviour). */
   | { k: 'feedParcel'; kind: ParcelKind; conveyor?: string }
   | { k:'setPlantFault'; id:string; fault:string|null }
+  /** User-controlled training-person proxy: ephemeral, in mm, worker authoritative. */
+  | { k:'setTrainingOperator'; enabled:boolean; xMm:number; yMm:number; feetMm:number }
   | { k:'loadPlantScene'; id:string }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
