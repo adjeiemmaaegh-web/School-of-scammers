@@ -5,13 +5,26 @@
  */
 import type {Body,EquipmentPlacement,Vec3} from './types';
 import {vec} from './math';
+import {sweptPlacementContact} from './swept-contact';
 
 export const SHELF_SOLID_SIZE=vec(1100,600,3000);
 export const PROCESS_TANK_SOLID_SIZE=vec(700,700,1350);
 
+/** Registered outer enclosures for stationary machinery. These simple
+ * envelopes do NOT describe robot-arm moving links or open bays: a user
+ * must explicitly opt in to solid material-flow blocking. Keep these
+ * dimensions matched to the P3 equipment registry (regression enforced).
+ */
+const STATIONARY_SOLIDS:Readonly<Record<string,Vec3>>={
+ shelf:SHELF_SOLID_SIZE,'process-tank':PROCESS_TANK_SOLID_SIZE,
+ 'asrs-crane':vec(1300,750,3100),'robot-arm':vec(900,900,1800),
+ palletizer:vec(1300,1000,1750),mixer:vec(450,450,650),
+ heater:vec(320,320,350),'proportional-valve':vec(240,260,350),
+ filler:vec(250,250,500),capper:vec(240,240,500),
+};
+export const STATIC_SOLID_KINDS=Object.freeze(Object.keys(STATIONARY_SOLIDS));
 export function staticSolidSize(kind:string):Vec3|null{
- return kind==='shelf'?SHELF_SOLID_SIZE:
-  kind==='process-tank'?PROCESS_TANK_SOLID_SIZE:null;
+ return STATIONARY_SOLIDS[kind]??null;
 }
 export function intersectsStaticSolid(body:Body,item:EquipmentPlacement):boolean{
  const solid=staticSolidSize(item.kind);
@@ -28,6 +41,14 @@ export function intersectsStaticSolid(body:Body,item:EquipmentPlacement):boolean
 export function newlyContactsStaticSolid(
  body:Body,moved:Body,items:readonly EquipmentPlacement[],
 ):boolean{
- return items.some(item=>item.params.blockMaterialFlow===1&&staticSolidSize(item.kind)!==null&&
-  !intersectsStaticSolid(body,item)&&intersectsStaticSolid(moved,item));
+ return items.some(item=>{
+  if(item.params.blockMaterialFlow!==1)return false;
+  const size=staticSolidSize(item.kind);
+  if(!size)return false;
+  // Check the complete continuous 3D path, not only the position sampled
+  // after a 10ms substep (which could tunnel across a thin enclosure).
+  return sweptPlacementContact(body,item,size,{
+   x:moved.pos.x-body.pos.x,y:moved.pos.y-body.pos.y,
+   z:moved.pos.z-body.pos.z})!==null;
+ });
 }
