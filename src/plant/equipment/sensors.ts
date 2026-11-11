@@ -4,6 +4,7 @@ import {draw,initial,param,spec} from '../world/equipment';
 import type {Body,World} from '../world/types';
 import {insideFootprint,q,vec} from '../world/math';
 import {nextSeed} from '../world/seed';
+import {opticalZoneContains,opticalZoneOf} from './sensor-zone';
 const bodiesNear=(world:World,ctx:EquipmentContext,range:number):Body[]=>
  world.bodies.filter(b=>insideFootprint(b.pos,ctx.originMm,vec(range,range,0))&&
  Math.abs(b.pos.z-ctx.originMm.z)<=600);
@@ -11,12 +12,15 @@ const optical=(kind:string,label:string,predicate:(b:Body)=>boolean):EquipmentDe
  kind,label,footprint:vec(100,100,150),commands:[],
  signals:[{name:'present',kind:'bool'}],
  params:[spec('rangeMm','Sensing range','mm',50,800,10,200),
-  spec('responseMs','Response delay','ms',0,500,10,40)],
+  spec('responseMs','Response delay','ms',0,500,10,40),
+  // 0 preserves old saved-project area sensing; 1 enables a forward zone.
+  spec('beamMode','Detection mode','0=area, 1=forward',0,1,1,0),
+  spec('beamWidthMm','Forward beam width','mm',20,400,10,100)],
  faults:['sensor-stuck-on','sensor-stuck-off','dirty-lens'],
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
-  const range=param(ctx,'rangeMm',200)*(f==='dirty-lens'?.25:1);
-  const seen=bodiesNear(w,ctx,range).some(predicate);
+  const zone=opticalZoneOf(kind,ctx,f);
+  const seen=w.bodies.some(body=>predicate(body)&&opticalZoneContains(body.pos,ctx,zone));
   const response=param(ctx,'responseMs',40);
   const elapsedMs=seen?s.elapsedMs+dt:0;
   const on=f==='sensor-stuck-on'?true:f==='sensor-stuck-off'?false:seen&&elapsedMs>=response;
