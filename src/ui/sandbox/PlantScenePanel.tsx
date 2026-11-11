@@ -6,6 +6,8 @@
 import {useMemo,useState} from 'react';
 import type {ProjectFile,RenderSnapshot,Command} from '../../sim/signals';
 import {SCENES} from '../../plant/scenes/catalogue';
+import {sceneFromProject} from '../../plant/scenes/commissioning';
+import {SceneCommissioningPanel} from './SceneCommissioningPanel';
 import {PLANT_EQUIPMENT} from '../../plant/equipment';
 import {SCENE_CATEGORIES,SCENE_METADATA,searchSceneIds,
  type SceneCategory} from '../../plant/scenes/metadata';
@@ -20,6 +22,17 @@ export function PlantScenePanel({project,snapshot,editable,onCommands}:Props){
  const [query,setQuery]=useState('');
  const [category,setCategory]=useState<SceneCategory|'All'>('All');
  const [pendingId,setPendingId]=useState<string|null>(null);
+ const [openedId,setOpenedId]=useState<string|null>(null);
+ const activeScene=useMemo(()=>{
+  const recognized=sceneFromProject(project);
+  if(recognized)return recognized;
+  if(!openedId||!project)return;
+  const previous=SCENES.find(s=>s.id===openedId);
+  // Keep an in-progress diagnostic visible when a learner removes a device;
+  // do not associate an unrelated new project with the old scene.
+  return previous?.equipment.some(item=>project.components.some(c=>
+   c.id===item.id&&c.kind===item.kind))?previous:undefined;
+ },[project,openedId]);
  const visible=useMemo(()=>{
   const ids=new Set(searchSceneIds(query,category,SCENES));
   return SCENES.filter(scene=>ids.has(scene.id));
@@ -28,6 +41,7 @@ export function PlantScenePanel({project,snapshot,editable,onCommands}:Props){
   if(!editable)return;
   if(project?.components.length&&pendingId!==id){setPendingId(id);return;}
   onCommands([{k:'loadPlantScene',id}]);
+  setOpenedId(id);
   setPendingId(null);
  };
  return <>
@@ -86,6 +100,8 @@ export function PlantScenePanel({project,snapshot,editable,onCommands}:Props){
       No matching scene. Clear the search or choose another area.</p>}
    </div>
   </details>
+  {activeScene&&snapshot&&project&&<SceneCommissioningPanel
+    key={activeScene.id} scene={activeScene} project={project} snapshot={snapshot}/>}
   {snapshot&&parts.length>0&&<section className="sandbox-p3-world panel" aria-label="Shared plant physics and equipment">
     <div className="sandbox-section-head"><div>
       <span className="eyebrow">P3 · physical world</span><h2>Multi-body plant status</h2>
