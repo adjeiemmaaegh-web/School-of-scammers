@@ -54,7 +54,7 @@ describe('P8 offline composed / nested workcell fragments through real worker',(
  });
  it('supports nested composition snapshots with no external reference required',()=>{
   const joined=composeAssemblyFragments([a(),b()]);
-  const nested=composeAssemblyFragments([joined,b()]);
+  const nested=composeAssemblyFragments([joined,b()],100);
   expect(nested.components).toHaveLength(6);
   expect(nested.wires).toHaveLength(3);
   const source=JSON.stringify(joined);
