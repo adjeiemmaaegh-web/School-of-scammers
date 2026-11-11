@@ -124,7 +124,7 @@ export function AssemblyLibrary({project,selectedIds,editable,grid,onInsert}:Pro
      <button type="button" data-assembly-reset className="btn ghost small"
        onClick={resetCorrupt}>{confirmReset?'Confirm local reset':'Reset unreadable shelf'}</button>
    </div>}
-   {error&&<p role="alert" className="sandbox-error">{error}</p>
+   {error&&<p role="alert" className="sandbox-error">{error}</p>}
    {message&&<p role="status" className="sandbox-help">{message}</p>}
    <p className="sandbox-help">Saved only in this browser. Export the full project JSON
      for portable backup. Physical overlaps and PLC correctness are not guaranteed by a saved assembly.</p>
