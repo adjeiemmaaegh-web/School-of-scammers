@@ -37,8 +37,8 @@ export function proposeSensorMount(
   if(!RAIL_KINDS.has(carrier.kind))continue;
   const f=footprintOf(carrier,project.params);
   const sideways=f.yawDeg===90||f.yawDeg===270;
-  const wide=f.width/2;
-  const narrow=f.depth/2;
+  const wide=(sideways?f.depth:f.width)/2;
+  const narrow=(sideways?f.width:f.depth)/2;
   // Centre in the persisted UI floor, not the component's top-left.
   const cx=raw.x+85,cy=raw.y+65;
   const long=Math.max(-wide+4,Math.min(wide-4,cx-f.x));
