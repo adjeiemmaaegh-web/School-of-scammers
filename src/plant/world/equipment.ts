@@ -2,7 +2,11 @@
 import type {ParamSpec} from '../../components/params';
 import type {EquipmentCommand,EquipmentDrawing,EquipmentPlacement,EquipmentSignal,EquipmentState,Vec3,World} from './types';
 export type Channel={name:string;kind:'bool'|'number';unit?:string};
-export type EquipmentContext={id:string;originMm:Vec3;yawDeg:0|90|180|270;params:Record<string,number>};
+export type SceneOccluder={id:string;originMm:Vec3;yawDeg:0|90|180|270;sizeMm:Vec3};
+export type EquipmentContext={id:string;originMm:Vec3;yawDeg:0|90|180|270;params:Record<string,number>;
+ /** Worker-provided opaque structural solids; absent in legacy direct tests and render-only contexts. */
+ occluders?:readonly SceneOccluder[];
+};
 export type EquipmentDef={
  kind:string;label:string;footprint:Vec3;
  commands:readonly Channel[];signals:readonly Channel[];params:readonly ParamSpec[];
@@ -14,8 +18,8 @@ export type EquipmentDef={
  read:(state:EquipmentState,world:World,ctx:EquipmentContext)=>Record<string,EquipmentSignal>;
  describe:(state:EquipmentState,ctx:EquipmentContext)=>EquipmentDrawing[];
 };
-export const ctxOf=(item:EquipmentPlacement):EquipmentContext=>({
- id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,params:item.params,
+export const ctxOf=(item:EquipmentPlacement,occluders?:readonly SceneOccluder[]):EquipmentContext=>({
+ id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,params:item.params,occluders,
 });
 export const flag=(command:EquipmentCommand,key:string):boolean=>command[key]===true;
 export const numeric=(command:EquipmentCommand,key:string,fallback:number,min:number,max:number):number=>{
