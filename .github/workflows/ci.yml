@@ -42,6 +42,10 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p1-workspace-browser.cjs
       - name: P7 3D factory commissioning - empty real 3D floor, PLC16 ST, 23 wires, worker parcel
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-3d-commissioning-browser.cjs
+      - name: P7 3D physical clearance - reject co-located carriers while preserving sensor mounting
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-clearance-browser.cjs
+      - name: P7 offline reusable 3D assemblies - save, reload, worker paste and delete
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-assemblies-browser.cjs
       - name: P6 primary 3D workcell - Fly First Person and direct worker validated model dragging
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-3d-workcell-browser.cjs
       - name: P6 visual workcell - build PLC conveyor/turntable line from empty 2D floor without WebGL
