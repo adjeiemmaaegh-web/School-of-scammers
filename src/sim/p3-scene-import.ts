@@ -14,6 +14,8 @@ export function makePlantSceneProject(id:string):ProjectFile{
  const equipment:PlacedComponent[]=scene.equipment.map(p=>({
   id:p.id,kind:p.kind as PlacedComponent['kind'],
   x:px(p.originMm.x),y:py(p.originMm.y),pressed:false,
+  ...(p.yawDeg?{yawDeg:p.yawDeg}:{}),
+  ...(p.originMm.z?{elevationMm:p.originMm.z}:{}),
  }));
  const first=defaultProgramFor('plc16');
  const components:PlacedComponent[]=[
