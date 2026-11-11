@@ -28,10 +28,10 @@ describe('P7 Fit Scene operates only on actual saved 3D workcell bounds',()=>{
  });
  it('uses rotated worker footprints and saved nondefault dimensions',()=>{
   const base=frameEntireWorkcell(scene([
-   part('north','roller-conveyor',455,200,90),part('east','roller-conveyor',530,200),
+   part('north','roller-conveyor',455,200,90),part('east','roller-conveyor',800,200),
   ]));
   const expanded=frameEntireWorkcell(scene([
-   part('north','roller-conveyor',455,200,90),part('east','roller-conveyor',530,200),
+   part('north','roller-conveyor',455,200,90),part('east','roller-conveyor',800,200),
   ],{east:{lengthMm:2200,widthMm:400}}));
   expect(expanded.position[1]).toBeGreaterThan(base.position[1]);
   expect(expanded.target[0]).toBeGreaterThan(base.target[0]);
