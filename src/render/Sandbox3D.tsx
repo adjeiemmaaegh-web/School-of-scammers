@@ -21,7 +21,7 @@ import { footprintOf } from '../workspace/floor-plan';
 import { clampPlacement } from '../workspace/geometry';
 import type { GridStep } from '../workspace/types';
 import { WorkcellCameraRig } from './WorkcellCameraRig';
-import { frameEntireWorkcell, type CameraPose, type WorkcellCameraMode } from './workcell-camera';
+import { frameEntireWorkcell,initialNavigationPose, type CameraPose, type WorkcellCameraMode } from './workcell-camera';
 import {
   assess3DPlacement, placementMessage, previewDimensions,
   type PlacementAssessment,
@@ -660,6 +660,7 @@ export type Sandbox3DProps = {
   onMoveFinished: () => void;
   onRotate: (id:string,turns:-1|1)=>void;
   onOpenWiring:()=>void;
+  onTrainingOperator:(enabled:boolean,pose:CameraPose|null)=>void;
 };
 export function Sandbox3D(props: Sandbox3DProps) {
   const available = useMemo(supportsWebGL, []);
@@ -667,6 +668,14 @@ export function Sandbox3D(props: Sandbox3DProps) {
   const [cameraMode,setCameraMode]=useState<WorkcellCameraMode>('orbit');
   const [fitRequest,setFitRequest]=useState(0);
   const [cameraPose,setCameraPose]=useState<CameraPose|null>(null);
+  const [operatorEnabled,setOperatorEnabled]=useState(false);
+  const operatorLive=useRef(false),operatorSender=useRef(props.onTrainingOperator);
+  operatorLive.current=operatorEnabled;operatorSender.current=props.onTrainingOperator;
+  useEffect(()=>()=>{if(operatorLive.current)operatorSender.current(false,null);},[]);
+  const onCameraPose=(pose:CameraPose)=>{
+   setCameraPose(pose);
+   if(operatorEnabled&&cameraMode==='first-person')props.onTrainingOperator(true,pose);
+  };
   const [placementKind,setPlacementKind]=useState<ComponentKind | ''>('');
   const [alignSensor,setAlignSensor]=useState(true);
   const [showZones,setShowZones]=useState(true);
@@ -737,13 +746,31 @@ export function Sandbox3D(props: Sandbox3DProps) {
         ['orbit','Orbit'],['fly','Fly'],['first-person','First Person'],
       ] as const).map(([id,label])=><button key={id} type="button"
         data-3d-camera-mode={id} aria-pressed={cameraMode===id}
-        disabled={!available} onClick={()=>{setCameraMode(id);setCameraPose(null);}}>
+        disabled={!available} onClick={()=>{
+         if(id!=='first-person'&&operatorEnabled){
+          props.onTrainingOperator(false,null);setOperatorEnabled(false);
+         }
+         setCameraMode(id);setCameraPose(null);
+        }}>
         {label}</button>)}
       <button type="button" data-3d-fit-scene
         disabled={!available} title="Frame all placed equipment in the real 3D camera"
-        onClick={()=>{setCameraMode('orbit');setFitRequest(n=>n+1);}}>
+        onClick={()=>{
+         if(operatorEnabled){props.onTrainingOperator(false,null);setOperatorEnabled(false);}
+         setCameraMode('orbit');setFitRequest(n=>n+1);
+        }}>
         Fit scene
       </button>
+      <label className="p7-3d-check" title="Explicit teaching-person proxy in the worker, never real-person tracking">
+        <input type="checkbox" data-p8-training-operator
+          disabled={!available||cameraMode!=='first-person'} checked={operatorEnabled}
+          onChange={event=>{
+           setOperatorEnabled(event.target.checked);
+           props.onTrainingOperator(event.target.checked,
+             event.target.checked?(cameraPose??initialNavigationPose('first-person')):null);
+          }}/>
+        Simulate operator in opted-in sensors
+      </label>
     </div>
     <div className="p7-3d-authoring" role="group" aria-label="3D factory authoring" data-p7-3d-authoring>
       <label>3D placement
@@ -774,7 +801,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
         placeKind={placementKind} alignSensor={alignSensor} showZones={showZones}
         showSignals={showSignals} hover={hover} onPreview={onPreview}
         onRotate={props.onRotate}
-        onCameraPose={setCameraPose}
+        onCameraPose={onCameraPose}
         selectedDeviceIds={props.selectedDeviceIds ?? []}
         selectedTerminal={props.selectedTerminal} moveTarget={props.moveTarget}
         onTerminal={props.onTerminal} onOperate={props.onOperate}
