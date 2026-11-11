@@ -50,6 +50,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-assemblies-browser.cjs
       - name: P8 worker optics - real PLC16 ST, feeder, body and opt-in rotated rack obstruction
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-optical-browser.cjs
+      - name: P8 conveyor physical contact - real worker jam vs legacy free flow
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-jam-browser.cjs
       - name: P6 visual workcell - build PLC conveyor/turntable line from empty 2D floor without WebGL
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-floor-plan-browser.cjs
       - name: UX-first workbench - workflow, device inspector and responsive design
