@@ -404,12 +404,13 @@ type DeviceDrag = {
  * A dragged machine is a temporary ghost until the worker acknowledges 'move'.
  */
 function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSensor,
-  showZones, showSignals, selectedDeviceIds, selectedTerminal, moveTarget,
+  showZones, showSignals, hover, selectedDeviceIds, selectedTerminal, moveTarget,
   onTerminal, onOperate, onSelect, onPlaceAt, onPlace, onPreview, onMove, onRotate, onCameraPose }: {
   project: ProjectFile; snapshot: RenderSnapshot; editable: boolean; grid: GridStep;
   mode:WorkcellCameraMode;
   placeKind:ComponentKind | ''; alignSensor:boolean;
   showZones:boolean; showSignals:boolean;
+  hover:PlacementAssessment|null;
   selectedDeviceIds: readonly string[]; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
   onSelect: (id: string, additive: boolean) => void; onPlaceAt: (at: XY) => void;
@@ -612,6 +613,14 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
         c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false)}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect}
       onPress={start} onLabelPress={startLabel} onMoveDrag={moveGesture} onEndDrag={endGesture} onFocus={focus} />)}
+    {placeKind&&hover&&<mesh
+      position={[worldPosition(hover.at)[0],.055,worldPosition(hover.at)[2]]}>
+      <boxGeometry args={[previewDimensions(hover.footprint)[0],.075,
+        previewDimensions(hover.footprint)[1]]}/>
+      <meshBasicMaterial color={hover.overlappingCarriers.length?'#e9a44e':
+        hover.mountedTo?'#35c7a8':'#5ed0ee'} transparent opacity={.38}
+        wireframe depthWrite={false}/>
+    </mesh>}
     {selectedDeviceIds.length===1&&editable&&mode==='orbit'&&
       project.components.filter(c=>c.id===selectedDeviceIds[0]).map(c=>
         <SceneTransformGizmo key={c.id} component={c} grid={grid}
@@ -722,7 +731,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
       <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
         grid={props.grid??5} mode={cameraMode} onMove={props.onMove}
         placeKind={placementKind} alignSensor={alignSensor} showZones={showZones}
-        showSignals={showSignals} onPlace={props.onPlace} onPreview={onPreview}
+        showSignals={showSignals} hover={hover} onPlace={props.onPlace} onPreview={onPreview}
         onRotate={props.onRotate}
         onCameraPose={setCameraPose}
         selectedDeviceIds={props.selectedDeviceIds ?? []}
