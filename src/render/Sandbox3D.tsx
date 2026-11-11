@@ -387,7 +387,9 @@ function SceneTransformGizmo({component,grid,onMove,onRotate}:{
  return <Html position={[x,.48,z]} center distanceFactor={10}
    style={{pointerEvents:'auto'}}>
    <div className="p7-3d-gizmo" data-p7-gizmo={component.id}
-      role="group" aria-label={`Transform ${component.id} in 3D scene`}>
+      role="group" aria-label={`Transform ${component.id} in 3D scene`}
+      onPointerDown={e=>e.stopPropagation()}
+      onPointerUp={e=>e.stopPropagation()}>
      <button type="button" data-p7-transform="west" onClick={e=>{e.stopPropagation();move(-grid,0);}}
        title="Move west by one selected grid interval">←</button>
      <button type="button" data-p7-transform="north" onClick={e=>{e.stopPropagation();move(0,-grid);}}
