@@ -128,9 +128,15 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
    const p=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null');
    return p?.components?.find(c=>c.id===id)?.yawDeg===90;
   },{timeout:15000},id);
-  await page.waitForFunction(()=>
-    !!document.querySelector('.workspace-authoring-bar [data-undo]:not(:disabled)'),
-    {timeout:10000});
+  // The authoritative worker must acknowledge the previous placement,
+  // inspector move, 3D drag and 90-degree rotation before Undo can start.
+  // A stale event must never collapse the history to only the blank project.
+  await page.waitForFunction(()=>{
+    const h=document.querySelector('[data-history-undo-depth]');
+    return h&&h.getAttribute('data-history-pending')==='false'&&
+      Number(h.getAttribute('data-history-undo-depth'))>=3&&
+      !!document.querySelector('.workspace-authoring-bar [data-undo]:not(:disabled)');
+  },{timeout:12000});
   await page.click('.workspace-authoring-bar [data-undo]');
   await page.waitForFunction(()=>
     !!document.querySelector('.workspace-authoring-bar [data-redo]:not(:disabled)'),
