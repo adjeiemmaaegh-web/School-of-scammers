@@ -9,6 +9,7 @@ import type {EquipmentPlacement,LiveSignal,World,WorldInputs} from './types';
 import {MAX_SCENE_EQUIPMENT,SCAN_MS,SUBSTEP_MS} from './types';
 import {advanceBodies} from './physics';
 import {q} from './math';
+import {STATIC_SOLID_KINDS} from './solid-geometry';
 
 export type EquipmentLibrary=Readonly<Record<string,EquipmentDef>>;
 export type SceneRuntime={world:World;signals:Record<string,LiveSignal>};
@@ -59,11 +60,11 @@ export function stepScene(previous:SceneRuntime,placements:readonly EquipmentPla
  library:EquipmentLibrary,inputs:WorldInputs={},faults:Readonly<Record<string,string|null>>={}):SceneRuntime{
  validatePlacements(placements,library);
  let world=previous.world;
- // Only explicitly modelled opaque fixed solids cast sight shadows. Belt and
- // roller conveyor envelopes remain non-occluding so mounted sensors work.
- // Footprints come from the authoritative equipment registry, not the renderer.
+ // Explicitly modelled stationary solid envelopes cast sight shadows.
+ // Carrier surfaces remain non-occluding so mounted sensors still work.
+ // Footprints come from the authoritative equipment registry, not Three.js.
  const occluders:readonly SceneOccluder[]=placements
-  .filter(item=>item.kind==='shelf'||item.kind==='process-tank')
+  .filter(item=>STATIC_SOLID_KINDS.includes(item.kind))
   .map(item=>({id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,
    sizeMm:library[item.kind].footprint}));
  for(let i=0;i<SCAN_MS/SUBSTEP_MS;i++){
