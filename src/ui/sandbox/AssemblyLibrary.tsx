@@ -4,6 +4,7 @@ import type {GridStep,WorkspaceFragment} from '../../workspace/types';
 import {makeFragment} from '../../workspace/clipboard';
 import {clampPlacement} from '../../workspace/geometry';
 import {rotateAssemblyFragment,type AssemblyTurns} from '../../workspace/assembly-transform';
+import {composeAssemblyFragments} from '../../workspace/assembly-composition';
 import {
  ASSEMBLY_STORAGE_KEY,readAssemblyLibrary,encodeAssemblyLibrary,
  saveAssembly,deleteAssembly,type SavedAssembly,
@@ -33,6 +34,7 @@ export function AssemblyLibrary({project,selectedIds,editable,grid,onInsert}:Pro
  const [chosen,setChosen]=useState<number>(entries[0]?.id??0);
  const [x,setX]=useState('240'),[y,setY]=useState('170');
  const [quarterTurns,setQuarterTurns]=useState<AssemblyTurns>(0);
+ const [composition,setComposition]=useState<number[]>([]);
  const [confirmDelete,setConfirmDelete]=useState(false);
  const [message,setMessage]=useState('');
  const current=entries.find(e=>e.id===chosen);
@@ -51,6 +53,27 @@ export function AssemblyLibrary({project,selectedIds,editable,grid,onInsert}:Pro
    setChosen(next[next.length-1].id);setName('');
    setMessage('Saved '+next[next.length-1].name+' locally. No PLC state changed.');
   }catch(e){setError(e instanceof Error?e.message:'Unable to save assembly');}
+ };
+ const addToComposition=()=>{
+  if(!current||storageCorrupt||composition.includes(current.id))return;
+  if(composition.length>=4){setError('A composite can contain up to four saved cells');return;}
+  setComposition(prev=>[...prev,current.id]);setError(null);
+ };
+ const compose=()=>{
+  if(composition.length<2||!editable||storageCorrupt)return;
+  try{
+   const parts=composition.map(id=>{
+    const saved=entries.find(entry=>entry.id===id);
+    if(!saved)throw new Error('A selected assembly no longer exists');
+    return saved.fragment;
+   });
+   const combined=composeAssemblyFragments(parts);
+   const next=saveAssembly(entries,name,combined);
+   persist(next);setChosen(next[next.length-1].id);
+   setMessage('Created '+next[next.length-1].name+' from '+composition.length+
+    ' immutable source cells. Actual insertion remains worker-validated.');
+   setComposition([]);setName('');
+  }catch(e){setError(e instanceof Error?e.message:'Unable to compose saved cells');}
  };
  const insert=()=>{
   if(!current||!editable)return;
@@ -72,6 +95,7 @@ export function AssemblyLibrary({project,selectedIds,editable,grid,onInsert}:Pro
   try{
    const next=deleteAssembly(entries,current.id);
    persist(next);setChosen(next[0]?.id??0);
+   setComposition(old=>old.filter(id=>id!==current.id));
    setConfirmDelete(false);setMessage('Removed saved assembly from this browser.');
   }catch(e){setError(e instanceof Error?e.message:'Unable to delete assembly');}
  };
@@ -81,7 +105,7 @@ export function AssemblyLibrary({project,selectedIds,editable,grid,onInsert}:Pro
   try{
    // A deliberate second click is required before discarding damaged data.
    localStorage.removeItem(ASSEMBLY_STORAGE_KEY);
-   setEntries([]);setChosen(0);setStorageCorrupt(false);
+   setEntries([]);setChosen(0);setComposition([]);setStorageCorrupt(false);
    setConfirmReset(false);setError(null);
    setMessage('Damaged local assembly shelf reset by request.');
   }catch(e){setError(e instanceof Error?e.message:'Could not reset the local shelf');}
@@ -91,7 +115,8 @@ export function AssemblyLibrary({project,selectedIds,editable,grid,onInsert}:Pro
    <p className="sandbox-help">Select equipment in the workcell, then save it as an offline assembly.
      Internal wires, device settings and PLC programs travel with it.
      Inserting uses the same worker-validated paste command as normal editing.
-     Rotate the entire reusable cell in quarter turns only when all saved machines support rotation.</p>
+     Rotate the entire reusable cell in quarter turns only when all saved machines support rotation.
+     Combine two to four previously saved cells into a larger, offline snapshot with independent internal wiring.</p>
    <div className="sandbox-assembly-fields">
      <label>Assembly name
        <input data-assembly-name value={name} maxLength={48}
@@ -130,6 +155,19 @@ export function AssemblyLibrary({project,selectedIds,editable,grid,onInsert}:Pro
        disabled={!current||!editable} onClick={insert}>Insert into workcell</button>
      <button data-assembly-delete type="button" className="btn ghost small"
        disabled={!current} onClick={remove}>{confirmDelete?'Confirm delete':'Delete saved'}</button>
+   </div>
+   <div className="sandbox-assembly-fields" data-p8-assembly-composition>
+     <button type="button" className="btn ghost small" data-assembly-compose-add
+       disabled={!current||composition.includes(current.id)||composition.length>=4||storageCorrupt}
+       onClick={addToComposition}>Add saved cell to combination</button>
+     <span data-assembly-compose-stack className="sandbox-help">
+       {composition.length?composition.map(id=>entries.find(entry=>entry.id===id)?.name??'Deleted').join(' + '):
+       'Choose two or more saved cells, using the selector above'}</span>
+     <button type="button" className="btn ghost small" data-assembly-compose-save
+       disabled={composition.length<2||!editable||storageCorrupt||!name.trim()}
+       onClick={compose}>Save combined cell</button>
+     <button type="button" className="btn ghost small" data-assembly-compose-clear
+       disabled={!composition.length} onClick={()=>setComposition([])}>Clear combination</button>
    </div>
    {storageCorrupt&&<div className="sandbox-assembly-fields">
      <p className="sandbox-help">Existing damaged assembly data has not been overwritten.
