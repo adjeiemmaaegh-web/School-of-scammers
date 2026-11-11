@@ -47,3 +47,16 @@
  color:var(--muted);overflow-wrap:anywhere;}
 .sandbox-p10-checks [data-p10-check-state="pass"]>span {color:var(--ink);}
 .sandbox-p10-checks [data-p10-check-state="pending"]>span {color:var(--muted);}
+
+/* P11 bounded worker-evidence trial is a learning record, not a certification. */
+.sandbox-p11-assessment {margin:10px 0;padding:14px;}
+.sandbox-p11-assessment>summary {cursor:pointer;font-weight:700;font-size:13px;}
+.sandbox-p11-assessment>summary .sandbox-help {font-weight:400;}
+.sandbox-p11-goals li {min-height:92px;}
+.sandbox-p11-goals li[data-p11-trial-state="observed"] {border-style:solid;}
+.sandbox-p11-goals li[data-p11-trial-state="pending"] {border-style:dashed;}
+.sandbox-p11-goals li>span {min-width:19px;text-align:center;}
+.sandbox-p11-goals strong {font-size:12px;}
+.sandbox-p11-assessment [data-p11-trial-hint] {
+ border-left:2px solid var(--line);padding-left:9px;margin-top:10px;
+}
