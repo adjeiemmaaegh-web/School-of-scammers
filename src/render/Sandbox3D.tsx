@@ -413,7 +413,9 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
       origin:{x:item.x,y:item.y},preview:{x:item.x,y:item.y},
     };
     currentDrag.current=next;setDrag(next);
-    event.target.setPointerCapture(event.pointerId);
+    const target=event.target;
+    if(target && 'setPointerCapture' in target && typeof target.setPointerCapture==='function')
+      target.setPointerCapture(event.pointerId);
   };
   const translated=(gesture:DeviceDrag,point:{x:number;z:number}):XY=>
     clampPlacement({
@@ -435,8 +437,11 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
     const point=floorPoint(event);
     const to=point?translated(active,point):active.preview;
     currentDrag.current=null;setDrag(null);
-    if(event.target.hasPointerCapture(event.pointerId))
-      event.target.releasePointerCapture(event.pointerId);
+    const target=event.target;
+    if(target && 'hasPointerCapture' in target && typeof target.hasPointerCapture==='function' &&
+      'releasePointerCapture' in target && typeof target.releasePointerCapture==='function' &&
+      target.hasPointerCapture(event.pointerId))
+      target.releasePointerCapture(event.pointerId);
     if(editable&&(to.x!==active.origin.x||to.y!==active.origin.y))
       onMove(active.id,to);
   };
