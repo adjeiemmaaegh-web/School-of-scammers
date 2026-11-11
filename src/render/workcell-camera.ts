@@ -6,11 +6,14 @@
  */
 import type { ProjectFile } from '../sim/signals';
 import { footprintOf } from '../workspace/floor-plan';
+import { PLANT_EQUIPMENT } from '../plant/equipment';
 
 export type WorkcellCameraMode = 'orbit' | 'fly' | 'first-person';
-export type CameraPose = { x:number; y:number; z:number; yaw:number; pitch:number };
+export type CameraPose = { x:number; y:number; z:number; yaw:number; pitch:number;
+ /** Local view-only jump state, never sent to the PLC worker. */
+ verticalVelocityMps?:number; jumpConsumed?:boolean };
 export type CameraKeys = { forward:boolean; back:boolean; left:boolean; right:boolean;
-  rise:boolean; descend:boolean };
+  rise:boolean; descend:boolean; jump?:boolean };
 export type CameraObstacle = { x:number; z:number; halfX:number; halfZ:number; height:number };
 export const FIRST_PERSON_HEIGHT_M = 1.8;
 export const FLOOR_LIMIT_X = 5.55, FLOOR_LIMIT_Z = 3.05;
@@ -29,7 +32,7 @@ export function sceneCameraObstacles(project:Pick<ProjectFile,'components'|'para
    x:(f.x-540)/100,z:(f.y-290)/100,
    halfX:(isPlant?f.width:150)/200,
    halfZ:(isPlant?f.depth:120)/200,
-   height:isPlant?Math.max(.15, (c.kind==='turntable' ? 150 : 400)/1000):1.5,
+   height:isPlant?Math.max(.15,(PLANT_EQUIPMENT[c.kind]?.footprint.z??400)/1000):1.5,
   };
  });
 }
@@ -57,10 +60,22 @@ export function advanceCamera(
  const speed=mode==='first-person'?2.4:4.5;
  const dx=(Math.sin(pose.yaw)*fwd+Math.cos(pose.yaw)*side)*speed*dt/norm;
  const dz=(-Math.cos(pose.yaw)*fwd+Math.sin(pose.yaw)*side)*speed*dt/norm;
- const nextY=mode==='first-person'?FIRST_PERSON_HEIGHT_M:
+ const firstPerson=mode==='first-person';
+ const grounded=pose.y<=FIRST_PERSON_HEIGHT_M+1e-6;
+ const jumpStarts=firstPerson&&grounded&&!!keys.jump&&!pose.jumpConsumed;
+ // Fixed-step classroom jump with gravity, independent of the worker clock.
+ // Space is edge-triggered: holding it may not repeatedly launch an avatar.
+ const v0=jumpStarts?3.65:pose.verticalVelocityMps??0;
+ const vertical=firstPerson?Math.max(FIRST_PERSON_HEIGHT_M,
+   pose.y+v0*dt-9.81*dt*dt/2):pose.y;
+ const nextY=firstPerson?vertical:
    Math.max(.4,Math.min(11,pose.y+(Number(keys.rise)-Number(keys.descend))*3*dt));
- const collisionHeight=mode==='first-person' ? .2 : nextY;
- const previousCollisionHeight=mode==='first-person' ? .2 : pose.y;
+ const v1=nextY<=FIRST_PERSON_HEIGHT_M?0:v0-9.81*dt;
+ // Obstacles are floor-mounted: a jumping viewpoint may clear low conveyors,
+ // but not a full-height rack. This remains view-only, not avatar/PLC input.
+ const collisionHeight=firstPerson?Math.max(.2,nextY-FIRST_PERSON_HEIGHT_M):nextY;
+ const previousCollisionHeight=firstPerson?
+   Math.max(.2,pose.y-FIRST_PERSON_HEIGHT_M):pose.y;
  const canMove=(x:number,z:number):boolean=>within(x,z)&&(
   !occupied(x,collisionHeight,z,obstacles) ||
   (occupied(pose.x,previousCollisionHeight,pose.z,obstacles) &&
@@ -76,7 +91,9 @@ export function advanceCamera(
  let x=pose.x,z=pose.z;
  if(canMove(pose.x+dx,z))x=pose.x+dx;
  if(canMove(x,pose.z+dz))z=pose.z+dz;
- return {...pose,x,y:nextY,z};
+ return firstPerson?{...pose,x,y:nextY,z,
+  verticalVelocityMps:v1,jumpConsumed:!!keys.jump}:
+  {...pose,x,y:nextY,z};
 }
 
 
