@@ -4,6 +4,9 @@ import {accumulateCommissioning,directSceneLinkPatched,projectSignature,
  sceneCommissioningChecks,sceneFromProject} from '../src/plant/scenes/commissioning';
 import {createWorld,renderSnapshot,tick} from '../src/sim/orchestrator';
 import {makePlantSceneProject} from '../src/sim/p3-scene-import';
+import {plantPlacements} from '../src/sim/p3-plant-bridge';
+import {PLANT_EQUIPMENT} from '../src/plant/equipment';
+import {stepScene} from '../src/plant/world/runner';
 import type {ProjectFile,RenderSnapshot,Command} from '../src/sim/signals';
 
 const scene=SCENES.find(s=>s.id==='sorting-line')!;
@@ -110,19 +113,21 @@ describe('P10 scene commissioning — worker read-only diagnostics',()=>{
   expect(find(sceneCommissioningChecks(scene,project,snapshot,b),'response').pass)
    .toBe(false);
  });
- it('a witnessed change in actual worker plant state is captured as training evidence',()=>{
-  const {project,snapshot}=get('sorting-line');
-  const base=accumulateCommissioning(scene,project,snapshot,null);
-  // Real plant model step (not a renderer-derived flag) drives the witness.
-  const moved={...snapshot,plantWorld:{...snapshot.plantWorld,
-   world:{...snapshot.plantWorld.world,timeMs:50,
-    model:{...snapshot.plantWorld.world.model,
-     belt:{...snapshot.plantWorld.world.model.belt,progress:0.5}}},
-  }};
-  const e=accumulateCommissioning(scene,project,moved,base);
+ it('actual worker process dynamics, not a fabricated render flag, produce commissioning evidence',()=>{
+  const tankScene=SCENES.find(s=>s.id==='mixing-tank')!;
+  const {project,snapshot}=get(tankScene.id);
+  const base=accumulateCommissioning(tankScene,project,snapshot,null);
+  // Step the genuine P3 registered tank through the authoritative 50ms
+  // deterministic plant runner and observe its independently calculated level.
+  const next=stepScene(snapshot.plantWorld,plantPlacements(project),
+   PLANT_EQUIPMENT,{tank:{fill:true,inletPct:100}});
+  expect(next.world.timeMs).toBe(50);
+  expect(next.signals.tank.levelMl).toBeGreaterThan(0);
+  const advanced={...snapshot,plantWorld:next};
+  const e=accumulateCommissioning(tankScene,project,advanced,base);
   expect(e.actuatorMovement).toBe(true);
-  expect(find(sceneCommissioningChecks(scene,project,moved,e),'response').pass)
-   .toBe(true);
+  expect(sceneCommissioningChecks(tankScene,project,advanced,e)
+   .find(x=>x.id==='response')?.pass).toBe(true);
  });
  it('injected faults and rejected worker commands keep the diagnostic unresolved',()=>{
   const {project,snapshot}=get('sorting-line');
