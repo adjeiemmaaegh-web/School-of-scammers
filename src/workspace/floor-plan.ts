@@ -45,8 +45,11 @@ export function footprintOf(
 }
 /** Worker plant x/y are millimetres; the 3D canvas uses x/z as metres. */
 export function workerToPlan(mmX: number, mmY: number): XY {
-  return { x: finiteMm(mmX) / 10 + PLAN_WIDTH / 2 - DEVICE_WIDTH / 2,
-    y: finiteMm(mmY) / 10 + PLAN_DEPTH / 2 - DEVICE_DEPTH / 2 };
+  // P3 placements and live bodies use the device CENTRE in millimetres.
+  // Do not subtract the legacy device half-slot: that subtraction belongs
+  // only to planToPlacement, which returns persisted top-left coordinates.
+  return { x: finiteMm(mmX) / 10 + PLAN_WIDTH / 2,
+    y: finiteMm(mmY) / 10 + PLAN_DEPTH / 2 };
 }
 /** Cursor is a plan CENTRE, but saved coordinates are device slot upper-left. */
 export function planToPlacement(x: number, y: number, grid: GridStep): XY {
