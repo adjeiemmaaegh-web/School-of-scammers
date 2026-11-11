@@ -65,7 +65,7 @@ describe('P8 opt-in structural line-of-sight occlusion',()=>{
   expect(JSON.stringify(solids)).toBe(snapshot);
  });
  it('rejects unsupported parameter values through the saved scene validator',()=>{
-  expect(()=>validatePlacements([sensor({occlusionMode:2})],PLANT_EQUIPMENT))
+  expect(()=>validatePlacements([sensor({occlusionMode:3})],PLANT_EQUIPMENT))
    .toThrow(/Invalid plant parameter/);
   expect(()=>validatePlacements([sensor({occlusionMode:1})],PLANT_EQUIPMENT))
    .not.toThrow();
