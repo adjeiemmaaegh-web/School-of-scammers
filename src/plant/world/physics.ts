@@ -7,6 +7,7 @@ import {G_MM_S2} from './types';
 import {clamp,face,footprintOverlap,insideFootprint,q,vec} from './math';
 import {addEvent} from './events';
 import {newlyContactsStaticSolid} from './solid-geometry';
+import {sweptBodyContact} from './swept-contact';
 
 const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','lift','scissor-lift',
  'pick-and-place','palletizer','asrs-crane']);
@@ -23,12 +24,25 @@ function chooseCarrier(body:Body,items:readonly EquipmentPlacement[],states:Worl
   worldFootprint(item,item.params.lengthMm??600,item.params.widthMm??300)) &&
   Math.abs(body.pos.z-baseHeight(item,states[item.id]))<150);
 }
-function collide(body:Body,candidates:readonly Body[],move:Vec3):{delta:Vec3;blocked:boolean}{
+function collide(body:Body,candidates:readonly Body[],move:Vec3,
+ swept3D=false):{delta:Vec3;blocked:boolean}{
  let x=move.x,y=move.y,blocked=false;
  for(const other of candidates){
-  if(other.id===body.id||Math.abs(other.pos.z-body.pos.z)>Math.min(body.size.z,other.size.z))continue;
+  if(other.id===body.id)continue;
   const shifted={...body,pos:{...body.pos,x:q(body.pos.x+x),y:q(body.pos.y+y)}};
-  if(!footprintOverlap(shifted,other))continue;
+  if(swept3D){
+   // Broad-phase swept 3D bounds account for quarter-turn footprint and
+   // actual vertical separation. Already-overlapping legacy starts are
+   // handled by the old endpoint queue test to avoid drawing cargo through.
+   const contact=sweptBodyContact(body,other,vec(x,y,0));
+   const initial=sweptBodyContact(body,other,vec(0,0,0));
+   if(contact===null&&initial===null&&
+      !(Math.abs(other.pos.z-body.pos.z)<Math.min(body.size.z,other.size.z)&&
+        footprintOverlap(shifted,other)))continue;
+  }else{
+   if(Math.abs(other.pos.z-body.pos.z)>Math.min(body.size.z,other.size.z))continue;
+   if(!footprintOverlap(shifted,other))continue;
+  }
   // The cheaper/simpler contact solver keeps previous motion axis if another body occupies its destination.
   x=0;y=0;blocked=true;break;
  }
@@ -72,7 +86,8 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
     if(!prior.tags.jammed)changed=addEvent(changed,{kind:'jam',source:carrier.id,bodyId:body.id,
      detail:solidBlocked?'Body contacted a fixed solid':'Body blocked by a gate'});
    }else{
-    const contact=collide(body,[...next,...sorted.filter(o=>Number(o.id.slice(1))>Number(body.id.slice(1)))],proposed);
+    const contact=collide(body,[...next,...sorted.filter(o=>Number(o.id.slice(1))>Number(body.id.slice(1)))],proposed,
+      carrier.params.contactMode===1);
     if(contact.blocked){
      body.vel.x=0;body.vel.y=0;body.tags={...body.tags,jammed:true};
      if(!prior.tags.jammed)changed=addEvent(changed,{kind:'jam',source:carrier.id,bodyId:body.id,detail:'Body accumulated behind another body'});
