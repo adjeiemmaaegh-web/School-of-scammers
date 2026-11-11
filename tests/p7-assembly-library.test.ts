@@ -48,6 +48,7 @@ describe('P7 offline workcell station assemblies',()=>{
   expect(()=>readAssemblyLibrary('x'.repeat(500000))).toThrow(/limit/);
   const giant=fragment();
   giant.components[0].id='x'.repeat(MAX_ASSEMBLY_BYTES);
+  giant.wires[0].from=giant.components[0].id+'.P24';
   expect(()=>saveAssembly([],'Overflow',giant)).toThrow(/large/);
  });
  it('cannot save empty/untrusted fragments or wires referring to absent devices',()=>{
