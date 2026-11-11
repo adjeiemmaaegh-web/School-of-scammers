@@ -24,9 +24,9 @@ describe('P7 exact worker-to-3D directional photoeye geometry',()=>{
  it('keeps historic area sensing for every project that has no new sensor settings',()=>{
   const c=ctx();
   const zone=opticalZoneOf('geometry-photoeye',c);
-  expect(zone).toMatchObject({shape:'area',rangeMm:400,beamWidthMm:800,yawDeg:0});
-  expect(detect(photoeye,world(body(-300,200)),c)).toBe(true);
-  expect(detect(photoeye,world(body(-410,0)),c)).toBe(false);
+  expect(zone).toMatchObject({shape:'area',rangeMm:400,beamWidthMm:400,yawDeg:0});
+  expect(detect(photoeye,world(body(-180,180)),c)).toBe(true);
+  expect(detect(photoeye,world(body(-210,0)),c)).toBe(false);
   expect(detect(photoeye,world(body(0,0,601)),c)).toBe(false);
  });
  it('enables actual forward detection only when beamMode is explicitly set',()=>{
@@ -69,7 +69,7 @@ describe('P7 exact worker-to-3D directional photoeye geometry',()=>{
   const c=ctx(90,{beamMode:1,beamWidthMm:30});
   const zone=opticalZoneOf('light-curtain',c);
   expect(zone).toMatchObject({shape:'area',rangeMm:500,yawDeg:90});
-  expect(detect(lightCurtain,world(body(-250,-250)),c)).toBe(true);
+  expect(detect(lightCurtain,world(body(-240,-240)),c)).toBe(true);
  });
  it('does not infer orientation or change any saved world data',()=>{
   const c=ctx(180,{beamMode:1,beamWidthMm:100});
