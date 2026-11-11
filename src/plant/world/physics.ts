@@ -63,7 +63,12 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    const travelYaw=carrier.kind==='turntable'&&state.done
      ? (carrier.yawDeg+90)%360 : carrier.yawDeg;
    const direction=face(travelYaw);
-   const speed=state.engaged?state.speedMmS:0;
+   // During P8 worker-timed table indexing, carried parcels rotate about
+   // the fixed turntable centre; translation is temporarily locked. Prior
+   // projects without the explicit opt-in retain legacy conveying behavior.
+   const turning=carrier.kind==='turntable'&&carrier.params.rotateCargo===1&&
+    state.progress>0&&!state.done;
+   const speed=state.engaged&&!turning?state.speedMmS:0;
    const targetX=direction.x*speed,targetY=direction.y*speed;
    body.vel.x=clampVelocity(body.vel.x,targetX,dtMs);
    body.vel.y=clampVelocity(body.vel.y,targetY,dtMs);
