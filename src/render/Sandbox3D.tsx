@@ -365,19 +365,21 @@ type DeviceDrag = {
 /** This scene owns camera and pointer gestures, NEVER PLC or physics state.
  * A dragged machine is a temporary ghost until the worker acknowledges 'move'.
  */
-function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPlaceAt, onMove }: {
+function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPlaceAt, onMove, onCameraPose }: {
   project: ProjectFile; snapshot: RenderSnapshot; editable: boolean; grid: GridStep;
   mode:WorkcellCameraMode;
   selectedDeviceIds: readonly string[]; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
   onSelect: (id: string, additive: boolean) => void; onPlaceAt: (at: XY) => void;
   onMove: (id:string,at:XY)=>void;
+  onCameraPose:(pose:CameraPose)=>void;
 }) {
   const { camera, gl } = useThree();
   const [interest,setInterest]=useState<[number,number,number]>([0,0,0]);
   const [drag,setDrag]=useState<DeviceDrag|null>(null);
   const currentDrag=useRef<DeviceDrag|null>(null);
-  const onCameraPose=useRef<((pose:CameraPose)=>void)|null>(null);
+  const poseCallback=useRef(onCameraPose);
+  poseCallback.current=onCameraPose;
   // Direct, mouse-driven drag uses a ray through the current perspective camera.
   // The worker's project is unchanged until pointer release and acknowledgement.
   const floorPoint=(event:ThreeEvent<PointerEvent>):{x:number;z:number}|null=>{
@@ -483,7 +485,7 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
       <meshBasicMaterial color="#ffa633" transparent opacity={.42} depthWrite={false} wireframe />
     </mesh>}
     <WorkcellCameraRig mode={mode} editableCamera={!drag} project={project}
-      interest={interest} onPose={pose=>onCameraPose.current?.(pose)} />
+      interest={interest} onPose={pose=>poseCallback.current(pose)} />
     <GizmoHelper alignment="bottom-right" margin={[76, 76]}>
       <GizmoViewport axisColors={['#d45b59', '#4db987', '#549fea']} labelColor="#ffffff" />
     </GizmoHelper>
@@ -492,7 +494,7 @@ function Workbench({ project, snapshot, editable, grid, mode, selectedDeviceIds,
 
 export type Sandbox3DProps = {
   project: ProjectFile; snapshot: RenderSnapshot;
-  editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
+  editable: boolean; grid?: GridStep; selectedTerminal: string | null; moveTarget: string | null;
   selectedDeviceId: string | null; selectedDeviceIds?: readonly string[];
   onSelectDevice: (id: string, additive?: boolean) => void;
   onTerminal: (id: string) => void;
@@ -504,6 +506,8 @@ export type Sandbox3DProps = {
 export function Sandbox3D(props: Sandbox3DProps) {
   const available = useMemo(supportsWebGL, []);
   const camera = useRef<Camera | null>(null);
+  const [cameraMode,setCameraMode]=useState<WorkcellCameraMode>('orbit');
+  const [cameraPose,setCameraPose]=useState<CameraPose|null>(null);
   const onPlaceAt = (at: XY) => {
     if (!props.moveTarget) return;
     props.onMove(props.moveTarget, at);
@@ -526,11 +530,21 @@ export function Sandbox3D(props: Sandbox3DProps) {
   };
   return <div className="sandbox-3d-shell" aria-label="Interactive 3D industrial automation workspace"
     onDragOver={event => { if (props.editable && available) event.preventDefault(); }} onDrop={drop}>
+    <div className="sandbox-3d-camera-controls" role="group" aria-label="3D navigation camera">
+      {([
+        ['orbit','Orbit'],['fly','Fly'],['first-person','First Person'],
+      ] as const).map(([id,label])=><button key={id} type="button"
+        data-3d-camera-mode={id} aria-pressed={cameraMode===id}
+        disabled={!available} onClick={()=>{setCameraMode(id);setCameraPose(null);}}>
+        {label}</button>)}
+    </div>
     {available ? <Canvas className="sandbox-three-canvas" dpr={[1, 1.5]}
       gl={{ antialias: true, powerPreference: 'low-power' }}
       camera={{ position: [7, 8.5, 10], fov: 42, near: 0.1, far: 120 }}
       onCreated={state => { camera.current = state.camera; state.camera.lookAt(0, 0, 0); }}>
       <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
+        grid={props.grid??5} mode={cameraMode} onMove={props.onMove}
+        onCameraPose={setCameraPose}
         selectedDeviceIds={props.selectedDeviceIds ?? []}
         selectedTerminal={props.selectedTerminal} moveTarget={props.moveTarget}
         onTerminal={props.onTerminal} onOperate={props.onOperate}
@@ -540,8 +554,16 @@ export function Sandbox3D(props: Sandbox3DProps) {
       <p>The PLC simulator still runs. Use the component patch panel below to wire, operate and inspect devices without WebGL.</p>
     </div>}
     <div className="sandbox-3d-hud">
-      <span>3D WORKBENCH · Orbit: drag · Pan: right-drag · Zoom: wheel</span>
-      <span>{props.moveTarget ? 'Move selected: click the workbench floor' : props.selectedDeviceId ? `Selected: ${props.selectedDeviceId}` : 'Select a device or terminal'}</span>
+      <span data-3d-camera-status>{cameraMode==='orbit'
+        ? '3D ORBIT · Drag to rotate · Right drag to pan · Wheel zoom · Double-click to focus'
+        : cameraMode==='fly'
+        ? '3D FLY · Focus scene, WASD to move · Q/E height · Right drag to look'
+        : '3D FIRST PERSON · Eye height 1.8 m · Focus scene, WASD to walk · Right drag to look'}
+        {cameraMode!=='orbit'&&cameraPose
+          ? ` · Camera ${cameraPose.x.toFixed(2)}, ${cameraPose.y.toFixed(2)}, ${cameraPose.z.toFixed(2)} m` : ''}</span>
+      <span>{props.moveTarget ? 'Move selected: click the 3D workbench floor' :
+        props.selectedDeviceId ? `Selected: ${props.selectedDeviceId} · Drag the model to move (paused)`
+        : 'Select a 3D machine or terminal · paused editing'}</span>
     </div>
   </div>;
 }
