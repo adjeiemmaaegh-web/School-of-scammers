@@ -7,7 +7,7 @@ import {G_MM_S2} from './types';
 import {clamp,face,footprintOverlap,insideFootprint,q,vec} from './math';
 import {addEvent} from './events';
 import {newlyContactsStaticSolid} from './solid-geometry';
-import {sweptBodyContact} from './swept-contact';
+import {sweptBodyContact,bodyVolumeOverlap} from './swept-contact';
 
 const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','lift','scissor-lift',
  'pick-and-place','palletizer','asrs-crane']);
@@ -35,10 +35,7 @@ function collide(body:Body,candidates:readonly Body[],move:Vec3,
    // actual vertical separation. Already-overlapping legacy starts are
    // handled by the old endpoint queue test to avoid drawing cargo through.
    const contact=sweptBodyContact(body,other,vec(x,y,0));
-   const initial=sweptBodyContact(body,other,vec(0,0,0));
-   if(contact===null&&initial===null&&
-      !(Math.abs(other.pos.z-body.pos.z)<Math.min(body.size.z,other.size.z)&&
-        footprintOverlap(shifted,other)))continue;
+   if(contact===null&&!bodyVolumeOverlap(shifted,other))continue;
   }else{
    if(Math.abs(other.pos.z-body.pos.z)>Math.min(body.size.z,other.size.z))continue;
    if(!footprintOverlap(shifted,other))continue;
