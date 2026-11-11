@@ -4,7 +4,9 @@
  * horizontal factory plane, z is vertical. Quarter-turn yaw is worker-owned.
  *
  * Existing saved projects deliberately default to the original square zone.
- * A user can opt in to a directional, forward-looking zone for three optical
+ * In area mode, rangeMm is the square's full side length (the historical
+ * insideFootprint(vec(range,range)) semantics, NOT radius). A user can opt
+ * in to a directional, forward-looking zone for three optical
  * sensor families. The render layer never performs detection itself.
  */
 import type {EquipmentContext} from '../world/equipment';
@@ -31,7 +33,7 @@ export function opticalZoneOf(kind:string,ctx:EquipmentContext,fault:string|null
  return {
   shape:directional?'forward':'area',
   rangeMm,
-  beamWidthMm:directional?(ctx.params.beamWidthMm??100):rangeMm*2,
+  beamWidthMm:directional?(ctx.params.beamWidthMm??100):rangeMm,
   heightMm:1200,
   yawDeg:ctx.yawDeg,
  };
@@ -46,7 +48,7 @@ export function opticalZoneContains(
  const dy=position.y-ctx.originMm.y;
  if(Math.abs(position.z-ctx.originMm.z)>zone.heightMm/2)return false;
  if(zone.shape==='area')
-  return Math.abs(dx)<=zone.rangeMm&&Math.abs(dy)<=zone.rangeMm;
+  return Math.abs(dx)<=zone.rangeMm/2&&Math.abs(dy)<=zone.rangeMm/2;
  const direction=face(zone.yawDeg);
  const longitudinal=dx*direction.x+dy*direction.y;
  const transverse=-dx*direction.y+dy*direction.x;
