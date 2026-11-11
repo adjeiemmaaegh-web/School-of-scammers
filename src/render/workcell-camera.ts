@@ -32,7 +32,7 @@ export function sceneCameraObstacles(project:Pick<ProjectFile,'components'|'para
    x:(f.x-540)/100,z:(f.y-290)/100,
    halfX:(isPlant?f.width:150)/200,
    halfZ:(isPlant?f.depth:120)/200,
-   height:isPlant?Math.max(.15,(PLANT_EQUIPMENT[c.kind]?.footprint.z??400)/1000):1.5,
+   height:isPlant?Math.max(.12,(PLANT_EQUIPMENT[c.kind]?.footprint.z??400)/1000):1.5,
   };
  });
 }
@@ -73,9 +73,10 @@ export function advanceCamera(
  const v1=nextY<=FIRST_PERSON_HEIGHT_M?0:v0-9.81*dt;
  // Obstacles are floor-mounted: a jumping viewpoint may clear low conveyors,
  // but not a full-height rack. This remains view-only, not avatar/PLC input.
- const collisionHeight=firstPerson?Math.max(.2,nextY-FIRST_PERSON_HEIGHT_M):nextY;
+ const collisionHeight=firstPerson?Math.max(.2,nextY-FIRST_PERSON_HEIGHT_M):
+   Math.max(0,nextY-.2);
  const previousCollisionHeight=firstPerson?
-   Math.max(.2,pose.y-FIRST_PERSON_HEIGHT_M):pose.y;
+   Math.max(.2,pose.y-FIRST_PERSON_HEIGHT_M):Math.max(0,pose.y-.2);
  const canMove=(x:number,z:number):boolean=>within(x,z)&&(
   !occupied(x,collisionHeight,z,obstacles) ||
   (occupied(pose.x,previousCollisionHeight,pose.z,obstacles) &&
