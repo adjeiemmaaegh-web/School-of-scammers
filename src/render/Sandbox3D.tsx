@@ -613,7 +613,7 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
         c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false)}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect}
       onPress={start} onLabelPress={startLabel} onMoveDrag={moveGesture} onEndDrag={endGesture} onFocus={focus} />)}
-    {placeKind&&hover&&<mesh
+    {placeKind&&hover&&<mesh raycast={()=>{}}
       position={[worldPosition(hover.at)[0],.055,worldPosition(hover.at)[2]]}>
       <boxGeometry args={[previewDimensions(hover.footprint)[0],.075,
         previewDimensions(hover.footprint)[1]]}/>
@@ -625,7 +625,7 @@ function Workbench({ project, snapshot, editable, grid, mode, placeKind, alignSe
       project.components.filter(c=>c.id===selectedDeviceIds[0]).map(c=>
         <SceneTransformGizmo key={c.id} component={c} grid={grid}
           onMove={onMove} onRotate={onRotate}/>)}
-    {ghost&&preview&&plan&&<mesh position={[ghost[0],0.075,ghost[2]]}>
+    {ghost&&preview&&plan&&<mesh raycast={()=>{}} position={[ghost[0],0.075,ghost[2]]}>
       <boxGeometry args={[plan.width/100,.06,plan.depth/100]} />
       <meshBasicMaterial color="#ffa633" transparent opacity={.42} depthWrite={false} wireframe />
     </mesh>}
