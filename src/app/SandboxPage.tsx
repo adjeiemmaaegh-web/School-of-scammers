@@ -662,7 +662,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <div><span className="sandbox-scene-stat">{project?.components.length ?? 0} devices</span><span className="sandbox-scene-stat">{project?.wires.length ?? 0} wires</span></div></div>
           <Suspense fallback={<div className="sandbox-3d-loading" role="status">Loading the interactive 3D workbench…</div>}>
             {workspaceView==='physical' && project && snapshot && <Sandbox3D
-              project={project} snapshot={snapshot} editable={editable}
+              project={project} snapshot={snapshot} editable={editable} grid={grid}
               selectedTerminal={selectedTerminal} moveTarget={moveTarget}
               selectedDeviceId={selectedDeviceId} selectedDeviceIds={selectedDeviceIds} onSelectDevice={selectDevice}
               onTerminal={connect}
