@@ -153,6 +153,19 @@ const ST = [
   await page.click(`[data-3d-drag-handle="${ids.north}"]`);
   await page.waitForSelector(`[data-p7-gizmo="${ids.north}"]`);
   await page.click(`[data-p7-gizmo="${ids.north}"] [data-p7-transform="rotate"]`);
+  await new Promise(resolve=>setTimeout(resolve,300));
+  console.log('P7 GIZMO ROTATE DIAGNOSTIC',JSON.stringify({
+    intended:ids.north,
+    component:(await saved()).components.find(c=>c.id===ids.north),
+    selection:await page.evaluate(()=>({
+      checkboxes:[...document.querySelectorAll('[data-workspace-selection] input:checked')]
+        .map(el=>el.closest('label')?.textContent?.trim()),
+      visibleGizmos:[...document.querySelectorAll('[data-p7-gizmo]')]
+        .map(el=>el.getAttribute('data-p7-gizmo')),
+      alert:document.querySelector('[role="alert"]')?.textContent??null,
+    })),
+    errors,
+  }));
   await page.waitForFunction(id=>{
     const p=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null');
     return p?.components?.find(c=>c.id===id)?.yawDeg===90;
