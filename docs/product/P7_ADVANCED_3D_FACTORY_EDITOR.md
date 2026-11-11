@@ -1,6 +1,6 @@
 # P7 Advanced 3D Factory Editor — engineering evidence and acceptance
 
-**Status:** source development on draft PR #45; staged on verified PR #44 commit `c8b9aa5ab19e009ff161ae8e6e3d50ada217192f`. No merge or production deployment.  
+**Status:** original 3D scope on draft PR #45; 1,009/1,009 verified continuation on draft PR #46; follow-up software gap closure on draft PR #47 (exact-head verification required). P6 baseline is unmerged PR #44 at `c8b9aa5ab19e009ff161ae8e6e3d50ada217192f`. No merge or production deployment.  
 **Date:** 2026-11-11.  
 **Primary user correction:** FACTORY I/O is three-dimensional. PLC Skills Lab must be a **3D-first interactive factory**, with the 2D floor plan serving only as precision and low-spec fallback.
 
@@ -27,3 +27,62 @@ This is a **simplified educational simulation**, not a claim of equivalent FACTO
 The advisory carrier-overlap warning does **not** block placement because intentional handoffs require intersecting transport envelopes. A camera's simulated position never becomes an input signal, and the render layer never infers detection from a drawn volume.
 
 **Release state:** NO-GO for full Factory I/O parity / real hardware / production. The draft may remain open when source development verification is green.
+
+
+## P7 additional software-gap closure — draft PR #47 (11 November 2026)
+
+This work builds **on the verified 3D commissioned workcell** in PR #46, without
+changing the project into a 2D editor or starting backend/cloud services.
+
+- **Sensor accuracy:** the actual P3 photoeye/inductive/capacitive worker model
+  now accepts optional `beamMode=1` and `beamWidthMm`, using configured
+  quarter-turn yaw for forward rectangular detection. The default
+  `beamMode=0` preserves existing legacy area-sensor behavior. A shared
+  pure zone descriptor drives both real worker sampling and the translucent
+  3D detection-volume preview, including dirty-lens range reduction. This
+  corrects a discovered pre-existing preview defect: the legacy P3 area
+  detector uses a square with side length `rangeMm`, whereas the former 3D
+  visualization depicted a square twice that width. This is still idealized
+  body-centre detection, not accurate photoelectric hardware optics or
+  raycast occlusion. Validation rejects invalid beam settings.
+- **View ergonomics:** an explicit accessible `Fit scene` button computes
+  bounds from the saved, yaw-aware 3D equipment footprint and reframes the
+  Orbit camera. This changes the view only, never a sensor or worker state.
+- **Narrow invalid-placement protection:** newly near-total superposed
+  **same-kind, same-orientation material carriers** are now rejected by the
+  worker for Place, Move and workspace-edit commands. Overlapping conveyor
+  handoffs, sensor mounting, crossed machinery and historically saved
+  layouts remain permitted. This is an intentionally bounded rule, not a
+  generalized collision/contact engine or industrial safety guarantee.
+- **Reusable local assemblies:** the simulator can save selected equipment,
+  internal wires, device parameters and PLC programs as a browser-local
+  reusable assembly and request insertion via the existing worker-validated
+  paste command. Limits: 12 saved assemblies, 120 kB per fragment and
+  450 kB total library JSON. The shelf survives a browser reload and supports
+  deleting templates without altering placed equipment. This is an offline
+  assembly shelf, not a complete linked hierarchical prefab editor or a
+  centralized scene-library service.
+
+**Additional automated gates:** `tests/p7-directional-sensors.test.ts`,
+`tests/p7-camera-framing.test.ts`, `tests/p7-carrier-clearance.test.ts`
+and `tests/p7-assembly-library.test.ts`, plus mandatory browser scripts
+`scripts/sandbox-p7-clearance-browser.cjs` and
+`scripts/sandbox-p7-assemblies-browser.cjs` in Linux CI. Exact branch-head
+TypeScript, Vitest, WebGL browser commissioning, existing PLC regressions,
+accessibility, CPU/no-WebGL fallback, Firefox, WebKit and Windows Edge must
+all pass before this increment is considered verified.
+
+### What software and real-world work still remains
+
+The following are **not falsely marked complete** by these bounded P7
+improvements: real-directional optics with obstacles/occlusion and calibrated
+reflection; general 3D solids, continuous arbitrary-angle transforms,
+machine-body collision accuracy, full prefab hierarchy and industrial CAD;
+Factory I/O's broader 21-scene catalogue and individual scene fidelity;
+true first-person avatar collision/jump/sensor-trigger semantics; industrial
+PLC protocol drivers and verified Siemens connections; performance on the
+owner's physical low-spec Windows hardware; full owner UI review; and
+industrial-safety, licensing and release approval. Several of these are
+substantial **future stages**, not quick P7 bug fixes.
+
+**No production or full Factory I/O-equivalence signoff.**
