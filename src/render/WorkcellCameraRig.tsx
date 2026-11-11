@@ -60,6 +60,10 @@ export function WorkcellCameraRig({mode,editableCamera,project,interest,onPose}:
   useEffect(()=>{
     if(mode==='orbit')return;
     const canvas=gl.domElement;
+    // A WebGL canvas is not consistently keyboard-focusable across engines.
+    // The scene (not document-wide shortcuts) owns WASD once explicitly focused.
+    const originalTabIndex=canvas.getAttribute('tabindex');
+    canvas.setAttribute('tabindex','0');
     const keyDown=(event:KeyboardEvent)=>{
       const field=KEY_FIELD[event.key.toLowerCase()];
       if(!field||document.activeElement!==canvas||event.altKey||event.ctrlKey||event.metaKey)return;
@@ -109,6 +113,8 @@ export function WorkcellCameraRig({mode,editableCamera,project,interest,onPose}:
       canvas.removeEventListener('pointerup',up);
       canvas.removeEventListener('pointercancel',blur);
       canvas.removeEventListener('contextmenu',menu);
+      if(originalTabIndex===null)canvas.removeAttribute('tabindex');
+      else canvas.setAttribute('tabindex',originalTabIndex);
     };
   },[mode,gl]);
 
