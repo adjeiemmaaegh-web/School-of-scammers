@@ -70,7 +70,7 @@ export function saveAssembly(
   throw new Error('An assembly already uses that name');
  if(!validFragment(fragment))throw new Error('Select valid devices to save an assembly');
  const copy=JSON.parse(JSON.stringify(fragment)) as WorkspaceFragment;
- if(JSON.stringify(copy).length>MAX_ASSEMBLY_BYTES)throw new Error('Assembly exceeds local size limit');
+ if(JSON.stringify(copy).length>MAX_ASSEMBLY_BYTES)throw new Error('Assembly is too large for local storage');
  const id=Math.max(0,...entries.map(e=>e.id))+1;
  const result=[...entries,{id,name:title,fragment:copy}];
  validateAssemblyLibrary(result);
