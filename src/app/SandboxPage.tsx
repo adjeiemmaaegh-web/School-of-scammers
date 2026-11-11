@@ -669,6 +669,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               onOperate={id => send([{ k: 'operateToggle', id }])}
               onPlace={(kind, at) => place(kind, at.x, at.y)}
               onMove={move} onMoveFinished={() => setMoveTarget(null)}
+              onRotate={rotateSelection}
+              onOpenWiring={()=>{setWorkspaceView('logical');setActiveStage('wire');}}
             />}
           </Suspense>
           {!scenario && workspaceView==='physical' && <WorkspaceSelectionPanel components={project?.components??[]} selected={selectedDeviceIds}
