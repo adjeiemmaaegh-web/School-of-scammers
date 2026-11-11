@@ -63,7 +63,8 @@ const project=(occlusionMode)=>({
   assert.equal(actual,expected,
    'Actual worker photoeye must obey user-saved 3D occlusion setting '+mode);
   const saved=await page.evaluate(name=>JSON.parse(localStorage.getItem(name)||'null'),key);
-  assert.equal(saved?.params?.eye?.occlusionMode,mode);
+  // The project serializer omits default-valued settings (0), by design.
+  assert.equal(saved?.params?.eye?.occlusionMode??0,mode);
   assert.equal(saved?.components?.find(c=>c.id==='rack')?.yawDeg,90);
   assert.equal(saved?.wires?.length,10);
  };
