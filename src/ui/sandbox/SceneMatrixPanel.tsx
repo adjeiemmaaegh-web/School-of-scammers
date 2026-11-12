@@ -6,15 +6,19 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import type {ProjectFile,RenderSnapshot} from '../../sim/signals';
 import type {PlantScene} from '../../plant/scenes/catalogue';
 import {matrixPreflight,matrixSpecFor,type MatrixResult} from '../../plant/scenes/matrix';
+import {expandedPreflight,expandedSpecFor,P13_UNSUPPORTED} from '../../plant/scenes/matrix-p13';
 import {projectSignature} from '../../plant/scenes/commissioning';
 
 type Props={scene:PlantScene;project:ProjectFile;snapshot:RenderSnapshot};
 type Reply={kind:'matrix-result';id:number;result:MatrixResult}|
  {kind:'matrix-error';id:number;message:string};
 export function SceneMatrixPanel({scene,project,snapshot}:Props){
- const spec=matrixSpecFor(scene.id);
+ const spec=matrixSpecFor(scene.id)??expandedSpecFor(scene.id);
+ const unsupported=P13_UNSUPPORTED[scene.id];
  const signature=projectSignature(project);
- const blockers=useMemo(()=>matrixPreflight(project,scene.id),[signature,scene.id]);
+ const blockers=useMemo(()=>matrixSpecFor(scene.id)?
+  matrixPreflight(project,scene.id):expandedPreflight(project,scene.id),
+  [signature,scene.id]);
  const [pending,setPending]=useState(false);
  const [report,setReport]=useState<MatrixResult|null>(null);
  const [error,setError]=useState<string|null>(null);
@@ -30,7 +34,16 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
    nextId.current++;worker.current?.terminate();worker.current=null;
   };
  },[signature,scene.id]);
- if(!spec)return null;
+ if(!spec)return unsupported?<details className="sandbox-p12-matrix panel"
+  data-p13-unavailable data-p13-scene={scene.id}>
+  <summary>Advanced multi-case assessment · Not yet supported</summary>
+  <p className="sandbox-help">This original 3D scene remains available for
+   engineering practice and P11 single-trace observations, but its
+   independent fault/recovery matrix is not yet technically justified.</p>
+  <p role="status">{unsupported}</p>
+  <p className="sandbox-help">The application will not generate a passing
+   score from synthetic bodies, fake PLC coil changes or animation frames.</p>
+ </details>:null;
  const debug=Object.keys(snapshot.debugForces??{}).length>0||
   Object.values(snapshot.plcs).some(plc=>Object.keys(plc.debugForces??{}).length>0);
  const begin=()=>{
@@ -65,8 +78,9 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   <p className="sandbox-help">The same learner PLC program must handle four
    independent real-engine challenges: safe idle, demand, release and
    equipment fault with repair. The isolated test bench uses a genuine
-   powered 24 V pushbutton to substitute one sensor input, without changing
-   your saved project, forcing PLC coils, or running the cases in the UI thread.</p>
+   powered 24 V pushbutton to drive a PLC test input, replacing the mapped
+   sensor signal only in a private test clone when applicable. The worker
+   never modifies your saved project, forces PLC coils, or runs on the UI thread.</p>
   <p className="sandbox-help">This probes only the stated training terminals and
    bounded device behavior; it does not certify safety, external PLCs or all
    possible programs and physical inputs.</p>
