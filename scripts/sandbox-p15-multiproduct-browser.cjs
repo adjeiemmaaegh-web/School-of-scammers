@@ -79,7 +79,8 @@ const patch=[
    id:e.dataset.p15Case,pass:e.dataset.p15CaseState,detail:e.textContent,
   })));
   assert.deepEqual(cases.map(c=>[c.id,c.pass]),[
-   ['idle','pass'],['product-1','pass'],['product-2','pass'],['product-3','pass'],
+   ['idle','pass'],['product-1','pass'],['fault-recovery','pass'],
+   ['product-2','pass'],['product-3','pass'],
   ]);
   assert.ok(cases.filter(c=>c.id.startsWith('product-')).every(c=>
    /Original physical body b\d+ processed/.test(c.detail)));
