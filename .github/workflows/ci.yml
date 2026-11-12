@@ -80,6 +80,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p16-resilience-browser.cjs
       - name: P17 seeded material quality - three real feeder lots, material sorting, filling and deterministic replay
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p17-material-lots-browser.cjs
+      - name: P18 physically latched conveyor jam - PLC acknowledgement, same-bottle recovery and faulty reset rejection
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p18-conveyor-jam-browser.cjs
       - name: P6 visual workcell - build PLC conveyor/turntable line from empty 2D floor without WebGL
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-floor-plan-browser.cjs
       - name: UX-first workbench - workflow, device inspector and responsive design
