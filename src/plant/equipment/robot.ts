@@ -7,11 +7,13 @@ export const robotArm:EquipmentDef={
  commands:[{name:'xTargetMm',kind:'number',unit:'mm'},
   {name:'yTargetMm',kind:'number',unit:'mm'},
   {name:'zTargetMm',kind:'number',unit:'mm'},{name:'grip',kind:'bool'},
-  {name:'dispatch',kind:'bool'}],
+  {name:'dispatch',kind:'bool'},
+  {name:'routeMetal',kind:'bool'}],
  signals:[{name:'inPosition',kind:'bool'},{name:'partHeld',kind:'bool'},
   {name:'collisionStop',kind:'bool'},{name:'unreachable',kind:'bool'}],
  params:[spec('reachMm','Reach','mm',200,1700,50,900),
-  spec('speedMmS','End-effector speed','mm/s',20,900,10,350)],
+  spec('speedMmS','End-effector speed','mm/s',20,900,10,350),
+  spec('sortMode','Material sorting','0=original XY, 1=two physical X/Y lanes',0,1,1,0)],
  faults:['robot-joint-stuck','robot-gripper-leak','position-drift'],
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
@@ -21,7 +23,13 @@ export const robotArm:EquipmentDef={
   // External Cartesian/analog motion-control hardware remains unsupported.
   const x=flag(c,'dispatch')?Math.min(650,reach-150):
    numeric(c,'xTargetMm',0,-reach,reach);
-  const y=numeric(c,'yTargetMm',0,-reach,reach);
+  // Opt-in: one physically latched pickup decision selects a real spatial
+  // lane. The PLC must drive routeMetal while the gripper acquires the body.
+  // Changing an induction signal halfway through travel must not redirect it.
+  const sorting=param(ctx,'sortMode',0)===1;
+  const latchedRoute=s.heldBodyId?s.routeMetalLatched===true:flag(c,'routeMetal');
+  const y=sorting&&flag(c,'dispatch')?(latchedRoute?300:-300):
+   numeric(c,'yTargetMm',0,-reach,reach);
   const z=numeric(c,'zTargetMm',100,0,reach);
   const beyond=x*x+y*y+z*z>reach*reach;
   const nextX=ctx.originMm.x+x,nextY=ctx.originMm.y+y,nextZ=ctx.originMm.z+z;
@@ -49,8 +57,10 @@ export const robotArm:EquipmentDef={
   const bodies=w.bodies.map(body=>body.id===held?{...body,pos:vec(ctx.originMm.x+px,
     ctx.originMm.y+py,ctx.originMm.z+pz),supportedBy:ctx.id,vel:vec()}:
     s.heldBodyId===body.id&&!held?{...body,supportedBy:null}:body);
+  const acquired=!!held&&s.heldBodyId!==held;
   return {world:{...w,bodies},state:{...s,positionMm:px,progress:py,value:pz,
-    heldBodyId:held,engaged:!!held,done:!blocked&&px===x&&py===y&&pz===z,
+    heldBodyId:held,routeMetalLatched:acquired?flag(c,'routeMetal'):
+     s.routeMetalLatched,engaged:!!held,done:!blocked&&px===x&&py===y&&pz===z,
     stalled:blocked,faulted:!!f}};
  },
  read:(s,w,ctx)=>({inPosition:s.done,partHeld:!!s.heldBodyId,collisionStop:s.stalled,
