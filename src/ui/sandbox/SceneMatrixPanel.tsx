@@ -7,17 +7,19 @@ import type {ProjectFile,RenderSnapshot} from '../../sim/signals';
 import type {PlantScene} from '../../plant/scenes/catalogue';
 import {matrixPreflight,matrixSpecFor,type MatrixResult} from '../../plant/scenes/matrix';
 import {expandedPreflight,expandedSpecFor,P13_UNSUPPORTED} from '../../plant/scenes/matrix-p13';
+import {advancedPreflight,advancedSpecFor} from '../../plant/scenes/matrix-p14';
 import {projectSignature} from '../../plant/scenes/commissioning';
 
 type Props={scene:PlantScene;project:ProjectFile;snapshot:RenderSnapshot};
 type Reply={kind:'matrix-result';id:number;result:MatrixResult}|
  {kind:'matrix-error';id:number;message:string};
 export function SceneMatrixPanel({scene,project,snapshot}:Props){
- const spec=matrixSpecFor(scene.id)??expandedSpecFor(scene.id);
+ const spec=matrixSpecFor(scene.id)??expandedSpecFor(scene.id)??advancedSpecFor(scene.id);
  const unsupported=P13_UNSUPPORTED[scene.id];
  const signature=projectSignature(project);
  const blockers=useMemo(()=>matrixSpecFor(scene.id)?
-  matrixPreflight(project,scene.id):expandedPreflight(project,scene.id),
+  matrixPreflight(project,scene.id):advancedSpecFor(scene.id)?
+  advancedPreflight(project,scene.id):expandedPreflight(project,scene.id),
   [signature,scene.id]);
  const [pending,setPending]=useState(false);
  const [report,setReport]=useState<MatrixResult|null>(null);
@@ -77,7 +79,9 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   </summary>
   <p className="sandbox-help">The same learner PLC program must handle four
    independent real-engine challenges: safe idle, demand, release and
-   equipment fault with repair. The isolated test bench uses a genuine
+   equipment fault with repair. In the four advanced workcells, these
+   challenges additionally verify genuine physical feeder products,
+   body conservation and measured process outcomes. The bench uses a genuine
    powered 24 V pushbutton to drive a PLC test input, replacing the mapped
    sensor signal only in a private test clone when applicable. The worker
    never modifies your saved project, forces PLC coils, or runs on the UI thread.</p>
