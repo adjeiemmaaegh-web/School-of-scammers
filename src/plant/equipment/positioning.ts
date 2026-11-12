@@ -115,7 +115,7 @@ export const palletizer:EquipmentDef={
    const col=count%columns,row=Math.floor(count/columns)%rows,layer=Math.floor(count/(rows*columns));
    bodies=w.bodies.map(b=>b.id===held?{...b,pos:vec(ctx.originMm.x+col*200,
     ctx.originMm.y+row*200,ctx.originMm.z+160+layer*b.size.z),
-    supportedBy:null,vel:vec(),tags:{...b.tags,palletized:true}}:b);
+    supportedBy:ctx.id,vel:vec(),tags:{...b.tags,palletized:true}}:b);
    count++;held=null;
   }
   const pattern=columns*rows*param(ctx,'layers',2);
