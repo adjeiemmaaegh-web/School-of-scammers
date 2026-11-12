@@ -152,7 +152,7 @@ function wiring(scene){
   await page.waitForSelector('[data-p17-material-lots]',{timeout:20000});
   assert.equal(await state(),'setup');
   await run('failed');
-  assert.equal(await page.$eval('[data-p17-lot="first"]',
+  assert.equal(await page.$eval('[data-p17-lot="lot-a"]',
    e=>e.dataset.p17LotState),'fail');
   assert.deepEqual(errors.filter(e=>!/WebGL|GPU stall|favicon|swiftshader/i.test(e)),[]);
   console.log('P17 MATERIAL LOTS BROWSER PASS: original PLC browser-to-worker tests, original body-quality traces, source edit invalidation and no saved evidence');
