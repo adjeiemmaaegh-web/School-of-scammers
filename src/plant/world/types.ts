@@ -27,7 +27,8 @@ export type EquipmentState={
  levelMl:number;temperatureC:number;value:number;engaged:boolean;done:boolean;
  lastCommand:boolean;elapsedMs:number;stalled:boolean;faulted:boolean;
  heldBodyId?:string|null;routeMetalLatched?:boolean;activeBodyId?:string|null;
- lastPlaceCommand?:boolean;slots?:Record<string,string>;phase?:number;
+ lastPlaceCommand?:boolean;lastJamResetCommand?:boolean;
+ slots?:Record<string,string>;phase?:number;
 };
 export type EquipmentPlacement={
  id:string;kind:string;originMm:Vec3;yawDeg:0|90|180|270;params:Record<string,number>;
