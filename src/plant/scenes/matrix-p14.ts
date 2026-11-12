@@ -183,7 +183,7 @@ function gripping(w:WorldState,s:AdvancedSpec):boolean{
 function reached(w:WorldState,s:AdvancedSpec):boolean{
  if(s.kind==='gantry'||s.kind==='robot')return oneBody(w)&&
   body(w).pos.x>500&&
-  body(w).supportedBy===null&&
+  body(w).supportedBy!==(s.kind==='gantry'?'gantry':'robot')&&
   !gripping(w,s);
  if(s.kind==='palletizer')return oneBody(w)&&
   body(w).tags.palletized===true&&
