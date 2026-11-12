@@ -54,6 +54,18 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
  for(const original of sorted){
   const prior=original;
   let body={...prior,pos:{...prior.pos},vel:{...prior.vel}};
+  // The gantry, arm and palletizer have already advanced a *gripped*
+  // physical body in their own worker-owned model step. Treat that body as
+  // positively restrained; conveyor-gravity integration must not overwrite
+  // its XYZ position, detach it, or snap it to the 120 mm carrier surface.
+  // A release immediately disables this exception on the next substep.
+  const grip=body.supportedBy&&items.find(item=>item.id===body.supportedBy);
+  if(grip&&['pick-and-place','robot-arm','palletizer'].includes(grip.kind)&&
+   world.model[grip.id]?.heldBodyId===body.id){
+   body.vel=vec();
+   next.push(body);
+   continue;
+  }
   let carrier=body.supportedBy?items.find(item=>item.id===body.supportedBy):undefined;
   if(!carrier||!CARRIERS.has(carrier.kind))carrier=chooseCarrier(body,items,world.model);
   const state=carrier?world.model[carrier.id]:undefined;
