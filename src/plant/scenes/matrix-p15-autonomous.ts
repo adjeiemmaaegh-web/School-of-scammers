@@ -10,12 +10,14 @@ import type {ProjectFile,WorldState,Wire} from '../../sim/signals';
 import {conserved} from '../world/bodies';
 import {projectSignature} from './commissioning';
 import {advancedPreflight} from './matrix-p14';
+import {p17MaterialTrace,materialCode,type P17MaterialTrace} from './p17-product-trace';
 
 export type AutonomousTrial={
  sceneId:string;sourceSignature:string;status:'blocked'|'passed'|'failed';
  produced:number;sorted:number;metal:number;plain:number;
  simulatedMs:number;throughputPerSimHour:number;jamObservations:number;
  faultRecovered:boolean;cases:readonly {id:string;pass:boolean;detail:string}[];
+ materialSeed:number;productTrace:readonly P17MaterialTrace[];materialSequence:string;
  diagnostic:string;
 };
 const SCENE='robot-sort',PLC='scene-plc',SUPPLY='scene-supply';
@@ -74,18 +76,29 @@ function fault(w:WorldState,code:string|null):WorldState{
  return safe(tick(w,[{k:'run'}]).world);
 }
 export function runP15AutonomousSort(p:ProjectFile,sceneId:string,
- options:Readonly<{faultAtProduct?:number}>={}):AutonomousTrial{
+ options:Readonly<{faultAtProduct?:number;materialSeed?:number}>={}):AutonomousTrial{
  const sourceSignature=projectSignature(p),blockers=autonomousSortPreflight(p,sceneId);
  const faultAtProduct=options.faultAtProduct??2;
+ const materialSeed=options.materialSeed??1;
+ if(!Number.isSafeInteger(materialSeed)||materialSeed<1||
+  materialSeed>0xffffffff)blockers.push('P17 material-lot seed must be an unsigned nonzero 32-bit integer');
  if(!Number.isSafeInteger(faultAtProduct)||faultAtProduct<1||faultAtProduct>TARGET)
   blockers.push('P16 fault product must be an integer from 1 to '+TARGET);
  const base={sceneId,sourceSignature,produced:0,sorted:0,metal:0,
   plain:0,simulatedMs:0,throughputPerSimHour:0,jamObservations:0,
-  faultRecovered:false,cases:[] as {id:string;pass:boolean;detail:string}[]};
+  faultRecovered:false,cases:[] as {id:string;pass:boolean;detail:string}[],
+  materialSeed,productTrace:[] as P17MaterialTrace[],materialSequence:''};
  if(blockers.length)return {...base,status:'blocked',
   diagnostic:blockers.join('; ')};
  try{
   let w=safe(tick(createWorld(),[{k:'loadProject',project:fixture(p)}]).world);
+  // P17: select the SOURCE feeder's PRNG before any PLC scan or product.
+  // This touches only an empty private world, not the learner project, Q
+  // terminals, existing bodies, process quality, or saved source.
+  if(w.plantWorld.world.spawnedCount!==0||w.plantWorld.world.bodies.length!==0)
+   throw new Error('P17 refuses to seed an already-populated plant');
+  w={...w,plantWorld:{...w.plantWorld,
+   world:{...w.plantWorld.world,rngState:materialSeed}}};
   w=safe(tick(w,[{k:'run'}]).world);
   for(let i=0;i<8;i++)w=safe(tick(w).world);
   const powered=renderSnapshot(w).plcs[PLC]?.powered===true;
@@ -151,6 +164,12 @@ export function runP15AutonomousSort(p:ProjectFile,sceneId:string,
    const expected=b.tags.material==='metal'?1:-1;
    return expected*b.pos.y>180;
   });
+  const productTrace=all.map(b=>p17MaterialTrace(b,
+   received.has(b.id)&&((b.tags.material==='metal'&&
+    b.pos.y>180&&b.supportedBy==='metal-out')||
+    (b.tags.material==='cardboard'&&b.pos.y< -180&&
+     b.supportedBy==='plain-out'))));
+  const materialSequence=materialCode(productTrace);
   const resultCases=[...cases,
    {id:'classification',pass:complete&&noMaterialConfusion,
     detail:'Original seeded metal and cardboard bodies reached separate physical output belt lanes'},
@@ -167,6 +186,7 @@ export function runP15AutonomousSort(p:ProjectFile,sceneId:string,
   const plain=all.filter(b=>b.tags.material==='cardboard'&&received.has(b.id)).length;
   return {sceneId,sourceSignature,status:passed?'passed':'failed',
    cases:resultCases,produced:world.spawnedCount,sorted:received.size,metal,plain,
+   materialSeed,productTrace,materialSequence,
    simulatedMs:ms,throughputPerSimHour:ms>0?
     Math.round(received.size*3600000/ms*100)/100:0,
    jamObservations:jammed.size,faultRecovered:recovered,
