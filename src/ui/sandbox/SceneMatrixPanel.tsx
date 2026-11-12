@@ -13,6 +13,7 @@ import {autonomousSortPreflight,type AutonomousTrial} from '../../plant/scenes/m
 import {autoFactoryPreflight,type AutoFactoryResult} from '../../plant/scenes/matrix-p15-autonomous-factory';
 import {p16AuditPreflight,type P16AuditResult} from '../../plant/scenes/matrix-p16';
 import type {P17Campaign} from '../../plant/scenes/matrix-p17';
+import {p18Preflight,type P18Result} from '../../plant/scenes/matrix-p18';
 import {projectSignature} from '../../plant/scenes/commissioning';
 
 type Props={scene:PlantScene;project:ProjectFile;snapshot:RenderSnapshot};
@@ -21,11 +22,14 @@ type Reply={kind:'matrix-result';id:number;result:MatrixResult}|
  {kind:'autonomous-result';id:number;result:AutonomousTrial|AutoFactoryResult}|
  {kind:'resilience-result';id:number;result:P16AuditResult}|
  {kind:'material-lots-result';id:number;result:P17Campaign}|
+ {kind:'jam-recovery-result';id:number;result:P18Result}|
  {kind:'matrix-error';id:number;message:string};
 export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const spec=matrixSpecFor(scene.id)??expandedSpecFor(scene.id)??advancedSpecFor(scene.id);
  const unsupported=P13_UNSUPPORTED[scene.id];
  const signature=projectSignature(project);
+ const jamBlockers=useMemo(()=>scene.id==='bottle-line'?
+  p18Preflight(project,scene.id):[],[signature,scene.id]);
  const resilienceBlockers=useMemo(()=>advancedSpecFor(scene.id)?
   p16AuditPreflight(project,scene.id):[],[signature,scene.id]);
  const autoBlockers=useMemo(()=>scene.id==='robot-sort'?
@@ -41,6 +45,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const [autoReport,setAutoReport]=useState<AutonomousTrial|AutoFactoryResult|null>(null);
  const [resilienceReport,setResilienceReport]=useState<P16AuditResult|null>(null);
  const [materialReport,setMaterialReport]=useState<P17Campaign|null>(null);
+ const [jamReport,setJamReport]=useState<P18Result|null>(null);
  const [error,setError]=useState<string|null>(null);
  const worker=useRef<Worker|null>(null);
  const nextId=useRef(0);
@@ -50,7 +55,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   worker.current?.terminate();
   worker.current=null;
   setPending(false);setReport(null);setBatchReport(null);setAutoReport(null);
-  setResilienceReport(null);setMaterialReport(null);setError(null);
+  setResilienceReport(null);setMaterialReport(null);setJamReport(null);setError(null);
   return ()=>{
    nextId.current++;worker.current?.terminate();worker.current=null;
   };
@@ -67,7 +72,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  </details>:null;
  const debug=Object.keys(snapshot.debugForces??{}).length>0||
   Object.values(snapshot.plcs).some(plc=>Object.keys(plc.debugForces??{}).length>0);
- const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots')=>{
+ const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery')=>{
   if(pending||blockers.length||debug||snapshot.lastError)return;
   worker.current?.terminate();
   const runId=++nextId.current;
@@ -76,6 +81,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   worker.current=local;
   setPending(true);setError(null);setReport(null);setBatchReport(null);
   setAutoReport(null);setResilienceReport(null);setMaterialReport(null);
+  setJamReport(null);
   local.onmessage=(event:MessageEvent<Reply>)=>{
    if(event.data?.id!==runId||worker.current!==local)return;
    local.terminate();worker.current=null;
@@ -87,6 +93,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
    else if(event.data.kind==='autonomous-result')setAutoReport(event.data.result);
    else if(event.data.kind==='resilience-result')setResilienceReport(event.data.result);
    else if(event.data.kind==='material-lots-result')setMaterialReport(event.data.result);
+   else if(event.data.kind==='jam-recovery-result')setJamReport(event.data.result);
    else setReport(event.data.result);
   };
   local.onerror=()=>{
@@ -170,6 +177,45 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
      This is not a measured industrial throughput rate. Fault repaired:
      {' '}{autoReport.faultRecovered?'yes':'no'}.
      The result is ephemeral, not part of the project.</p>
+   </div>}
+  </section>}
+  {scene.id==='bottle-line'&&<section className="sandbox-p18-jam"
+   data-p18-jam data-p18-state={pending?'running':jamReport?.status??'setup'}>
+   <h3>P18 · Conveyor jam service and reset</h3>
+   <p className="sandbox-help">Test a genuine latched belt fault on the
+    original bottle line. The real PLC must detect the powered jam sensor;
+    mechanical repair by itself must NOT restart the stopped cylinder.
+    A separate maintenance acknowledgement sends a temporary real 24 V
+    button pulse to I0.7. Only your own PLC program may command
+    Q0.4 to clear the repaired belt. The same original bottle must then
+    resume filling and capping, with all three products conserved.</p>
+   <p className="sandbox-help">This bounded educational assessment injects a
+    registered simulator fault, not a real-world safety stop. Results and
+    temporary buttons stay in the isolated Worker and are never saved.</p>
+   {jamBlockers.length>0&&<div data-p18-preflight>
+    <strong>Prepare the latched 24 V conveyor reset:</strong>
+    <ul>{jamBlockers.map(msg=><li key={msg}>{msg}</li>)}</ul>
+   </div>}
+   <button type="button" className="btn ghost small" data-p18-run-jam
+    disabled={pending||blockers.length>0||jamBlockers.length>0||
+     debug||!!snapshot.lastError}
+    onClick={()=>begin('run-jam-recovery')}>{pending?
+     'Testing physical jam and maintenance acknowledgement…':
+     'Test latched belt jam, repair, 24 V reset and bottle recovery'}</button>
+   {jamReport&&<div data-p18-result data-p18-result-state={jamReport.status}>
+    <p role="status"><strong>{jamReport.status==='passed'?
+     'P18 conveyor recovery passed':'P18 conveyor recovery did not pass'}</strong>.
+     {' '}{jamReport.diagnostic}</p>
+    <ol>{jamReport.cases.map(c=><li key={c.id}
+      data-p18-case={c.id} data-p18-case-state={c.pass?'pass':'fail'}>
+      <strong>{c.pass?'✓':'○'} {c.id}</strong> — {c.detail}
+    </li>)}</ol>
+    <p className="sandbox-help">Original bottle
+     {' '}{jamReport.jammedBodyId??'not witnessed'};
+     {' '}produced {jamReport.produced}, fully completed {jamReport.completed};
+     {' '}material order {jamReport.materialSequence};
+     {' '}model-only throughput {jamReport.modelThroughputPerHour} items per
+     simulated hour. Not calibrated industrial performance.</p>
    </div>}
   </section>}
   {advancedSpecFor(scene.id)&&<section className="sandbox-p17-material-lots"
