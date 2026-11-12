@@ -42,7 +42,7 @@ describe('P17 feeder-seeded material-lot quality campaign',()=>{
      t.filledMl!==null&&t.filledMl>=500&&t.shape==='cylinder')).toBe(true);
     if(scene==='palletizing')expect(lot.trace.map(t=>t.palletSlot)).toEqual(
      Array.from({length:8},(_,i)=>i));
-    if(scene==='robot-sort')expect(new Set(lot.trace.map(t=>t.supportedBy))).toEqual(
+    if(scene==='robot-sort')expect(new Set(lot.trace.map(t=>t.receivedBy))).toEqual(
      new Set(['metal-out','plain-out']));
    }
    expect(JSON.stringify(p)).toBe(before);
