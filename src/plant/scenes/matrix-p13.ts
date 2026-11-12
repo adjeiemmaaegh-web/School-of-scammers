@@ -249,16 +249,31 @@ export function runExpandedMatrix(p:ProjectFile,sceneId:string):MatrixResult{
    s.kind==='pusher'?8:Math.min(n,10));
   const last=s.kind==='crane'?w.plantWorld.world.model[s.actor]?.progress:
    s.kind==='table'?val(w,s.actor,'angleDeg'):null;
+  // PLC scan image drives the real equipment with one tick of output
+  // propagation latency. Capture the first physically settled sample when
+  // the NO training switch opens, then insist on genuinely stationary
+  // world state for another ten scans. This is NOT a last-value-only test:
+  // constant-ON control continues moving and cannot satisfy both stages.
   w=press(w,false);
+  const lagged=s.kind==='crane'?w.plantWorld.world.model[s.actor]?.progress:
+   s.kind==='table'?val(w,s.actor,'angleDeg'):null;
   w=scans(w,s.kind==='pusher'?35:s.kind==='gate'?24:
    s.kind==='stopper'?22:10);
   let pass=power(w)&&!output(w);
-  if(s.kind==='crane')pass=pass&&
-  Math.abs((w.plantWorld.world.model[s.actor]?.progress??-2)-
-   (typeof last==='number'?last:-1))<.001&&
-  val(w,s.actor,'atBay')===0;
-  else if(s.kind==='table')pass=pass&&val(w,s.actor,'rotated')===false&&
-   Math.abs((val(w,s.actor,'angleDeg') as number)-(last as number))<1;
+  if(s.kind==='crane'){
+   const begin=typeof last==='number'?last:-2;
+   const first=typeof lagged==='number'?lagged:-2;
+   const held=w.plantWorld.world.model[s.actor]?.progress??-2;
+   pass=pass&&first>=begin&&first-begin<=.111&&
+    Math.abs(held-first)<.001&&val(w,s.actor,'atBay')===0;
+  }else if(s.kind==='table'){
+   const begin=typeof last==='number'?last:-100;
+   const first=typeof lagged==='number'?lagged:-100;
+   const held=val(w,s.actor,'angleDeg');
+   pass=pass&&first>=begin&&first-begin<=2.30&&
+    typeof held==='number'&&Math.abs(held-first)<.05&&
+    val(w,s.actor,'rotated')===false;
+  }
   else if(s.kind==='stopper'||s.kind==='pusher')pass=pass&&
    val(w,s.actor,'retracted')===true;
   else if(s.kind==='gate')pass=pass&&val(w,s.actor,'home')===true;
@@ -266,7 +281,8 @@ export function runExpandedMatrix(p:ProjectFile,sceneId:string):MatrixResult{
   return {pass,world:w,scans:n+10,
    reason:'Actual PLC output drops; the physical device settles, stops or retracts as defined',
    wrong:'Output stayed high or worker device continued moving after the training contact opened; model '+s.actor+'='+JSON.stringify(w.plantWorld.signals[s.actor])+
-    ', previous='+String(last)+', Q0.0='+String(output(w))};
+    ', before='+String(last)+', after last PLC image='+String(lagged)+
+    ', Q0.0='+String(output(w))};
  });
  run('fault-recovery','Registered machine failure blocks movement until repair',()=>{
   let w=fresh(p,s,true);w=press(w,true);
