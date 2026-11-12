@@ -254,7 +254,8 @@ export function runExpandedMatrix(p:ProjectFile,sceneId:string):MatrixResult{
    s.kind==='stopper'?22:10);
   let pass=power(w)&&!output(w);
   if(s.kind==='crane')pass=pass&&
-  Math.abs((w.plantWorld.world.model[s.actor]?.progress??-2)-(last??-1))<.001&&
+  Math.abs((w.plantWorld.world.model[s.actor]?.progress??-2)-
+   (typeof last==='number'?last:-1))<.001&&
   val(w,s.actor,'atBay')===0;
   else if(s.kind==='table')pass=pass&&val(w,s.actor,'rotated')===false&&
    Math.abs((val(w,s.actor,'angleDeg') as number)-(last as number))<1;
@@ -264,7 +265,8 @@ export function runExpandedMatrix(p:ProjectFile,sceneId:string):MatrixResult{
   else pass=pass&&!active(w,s);
   return {pass,world:w,scans:n+10,
    reason:'Actual PLC output drops; the physical device settles, stops or retracts as defined',
-   wrong:'Output stayed high or worker device continued moving after the training contact opened'};
+   wrong:'Output stayed high or worker device continued moving after the training contact opened; model '+s.actor+'='+JSON.stringify(w.plantWorld.signals[s.actor])+
+    ', previous='+String(last)+', Q0.0='+String(output(w))};
  });
  run('fault-recovery','Registered machine failure blocks movement until repair',()=>{
   let w=fresh(p,s,true);w=press(w,true);
