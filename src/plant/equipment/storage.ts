@@ -30,7 +30,10 @@ export const asrsCrane:EquipmentDef={
   const travel=param(ctx,'travelMs',500);
   const motion=requested&&f!=='crane-motor-fault'?dt/travel:0;
   const progress=Math.max(0,Math.min(1,s.progress+motion));
-  const atBay=progress===1?bay:s.value;
+  // Report the previously physically reached bay until the crane actually
+  // finishes travelling. s.value is the requested target index and must
+  // NEVER be exposed as sensor feedback before the command moves hardware.
+  const atBay=progress===1?bay:s.positionMm;
   const slots={...s.slots};
   let bodies=w.bodies,count=s.count;
   const canHandle=progress===1&&f!=='fork-jammed';
