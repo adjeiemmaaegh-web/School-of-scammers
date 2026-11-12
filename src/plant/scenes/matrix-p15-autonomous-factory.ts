@@ -96,12 +96,17 @@ function isComplete(w:WorldState,s:Spec,id:string,index:number):boolean{
  return b.shape==='box'&&b.pos.x>500&&b.supportedBy!=='gantry'&&
   state(w,'gantry','partHeld')===false;
 }
-export function runP15AutonomousFactory(p:ProjectFile,sceneId:string):AutoFactoryResult{
+export function runP15AutonomousFactory(p:ProjectFile,sceneId:string,
+ options:Readonly<{faultAtProduct?:number}>={}):AutoFactoryResult{
  const sourceSignature=projectSignature(p),s=specFor(sceneId),expected=s?.expected??0;
  const base={sceneId,sourceSignature,expected,produced:0,completed:0,
   simulatedMs:0,throughputPerSimHour:0,jamObservations:0,faultRecovered:false,
   cases:[] as {id:string;pass:boolean;detail:string}[]};
  const problems=autoFactoryPreflight(p,sceneId);
+ const faultAtProduct=options.faultAtProduct??2;
+ if(!Number.isSafeInteger(faultAtProduct)||faultAtProduct<1||
+   faultAtProduct>expected)
+  problems.push('P16 fault product must be an integer between 1 and '+expected);
  if(!s||problems.length)return {...base,status:'blocked',diagnostic:problems.join('; ')};
  try{
   let w=checked(tick(createWorld(),[{k:'loadProject',project:trialProject(p)}]).world);
@@ -125,8 +130,10 @@ export function runP15AutonomousFactory(p:ProjectFile,sceneId:string):AutoFactor
    w=checked(tick(w).world);
    const scene=w.plantWorld.world;
    if(scene.spawnedCount>expected){overrun=true;break;}
-   if(scene.spawnedCount===2&&faultId===null){
-    const item=scene.bodies.find(b=>b.id==='b2');
+   if(scene.spawnedCount===faultAtProduct&&faultId===null){
+    // P16 rotates the real registered fault across first, middle and final
+    // products without altering any learner wire, program, body or PLC output.
+    const item=scene.bodies.find(b=>b.id==='b'+faultAtProduct);
     if(item){
      faultId=item.id;
      w=machineFault(w,s,s.fault);
@@ -182,7 +189,8 @@ export function runP15AutonomousFactory(p:ProjectFile,sceneId:string):AutoFactor
    {id:'continuous-process',pass:all&&quality,
     detail:'Distinct original products completed through live PLC sensory feedback, with genuine physical position/process tags'},
    {id:'fault-in-batch',pass:recovered,
-    detail:'Registered second-body machine fault withheld output until repair, then the same original material completed'},
+    detail:'Registered machine fault on original product '+faultAtProduct+
+     ' withheld completion until repair, then the same body finished'},
    {id:'bounded-flow',pass:!overrun&&scene.bodies.length<=60&&conserved(scene),
     detail:'No excess feed, body loss, duplication or unbounded material accumulation'},
   ];
