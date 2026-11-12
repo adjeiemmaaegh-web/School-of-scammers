@@ -102,6 +102,8 @@ const wires=[
   // The specialized robot/gantry/bottle workcells must not render a false pass.
   await page.$eval('[data-p9-scene-gallery]',el=>{el.open=true;});
   await page.click('[data-load-plant-scene="bottle-line"]');
+  await page.waitForSelector('[data-p9-scene-confirm-warning]',{timeout:12000});
+  await page.click('[data-load-plant-scene="bottle-line"]');
   await page.waitForSelector('[data-p13-unavailable]',{timeout:20000});
   assert.ok((await page.$eval('[data-p13-unavailable]',
    el=>el.textContent)).includes('cylinder bottle'));
