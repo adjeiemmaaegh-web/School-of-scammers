@@ -95,7 +95,7 @@ const endpoints=[
    ['fault-repair','pass'],['capacity-and-flow','pass'],
   ]);
   const result=await page.$eval('[data-p15-auto-result]',e=>e.textContent);
-  assert.match(result,/metal:\s*[1-3]/);
+  assert.match(result,/Metal:\s*[1-3]/);
   assert.match(result,/plain:\s*[1-3]/);
   const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),KEY);
   assert.equal(saved.components.some(c=>c.id==='p15-auto-start'),false);
