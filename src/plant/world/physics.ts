@@ -60,6 +60,13 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
   // its XYZ position, detach it, or snap it to the 120 mm carrier surface.
   // A release immediately disables this exception on the next substep.
   const grip=body.supportedBy&&items.find(item=>item.id===body.supportedBy);
+  // The bounded pallet-pattern model represents an already-placed package as
+  // supported by the palletizer's stable pallet/stack frame. Do not reclassify
+  // it as an ordinary moving conveyor load or let gravity erase its counted
+  // layer. Its original spawn ID and conservation accounting are unchanged.
+  if(grip?.kind==='palletizer'&&body.tags.palletized===true){
+   body.vel=vec();next.push(body);continue;
+  }
   if(grip&&['pick-and-place','robot-arm','palletizer'].includes(grip.kind)&&
    world.model[grip.id]?.heldBodyId===body.id){
    body.vel=vec();
