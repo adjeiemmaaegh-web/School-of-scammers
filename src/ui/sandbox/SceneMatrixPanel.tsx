@@ -10,19 +10,21 @@ import {expandedPreflight,expandedSpecFor,P13_UNSUPPORTED} from '../../plant/sce
 import {advancedPreflight,advancedSpecFor} from '../../plant/scenes/matrix-p14';
 import type {BatchResult} from '../../plant/scenes/matrix-p15';
 import {autonomousSortPreflight,type AutonomousTrial} from '../../plant/scenes/matrix-p15-autonomous';
+import {autoFactoryPreflight,type AutoFactoryResult} from '../../plant/scenes/matrix-p15-autonomous-factory';
 import {projectSignature} from '../../plant/scenes/commissioning';
 
 type Props={scene:PlantScene;project:ProjectFile;snapshot:RenderSnapshot};
 type Reply={kind:'matrix-result';id:number;result:MatrixResult}|
  {kind:'batch-result';id:number;result:BatchResult}|
- {kind:'autonomous-result';id:number;result:AutonomousTrial}|
+ {kind:'autonomous-result';id:number;result:AutonomousTrial|AutoFactoryResult}|
  {kind:'matrix-error';id:number;message:string};
 export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const spec=matrixSpecFor(scene.id)??expandedSpecFor(scene.id)??advancedSpecFor(scene.id);
  const unsupported=P13_UNSUPPORTED[scene.id];
  const signature=projectSignature(project);
  const autoBlockers=useMemo(()=>scene.id==='robot-sort'?
-  autonomousSortPreflight(project,scene.id):[],[signature,scene.id]);
+  autonomousSortPreflight(project,scene.id):advancedSpecFor(scene.id)?
+  autoFactoryPreflight(project,scene.id):[],[signature,scene.id]);
  const blockers=useMemo(()=>matrixSpecFor(scene.id)?
   matrixPreflight(project,scene.id):advancedSpecFor(scene.id)?
   advancedPreflight(project,scene.id):expandedPreflight(project,scene.id),
@@ -30,7 +32,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const [pending,setPending]=useState(false);
  const [report,setReport]=useState<MatrixResult|null>(null);
  const [batchReport,setBatchReport]=useState<BatchResult|null>(null);
- const [autoReport,setAutoReport]=useState<AutonomousTrial|null>(null);
+ const [autoReport,setAutoReport]=useState<AutonomousTrial|AutoFactoryResult|null>(null);
  const [error,setError]=useState<string|null>(null);
  const worker=useRef<Worker|null>(null);
  const nextId=useRef(0);
@@ -123,26 +125,29 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
     All test evidence is transient, discarded on edits or reload, and
     intentionally excluded from exported projects.</p>
   </div>}
-  {scene.id==='robot-sort'&&<section className="sandbox-p15-autonomous"
+  {advancedSpecFor(scene.id)&&<section className="sandbox-p15-autonomous"
    data-p15-autonomous data-p15-autonomous-state={pending?'running':autoReport?.status??'setup'}>
-   <h3>P15 · Autonomous material-based robot sorting</h3>
-   <p className="sandbox-help">A single Start pulse must cause your own PLC
-    program to feed, sense material with the real inductive pickup sensor,
-    grip, select one of two physical output lanes, release and return home.
-    The private Worker grades three original cartons and injects a real
-    gripper leak during the second carton. No synthetic PLC outputs,
-    prewritten learner solution or stored passing score is used.</p>
+   <h3>P15 · Autonomous physical production and feedback</h3>
+   <p className="sandbox-help">A single 24 V Start pulse must drive your own
+    PLC program through original machine feedback for the entire bounded
+    production batch. Robot sorting uses a real inductive material signal and
+    two physical output lanes. Gantry transfer, pallet pattern and bottle
+    filling/capping require worker-observed sensor and process completion.
+    A registered machine fault interrupts the second original product and
+    must recover without material replacement or fabricated results. The
+    private assessment never forces coils or saves a score.</p>
    {autoBlockers.length>0&&<div data-p15-auto-preflight><strong>Prepare your autonomous cell:</strong>
     <ul>{autoBlockers.map(x=><li key={x}>{x}</li>)}</ul></div>}
    <button type="button" className="btn ghost small" data-p15-run-autonomous
     disabled={pending||autoBlockers.length>0||debug||!!snapshot.lastError}
     onClick={()=>begin('run-autonomous')}>{pending?'Running physical PLC workcell…':
-     'Run autonomous metal/plain sorting trial'}</button>
+     'Run autonomous process and fault-recovery trial'}</button>
    {autoReport&&<div data-p15-auto-result>
     <p role="status"><strong>{autoReport.status==='passed'?
      'Autonomous sorting passed':'Autonomous sorting did not pass'}</strong>
-     {' '}Actual items: {autoReport.sorted}/{autoReport.produced};
-     metal: {autoReport.metal}, plain: {autoReport.plain}.
+     {' '}Actual items: {'sorted' in autoReport?autoReport.sorted:autoReport.completed}/
+     {autoReport.produced}.{' '}{'metal' in autoReport?
+      'Metal: '+autoReport.metal+', plain: '+autoReport.plain+'.':''}
      {' '}{autoReport.diagnostic}</p>
     <ol>{autoReport.cases.map(c=><li key={c.id} data-p15-auto-case={c.id}
       data-p15-auto-case-state={c.pass?'pass':'fail'}>
