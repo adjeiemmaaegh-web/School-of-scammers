@@ -74,6 +74,11 @@ const wires=[
   await page.reload({waitUntil:'networkidle0',timeout:45000});
   await page.waitForSelector('[data-p12-matrix]',{timeout:16000});
   assert.equal(await page.$eval('[data-p12-run-matrix]',el=>el.disabled),false);
+  // The classroom test lives in a native collapsible details panel. Trying
+  // to click a hidden button can instead click its summary without starting
+  // anything, even though Puppeteer reports a successful pointer click.
+  await page.$eval('[data-p12-matrix]',el=>{el.open=true;});
+  await page.waitForFunction(()=>document.querySelector('[data-p12-matrix]')?.open===true);
   await page.click('[data-p12-run-matrix]');
   await awaitResult('passed');
   const checks=await page.$$eval('[data-p12-case]',es=>es.map(e=>({
@@ -98,6 +103,8 @@ const wires=[
   await page.waitForSelector('[data-p12-matrix]',{timeout:16000});
   assert.equal(await state(),'setup',
    'A previous passing report must never survive source edit/reload');
+  await page.$eval('[data-p12-matrix]',el=>{el.open=true;});
+  await page.waitForFunction(()=>document.querySelector('[data-p12-matrix]')?.open===true);
   await page.click('[data-p12-run-matrix]');
   await awaitResult('failed');
   assert.equal(await page.$eval('[data-p12-case="idle"]',
