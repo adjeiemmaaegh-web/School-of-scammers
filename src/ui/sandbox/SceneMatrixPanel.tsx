@@ -11,17 +11,21 @@ import {advancedPreflight,advancedSpecFor} from '../../plant/scenes/matrix-p14';
 import type {BatchResult} from '../../plant/scenes/matrix-p15';
 import {autonomousSortPreflight,type AutonomousTrial} from '../../plant/scenes/matrix-p15-autonomous';
 import {autoFactoryPreflight,type AutoFactoryResult} from '../../plant/scenes/matrix-p15-autonomous-factory';
+import {p16AuditPreflight,type P16AuditResult} from '../../plant/scenes/matrix-p16';
 import {projectSignature} from '../../plant/scenes/commissioning';
 
 type Props={scene:PlantScene;project:ProjectFile;snapshot:RenderSnapshot};
 type Reply={kind:'matrix-result';id:number;result:MatrixResult}|
  {kind:'batch-result';id:number;result:BatchResult}|
  {kind:'autonomous-result';id:number;result:AutonomousTrial|AutoFactoryResult}|
+ {kind:'resilience-result';id:number;result:P16AuditResult}|
  {kind:'matrix-error';id:number;message:string};
 export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const spec=matrixSpecFor(scene.id)??expandedSpecFor(scene.id)??advancedSpecFor(scene.id);
  const unsupported=P13_UNSUPPORTED[scene.id];
  const signature=projectSignature(project);
+ const resilienceBlockers=useMemo(()=>advancedSpecFor(scene.id)?
+  p16AuditPreflight(project,scene.id):[],[signature,scene.id]);
  const autoBlockers=useMemo(()=>scene.id==='robot-sort'?
   autonomousSortPreflight(project,scene.id):advancedSpecFor(scene.id)?
   autoFactoryPreflight(project,scene.id):[],[signature,scene.id]);
@@ -33,6 +37,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const [report,setReport]=useState<MatrixResult|null>(null);
  const [batchReport,setBatchReport]=useState<BatchResult|null>(null);
  const [autoReport,setAutoReport]=useState<AutonomousTrial|AutoFactoryResult|null>(null);
+ const [resilienceReport,setResilienceReport]=useState<P16AuditResult|null>(null);
  const [error,setError]=useState<string|null>(null);
  const worker=useRef<Worker|null>(null);
  const nextId=useRef(0);
@@ -41,7 +46,8 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   nextId.current++;
   worker.current?.terminate();
   worker.current=null;
-  setPending(false);setReport(null);setBatchReport(null);setAutoReport(null);setError(null);
+  setPending(false);setReport(null);setBatchReport(null);setAutoReport(null);
+  setResilienceReport(null);setError(null);
   return ()=>{
    nextId.current++;worker.current?.terminate();worker.current=null;
   };
@@ -58,14 +64,15 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  </details>:null;
  const debug=Object.keys(snapshot.debugForces??{}).length>0||
   Object.values(snapshot.plcs).some(plc=>Object.keys(plc.debugForces??{}).length>0);
- const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous')=>{
+ const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience')=>{
   if(pending||blockers.length||debug||snapshot.lastError)return;
   worker.current?.terminate();
   const runId=++nextId.current;
   const local=new Worker(new URL('../../sim/p12-assessment.worker.ts',import.meta.url),
    {type:'module'});
   worker.current=local;
-  setPending(true);setError(null);setReport(null);setBatchReport(null);setAutoReport(null);
+  setPending(true);setError(null);setReport(null);setBatchReport(null);
+  setAutoReport(null);setResilienceReport(null);
   local.onmessage=(event:MessageEvent<Reply>)=>{
    if(event.data?.id!==runId||worker.current!==local)return;
    local.terminate();worker.current=null;
@@ -75,6 +82,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
     setError('Project changed before the trial completed; restart the assessment');
    else if(event.data.kind==='batch-result')setBatchReport(event.data.result);
    else if(event.data.kind==='autonomous-result')setAutoReport(event.data.result);
+   else if(event.data.kind==='resilience-result')setResilienceReport(event.data.result);
    else setReport(event.data.result);
   };
   local.onerror=()=>{
@@ -158,6 +166,59 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
      This is not a measured industrial throughput rate. Fault repaired:
      {' '}{autoReport.faultRecovered?'yes':'no'}.
      The result is ephemeral, not part of the project.</p>
+   </div>}
+  </section>}
+  {advancedSpecFor(scene.id)&&<section className="sandbox-p16-resilience"
+   data-p16-resilience
+   data-p16-state={pending?'running':resilienceReport?.status??'setup'}>
+   <h3>P16 · Factory fault-resilience and deterministic replay</h3>
+   <p className="sandbox-help">Audit your own PLC logic across independent
+    first, middle and final original-product machine faults. Every trial
+    uses real powered input sensors and PLC Q outputs, repairs and resumes
+    the <strong>same physically generated item</strong>, then repeats the
+    middle case to check deterministic results. Four independent invalid
+    controls verify that constant-on/constant-off programs, disconnected
+    feedback and lost PLC power cannot earn a passing grade.</p>
+   <p className="sandbox-help">This offline CPU-bound assessment runs only in
+    a private Worker. It neither modifies source files nor persists test
+    fixtures, grades or hardware commands. It is not real-machine safety or
+    industrial throughput validation.</p>
+   {resilienceBlockers.length>0&&<div data-p16-preflight>
+    <strong>Complete physical PLC wiring before the resilience audit:</strong>
+    <ul>{resilienceBlockers.map(item=><li key={item}>{item}</li>)}</ul>
+   </div>}
+   <button type="button" className="btn ghost small" data-p16-run-resilience
+    disabled={pending||blockers.length>0||resilienceBlockers.length>0||
+     debug||!!snapshot.lastError}
+    onClick={()=>begin('run-resilience')}>{pending?'Running independent PLC stress trials…':
+     'Audit first/middle/final equipment faults and PLC controls'}</button>
+   {resilienceReport&&<div data-p16-result data-p16-result-state={resilienceReport.status}>
+    <p role="status"><strong>{resilienceReport.status==='passed'?
+     'P16 resilience audit passed':'P16 resilience audit did not pass'}</strong>.
+     {' '}{resilienceReport.diagnostic}</p>
+    <p className="sandbox-help">Real physical batch size:
+     {' '}{resilienceReport.expectedProducts} items. The three fault
+     profiles are independent; the replay is a fourth deterministic check.</p>
+    <ol>{resilienceReport.profiles.map(item=><li key={item.id}
+     data-p16-profile={item.id} data-p16-profile-state={item.passed?'pass':'fail'}>
+     <strong>{item.passed?'✓':'○'} {item.id}</strong> — fault at original
+     item {item.faultAtProduct}; {item.completed}/{item.expected} physically
+     completed; same-body recovery: {item.faultRecovered?'yes':'no'}.
+     Simulated duration {item.simulatedMs} ms; {item.diagnostic}
+    </li>)}</ol>
+    <p data-p16-replay={resilienceReport.deterministicReplay?'pass':'fail'}>
+     Deterministic replay: {resilienceReport.deterministicReplay?'passed':'failed'}.</p>
+    <h4>Independent negative controls</h4>
+    <ul>{resilienceReport.controls.map(item=><li key={item.id}
+     data-p16-control={item.id} data-p16-control-state={item.rejected?'pass':'fail'}>
+     <strong>{item.rejected?'✓':'○'} {item.id}</strong> — expected
+     {' '}{item.expectedStatus}; observed {item.observedStatus}.
+    </li>)}</ul>
+    <p className="sandbox-help">Median simulated time:
+     {' '}{resilienceReport.medianSimulatedMs} ms; slowest
+     {' '}{resilienceReport.slowestSimulatedMs} ms; lowest model-only
+     throughput {resilienceReport.lowestThroughputPerSimHour} items per
+     simulated hour. No real production-performance claim is implied.</p>
    </div>}
   </section>}
   {advancedSpecFor(scene.id)&&<section className="sandbox-p15-batch" data-p15-batch
