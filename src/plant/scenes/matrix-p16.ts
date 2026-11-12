@@ -42,7 +42,7 @@ type Outcome={status:'passed'|'failed'|'blocked';produced:number;completed:numbe
 function isP16Scene(sceneId:string):sceneId is P16Scene{
  return (supported as readonly string[]).includes(sceneId);
 }
-function requiredProducts(sceneId:P16Scene):number=>
+const requiredProducts=(sceneId:P16Scene):number=>
  sceneId==='palletizing'?8:3;
 function run(p:ProjectFile,sceneId:P16Scene,faultAtProduct:number):Outcome{
  if(sceneId==='robot-sort'){
