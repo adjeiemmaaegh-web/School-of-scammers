@@ -10,6 +10,7 @@ import {accumulateCommissioning,sceneCommissioningChecks,
  type CommissioningEvidence} from '../../plant/scenes/commissioning';
 import {advanceSceneTrial,SCENE_TRIALS,trialProgress,
  type TrialEvidence} from '../../plant/scenes/assessment';
+import {SceneMatrixPanel} from './SceneMatrixPanel';
 
 type Props={scene:PlantScene;project:ProjectFile;snapshot:RenderSnapshot};
 export function SceneCommissioningPanel({scene,project,snapshot}:Props){
@@ -86,5 +87,7 @@ export function SceneCommissioningPanel({scene,project,snapshot}:Props){
   <p className="sandbox-help">Witnesses are transient. Scene reset, project
    edits, PLC forcing, faults or loss of electrical preflight clear the trial.
    Validity is limited to the listed simulation observations.</p>
- </details></>;
+ </details>
+ <SceneMatrixPanel scene={scene} project={project} snapshot={snapshot}/>
+ </>;
 }
