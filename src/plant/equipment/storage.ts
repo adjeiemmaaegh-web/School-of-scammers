@@ -23,7 +23,12 @@ export const asrsCrane:EquipmentDef={
  step:(s,w,c,dt,f,ctx)=>{
   const bay=numeric(c,'bay',1,1,15);
   if(!Number.isInteger(bay))throw new RangeError('ASRS bay must be integer 1–15');
-  const travel=param(ctx,'travelMs',500),motion=f==='crane-motor-fault'?0:dt/travel;
+  // Physically require a wired PLC store/retrieve request to drive a crane:
+  // previously the model autonomously completed travel on every scan, even
+  // with both commands OFF, so a wrong PLC could appear to reach a bay.
+  const requested=flag(c,'store')||flag(c,'retrieve');
+  const travel=param(ctx,'travelMs',500);
+  const motion=requested&&f!=='crane-motor-fault'?dt/travel:0;
   const progress=Math.max(0,Math.min(1,s.progress+motion));
   const atBay=progress===1?bay:s.value;
   const slots={...s.slots};
@@ -50,7 +55,7 @@ export const asrsCrane:EquipmentDef={
   }
   return {world:bodies===w.bodies?w:{...w,bodies},state:{...s,slots,
     count,positionMm:q(atBay),value:bay,progress:canHandle?1:progress,
-    engaged:progress<1,lastCommand:flag(c,'store')||flag(c,'retrieve'),faulted:!!f}};
+    engaged:requested&&progress<1,lastCommand:requested,faulted:!!f}};
  },
  read:(s,w,ctx)=>({busy:s.engaged,bayOccupied:!!s.slots?.[s.value],storedCount:s.count,
   atBay:s.positionMm}),
