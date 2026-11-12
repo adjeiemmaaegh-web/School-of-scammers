@@ -73,8 +73,12 @@ function fault(w:WorldState,code:string|null):WorldState{
  w=safe(tick(w,[{k:'pause'},{k:'setPlantFault',id:'robot',fault:code}]).world);
  return safe(tick(w,[{k:'run'}]).world);
 }
-export function runP15AutonomousSort(p:ProjectFile,sceneId:string):AutonomousTrial{
+export function runP15AutonomousSort(p:ProjectFile,sceneId:string,
+ options:Readonly<{faultAtProduct?:number}>={}):AutonomousTrial{
  const sourceSignature=projectSignature(p),blockers=autonomousSortPreflight(p,sceneId);
+ const faultAtProduct=options.faultAtProduct??2;
+ if(!Number.isSafeInteger(faultAtProduct)||faultAtProduct<1||faultAtProduct>TARGET)
+  blockers.push('P16 fault product must be an integer from 1 to '+TARGET);
  const base={sceneId,sourceSignature,produced:0,sorted:0,metal:0,
   plain:0,simulatedMs:0,throughputPerSimHour:0,jamObservations:0,
   faultRecovered:false,cases:[] as {id:string;pass:boolean;detail:string}[]};
@@ -106,8 +110,11 @@ export function runP15AutonomousSort(p:ProjectFile,sceneId:string):AutonomousTri
    if(world.spawnedCount>TARGET){excess=true;break;}
    // A machine fault starts after the genuine second product is fed and
    // *before* the gripper can pick it. Measure the blocked physical state.
-   if(world.spawnedCount===2&&!faultInjected&&!world.model.robot?.heldBodyId){
-    faultBodyId=world.bodies.find(b=>b.id==='b2')?.id??null;
+   if(world.spawnedCount===faultAtProduct&&!faultInjected&&
+      !world.model.robot?.heldBodyId){
+    // Rotate the actual robot gripper leak across a physical batch. No
+    // fixture is allowed to manipulate the robot Q or inject source bodies.
+    faultBodyId=world.bodies.find(b=>b.id==='b'+faultAtProduct)?.id??null;
     w=fault(w,'robot-gripper-leak');faultInjected=true;
     for(let hold=0;hold<12;hold++)w=safe(tick(w).world);
     blocked=!!faultBodyId&&
@@ -150,7 +157,7 @@ export function runP15AutonomousSort(p:ProjectFile,sceneId:string):AutonomousTri
    {id:'three-products',pass:complete,
     detail:'Three unique bodies and no excess feeder pulses, duplication, deletion or phantom completion'},
    {id:'fault-repair',pass:recovered,
-    detail:'Second carton was physically blocked by a robot gripper leak, then the same ID was sorted after repair'},
+    detail:'Carton '+faultAtProduct+' was physically blocked by a robot gripper leak, then the same ID was sorted after repair'},
    {id:'capacity-and-flow',pass:!excess&&world.bodies.length<=60,
     detail:'Bounded original material count and deterministic simulation time; no artificial throughput scores'},
   ];
