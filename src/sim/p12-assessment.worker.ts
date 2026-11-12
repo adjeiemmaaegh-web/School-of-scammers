@@ -3,6 +3,7 @@
  * No timers, fetch, storage, server, external PLC actions or renderer state.
  */
 import {runPlantMatrix} from '../plant/scenes/matrix';
+import {expandedSpecFor,runExpandedMatrix} from '../plant/scenes/matrix-p13';
 import type {ProjectFile} from './signals';
 
 type RunRequest={kind:'run-matrix';id:number;sceneId:string;project:ProjectFile};
@@ -16,7 +17,9 @@ scope.onmessage=(event:MessageEvent<RunRequest>)=>{
  try{
   const size=JSON.stringify(req.project).length;
   if(size>300000)throw new RangeError('Assessment project exceeds bounded local trial size');
-  const result=runPlantMatrix(req.project,req.sceneId);
+  const result=expandedSpecFor(req.sceneId)?
+   runExpandedMatrix(req.project,req.sceneId):
+   runPlantMatrix(req.project,req.sceneId);
   scope.postMessage({kind:'matrix-result',id:req.id,result} satisfies RunResponse);
  }catch(error){
   scope.postMessage({kind:'matrix-error',id:req.id,
