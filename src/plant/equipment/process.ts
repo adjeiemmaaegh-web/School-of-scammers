@@ -121,12 +121,19 @@ export const capper:EquipmentDef={
  kind:'capper',label:'Bottle capper',footprint:vec(240,240,500),
  commands:[{name:'cap',kind:'bool'}],
  signals:[{name:'bottlePresent',kind:'bool'},{name:'capped',kind:'bool'}],
- params:[spec('dwellMs','Cap dwell','ms',100,5000,50,800)],
+ params:[spec('dwellMs','Cap dwell','ms',100,5000,50,800),
+  // Opt-in P14 sequential-fill condition. Original older projects retain 0.
+  spec('requiresFilled','Require filled bottle before cap','0=legacy, 1=verified filled volume',0,1,1,0),
+  spec('minFillMl','Required upstream fill','ml',50,2000,10,500)],
  faults:['capper-jammed','missing-caps'],
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
   const bottle=w.bodies.find(b=>b.shape==='cylinder'&&insideFootprint(b.pos,ctx.originMm,vec(200,200,0)));
-  const active=flag(c,'cap')&&!!bottle&&f!=='capper-jammed'&&f!=='missing-caps';
+  const filled=!!bottle&&typeof bottle.tags.filledMl==='number'&&
+   bottle.tags.filledMl>=param(ctx,'minFillMl',500);
+  const active=flag(c,'cap')&&!!bottle&&
+   (param(ctx,'requiresFilled',0)===0||filled)&&
+   f!=='capper-jammed'&&f!=='missing-caps';
   const elapsedMs=active?s.elapsedMs+dt:0,done=!!bottle&&elapsedMs>=param(ctx,'dwellMs',800);
   const bodies=done?w.bodies.map(b=>b.id===bottle?.id?{...b,tags:{...b.tags,capped:true}}:b):w.bodies;
   return {world:done?{...w,bodies}:w,state:{...s,elapsedMs,done,engaged:active,faulted:!!f}};
