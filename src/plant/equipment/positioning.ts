@@ -98,13 +98,17 @@ export const palletizer:EquipmentDef={
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
   let held=s.heldBodyId??null,count=s.count;
-  const picking=flag(c,'pick')&&!s.lastCommand;
+  const columns=param(ctx,'columns',2),rows=param(ctx,'rows',2);
+  const pattern=columns*rows*param(ctx,'layers',2);
+  // Stop accepting new pallet slots once the physically counted pattern is full.
+  const picking=count<pattern&&flag(c,'pick')&&!s.lastCommand;
   if(picking&&!held&&f!=='gripper-fault'){
    const body=w.bodies.find(b=>insideFootprint(b.pos,ctx.originMm,vec(600,900,0))&&!b.tags.palletized);
    held=body?.id??null;
   }
-  const placing=flag(c,'place')&&held&&f!=='pattern-jam';
-  const columns=param(ctx,'columns',2),rows=param(ctx,'rows',2);
+  // A held output cannot place multiple cartons without a new physical PLC edge.
+  const placing=flag(c,'place')&&!s.lastPlaceCommand&&!!held&&
+   count<pattern&&f!=='pattern-jam'&&!picking;
   // A held package must have a genuine equipment support and a modelled
   // pickup pose. Otherwise ordinary gravity will drop a supposedly gripped
   // body before the PLC's separate place command arrives.
@@ -113,14 +117,15 @@ export const palletizer:EquipmentDef={
    supportedBy:ctx.id,vel:vec()}:b):w.bodies;
   if(placing){
    const col=count%columns,row=Math.floor(count/columns)%rows,layer=Math.floor(count/(rows*columns));
-   bodies=w.bodies.map(b=>b.id===held?{...b,pos:vec(ctx.originMm.x+col*200,
+   bodies=bodies.map(b=>b.id===held?{...b,pos:vec(ctx.originMm.x+col*200,
     ctx.originMm.y+row*200,ctx.originMm.z+160+layer*b.size.z),
-    supportedBy:ctx.id,vel:vec(),tags:{...b.tags,palletized:true}}:b);
+    supportedBy:ctx.id,vel:vec(),tags:{...b.tags,palletized:true,
+     palletSlot:count,palletLayer:layer}}:b);
    count++;held=null;
   }
-  const pattern=columns*rows*param(ctx,'layers',2);
   return {world:bodies===w.bodies?w:{...w,bodies},state:{...s,heldBodyId:held,
-    count,done:count>=pattern,engaged:!!held,lastCommand:flag(c,'pick'),faulted:!!f}};
+    count,done:count>=pattern,engaged:!!held,lastCommand:flag(c,'pick'),
+    lastPlaceCommand:flag(c,'place'),faulted:!!f}};
  },
  read:s=>({partHeld:!!s.heldBodyId,patternDone:s.done,placedCount:s.count}),
  describe:(s,ctx)=>[draw(ctx,'palletizer frame','box',vec(1250,900,140),1500,'#718aa8')],
