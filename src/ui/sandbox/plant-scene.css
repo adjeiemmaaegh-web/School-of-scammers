@@ -60,3 +60,19 @@
 .sandbox-p11-assessment [data-p11-trial-hint] {
  border-left:2px solid var(--line);padding-left:9px;margin-top:10px;
 }
+
+/* P12 independent worker program challenges: evidence, not certification. */
+.sandbox-p12-matrix {margin:10px 0;padding:14px;}
+.sandbox-p12-matrix>summary {cursor:pointer;font-weight:700;font-size:13px;}
+.sandbox-p12-matrix>summary .sandbox-help {font-weight:400;}
+.sandbox-p12-matrix [data-p12-preflight] {margin:9px 0;padding:9px;
+ border:1px solid var(--line);border-radius:8px;font-size:12px;}
+.sandbox-p12-matrix [data-p12-preflight] ul {margin:6px 0 0;padding-left:18px;}
+.sandbox-p12-matrix-results {list-style:none;padding:0;margin:12px 0;
+ display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;}
+.sandbox-p12-matrix-results li {border:1px solid var(--line);
+ background:var(--surface-2);padding:10px;border-radius:8px;}
+.sandbox-p12-matrix-results li[data-p12-case-state="fail"] {border-style:dashed;}
+.sandbox-p12-matrix-results strong {font-size:12px;}
+.sandbox-p12-matrix-results p {font-size:11px;line-height:1.5;
+ margin:6px 0 0;overflow-wrap:anywhere;}
