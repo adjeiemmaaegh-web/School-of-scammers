@@ -12,12 +12,14 @@ import type {ProjectFile,WorldState,Wire} from '../../sim/signals';
 import {conserved} from '../world/bodies';
 import {projectSignature} from './commissioning';
 import {advancedPreflight} from './matrix-p14';
+import {p17MaterialTrace,materialCode,type P17MaterialTrace} from './p17-product-trace';
 export type AutoFactoryKind='gantry-transfer'|'palletizing'|'bottle-line';
 export type AutoFactoryResult={
  sceneId:string;sourceSignature:string;status:'passed'|'failed'|'blocked';
  produced:number;completed:number;expected:number;simulatedMs:number;
  throughputPerSimHour:number;jamObservations:number;faultRecovered:boolean;
  cases:readonly {id:string;pass:boolean;detail:string}[];diagnostic:string;
+ materialSeed:number;productTrace:readonly P17MaterialTrace[];materialSequence:string;
 };
 const PLC='scene-plc',SUPPLY='scene-supply',BTN='p15-auto-factory-start';
 const LIMIT=2600;
@@ -97,12 +99,17 @@ function isComplete(w:WorldState,s:Spec,id:string,index:number):boolean{
   state(w,'gantry','partHeld')===false;
 }
 export function runP15AutonomousFactory(p:ProjectFile,sceneId:string,
- options:Readonly<{faultAtProduct?:number}>={}):AutoFactoryResult{
+ options:Readonly<{faultAtProduct?:number;materialSeed?:number}>={}):AutoFactoryResult{
  const sourceSignature=projectSignature(p),s=specFor(sceneId),expected=s?.expected??0;
+ const materialSeed=options.materialSeed??1;
  const base={sceneId,sourceSignature,expected,produced:0,completed:0,
   simulatedMs:0,throughputPerSimHour:0,jamObservations:0,faultRecovered:false,
-  cases:[] as {id:string;pass:boolean;detail:string}[]};
+  cases:[] as {id:string;pass:boolean;detail:string}[],materialSeed,
+  productTrace:[] as P17MaterialTrace[],materialSequence:''};
  const problems=autoFactoryPreflight(p,sceneId);
+ if(!Number.isSafeInteger(materialSeed)||materialSeed<1||
+  materialSeed>0xffffffff)
+  problems.push('P17 material-lot seed must be an unsigned nonzero 32-bit integer');
  const faultAtProduct=options.faultAtProduct??2;
  if(!Number.isSafeInteger(faultAtProduct)||faultAtProduct<1||
    faultAtProduct>expected)
@@ -110,6 +117,12 @@ export function runP15AutonomousFactory(p:ProjectFile,sceneId:string,
  if(!s||problems.length)return {...base,status:'blocked',diagnostic:problems.join('; ')};
  try{
   let w=checked(tick(createWorld(),[{k:'loadProject',project:trialProject(p)}]).world);
+  // Only seed a new empty Worker-owned feeder; no body or PLC outputs are
+  // altered or injected, and the learner's JSON never contains this seed.
+  if(w.plantWorld.world.spawnedCount!==0||w.plantWorld.world.bodies.length!==0)
+   throw new Error('P17 refuses to seed an already-populated plant');
+  w={...w,plantWorld:{...w.plantWorld,
+   world:{...w.plantWorld.world,rngState:materialSeed}}};
   w=checked(tick(w,[{k:'run'}]).world);
   for(let i=0;i<8;i++)w=checked(tick(w).world);
   const snapshot=renderSnapshot(w);
@@ -185,6 +198,12 @@ export function runP15AutonomousFactory(p:ProjectFile,sceneId:string,
    finished.size===expected&&!overrun;
   const recovered=!!faultId&&blocked&&repaired&&finished.has(faultId);
   const quality=productIds.every((id,i)=>isComplete(w,s,id,i));
+  const productTrace=scene.bodies.filter(b=>b.tags.origin==='feeder').map(b=>{
+   const index=Number(b.id.slice(1))-1;
+   return p17MaterialTrace(b,index>=0&&index<expected&&
+    isComplete(w,s,b.id,index));
+  });
+  const materialSequence=materialCode(productTrace);
   const outputCases=[...cases,
    {id:'continuous-process',pass:all&&quality,
     detail:'Distinct original products completed through live PLC sensory feedback, with genuine physical position/process tags'},
@@ -197,7 +216,7 @@ export function runP15AutonomousFactory(p:ProjectFile,sceneId:string,
   const passed=outputCases.every(c=>c.pass);
   const ms=scene.timeMs;
   return {sceneId,sourceSignature,expected,produced:scene.spawnedCount,
-   completed:finished.size,simulatedMs:ms,
+   completed:finished.size,simulatedMs:ms,materialSeed,productTrace,materialSequence,
    throughputPerSimHour:ms>0?Math.round(finished.size*3600000/ms*100)/100:0,
    jamObservations:jammed.size,faultRecovered:recovered,cases:outputCases,
    status:passed?'passed':'failed',diagnostic:passed?
