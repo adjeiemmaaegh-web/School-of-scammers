@@ -56,7 +56,7 @@ function runLot(p:ProjectFile,scene:P16Scene,seed:number,index:number,id:LotId):
  const result=scene==='robot-sort'?
   runP15AutonomousSort(p,scene,{faultAtProduct:index,materialSeed:seed}):
   runP15AutonomousFactory(p,scene,{faultAtProduct:index,materialSeed:seed});
- const accepted=scene==='robot-sort'?result.sorted:result.completed;
+ const accepted='sorted' in result?result.sorted:result.completed;
  const trace=result.productTrace;
  const materialSequence=materialFromTrace(trace);
  const bodyIDs=trace.map(item=>item.bodyId);
@@ -66,6 +66,8 @@ function runLot(p:ProjectFile,scene:P16Scene,seed:number,index:number,id:LotId):
  const validMaterial=materialSequence===predictedMaterial(seed,expected)&&
   trace.every(t=>t.material==='metal'||t.material==='cardboard');
  const measuredQuality=trace.every(t=>t.qualityPassed&&
+  (scene!=='robot-sort'||(t.receivedAtMs!==null&&
+   t.receivedBy===(t.material==='metal'?'metal-out':'plain-out')))&&
   (scene!=='bottle-line'||(t.shape==='cylinder'&&t.capped&&
    t.filledMl!==null&&t.filledMl>=500))&&
   (scene!=='palletizing'||t.palletSlot!==null));
