@@ -9,16 +9,20 @@ import {matrixPreflight,matrixSpecFor,type MatrixResult} from '../../plant/scene
 import {expandedPreflight,expandedSpecFor,P13_UNSUPPORTED} from '../../plant/scenes/matrix-p13';
 import {advancedPreflight,advancedSpecFor} from '../../plant/scenes/matrix-p14';
 import type {BatchResult} from '../../plant/scenes/matrix-p15';
+import {autonomousSortPreflight,type AutonomousTrial} from '../../plant/scenes/matrix-p15-autonomous';
 import {projectSignature} from '../../plant/scenes/commissioning';
 
 type Props={scene:PlantScene;project:ProjectFile;snapshot:RenderSnapshot};
 type Reply={kind:'matrix-result';id:number;result:MatrixResult}|
  {kind:'batch-result';id:number;result:BatchResult}|
+ {kind:'autonomous-result';id:number;result:AutonomousTrial}|
  {kind:'matrix-error';id:number;message:string};
 export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const spec=matrixSpecFor(scene.id)??expandedSpecFor(scene.id)??advancedSpecFor(scene.id);
  const unsupported=P13_UNSUPPORTED[scene.id];
  const signature=projectSignature(project);
+ const autoBlockers=useMemo(()=>scene.id==='robot-sort'?
+  autonomousSortPreflight(project,scene.id):[],[signature,scene.id]);
  const blockers=useMemo(()=>matrixSpecFor(scene.id)?
   matrixPreflight(project,scene.id):advancedSpecFor(scene.id)?
   advancedPreflight(project,scene.id):expandedPreflight(project,scene.id),
@@ -26,6 +30,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const [pending,setPending]=useState(false);
  const [report,setReport]=useState<MatrixResult|null>(null);
  const [batchReport,setBatchReport]=useState<BatchResult|null>(null);
+ const [autoReport,setAutoReport]=useState<AutonomousTrial|null>(null);
  const [error,setError]=useState<string|null>(null);
  const worker=useRef<Worker|null>(null);
  const nextId=useRef(0);
@@ -34,7 +39,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   nextId.current++;
   worker.current?.terminate();
   worker.current=null;
-  setPending(false);setReport(null);setBatchReport(null);setError(null);
+  setPending(false);setReport(null);setBatchReport(null);setAutoReport(null);setError(null);
   return ()=>{
    nextId.current++;worker.current?.terminate();worker.current=null;
   };
@@ -51,14 +56,14 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  </details>:null;
  const debug=Object.keys(snapshot.debugForces??{}).length>0||
   Object.values(snapshot.plcs).some(plc=>Object.keys(plc.debugForces??{}).length>0);
- const begin=(kind:'run-matrix'|'run-batch')=>{
+ const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous')=>{
   if(pending||blockers.length||debug||snapshot.lastError)return;
   worker.current?.terminate();
   const runId=++nextId.current;
   const local=new Worker(new URL('../../sim/p12-assessment.worker.ts',import.meta.url),
    {type:'module'});
   worker.current=local;
-  setPending(true);setError(null);setReport(null);setBatchReport(null);
+  setPending(true);setError(null);setReport(null);setBatchReport(null);setAutoReport(null);
   local.onmessage=(event:MessageEvent<Reply>)=>{
    if(event.data?.id!==runId||worker.current!==local)return;
    local.terminate();worker.current=null;
@@ -67,6 +72,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
    else if(event.data.result.sourceSignature!==signature)
     setError('Project changed before the trial completed; restart the assessment');
    else if(event.data.kind==='batch-result')setBatchReport(event.data.result);
+   else if(event.data.kind==='autonomous-result')setAutoReport(event.data.result);
    else setReport(event.data.result);
   };
   local.onerror=()=>{
@@ -117,6 +123,38 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
     All test evidence is transient, discarded on edits or reload, and
     intentionally excluded from exported projects.</p>
   </div>}
+  {scene.id==='robot-sort'&&<section className="sandbox-p15-autonomous"
+   data-p15-autonomous data-p15-autonomous-state={pending?'running':autoReport?.status??'setup'}>
+   <h3>P15 · Autonomous material-based robot sorting</h3>
+   <p className="sandbox-help">A single Start pulse must cause your own PLC
+    program to feed, sense material with the real inductive pickup sensor,
+    grip, select one of two physical output lanes, release and return home.
+    The private Worker grades three original cartons and injects a real
+    gripper leak during the second carton. No synthetic PLC outputs,
+    prewritten learner solution or stored passing score is used.</p>
+   {autoBlockers.length>0&&<div data-p15-auto-preflight><strong>Prepare your autonomous cell:</strong>
+    <ul>{autoBlockers.map(x=><li key={x}>{x}</li>)}</ul></div>}
+   <button type="button" className="btn ghost small" data-p15-run-autonomous
+    disabled={pending||autoBlockers.length>0||debug||!!snapshot.lastError}
+    onClick={()=>begin('run-autonomous')}>{pending?'Running physical PLC workcell…':
+     'Run autonomous metal/plain sorting trial'}</button>
+   {autoReport&&<div data-p15-auto-result>
+    <p role="status"><strong>{autoReport.status==='passed'?
+     'Autonomous sorting passed':'Autonomous sorting did not pass'}</strong>
+     {' '}Actual items: {autoReport.sorted}/{autoReport.produced};
+     metal: {autoReport.metal}, plain: {autoReport.plain}.
+     {' '}{autoReport.diagnostic}</p>
+    <ol>{autoReport.cases.map(c=><li key={c.id} data-p15-auto-case={c.id}
+      data-p15-auto-case-state={c.pass?'pass':'fail'}>
+      <strong>{c.pass?'✓':'○'} {c.id}</strong> — {c.detail}
+     </li>)}</ol>
+    <p className="sandbox-help">Simulated time {autoReport.simulatedMs} ms;
+     model-only throughput {autoReport.throughputPerSimHour} items/simulated hour.
+     This is not a measured industrial throughput rate. Fault repaired:
+     {' '}{autoReport.faultRecovered?'yes':'no'}.
+     The result is ephemeral, not part of the project.</p>
+   </div>}
+  </section>}
   {advancedSpecFor(scene.id)&&<section className="sandbox-p15-batch" data-p15-batch
    data-p15-batch-state={pending?'running':batchReport?.status??'setup'}>
    <h3>P15 · Repeat-production commissioning</h3>
