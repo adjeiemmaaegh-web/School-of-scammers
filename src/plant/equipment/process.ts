@@ -131,12 +131,19 @@ export const capper:EquipmentDef={
   const bottle=w.bodies.find(b=>b.shape==='cylinder'&&insideFootprint(b.pos,ctx.originMm,vec(200,200,0)));
   const filled=!!bottle&&typeof bottle.tags.filledMl==='number'&&
    bottle.tags.filledMl>=param(ctx,'minFillMl',500);
-  const active=flag(c,'cap')&&!!bottle&&
+  // Dwell belongs to one physical bottle ID, not the machine's global clock.
+  // A replacement bottle must earn its own complete timed cap operation.
+  const active=flag(c,'cap')&&!!bottle&&bottle.tags.capped!==true&&
    (param(ctx,'requiresFilled',0)===0||filled)&&
    f!=='capper-jammed'&&f!=='missing-caps';
-  const elapsedMs=active?s.elapsedMs+dt:0,done=!!bottle&&elapsedMs>=param(ctx,'dwellMs',800);
-  const bodies=done?w.bodies.map(b=>b.id===bottle?.id?{...b,tags:{...b.tags,capped:true}}:b):w.bodies;
-  return {world:done?{...w,bodies}:w,state:{...s,elapsedMs,done,engaged:active,faulted:!!f}};
+  const activeBodyId=active?bottle!.id:null;
+  const elapsedMs=active?(s.activeBodyId===activeBodyId?s.elapsedMs+dt:dt):0;
+  const newCap=active&&elapsedMs>=param(ctx,'dwellMs',800);
+  const done=!!bottle&&(bottle.tags.capped===true||newCap);
+  const bodies=newCap?w.bodies.map(b=>b.id===bottle?.id?{...b,
+   tags:{...b.tags,capped:true}}:b):w.bodies;
+  return {world:newCap?{...w,bodies}:w,state:{...s,activeBodyId,elapsedMs,
+   done,engaged:active,faulted:!!f}};
  },
  read:(s,w,ctx)=>({bottlePresent:w.bodies.some(b=>b.shape==='cylinder'&&
    insideFootprint(b.pos,ctx.originMm,vec(200,200,0))),capped:s.done}),
