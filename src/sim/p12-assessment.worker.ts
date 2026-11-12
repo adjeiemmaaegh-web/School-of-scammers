@@ -4,6 +4,7 @@
  */
 import {runPlantMatrix} from '../plant/scenes/matrix';
 import {expandedSpecFor,runExpandedMatrix} from '../plant/scenes/matrix-p13';
+import {advancedSpecFor,runAdvancedProcess} from '../plant/scenes/matrix-p14';
 import type {ProjectFile} from './signals';
 
 type RunRequest={kind:'run-matrix';id:number;sceneId:string;project:ProjectFile};
@@ -17,7 +18,9 @@ scope.onmessage=(event:MessageEvent<RunRequest>)=>{
  try{
   const size=JSON.stringify(req.project).length;
   if(size>300000)throw new RangeError('Assessment project exceeds bounded local trial size');
-  const result=expandedSpecFor(req.sceneId)?
+  const result=advancedSpecFor(req.sceneId)?
+   runAdvancedProcess(req.project,req.sceneId):
+   expandedSpecFor(req.sceneId)?
    runExpandedMatrix(req.project,req.sceneId):
    runPlantMatrix(req.project,req.sceneId);
   scope.postMessage({kind:'matrix-result',id:req.id,result} satisfies RunResponse);
