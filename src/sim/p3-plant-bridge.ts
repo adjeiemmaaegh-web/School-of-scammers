@@ -72,12 +72,18 @@ export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
  const set=new Set(energizedLoads);
  for(const item of placements){
   const def=PLANT_EQUIPMENT[item.kind];
-  inputs[item.id]=Object.fromEntries(def.commands.map(ch=>[
-   ch.name,ch.kind==='bool'?set.has(item.id+'-CMD_'+ch.name):
-    // A numeric command without a mapped analogue wire uses that MODEL'S
-    // safe parameter-bound default, never invented zero in every case.
-    defaultUnwiredPlantNumber(item.kind,ch.name,item.params),
-  ]));
+  inputs[item.id]=Object.fromEntries(def.commands.flatMap(ch=>{
+   // A missing analogue height channel must remain genuinely ABSENT:
+   // the idealized lift models deliberately give explicit discrete UP/DOWN
+   // commands precedence only when no numerical height target was supplied.
+   // Passing a fabricated numeric zero previously suppressed every UP relay,
+   // despite a correctly energized 24V command. This is not an analogue
+   // output wiring implementation; PLC AO remains unavailable.
+   if(ch.name==='height'&&(item.kind==='lift'||item.kind==='scissor-lift'))
+    return [];
+   return [[ch.name,ch.kind==='bool'?set.has(item.id+'-CMD_'+ch.name):
+    defaultUnwiredPlantNumber(item.kind,ch.name,item.params)]];
+  }));
  }
  const updated=stepScene(previous,placements,PLANT_EQUIPMENT,inputs,project.plantFaults??{});
  const drained=drainEvents(updated.world);
