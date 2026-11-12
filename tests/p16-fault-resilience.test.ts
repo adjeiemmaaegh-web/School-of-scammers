@@ -66,6 +66,7 @@ describe('P16 independent first/middle/final fault-position endurance, replay an
   expect(blocked.status).toBe('blocked');
   expect(blocked.profiles).toHaveLength(0);
   expect(blocked.controls).toHaveLength(0);
+  if(!source.stSource)throw new Error('P16 teacher reference source missing');
   const inert={...source,stSource:source.stSource.replace(
    'IF In0 THEN Phase := 1; END_IF;','IF FALSE THEN Phase := 1; END_IF;')};
   const failed=runP16ResilienceAudit(inert,'robot-sort');
