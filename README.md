@@ -2,6 +2,20 @@
 
 **Open, browser-based industrial automation sandbox** — build a system from components, wire it, edit real Ladder logic, then Run, Step and troubleshoot. Inspired by the workflow of Cisco Packet Tracer/GNS3, PLC programming engineering tools, and Factory I/O; this is an original educational simulator, not a vendor clone.
 
+> **Engineering update — 11 November 2026:** This README's historical
+> P0–P6 description refers to the older mainline product. The advanced
+> 3D-first workcell developments are stacked as **draft, unmerged** PRs:
+> [#43](https://github.com/adjeiemmaaegh-web/School-of-scammers/pull/43)
+> (integration), [#44](https://github.com/adjeiemmaaegh-web/School-of-scammers/pull/44)
+> (P6 3D baseline), [#46](https://github.com/adjeiemmaaegh-web/School-of-scammers/pull/46)
+> (verified P7 commissioning), and
+> [#47](https://github.com/adjeiemmaaegh-web/School-of-scammers/pull/47)
+> (bounded P7 software closure, exact-head QA required).
+> These draft capabilities must not be mistaken for deployed `main` behavior.
+> See [P7 evidence and open gates](docs/product/P7_ADVANCED_3D_FACTORY_EDITOR.md)
+> for what remains unverified, especially real PLC hardware, 3D parity and
+> physical low-spec Windows acceptance.
+
 **Current state (7 November 2026):** the simulator is the primary product; learning and assessments are separate, secondary sections (see the navigation: **Simulator · Learn & Practice · Assessments**). P0–P6 are merged to `main`; several PLCs/panels (PR #20) and device editing (PR #21) are open drafts. An honest audit against the product objective, with what is missing, is in [docs/product/AUDIT_SIMULATOR_FIRST.md](docs/product/AUDIT_SIMULATOR_FIRST.md).
 
 ## Several PLCs and panels (in development)
