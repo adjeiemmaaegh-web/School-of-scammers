@@ -122,7 +122,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
    <h3>P15 · Repeat-production commissioning</h3>
    <p className="sandbox-help">In a separate temporary Worker clone, the same real PLC
     wiring and your exact Ladder/FBD/ST program control three consecutive products
-    (four cartons for the palletizer). The assessor checks stable material IDs,
+    (eight cartons for the palletizer). The assessor checks stable material IDs,
     physical placement or fill/cap results, conservation and full-pallet refusal.
     This is a bounded externally commanded training cycle, not autonomous sequencing,
     material-classification sorting or industrial safety validation.</p>
