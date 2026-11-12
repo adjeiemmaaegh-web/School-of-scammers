@@ -38,16 +38,58 @@ jobs:
           curl --silent --fail http://127.0.0.1:4173/ > /dev/null
       - name: Open sandbox P1 - place, wire, program, run and test failures
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-browser-acceptance.cjs
+      - name: P1 advanced authoring - select, duplicate, undo, redo, rotate, copy, paste and reload
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p1-workspace-browser.cjs
+      - name: P6 primary 3D workcell - Fly First Person and direct worker validated model dragging
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-3d-workcell-browser.cjs
+      - name: P7 3D factory commissioning - empty real 3D floor, PLC16 ST, 23 wires, worker parcel
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-3d-commissioning-browser.cjs
+      - name: P7 3D physical clearance - reject co-located carriers while preserving sensor mounting
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-clearance-browser.cjs
+      - name: P7 offline reusable 3D assemblies - save, reload, worker paste and delete
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-assemblies-browser.cjs
+      - name: P8 worker optics - real PLC16 ST, feeder, body and opt-in rotated rack obstruction
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-optical-browser.cjs
+      - name: P8 conveyor physical contact - real worker jam vs legacy free flow
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-jam-browser.cjs
+      - name: P8 offline assembly orientation - rotate worker-accepted 3D station and preserve wires
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-assembly-rotation-browser.cjs
+      - name: P8 explicit operator detection - First Person worker target through photoeye and PLC
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-training-operator-browser.cjs
+      - name: P8 offline hierarchy - two independently wired cells composed and worker-pasted
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-composed-assembly-browser.cjs
+      - name: P9 original scenes - search, 21 editable factories, safe replacement and yaw/elevation
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p9-21-scenes-browser.cjs
+      - name: P10 commissioning - worker-powered PLC, direct IO and no invented physical outcome
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p10-commissioning-browser.cjs
+      - name: P11 ordered scene assessment - real PLC16 ST, indexed rotary, witnessed separate worker scans
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p11-chronological-assessment-browser.cjs
+      - name: P12 independent PLC input/fault matrix - correct program passes, constant-on logic fails
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p12-multicase-browser.cjs
+      - name: P6 visual workcell - build PLC conveyor/turntable line from empty 2D floor without WebGL
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-floor-plan-browser.cjs
       - name: UX-first workbench - workflow, device inspector and responsive design
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux-acceptance.cjs
+      - name: Integrated numeric PLC and P5 workspace - real wiring/view browser E2E
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-workspace-browser.cjs
       - name: P2 PLC programming - real multi-rung timers and Structured Text E2E
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-browser-acceptance.cjs
+      - name: P2 visual FBD - edit graph, compile, PLC-driven motor latch, stop and persistence
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-fbd-browser.cjs
       - name: P2 typed numeric PLC - INT, ADD and comparator 3D motor browser E2E
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-numeric-browser.cjs
       - name: P3 3D sorting - powered conveyor, photoeye, diverter and wrong PLC logic
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-sorting-browser.cjs
       - name: P3 3D tank - wired pump, high-level switch and drain valve browser E2E
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-tank-browser.cjs
+      - name: P3 world integrated - real PLC to feeder to body to geometric sensor browser
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-plant-browser.cjs
+      - name: Combined three-conveyor turntable - PLC, two sensors, body transfers, ST and reload
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-three-conveyor-turntable-browser.cjs
+      - name: Analog process I/O - numeric tank signal drives ST-controlled pump over isolated wire
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-analog-browser.cjs
+      - name: P4 400V starter - real phase conductors, PLC-driven star/delta and thermal telemetry E2E
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-star-delta-browser.cjs
       - name: P4 electrical panel - breaker, overload, pilot lamp and 24V multimeter browser E2E
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-panel-browser.cjs
       - name: P4 3D reversing - physical dual NC interlocks and motor direction browser E2E
