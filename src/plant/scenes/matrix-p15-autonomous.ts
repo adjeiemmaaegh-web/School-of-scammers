@@ -116,6 +116,7 @@ export function runP15AutonomousSort(p:ProjectFile,sceneId:string,
   let faultInjected=false,blocked=false,repairDone=false;
   let faultBodyId:string|null=null,detectedMetal=false,detectedPlain=false;
   const received=new Set<string>(),jammed=new Set<string>();
+  const receiptEvidence=new Map<string,{receivedBy:string;receivedAtMs:number}>();
   let finished=false,excess=false;
   for(let i=0;i<LIMIT;i++){
    w=safe(tick(w).world);
@@ -142,7 +143,11 @@ export function runP15AutonomousSort(p:ProjectFile,sceneId:string,
     if(body.tags.material==='cardboard')detectedPlain=true;
     const expected=body.tags.material==='metal'?'metal-out':'plain-out';
     const rightLane=body.tags.material==='metal'?body.pos.y>180:body.pos.y< -180;
-    if(body.pos.x>530&&rightLane&&body.supportedBy===expected)received.add(body.id);
+    if(body.pos.x>530&&rightLane&&body.supportedBy===expected){
+     received.add(body.id);
+     if(!receiptEvidence.has(body.id))receiptEvidence.set(body.id,{
+      receivedBy:expected,receivedAtMs:w.plantWorld.world.timeMs});
+    }
    }
    if(world.spawnedCount===TARGET&&received.size===TARGET){
     // Require a final physical settling interval with no extra body.
@@ -164,11 +169,19 @@ export function runP15AutonomousSort(p:ProjectFile,sceneId:string,
    const expected=b.tags.material==='metal'?1:-1;
    return expected*b.pos.y>180;
   });
-  const productTrace=all.map(b=>p17MaterialTrace(b,
-   received.has(b.id)&&((b.tags.material==='metal'&&
-    b.pos.y>180&&b.supportedBy==='metal-out')||
-    (b.tags.material==='cardboard'&&b.pos.y< -180&&
-     b.supportedBy==='plain-out'))));
+  // A transferred body can legitimately leave the conveyor before the
+  // final batch snapshot. Its REAL receipt is proven by prior Worker scans
+  // that witnessed support on the matching physical output conveyor.
+  // Never infer delivery merely from an unclamped final x/y position.
+  const productTrace=all.map(b=>{
+   const evidence=receiptEvidence.get(b.id);
+   const destination=b.tags.material==='metal'?'metal-out':'plain-out';
+   const laneOK=b.tags.material==='metal'?b.pos.y>180:b.pos.y< -180;
+   return p17MaterialTrace(b,received.has(b.id)&&!!evidence&&
+    evidence.receivedBy===destination&&laneOK,{
+     receivedBy:evidence?.receivedBy??null,
+     receivedAtMs:evidence?.receivedAtMs??null});
+  });
   const materialSequence=materialCode(productTrace);
   const resultCases=[...cases,
    {id:'classification',pass:complete&&noMaterialConfusion,
