@@ -12,6 +12,7 @@ import type {BatchResult} from '../../plant/scenes/matrix-p15';
 import {autonomousSortPreflight,type AutonomousTrial} from '../../plant/scenes/matrix-p15-autonomous';
 import {autoFactoryPreflight,type AutoFactoryResult} from '../../plant/scenes/matrix-p15-autonomous-factory';
 import {p16AuditPreflight,type P16AuditResult} from '../../plant/scenes/matrix-p16';
+import type {P17Campaign} from '../../plant/scenes/matrix-p17';
 import {projectSignature} from '../../plant/scenes/commissioning';
 
 type Props={scene:PlantScene;project:ProjectFile;snapshot:RenderSnapshot};
@@ -19,6 +20,7 @@ type Reply={kind:'matrix-result';id:number;result:MatrixResult}|
  {kind:'batch-result';id:number;result:BatchResult}|
  {kind:'autonomous-result';id:number;result:AutonomousTrial|AutoFactoryResult}|
  {kind:'resilience-result';id:number;result:P16AuditResult}|
+ {kind:'material-lots-result';id:number;result:P17Campaign}|
  {kind:'matrix-error';id:number;message:string};
 export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const spec=matrixSpecFor(scene.id)??expandedSpecFor(scene.id)??advancedSpecFor(scene.id);
@@ -38,6 +40,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const [batchReport,setBatchReport]=useState<BatchResult|null>(null);
  const [autoReport,setAutoReport]=useState<AutonomousTrial|AutoFactoryResult|null>(null);
  const [resilienceReport,setResilienceReport]=useState<P16AuditResult|null>(null);
+ const [materialReport,setMaterialReport]=useState<P17Campaign|null>(null);
  const [error,setError]=useState<string|null>(null);
  const worker=useRef<Worker|null>(null);
  const nextId=useRef(0);
@@ -47,7 +50,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   worker.current?.terminate();
   worker.current=null;
   setPending(false);setReport(null);setBatchReport(null);setAutoReport(null);
-  setResilienceReport(null);setError(null);
+  setResilienceReport(null);setMaterialReport(null);setError(null);
   return ()=>{
    nextId.current++;worker.current?.terminate();worker.current=null;
   };
@@ -64,7 +67,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  </details>:null;
  const debug=Object.keys(snapshot.debugForces??{}).length>0||
   Object.values(snapshot.plcs).some(plc=>Object.keys(plc.debugForces??{}).length>0);
- const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience')=>{
+ const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots')=>{
   if(pending||blockers.length||debug||snapshot.lastError)return;
   worker.current?.terminate();
   const runId=++nextId.current;
@@ -72,7 +75,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
    {type:'module'});
   worker.current=local;
   setPending(true);setError(null);setReport(null);setBatchReport(null);
-  setAutoReport(null);setResilienceReport(null);
+  setAutoReport(null);setResilienceReport(null);setMaterialReport(null);
   local.onmessage=(event:MessageEvent<Reply>)=>{
    if(event.data?.id!==runId||worker.current!==local)return;
    local.terminate();worker.current=null;
@@ -83,6 +86,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
    else if(event.data.kind==='batch-result')setBatchReport(event.data.result);
    else if(event.data.kind==='autonomous-result')setAutoReport(event.data.result);
    else if(event.data.kind==='resilience-result')setResilienceReport(event.data.result);
+   else if(event.data.kind==='material-lots-result')setMaterialReport(event.data.result);
    else setReport(event.data.result);
   };
   local.onerror=()=>{
@@ -166,6 +170,67 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
      This is not a measured industrial throughput rate. Fault repaired:
      {' '}{autoReport.faultRecovered?'yes':'no'}.
      The result is ephemeral, not part of the project.</p>
+   </div>}
+  </section>}
+  {advancedSpecFor(scene.id)&&<section className="sandbox-p17-material-lots"
+   data-p17-material-lots data-p17-state={pending?'running':materialReport?.status??'setup'}>
+   <h3>P17 · Seeded material lots and physical quality</h3>
+   <p className="sandbox-help">Run the same wired PLC program against three
+    separate real feeder-generated material lots: seed 1, seed 42, seed
+    65535. Each lot tests a different fault position, body-level material
+    identity, original physical process completion and real conveyor or
+    pallet destination. A fourth run repeats the second lot to verify
+    deterministic results. No hidden PLC solution, forced coils or
+    invented sensor data are used.</p>
+   <p className="sandbox-help">The independently simulated quality yield and
+    throughput are teaching metrics, not industrial inspections or
+    real production rates. All results stay temporary in a private
+    offline Worker and are discarded on project changes.</p>
+   {resilienceBlockers.length>0&&<div data-p17-preflight>
+    <strong>Wire and configure the original autonomous PLC cell first:</strong>
+    <ul>{resilienceBlockers.map(message=><li key={message}>{message}</li>)}</ul>
+   </div>}
+   <button type="button" className="btn ghost small" data-p17-run-material-lots
+    disabled={pending||blockers.length>0||resilienceBlockers.length>0||
+     debug||!!snapshot.lastError}
+    onClick={()=>begin('run-material-lots')}>{pending?
+     'Evaluating physical seeded lots…':
+     'Audit three material lots, quality and deterministic replay'}</button>
+   {materialReport&&<div data-p17-result data-p17-result-state={materialReport.status}>
+    <p role="status"><strong>{materialReport.status==='passed'?
+     'Material-lot campaign passed':'Material-lot campaign did not pass'}</strong>.
+     {' '}{materialReport.diagnostic}</p>
+    <p>Original physical workpieces accepted:
+     {' '}{materialReport.acceptedPhysicalProducts}/{materialReport.totalPhysicalProducts};
+     {' '}model-only quality yield {materialReport.qualityYieldPercent}%.</p>
+    <ol>{materialReport.lots.map(lot=><li key={lot.id}
+      data-p17-lot={lot.id} data-p17-lot-state={lot.pass?'pass':'fail'}>
+      <strong>{lot.pass?'✓':'○'} {lot.id}</strong>
+      {' '}seed {lot.materialSeed}; actual feeder order
+      {' '}{lot.materialSequence}; accepted {lot.accepted}/{lot.expected};
+      {' '}fault at body {lot.faultAtProduct}; same-body repair:
+      {' '}{lot.faultRecovered?'yes':'no'}.
+      <details><summary>Original product quality trace</summary>
+       <ol>{lot.trace.map(body=><li key={body.bodyId}
+        data-p17-body={body.bodyId} data-p17-body-state={body.qualityPassed?'pass':'fail'}>
+        {body.bodyId} · {body.material} · {body.shape}
+        {' '}· x {body.xMm} mm / y {body.yMm} mm
+        {' '}· quality {body.qualityPassed?'verified':'not verified'}
+        {' '}· support {body.supportedBy??'none'}
+        {body.filledMl!==null?' · fill '+body.filledMl+' mL':''}
+        {body.capped?' · capped':''}
+        {body.palletSlot!==null?' · pallet slot '+body.palletSlot:''}
+       </li>)}</ol>
+      </details>
+     </li>)}</ol>
+    <p data-p17-diversity={materialReport.materialDiversity?'pass':'fail'}>
+     Distinct material sequences: {materialReport.materialDiversity?'passed':'failed'}.</p>
+    <p data-p17-replay={materialReport.deterministicReplay?'pass':'fail'}>
+     Exact lot replay: {materialReport.deterministicReplay?'passed':'failed'}.</p>
+    <p className="sandbox-help">Model-only simulated throughput range:
+     {' '}{materialReport.minModelThroughputPerHour}–
+     {materialReport.maxModelThroughputPerHour} items per simulated hour.
+     These do not estimate real machine capacity.</p>
    </div>}
   </section>}
   {advancedSpecFor(scene.id)&&<section className="sandbox-p16-resilience"
