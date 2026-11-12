@@ -59,7 +59,7 @@ describe('P12 real PLC factory multi-case matrices',()=>{
    expect(matrixPreflight(project,spec.sceneId)).toEqual([]);
    const unchanged=JSON.stringify(project);
    const first=runPlantMatrix(project,spec.sceneId);
-   expect(first.status).toBe('passed');
+   expect(first.status,JSON.stringify(first.cases,null,2)).toBe('passed');
    expect(first.cases.map(x=>x.id)).toEqual([
     'idle','demand','release','fault-recovery',
    ]);
