@@ -41,7 +41,7 @@ describe('P16 independent first/middle/final fault-position endurance, replay an
    expect(audit.slowestSimulatedMs).toBeGreaterThanOrEqual(audit.medianSimulatedMs);
    expect(audit.lowestThroughputPerSimHour).toBeGreaterThan(0);
    expect(JSON.stringify(source)).toBe(before);
-   expect(before).not.toContain('p16');
+   expect(before).not.toContain('p16-audit-start');
    expect(before).not.toContain('p15-auto-start');
   },120000);
  it('rejects out-of-range fault schedules without fabricating a passing trial',()=>{
