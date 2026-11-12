@@ -254,16 +254,30 @@ export function runPlantMatrix(p:ProjectFile,sceneId:string):MatrixResult{
   w=scans(w,s.kind==='lift'||s.kind==='index'?8:22,h);
   const before=sig(w,s,s.kind==='lift'?'positionMm':'busy');
   w=button(w,false,h);
-  w=scans(w,nRelease(s),h);
   let stable=false;
-  if(s.kind==='lift')stable=typeof before==='number'&&
-   Math.abs((sig(w,s,'positionMm') as number)-before)<5&&!out(w,'Q0.0');
-  else if(s.kind==='index')stable=sig(w,s,'indexed')===false&&!out(w,'Q0.0');
-  else stable=resting(s,w);
+  if(s.kind==='lift'){
+   // The real 50 ms PLC image is sampled before the plant settles. One
+   // additional commanded scan can move the platform after the NO button
+   // opens. Allow a bounded <=30 mm stop distance (three 50 ms scans at
+   // 180 mm/s), then require genuinely stationary position across another
+   // 18 independent worker scans. Do not weaken this into a final-only
+   // position assertion: a stuck-ON PLC would keep moving and fail.
+   w=scans(w,2,h);
+   const settled=sig(w,s,'positionMm');
+   w=scans(w,18,h);
+   const final=sig(w,s,'positionMm');
+   stable=typeof before==='number'&&typeof settled==='number'&&
+    typeof final==='number'&&settled>=before&&
+    settled-before<=30&&Math.abs(final-settled)<5&&!out(w,'Q0.0');
+  }else{
+   w=scans(w,nRelease(s),h);
+   stable=s.kind==='index'?sig(w,s,'indexed')===false&&!out(w,'Q0.0'):
+    resting(s,w);
+  }
   const pass=powered(w)&&stable;
   return {world:w,pass,reason:pass?
-   'Removing actual 24V input produced worker-verified stop/return behavior':
-   'PLC or machine continued dangerously/unexpectedly after input was released'};
+   'Releasing physical demand settled PLC output and held/returned machine within bounded scans':
+   'Command output or real device position failed the trained release/settle behavior'};
  });
  execute('fault-recovery','Injected equipment fault prevents action; repair restores it',h=>{
   let w=fresh(p,s.actor,s.fault);
