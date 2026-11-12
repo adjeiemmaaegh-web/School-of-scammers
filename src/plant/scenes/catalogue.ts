@@ -69,7 +69,13 @@ export const SCENES:readonly PlantScene[]=[
   acceptance:'The rack models 15 bays and cannot silently duplicate bodies when storing/retrieving'},
  {id:'robot-sort',title:'Robot sort and place',description:'Arm, sensors and two receiving areas',seed:18,
   equipment:[pos('feeder','box-feeder',-60,0),pos('eye','inductive-prox',-200,0),
-   pos('robot','robot-arm',0,0),pos('out','belt-conveyor',800,0)],
+   pos('robot','robot-arm',0,0),pos('out','belt-conveyor',800,0),
+   // Independent pickup presence and material-classification sensors, with
+   // separate outbound powered carrier lanes. Unwired original scene stays
+   // completely unsolved; P14's legacy unsorted route remains the default.
+   pos('pickup','geometry-photoeye',-60,0,0,{rangeMm:300,responseMs:0}),
+   pos('metal-out','belt-conveyor',800,300),
+   pos('plain-out','belt-conveyor',800,-300)],
   recommendedLinks:[input('eye','present','Metal'),drive('Grip','robot','grip')],
   referenceST:ST(['Metal'],['Grip'],'Grip := Metal;'),
   acceptance:'The arm respects its finite workspace; colliding/unreachable targets inhibit motion'},
