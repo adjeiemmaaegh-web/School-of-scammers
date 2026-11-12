@@ -16,6 +16,8 @@ P14 exercised one product per isolated process challenge. P15 adds real 24 V / P
 | Robot sort workcell | Three distinct cartons gripped, transported and released with bounded reach; **does not prove material classification or two-lane sorting** |
 | Bottle line | Three original physical cylindrical bottles, real slow belt travel, measured at least 500 mL fill and cap-after-fill, distinct IDs and conservation |
 
+Every repeat-production trial now injects a registered machine fault on the second item, verifies that the original body did not falsely complete, repairs the device in the isolated Worker and requires processing of that same body ID before continuing the batch. The bottle trial stops its conveyor under a fault-blocked filler, then physically resumes after repair. This is a bounded scripted repair case, not exhaustive factory restart validation.
+
 Additional model corrections:
 
 - The capper's dwell tracks a specific body ID. A replacement bottle cannot inherit the previous bottle's partially elapsed dwell, even with the output continuously high.
@@ -34,7 +36,7 @@ This is **scripted operator-demand PLC commissioning**, not autonomous factory p
 
 1. Autonomous feedback-controlled PLC production, FIFO, variable products, and multiple independent valid engineering solutions.
 2. Actual robot material-classification routing to two physical destinations and measurable rejects.
-3. Faults and validated repair/restart during the repeated multi-product trial, rather than only the independent P14 single-product cases.
+3. Exhaustive unattended fault propagation/restart combinations and guarded human acknowledgement, beyond this one scripted second-item fault and same-body recovery per workcell.
 4. Line-wide throughput/jam/overflow metrics with many interacting carriers; instructor reference trials.
 5. Dynamic load support/stack stability and multi-pallet turnover beyond the bounded four-slot teaching pattern.
 6. Owner-run 8 GB no-GPU Windows/browser and real PLC testing; industrial safety, security, license/asset reviews and selective reconciliation of stacked unmerged PRs.
