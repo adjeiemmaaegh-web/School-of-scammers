@@ -22,9 +22,38 @@ const wires=[
   '--no-sandbox','--disable-setuid-sandbox','--enable-webgl',
   '--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader',
  ]});
- const page=await browser.newPage(),errors=[];
+ const page=await browser.newPage(),errors=[],consoleErrors=[];
  page.on('pageerror',e=>errors.push(String(e)));
+ page.on('console',msg=>{if(msg.type()==='error')consoleErrors.push(msg.text());});
  const state=()=>page.$eval('[data-p12-matrix]',el=>el.getAttribute('data-p12-state'));
+ const awaitResult=async(expected)=>{
+  try{
+   await page.waitForFunction(()=>
+    ['passed','failed'].includes(document.querySelector('[data-p12-matrix]')
+     ?.getAttribute('data-p12-state'))||
+    !!document.querySelector('[data-p12-error]'),{timeout:22000});
+  }catch(error){
+   const debug=await page.evaluate(()=>({
+    state:document.querySelector('[data-p12-matrix]')?.getAttribute('data-p12-state'),
+    error:document.querySelector('[data-p12-error]')?.textContent,
+    preflight:document.querySelector('[data-p12-preflight]')?.textContent,
+    buttonDisabled:document.querySelector('[data-p12-run-matrix]')?.disabled,
+    stage:document.querySelector('[data-p12-matrix-result]')?.textContent?.slice(0,1800),
+   }));
+   throw new Error('P12 browser result timeout: '+JSON.stringify({
+    debug,errors,consoleErrors,cause:String(error)}));
+  }
+  const actual=await state();
+  if(actual!==expected){
+   const debug=await page.evaluate(()=>({
+    error:document.querySelector('[data-p12-error]')?.textContent,
+    report:document.querySelector('[data-p12-matrix-result]')?.textContent?.slice(0,2500),
+   }));
+   throw new Error('P12 result '+actual+' instead of '+expected+': '+JSON.stringify({
+    debug,errors,consoleErrors}));
+  }
+ };
+
  try{
   await page.setViewport({width:1440,height:960,deviceScaleFactor:1});
   await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:45000});
@@ -46,8 +75,7 @@ const wires=[
   await page.waitForSelector('[data-p12-matrix]',{timeout:16000});
   assert.equal(await page.$eval('[data-p12-run-matrix]',el=>el.disabled),false);
   await page.click('[data-p12-run-matrix]');
-  await page.waitForFunction(()=>document.querySelector('[data-p12-matrix]')
-   ?.getAttribute('data-p12-state')==='passed',{timeout:45000});
+  await awaitResult('passed');
   const checks=await page.$$eval('[data-p12-case]',es=>es.map(e=>({
    id:e.getAttribute('data-p12-case'),state:e.getAttribute('data-p12-case-state'),
    content:e.textContent,
@@ -71,8 +99,7 @@ const wires=[
   assert.equal(await state(),'setup',
    'A previous passing report must never survive source edit/reload');
   await page.click('[data-p12-run-matrix]');
-  await page.waitForFunction(()=>document.querySelector('[data-p12-matrix]')
-   ?.getAttribute('data-p12-state')==='failed',{timeout:45000});
+  await awaitResult('failed');
   assert.equal(await page.$eval('[data-p12-case="idle"]',
    el=>el.getAttribute('data-p12-case-state')),'fail');
   const remaining=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),KEY);
