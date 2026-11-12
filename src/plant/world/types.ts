@@ -26,7 +26,7 @@ export type EquipmentState={
  positionMm:number;speedMmS:number;progress:number;count:number;
  levelMl:number;temperatureC:number;value:number;engaged:boolean;done:boolean;
  lastCommand:boolean;elapsedMs:number;stalled:boolean;faulted:boolean;
- heldBodyId?:string|null;activeBodyId?:string|null;
+ heldBodyId?:string|null;routeMetalLatched?:boolean;activeBodyId?:string|null;
  lastPlaceCommand?:boolean;slots?:Record<string,string>;phase?:number;
 };
 export type EquipmentPlacement={
