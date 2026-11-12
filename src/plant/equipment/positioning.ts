@@ -51,16 +51,19 @@ export const rotaryActuator:EquipmentDef={
 export const pickAndPlace:EquipmentDef={
  kind:'pick-and-place',label:'Two-axis pick and place',footprint:vec(1400,500,1900),
  commands:[{name:'xTargetMm',kind:'number',unit:'mm'},{name:'zTargetMm',kind:'number',unit:'mm'},
-  {name:'grip',kind:'bool'}],
+  {name:'grip',kind:'bool'},{name:'dispatch',kind:'bool'}],
  signals:[{name:'inPosition',kind:'bool'},{name:'partHeld',kind:'bool'},
   {name:'xMm',kind:'number',unit:'mm'},{name:'zMm',kind:'number',unit:'mm'}],
  params:[spec('travelMm','X travel','mm',300,3000,50,1200),
   spec('riseMm','Z travel','mm',200,2000,50,1000),
-  spec('speedMmS','Servo speed','mm/s',20,1000,10,400)],
+  spec('speedMmS','Servo speed','mm/s',20,1000,10,400),
+  spec('dispatchMm','Discrete outbound position','mm',100,2500,50,650)],
  faults:['servo-stuck','gripper-leak','axis-slip'],
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
-  const xTarget=numeric(c,'xTargetMm',0,0,param(ctx,'travelMm',1200));
+  const xTarget=flag(c,'dispatch')?
+   Math.min(param(ctx,'dispatchMm',650),param(ctx,'travelMm',1200)):
+   numeric(c,'xTargetMm',0,0,param(ctx,'travelMm',1200));
   const zTarget=numeric(c,'zTargetMm',0,0,param(ctx,'riseMm',1000));
   const speed=param(ctx,'speedMmS',400)*(f==='axis-slip'?.35:1);
   const x=f==='servo-stuck'?s.positionMm:approach(s.positionMm,xTarget,speed*dt/1000);
@@ -102,7 +105,12 @@ export const palletizer:EquipmentDef={
   }
   const placing=flag(c,'place')&&held&&f!=='pattern-jam';
   const columns=param(ctx,'columns',2),rows=param(ctx,'rows',2);
-  let bodies=w.bodies;
+  // A held package must have a genuine equipment support and a modelled
+  // pickup pose. Otherwise ordinary gravity will drop a supposedly gripped
+  // body before the PLC's separate place command arrives.
+  let bodies=held?w.bodies.map(b=>b.id===held?{...b,
+   pos:vec(ctx.originMm.x,ctx.originMm.y,ctx.originMm.z+250),
+   supportedBy:ctx.id,vel:vec()}:b):w.bodies;
   if(placing){
    const col=count%columns,row=Math.floor(count/columns)%rows,layer=Math.floor(count/(rows*columns));
    bodies=w.bodies.map(b=>b.id===held?{...b,pos:vec(ctx.originMm.x+col*200,
