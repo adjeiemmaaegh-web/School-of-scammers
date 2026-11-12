@@ -104,11 +104,16 @@ const wires=[
   await page.click('[data-load-plant-scene="bottle-line"]');
   await page.waitForSelector('[data-p9-scene-confirm-warning]',{timeout:12000});
   await page.click('[data-load-plant-scene="bottle-line"]');
-  await page.waitForSelector('[data-p13-unavailable]',{timeout:20000});
-  assert.ok((await page.$eval('[data-p13-unavailable]',
-   el=>el.textContent)).includes('cylinder bottle'));
-  assert.equal(await page.$$eval('[data-p12-matrix]',items=>items.length),0);
+  // P14 supersedes P13's former uncovered bottle gap with a REAL physical
+  // challenge. It still cannot auto-pass: the user must supply correct PLC
+  // terminal wiring and source. Historical P13 gate remains a negative test.
+  await page.waitForSelector('[data-p12-matrix][data-p12-scene-id="bottle-line"]',
+   {timeout:20000});
+  assert.equal(await page.$eval('[data-p12-run-matrix]',
+   el=>el.disabled),true,'Unwired bottle line cannot be silently graded');
+  assert.equal(await page.$eval('[data-p12-matrix]',
+   el=>el.getAttribute('data-p12-state')),'setup');
   assert.deepEqual(errors.filter(e=>!/WebGL|GPU stall|favicon|swiftshader/i.test(e)),[]);
-  console.log('P13 EXTENDED MATRIX BROWSER PASS: original gate has 4 worker passes; constant ON rejected; bottle gap disclosed; no fixture persistence');
+  console.log('P13 EXTENDED MATRIX BROWSER PASS: real gate passes, constant ON rejected; newly supported P14 bottle remains unsolved unless properly wired');
  }finally{await browser.close();}
 })().catch(e=>{console.error('P13 EXTENDED MATRIX BROWSER FAIL',e.stack||String(e));process.exitCode=1;});
