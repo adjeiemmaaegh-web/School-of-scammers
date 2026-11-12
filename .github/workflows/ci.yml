@@ -72,6 +72,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p14-physical-bottle-browser.cjs
       - name: P15 repeated physical product batch - three bottles, per-body cap, conservation and wrong PLC rejection
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p15-multiproduct-browser.cjs
+      - name: P15 autonomous material sorting - actual PLC sensors, two physical receiving conveyors, robot fault recovery
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p15-autonomous-robot-browser.cjs
       - name: P6 visual workcell - build PLC conveyor/turntable line from empty 2D floor without WebGL
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-floor-plan-browser.cjs
       - name: UX-first workbench - workflow, device inspector and responsive design
