@@ -6,20 +6,32 @@ import type {EquipmentState} from '../world/types';
 
 export const beltConveyor:EquipmentDef={
  kind:'belt-conveyor',label:'Variable-speed belt conveyor',footprint:vec(600,300,120),
- commands:[{name:'run',kind:'bool'},{name:'reverse',kind:'bool'},{name:'speed',kind:'number',unit:'mm/s'}],
+ commands:[{name:'run',kind:'bool'},{name:'reverse',kind:'bool'},
+  {name:'resetJam',kind:'bool'},{name:'speed',kind:'number',unit:'mm/s'}],
  signals:[{name:'moving',kind:'bool'},{name:'jam',kind:'bool'},{name:'speed',kind:'number',unit:'mm/s'}],
  params:[spec('lengthMm','Belt length','mm',200,2400,50,600),spec('widthMm','Belt width','mm',150,600,50,300),
  spec('speedMmS','Surface speed','mm/s',50,1000,10,250),
- spec('contactMode','Body collision','0=legacy, 1=swept 3D',0,1,1,0)],
+ spec('contactMode','Body collision','0=legacy, 1=swept 3D',0,1,1,0),
+  spec('jamResetMode','Jam acknowledgement','0=legacy, 1=PLC reset after repair',0,1,1,0)],
  faults:['belt-slip','belt-jammed','motor-dead'],
  fresh:()=>initial({}),
  step:(state,world,commands,dt,fault,ctx)=>{
   const run=flag(commands,'run')&&fault!=='motor-dead';
   const demanded=numeric(commands,'speed',param(ctx,'speedMmS',250),0,1000);
   const actual=run?(fault==='belt-slip'?demanded*.3:demanded):0;
-  return {world,state:{...state,engaged:run&&!state.stalled&&fault!=='belt-jammed',
-   speedMmS:q(flag(commands,'reverse')?-actual:actual),
-   faulted:!!fault,stalled:fault==='belt-jammed'||state.stalled}};
+  const resetRequested=flag(commands,'resetJam');
+  const resetEdge=resetRequested&&!state.lastJamResetCommand;
+  const latchedMode=param(ctx,'jamResetMode',0)===1;
+  // A NEW PLC reset edge after physical repair clears the latched stop.
+  // Held reset and reset during an unrepaired fault cannot bypass it.
+  const stalled=latchedMode?
+   fault==='belt-jammed'||(state.stalled&&!(resetEdge&&fault===null)):
+   fault==='belt-jammed'||state.stalled;
+  const engaged=run&&!stalled;
+  return {world,state:{...state,engaged,
+   speedMmS:q(engaged?(flag(commands,'reverse')?-actual:actual):0),
+   lastJamResetCommand:resetRequested,
+   faulted:!!fault,stalled}};
  },
  read:(s,w,ctx)=>({moving:s.engaged,jam:s.stalled||w.bodies.some(b=>b.supportedBy===ctx.id&&b.tags.jammed===true),
   speed:s.engaged?s.speedMmS:0}),
