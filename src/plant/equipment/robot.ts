@@ -6,7 +6,8 @@ export const robotArm:EquipmentDef={
  kind:'robot-arm',label:'Three-axis teaching robot',footprint:vec(900,900,1800),
  commands:[{name:'xTargetMm',kind:'number',unit:'mm'},
   {name:'yTargetMm',kind:'number',unit:'mm'},
-  {name:'zTargetMm',kind:'number',unit:'mm'},{name:'grip',kind:'bool'}],
+  {name:'zTargetMm',kind:'number',unit:'mm'},{name:'grip',kind:'bool'},
+  {name:'dispatch',kind:'bool'}],
  signals:[{name:'inPosition',kind:'bool'},{name:'partHeld',kind:'bool'},
   {name:'collisionStop',kind:'bool'},{name:'unreachable',kind:'bool'}],
  params:[spec('reachMm','Reach','mm',200,1700,50,900),
@@ -15,11 +16,21 @@ export const robotArm:EquipmentDef={
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
   const reach=param(ctx,'reachMm',900);
-  const x=numeric(c,'xTargetMm',0,-reach,reach),y=numeric(c,'yTargetMm',0,-reach,reach),
-   z=numeric(c,'zTargetMm',100,0,reach);
+  // P14 deliberately small, genuinely PLC-driven teaching transfer.
+  // The discrete dispatch target stays inside the configured arm reach.
+  // External Cartesian/analog motion-control hardware remains unsupported.
+  const x=flag(c,'dispatch')?Math.min(650,reach-150):
+   numeric(c,'xTargetMm',0,-reach,reach);
+  const y=numeric(c,'yTargetMm',0,-reach,reach);
+  const z=numeric(c,'zTargetMm',100,0,reach);
   const beyond=x*x+y*y+z*z>reach*reach;
   const nextX=ctx.originMm.x+x,nextY=ctx.originMm.y+y,nextZ=ctx.originMm.z+z;
   const collision=w.bodies.some(body=>body.id!==s.heldBodyId&&
+   // An intended reachable package is allowed inside the pickup envelope
+   // only during a powered grip request. Other obstacles still stop travel.
+   !(flag(c,'grip')&&!s.heldBodyId&&
+     Math.abs(body.pos.x-nextX)<100&&Math.abs(body.pos.y-nextY)<100&&
+     Math.abs(body.pos.z-nextZ)<150)&&
    Math.abs(body.pos.x-nextX)<body.size.x*.4 &&
    Math.abs(body.pos.y-nextY)<body.size.y*.4&&
    Math.abs(body.pos.z-nextZ)<body.size.z*.4);
