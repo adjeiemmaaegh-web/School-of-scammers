@@ -19,7 +19,7 @@ export type BatchResult={sceneId:string;sourceSignature:string;
  expectedProducts:number;verifiedProducts:number;executedScans:number;
  diagnostic:string};
 const PLC='scene-plc',PFX='p15-batch-switch-';
-const products=(s:AdvancedSpec)=>s.kind==='palletizer'?4:3;
+const products=(s:AdvancedSpec)=>s.kind==='palletizer'?8:3;
 function withButtons(p:ProjectFile,s:AdvancedSpec):ProjectFile{
  const count=s.commands.length;
  const inputPins=Array.from({length:count},(_,i)=>PLC+'.I0.'+i);
@@ -141,7 +141,7 @@ export function runP15Batch(p:ProjectFile,sceneId:string):BatchResult{
    w=returnHome(w,s);
   }
   if(s.kind==='palletizer'&&verifiedProducts===expectedProducts){
-   // Exercise the full 2x2 configured pallet capacity: a fifth real body
+   // Exercise the full 2x2x2 configured pallet capacity: a ninth real body
    // may still be fed, but MUST NOT be falsely placed or over-counted.
    const prior=world(w).spawnedCount;
    w=pulse(w,0);w=scan(w,2);
@@ -153,7 +153,7 @@ export function runP15Batch(p:ProjectFile,sceneId:string):BatchResult{
     world(w).bodies.filter(b=>b.tags.palletized===true).length===expectedProducts&&
     world(w).bodies.some(b=>b.tags.palletized!==true)&&conserved(world(w));
    cases.push(record('pattern-capacity',intact,
-    intact?'Fifth genuine carton refused by full 2x2 pallet; no false fifth slot':
+    intact?'Ninth genuine carton refused by full 2x2x2 pallet; no false ninth slot':
        'Full pallet accepted an extra position or lost/duplicated a physical body',w));
   }
   const unique=new Set(world(w).bodies.map(b=>b.id)).size===world(w).bodies.length;
