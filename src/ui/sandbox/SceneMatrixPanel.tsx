@@ -216,7 +216,8 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
         {body.bodyId} · {body.material} · {body.shape}
         {' '}· x {body.xMm} mm / y {body.yMm} mm
         {' '}· quality {body.qualityPassed?'verified':'not verified'}
-        {' '}· support {body.supportedBy??'none'}
+        {' '}· final support {body.supportedBy??'none'}
+        {body.receivedBy?' · witnessed receiver '+body.receivedBy:''}
         {body.filledMl!==null?' · fill '+body.filledMl+' mL':''}
         {body.capped?' · capped':''}
         {body.palletSlot!==null?' · pallet slot '+body.palletSlot:''}
