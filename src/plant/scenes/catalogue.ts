@@ -96,7 +96,7 @@ export const SCENES:readonly PlantScene[]=[
    pos('filler','filler',200,0),pos('capper','capper',400,0,0,{requiresFilled:1}),
    pos('fill-eye','geometry-photoeye',200,0,0,{rangeMm:160,responseMs:0}),
    pos('cap-eye','geometry-photoeye',400,0,0,{rangeMm:160,responseMs:0}),
-   pos('exit-eye','geometry-photoeye',650,0,0,{rangeMm:200,responseMs:0})],
+   pos('exit-eye','geometry-photoeye',650,0,0,{responseMs:0})],
   recommendedLinks:[input('eye','present','Bottle'),drive('Fill','filler','fill'),drive('Cap','capper','cap')],
   referenceST:ST(['Start','Bottle'],['Fill','Cap'],'Fill := Start AND Bottle; Cap := Fill;'),
   acceptance:'Bottles fill through genuine dwell/flow and only receive a cap after capper action'},
