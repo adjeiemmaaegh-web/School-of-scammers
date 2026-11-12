@@ -39,10 +39,10 @@ describe('P15 real repeated-production trials and conservation',()=>{
    const project=prepared(id),before=JSON.stringify(project);
    const a=runP15Batch(project,id);
    expect(a.status,id+JSON.stringify(a.cases)).toBe('passed');
-   expect(a.verifiedProducts,id).toBe(id==='palletizing'?4:3);
+   expect(a.verifiedProducts,id).toBe(id==='palletizing'?8:3);
    expect(a.expectedProducts).toBe(a.verifiedProducts);
    expect(a.cases.every(c=>c.pass)).toBe(true);
-   expect(a.cases.length).toBe(id==='palletizing'?6:4);
+   expect(a.cases.length).toBe(id==='palletizing'?10:4);
    expect(a.executedScans).toBeGreaterThan(30);
    expect(a.executedScans).toBeLessThan(2000);
    expect(JSON.stringify(project)).toBe(before);
