@@ -86,6 +86,36 @@ function physicalCycle(w:WorldState,s:AdvancedSpec):WorldState{
  w=switchInput(w,1,false);w=scan(w,4);
  return w;
 }
+// Registered faults are applied only to a disposable private Worker clone.
+function withFault(w:WorldState,s:AdvancedSpec,code:string|null):WorldState{
+ w=checked(tick(w,[{k:'pause'},{k:'setPlantFault',
+  id:s.faultActor,fault:code}]).world);
+ return checked(tick(w,[{k:'run'}]).world);
+}
+function faultedSecondCycle(w:WorldState,s:AdvancedSpec,id:string):
+ {world:WorldState;blocked:boolean}{
+ w=withFault(w,s,s.fault);
+ if(s.kind==='bottle'){
+  // Position the actual second cylinder under a physically blocked nozzle.
+  w=switchInput(w,1,true);w=switchInput(w,2,true);
+  w=switchInput(w,3,true);w=scan(w,250);
+  w=switchInput(w,1,false);w=scan(w,8);
+  const b=world(w).bodies.find(body=>body.id===id);
+  const blocked=!!b&&b.pos.x>=100&&b.pos.x<=300&&
+   b.tags.filledMl===0&&b.tags.capped!==true;
+  w=withFault(w,s,null);
+  w=switchInput(w,1,true);
+  return {world:scan(w,230),blocked};
+ }
+ const actor=s.kind==='palletizer'?'palletizer':
+  s.kind==='gantry'?'gantry':'robot';
+ w=switchInput(w,1,true);w=scan(w,6);
+ const blocked=read(w,actor,'partHeld')!==true&&
+  world(w).bodies.some(b=>b.id===id);
+ w=switchInput(w,1,false);
+ w=withFault(w,s,null);w=scan(w,3);
+ return {world:physicalCycle(w,s),blocked};
+}
 function returnHome(w:WorldState,s:AdvancedSpec):WorldState{
  if(s.kind!=='gantry'&&s.kind!=='robot')return w;
  w=switchInput(w,2,false);
@@ -127,8 +157,17 @@ export function runP15Batch(p:ProjectFile,sceneId:string):BatchResult{
      'Feeder must produce exactly one new original body per PLC edge',w));
     break;
    }
-   w=physicalCycle(w,s);
-   const ok=finished(w,s,newly!.id,index)&&ids.every((id,i)=>finished(w,s,id,i))&&
+   // Inject a genuine failure in the second machine cycle. The same
+   // original item must recover, not a newly fabricated replacement.
+   const recovery=index===1?faultedSecondCycle(w,s,newly!.id):null;
+   w=recovery?recovery.world:physicalCycle(w,s);
+   if(recovery)cases.push(record('fault-recovery',recovery.blocked&&
+    finished(w,s,newly!.id,index),
+    recovery.blocked?'Registered failure blocked product '+newly!.id+
+     ' before repair and resumed the same body':
+     'Mid-batch equipment fault or repair failed its physical-state proof',w));
+   const ok=(!recovery||recovery.blocked)&&finished(w,s,newly!.id,index)&&
+    ids.every((id,i)=>finished(w,s,id,i))&&
     read(w,s.kind==='palletizer'?'palletizer':'feeder',
      s.kind==='palletizer'?'placedCount':'count')===index+1&&
     conserved(world(w));
