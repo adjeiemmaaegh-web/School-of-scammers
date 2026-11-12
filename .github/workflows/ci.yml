@@ -66,6 +66,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p11-chronological-assessment-browser.cjs
       - name: P12 independent PLC input/fault matrix - correct program passes, constant-on logic fails
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p12-multicase-browser.cjs
+      - name: P13 eleven additional PLC/factory matrices - real reject gate, false logic and unsupported bottle case
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p13-expanded-matrix-browser.cjs
       - name: P6 visual workcell - build PLC conveyor/turntable line from empty 2D floor without WebGL
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-floor-plan-browser.cjs
       - name: UX-first workbench - workflow, device inspector and responsive design
