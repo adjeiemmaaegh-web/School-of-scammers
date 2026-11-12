@@ -22,8 +22,9 @@ function statements(id:AutoFactoryKind):string[]{
   'IF In0 THEN Phase := 1; END_IF;',
   'IF Count < 8 AND NOT In3 THEN Out0 := TRUE; Phase := 2; ELSE Phase := 9; END_IF;',
   'IF In1 THEN Phase := 3; END_IF;',
-  'Out1 := TRUE; IF In2 THEN Phase := 4; END_IF;',
-  'Out2 := TRUE; IF NOT In2 THEN Phase := 5; END_IF;',
+  'Out1 := TRUE; Wait := 0; Phase := 4;',
+  'IF In2 THEN Phase := 5; ELSIF Wait >= 3 THEN Phase := 3; ELSE Wait := Wait + 1; END_IF;',
+  'Out2 := TRUE; IF NOT In2 THEN Phase := 6; END_IF;',
   'Count := Count + 1; Phase := 1;',
  ];
  return [
@@ -38,12 +39,13 @@ function statements(id:AutoFactoryKind):string[]{
  ];
 }
 export function factorySource(id:AutoFactoryKind,variant:'case'|'if'='case'):string{
- const inputs=id==='bottle-line'?6:4,outputs=id==='gantry-transfer'?4:3;
+ const inputs=id==='bottle-line'?6:4,outputs=id==='palletizing'?3:4;
  const lines=statements(id);
  const all=[
   'VAR_INPUT',...Array.from({length:inputs},(_,i)=>' In'+i+' : BOOL;'),
   'END_VAR','VAR_OUTPUT',...Array.from({length:outputs},(_,i)=>' Out'+i+' : BOOL;'),
-  'END_VAR','VAR',' Phase : INT := 0;',' Count : INT := 0;','END_VAR',
+  'END_VAR','VAR',' Phase : INT := 0;',' Count : INT := 0;',
+  ' Wait : INT := 0;','END_VAR',
   ...Array.from({length:outputs},(_,i)=>'Out'+i+' := FALSE;'),
   ...(id==='gantry-transfer'?['Out3 := Phase > 0 AND Phase < 9;']:[]),
  ];
