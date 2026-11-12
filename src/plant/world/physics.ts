@@ -59,7 +59,7 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
   // positively restrained; conveyor-gravity integration must not overwrite
   // its XYZ position, detach it, or snap it to the 120 mm carrier surface.
   // A release immediately disables this exception on the next substep.
-  const grip=body.supportedBy&&items.find(item=>item.id===body.supportedBy);
+  const grip=body.supportedBy?items.find(item=>item.id===body.supportedBy):undefined;
   // The bounded pallet-pattern model represents an already-placed package as
   // supported by the palletizer's stable pallet/stack frame. Do not reclassify
   // it as an ordinary moving conveyor load or let gravity erase its counted
