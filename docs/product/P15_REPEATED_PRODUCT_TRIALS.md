@@ -12,7 +12,7 @@ P14 exercised one product per isolated process challenge. P15 adds real 24 V / P
 | Factory scene | P15 source-model test |
 | --- | --- |
 | Gantry transfer | Three separate feeder cartons, grip/dispatch/release of each, return-to-home between pickups, distinct IDs and stable outbound positions |
-| Palletizing | Four separate feeder cartons, exact 2×2 pattern slots and layer tags, conserved IDs and pattern-done feedback; fifth actual carton refused with no phantom extra placement |
+| Palletizing | Eight separate feeder cartons, exact 2×2×2 pattern slots and layer tags, conserved IDs and pattern-done feedback; ninth actual carton refused with no phantom extra placement |
 | Robot sort workcell | Three distinct cartons gripped, transported and released with bounded reach; **does not prove material classification or two-lane sorting** |
 | Bottle line | Three original physical cylindrical bottles, real slow belt travel, measured at least 500 mL fill and cap-after-fill, distinct IDs and conservation |
 
