@@ -146,7 +146,7 @@ describe('P22 authentic 24V PLC / physical three-carton backpressure commissioni
    {...p,wires:p.wires.filter(w=>w.from!=='scene-plc.Q0.0')},
    {...p,params:{...p.params,belt:{...p.params?.belt,zoneSensorMode:0}}},
    {...p,params:{...p.params,belt:{...p.params?.belt,zoneCapacity:3}}},
-   {...p,components:[...p.components,{id:'p22-more',kind:'start',x:10,y:10,pressed:false}]},
+   {...p,components:[...p.components,{id:'p22-more',kind:'start' as const,x:10,y:10,pressed:false}]},
   ];
   for(const invalid of changes){
    const r=runP22ZoneCampaign(invalid,'gate-accumulation');
