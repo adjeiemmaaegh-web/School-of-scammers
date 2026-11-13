@@ -1191,7 +1191,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // The authoritative P3 world advances exactly five 10 ms substeps AFTER PLC
   // outputs and the electrical actuator image settle. Geometry sensors feed the
   // following PLC scan, never the current scan's input image.
-  const p3 = stepProjectPlant(w.plantWorld, w.project, circuit.energizedLoads, dtMs);
+  const p3 = stepProjectPlant(w.plantWorld, w.project, circuit.energizedLoads, dtMs,
+    {controllerPowered:powered});
   for (const event of p3.events)
     events.push({ tick: w.tick + 1, kind: 'plant', detail: event.source + ': ' + event.detail });
   // P4 three-phase process after the worker's actual 24V coil demand scan.
