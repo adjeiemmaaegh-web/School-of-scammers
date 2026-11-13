@@ -64,7 +64,8 @@ export function defaultUnwiredPlantNumber(
 
 export type PlantTick={runtime:SceneRuntime;events:WorldEvent[]};
 export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
- energizedLoads:readonly string[],dtMs:number):PlantTick{
+ energizedLoads:readonly string[],dtMs:number,
+ options:Readonly<{controllerPowered?:boolean}>={}):PlantTick{
  const placements=plantPlacements(project);
  if(!placements.length)return {runtime:previous,events:[]};
  if(dtMs!==50)throw new RangeError('P3 plant world advances by exactly five 10ms substeps per 50ms PLC scan');
@@ -85,6 +86,11 @@ export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
     defaultUnwiredPlantNumber(item.kind,ch.name,item.params)]];
   }));
  }
+ // P19: only the real solved PLC netlist provides controller supply status;
+ // no program tag or UI input can spoof the equipment's supply evidence.
+ if(typeof options.controllerPowered==='boolean')for(const item of placements)
+  if(item.kind==='belt-conveyor')inputs[item.id]={...inputs[item.id],
+   controllerPowered:options.controllerPowered};
  const updated=stepScene(previous,placements,PLANT_EQUIPMENT,inputs,project.plantFaults??{});
  const drained=drainEvents(updated.world);
  return {runtime:{world:drained.world,signals:updated.signals},events:drained.events};
