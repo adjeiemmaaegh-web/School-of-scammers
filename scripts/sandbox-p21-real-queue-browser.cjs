@@ -81,7 +81,7 @@ const wires=()=>{
     !p.components.some(c=>c.id==='belt'))
     throw Error('Original gate-accumulation scene not loaded');
    p.components=p.components.map(c=>c.id==='feeder'?{...c,x:430,y:225}:c);
-   p.components.push({id:'pusher',kind:'pusher',x:473,y:225,pressed:false});
+   p.components.push({id:'pusher',kind:'pusher',x:479,y:225,pressed:false});
    p.wires=edges;p.language='st';p.stSource=code;
    p.params={...p.params,
     belt:{...p.params?.belt,lengthMm:600,widthMm:150,speedMmS:250,
