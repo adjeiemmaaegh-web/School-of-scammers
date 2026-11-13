@@ -36,6 +36,8 @@ export type EquipmentState={
  accumulationContactMs?:number;queueContactBodyId?:string|null;
  queueContactLeaderId?:string|null;accumulationBodyId?:string|null;
  accumulationBlockingBodyId?:string|null;
+ /** P24 opt-in source-observed continuous, physical held-carton contact with stopper. */
+ heldContactBodyId?:string|null;heldContactMs?:number;
  controllerPowerSeen?:boolean;
  slots?:Record<string,string>;phase?:number;
 };
