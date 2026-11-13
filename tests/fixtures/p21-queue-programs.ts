@@ -8,7 +8,7 @@ export type P21Controller='correct'|'no-reset'|'held-gate'|'early-reset'|'one-bo
 export function p21ReferenceProject(kind:P21Controller='correct'):ProjectFile{
  const base=makePlantSceneProject('gate-accumulation');
  const components=[...base.components.map(c=>c.id==='feeder'?{...c,x:430,y:225}:c),
-  {id:'pusher',kind:'pusher' as const,x:473,y:225,pressed:false}];
+  {id:'pusher',kind:'pusher' as const,x:479,y:225,pressed:false}];
  const pairs:ReadonlyArray<[string,string]>=[
   ['scene-supply.P24','scene-plc.L+'],['scene-supply.M0','scene-plc.M'],
   ['scene-plc.Q0.0','feeder.CMD_feed+'],['scene-supply.M0','feeder.M-'],
