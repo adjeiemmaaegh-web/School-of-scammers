@@ -50,18 +50,18 @@ const wires=()=>{
  ]});
  const page=await browser.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(String(e)));
- const status=()=>page.$eval('[data-p22-queue]',e=>e.dataset.p22State);
+ const status=()=>page.$eval('[data-p22-zone]',e=>e.dataset.p22State);
  async function run(expected){
   await page.$eval('[data-p12-matrix]',e=>{e.open=true;});
-  assert.equal(await page.$eval('[data-p22-run-queue]',e=>e.disabled),false,
+  assert.equal(await page.$eval('[data-p22-run-zone]',e=>e.disabled),false,
    'Power and program preflight must be satisfied before assessment');
-  await page.click('[data-p22-run-queue]');
+  await page.click('[data-p22-run-zone]');
   await page.waitForFunction(()=>['passed','failed','blocked'].includes(
-   document.querySelector('[data-p22-queue]')?.dataset.p22State)||
+   document.querySelector('[data-p22-zone]')?.dataset.p22State)||
    !!document.querySelector('[data-p12-error]'),{timeout:120000});
   const actual=await status();
   if(actual!==expected)throw Error('P22 expected '+expected+' got '+actual+': '+
-   await page.$eval('[data-p22-queue]',e=>e.textContent.slice(-15000)));
+   await page.$eval('[data-p22-zone]',e=>e.textContent.slice(-15000)));
  }
  try{
   await page.setViewport({width:1440,height:980});
@@ -71,9 +71,9 @@ const wires=()=>{
   await page.waitForSelector('[data-p9-scene-gallery]',{timeout:20000});
   await page.$eval('[data-p9-scene-gallery]',e=>{e.open=true;});
   await page.click('[data-load-plant-scene="gate-accumulation"]');
-  await page.waitForSelector('[data-p22-queue]',{timeout:20000});
+  await page.waitForSelector('[data-p22-zone]',{timeout:20000});
   assert.equal(await status(),'setup');
-  assert.equal(await page.$eval('[data-p22-run-queue]',e=>e.disabled),true,
+  assert.equal(await page.$eval('[data-p22-run-zone]',e=>e.disabled),true,
    'Original unprogrammed factory cannot pass a staged private queue trial');
   await page.evaluate((key,edges,code)=>{
    const p=JSON.parse(localStorage.getItem(key));
@@ -92,7 +92,7 @@ const wires=()=>{
    localStorage.setItem(key,JSON.stringify(p));
   },STORAGE,wires(),source());
   await page.reload({waitUntil:'networkidle0',timeout:45000});
-  await page.waitForSelector('[data-p22-queue]',{timeout:20000});
+  await page.waitForSelector('[data-p22-zone]',{timeout:20000});
   await run('passed');
   assert.equal(await page.$eval('[data-p22-replay]',e=>e.dataset.p22Replay),'pass');
   assert.deepEqual(await page.$$eval('[data-p22-lot]',els=>els.map(e=>[
@@ -118,7 +118,7 @@ const wires=()=>{
    localStorage.setItem(key,JSON.stringify(p));
   },STORAGE);
   await page.reload({waitUntil:'networkidle0',timeout:45000});
-  await page.waitForSelector('[data-p22-queue]',{timeout:20000});
+  await page.waitForSelector('[data-p22-zone]',{timeout:20000});
   assert.equal(await status(),'setup');
   await run('failed');
   assert.equal(await page.$eval('[data-p22-lot="0"]',
