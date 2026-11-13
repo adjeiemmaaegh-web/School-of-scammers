@@ -229,12 +229,12 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
     belt: travelMs=100, holdSensorMode=1 and holdDwellMs=200.
     Wire powered PLC Q0.6 to outstop.CMD_extend+, and power the stopper
     and return through the genuine 24V supply. Connect its actual feedback:
-    OUT_extended → PLC I0.9, OUT_retracted → PLC I0.10, and original worker
-    OUT_heldLoad → PLC I0.11. The private worker supplies a release button
-    through powered I0.8, distinct from I0.6 fresh-carton demand.</p>
+    OUT_extended → PLC I1.1, OUT_retracted → PLC I1.2, and original worker
+    OUT_heldLoad → PLC I1.3. The private worker supplies a release button
+    through powered I1.0, distinct from I0.6 fresh-carton demand.</p>
    <p className="sandbox-help">The same original b2 must enter the independently
     powered receiver, physically stop against the extended outstop for 200ms,
-    and make I0.11 HIGH. An early release request cannot clear Q0.6 before
+    and make I1.3 HIGH. An early release request cannot clear Q0.6 before
     physical contact. With b2 still held, fresh feeder demand cannot energize
     Q0.0. A new powered release after actual dwell must retract the gate,
     move that same b2 out of the receiver, and only then allow new original
