@@ -31,7 +31,9 @@ const wired=(p:ProjectFile,a:string,b:string)=>
 export function p22ZonePreflight(p:ProjectFile,sceneId:string):string[]{
  const errors=p21AccumulationPreflight(p,sceneId);
  if(sceneId!==SCENE)return errors;
- if(p.params?.belt?.zoneSensorMode!==1||p.params?.belt?.zoneCapacity!==2)
+ // Canonical project loading strips default-valued settings; an omitted
+ // zoneCapacity is the genuine registry default 2, NOT an invalid value.
+ if(p.params?.belt?.zoneSensorMode!==1||(p.params?.belt?.zoneCapacity??2)!==2)
   errors.push('Enable the original belt zoneSensorMode=1 and zoneCapacity=2');
  if(!wired(p,'belt.OUT_zoneFull',PLC+'.I0.5'))
   errors.push('Wire the actual belt.OUT_zoneFull to PLC I0.5');
