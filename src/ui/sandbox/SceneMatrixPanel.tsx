@@ -214,7 +214,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
    <p className="sandbox-help">Use accumulationTripMode=1,
     accumulationDwellMs=200, jamResetMode=1, obstructionTripMode=0 and a
     600 × 150 mm belt. Place original feeder at (430,225), stopper
-    at (481,225), and pusher at (473,225). Wire actual 24V PLC
+    at (481,225), and pusher at (479,225). Wire actual 24V PLC
     Q0.0 feeder feed, Q0.1 belt run, Q0.2 stopper extend, Q0.3
     resetJam, Q0.4 pusher extend. Connect belt accumulationTripped
     to I0.1, stopper retracted to I0.2 and pusher extended to I0.3.
