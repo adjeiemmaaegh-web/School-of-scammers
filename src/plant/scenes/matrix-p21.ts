@@ -49,7 +49,8 @@ export function p21AccumulationPreflight(p:ProjectFile,sceneId:string):string[]{
   problems.push('Set belt accumulationTripMode=1 to enable physical queued-carton trip');
  if(p.params?.belt?.jamResetMode!==1||p.params?.belt?.obstructionTripMode===1)
   problems.push('Enable jamResetMode=1 and leave obstructionTripMode=0 (body-to-body accumulation, not P20 gate trip)');
- if(p.params?.belt?.widthMm!==150||p.params?.belt?.lengthMm!==600)
+ if((p.params?.belt?.widthMm??300)!==150||
+   (p.params?.belt?.lengthMm??600)!==600)
   problems.push('Set original belt physical lengthMm=600 and widthMm=150 for this isolated two-carton lane');
  if(p.params?.belt?.accumulationDwellMs!==200)
   problems.push('Set accumulationDwellMs=200 to distinguish brief contacts from sustained queue');
@@ -59,7 +60,8 @@ export function p21AccumulationPreflight(p:ProjectFile,sceneId:string):string[]{
   if(!c||c.x!==x||c.y!==225)
    problems.push('Place '+id+' at training coordinates x='+x+', y=225 on the original lane');
  }
- if(p.params?.pusher?.speedMmS!==250||p.params?.pusher?.strokeMm!==260||
+ if((p.params?.pusher?.speedMmS??220)!==250||
+   (p.params?.pusher?.strokeMm??260)!==260||
   (p.params?.pusher?.maxMassKg??20)<8)
   problems.push('Configure real pusher speedMmS=250 and strokeMm=260 with at least 8 kg capacity');
  const links:ReadonlyArray<[string,string]>=[
