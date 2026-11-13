@@ -12,9 +12,10 @@ import {runP16ResilienceAudit} from '../plant/scenes/matrix-p16';
 import {runP17MaterialCampaign} from '../plant/scenes/matrix-p17';
 import {runP18JamRecovery} from '../plant/scenes/matrix-p18';
 import {runP19PowerCampaign} from '../plant/scenes/matrix-p19';
+import {runP20Obstruction} from '../plant/scenes/matrix-p20';
 import type {ProjectFile} from './signals';
 
-type RunRequest={kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery'|'run-power-recovery';id:number;sceneId:string;project:ProjectFile};
+type RunRequest={kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery'|'run-power-recovery'|'run-gate-obstruction';id:number;sceneId:string;project:ProjectFile};
 type RunResponse={kind:'matrix-result';id:number;result:ReturnType<typeof runPlantMatrix>}|
  {kind:'batch-result';id:number;result:ReturnType<typeof runP15Batch>}|
  {kind:'autonomous-result';id:number;result:ReturnType<typeof runP15AutonomousSort>|ReturnType<typeof runP15AutonomousFactory>}|
@@ -22,19 +23,24 @@ type RunResponse={kind:'matrix-result';id:number;result:ReturnType<typeof runPla
  {kind:'material-lots-result';id:number;result:ReturnType<typeof runP17MaterialCampaign>}|
  {kind:'jam-recovery-result';id:number;result:ReturnType<typeof runP18JamRecovery>}|
  {kind:'power-recovery-result';id:number;result:ReturnType<typeof runP19PowerCampaign>}|
+ {kind:'gate-obstruction-result';id:number;result:ReturnType<typeof runP20Obstruction>}|
  {kind:'matrix-error';id:number;message:string};
 const scope:DedicatedWorkerGlobalScope=self as DedicatedWorkerGlobalScope;
 scope.onmessage=(event:MessageEvent<RunRequest>)=>{
  const req=event.data;
  if(!req||(req.kind!=='run-matrix'&&req.kind!=='run-batch'&&req.kind!=='run-autonomous'&&
    req.kind!=='run-resilience'&&req.kind!=='run-material-lots'&&
-   req.kind!=='run-jam-recovery'&&req.kind!=='run-power-recovery')||
+   req.kind!=='run-jam-recovery'&&req.kind!=='run-power-recovery'&&
+   req.kind!=='run-gate-obstruction')||
    !Number.isSafeInteger(req.id)||
    typeof req.sceneId!=='string'||!req.project)return;
  try{
   const size=JSON.stringify(req.project).length;
   if(size>300000)throw new RangeError('Assessment project exceeds bounded local trial size');
-  if(req.kind==='run-power-recovery'){
+  if(req.kind==='run-gate-obstruction'){
+   const result=runP20Obstruction(req.project,req.sceneId);
+   scope.postMessage({kind:'gate-obstruction-result',id:req.id,result} satisfies RunResponse);
+  }else if(req.kind==='run-power-recovery'){
    const result=runP19PowerCampaign(req.project,req.sceneId);
    scope.postMessage({kind:'power-recovery-result',id:req.id,result} satisfies RunResponse);
   }else if(req.kind==='run-jam-recovery'){
