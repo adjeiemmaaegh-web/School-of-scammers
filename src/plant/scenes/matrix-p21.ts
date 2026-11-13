@@ -215,11 +215,16 @@ function one(p:ProjectFile,seed:number):P21Lot{
   }
   cases.push({id:'clearance-not-reset',pass:stillStopped,
    detail:'Removing b1 from the source lane and retracting gate does NOT auto-release b2; the original machine stays latched through twelve further PLC scans'});
+  const preAckPhase=plc(w)?.tagValues.Phase;
   w=checked(tick(w,[{k:'operate',id:ACK,pressed:true}]).world);
-  let realReset=false;
+  let realReset=plc(w)?.outputs['Q0.3']===true;
+  let ackInputSeen=plc(w)?.io.inputs.some(i=>i.terminal==='I0.4'&&i.on)===true;
+  let duringAckPhase=plc(w)?.tagValues.Phase;
   for(let k=0;k<4;k++){
    w=scan(w);
    realReset=realReset||plc(w)?.outputs['Q0.3']===true;
+   ackInputSeen=ackInputSeen||plc(w)?.io.inputs.some(i=>i.terminal==='I0.4'&&i.on)===true;
+   duringAckPhase=plc(w)?.tagValues.Phase;
   }
   w=checked(tick(w,[{k:'operate',id:ACK,pressed:false}]).world);
   w=scan(w,8);
@@ -255,7 +260,11 @@ function one(p:ProjectFile,seed:number):P21Lot{
    sameQueuedBodyRecovered:recovered,cases,
    diagnostic:passed?
     'True pairwise queue load stopped the belt; original b1 was physically diverted and original b2 resumed only after a fresh powered PLC acknowledgement':
-    'One or more real collision, PLC release, same-body conservation or acknowledgement gates failed'};
+    'One or more real collision, PLC release, same-body conservation or acknowledgement gates failed: '+
+    JSON.stringify({preAckPhase,duringAckPhase,ackInputSeen,realReset,
+     belt:w.plantWorld.world.model.belt,
+     leaderSupport:b1?.supportedBy,leaderY:b1?.pos.y,
+     followerSupport:b2?.supportedBy,followerX:b2?.pos.x})};
  }catch(error){
   return {...base,status:'failed',pass:false,
    diagnostic:'P21 original pairwise physical trial aborted without a pass: '+
