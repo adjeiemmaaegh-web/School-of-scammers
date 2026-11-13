@@ -30,6 +30,8 @@ export type EquipmentState={
  lastPlaceCommand?:boolean;lastJamResetCommand?:boolean;
  /** P19 opt-in 24V controller/drive outage recovery; never persisted as project data. */
  lastRestartCommand?:boolean;restartPending?:boolean;restartArmed?:boolean;
+ /** P20 original physical gate/body provenance; cleared only by recovered belt reset. */
+ obstructionGateId?:string|null;obstructionBodyId?:string|null;
  controllerPowerSeen?:boolean;
  slots?:Record<string,string>;phase?:number;
 };
