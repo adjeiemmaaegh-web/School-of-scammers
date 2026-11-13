@@ -53,8 +53,8 @@ export const beltConveyor:EquipmentDef={
     typeof b.tags.jammedByBody==='string'&&b.tags.jammedByBody!==b.id&&
     world.bodies.some(leader=>leader.id===b.tags.jammedByBody&&
      leader.supportedBy===ctx.id)):undefined;
-  const samePair=!!queued&&state.accumulationBodyId===queued.id&&
-   state.accumulationBlockingBodyId===queued.tags.jammedByBody;
+  const samePair=!!queued&&state.queueContactBodyId===queued.id&&
+   state.queueContactLeaderId===queued.tags.jammedByBody;
   const dwellRequired=param(ctx,'accumulationDwellMs',500);
   const queueDwellMs=queued?
    Math.min(dwellRequired,(samePair?(state.accumulationContactMs??0):0)+dt):0;
@@ -116,6 +116,9 @@ export const beltConveyor:EquipmentDef={
    accumulationBodyId:stalled?accumulationBodyId:null,
    accumulationBlockingBodyId:stalled?accumulationBlockingBodyId:null,
    accumulationContactMs:stalled&&!!accumulationBodyId?dwellRequired:queueDwellMs,
+   queueContactBodyId:queued?.id??null,
+   queueContactLeaderId:typeof queued?.tags.jammedByBody==='string'?
+    queued.tags.jammedByBody:null,
    faulted:!!fault,stalled}};
  },
  read:(s,w,ctx)=>({moving:s.engaged,jam:s.stalled||w.bodies.some(b=>b.supportedBy===ctx.id&&b.tags.jammed===true),
