@@ -25,8 +25,8 @@ function chooseCarrier(body:Body,items:readonly EquipmentPlacement[],states:Worl
   Math.abs(body.pos.z-baseHeight(item,states[item.id]))<150);
 }
 function collide(body:Body,candidates:readonly Body[],move:Vec3,
- swept3D=false):{delta:Vec3;blocked:boolean}{
- let x=move.x,y=move.y,blocked=false;
+ swept3D=false):{delta:Vec3;blocked:boolean;blockedByBodyId:string|null}{
+ let x=move.x,y=move.y,blocked=false,blockedByBodyId:string|null=null;
  for(const other of candidates){
   if(other.id===body.id)continue;
   const shifted={...body,pos:{...body.pos,x:q(body.pos.x+x),y:q(body.pos.y+y)}};
@@ -41,9 +41,9 @@ function collide(body:Body,candidates:readonly Body[],move:Vec3,
    if(!footprintOverlap(shifted,other))continue;
   }
   // The cheaper/simpler contact solver keeps previous motion axis if another body occupies its destination.
-  x=0;y=0;blocked=true;break;
+  x=0;y=0;blocked=true;blockedByBodyId=other.id;break;
  }
- return {delta:vec(x,y,move.z),blocked};
+ return {delta:vec(x,y,move.z),blocked,blockedByBodyId};
 }
 /** One 10ms integration step; stable body ID order prevents nondeterministic contact resolution. */
 export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dtMs=10):World{
@@ -92,7 +92,8 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    // Once a P20 physical obstruction has tripped its source belt, actual
    // carrier velocity is zero, not merely a gradually easing UI animation.
    const mechanicallyStopped=carrier.kind==='belt-conveyor'&&
-    carrier.params.obstructionTripMode===1&&state.stalled;
+    state.stalled&&(carrier.params.obstructionTripMode===1||
+    carrier.params.accumulationTripMode===1);
    body.vel.x=mechanicallyStopped?0:clampVelocity(body.vel.x,targetX,dtMs);
    body.vel.y=mechanicallyStopped?0:clampVelocity(body.vel.y,targetY,dtMs);
    body.vel.z=0;
@@ -119,11 +120,20 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
     body.vel.x=0;body.vel.y=0;
     body.tags={...body.tags,jammed:true,
      jammedByGate:state.obstructionGateId};
+   }else if(mechanicallyStopped&&state.accumulationBodyId===body.id&&
+      typeof state.accumulationBlockingBodyId==='string'){
+    // The original queued body/leader pair is a physical contact witness.
+    // A stopped carrier proposes zero travel; do not erase that witness
+    // until the leader is moved off the lane and a fresh PLC reset is issued.
+    body.vel.x=0;body.vel.y=0;
+    body.tags={...body.tags,jammed:true,
+     jammedByBody:state.accumulationBlockingBodyId};
    }else if(blocked||solidBlocked){
     body.vel.x=0;body.vel.y=0;
     const tags:Body['tags']={...body.tags,jammed:true};
     if(blockingGate)tags.jammedByGate=blockingGate.id;
     else delete tags.jammedByGate;
+    delete tags.jammedByBody;
     body.tags=tags;
     if(!prior.tags.jammed)changed=addEvent(changed,{kind:'jam',source:carrier.id,bodyId:body.id,
      detail:solidBlocked?'Body contacted a fixed solid':
@@ -133,12 +143,16 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
       carrier.params.contactMode===1);
     if(contact.blocked){
      body.vel.x=0;body.vel.y=0;const tags:Body['tags']={...body.tags,jammed:true};
-     delete tags.jammedByGate;body.tags=tags;
+     delete tags.jammedByGate;
+     if(contact.blockedByBodyId)tags.jammedByBody=contact.blockedByBodyId;
+     else delete tags.jammedByBody;
+     body.tags=tags;
      if(!prior.tags.jammed)changed=addEvent(changed,{kind:'jam',source:carrier.id,bodyId:body.id,detail:'Body accumulated behind another body'});
     }else{
      body.pos.x=q(body.pos.x+contact.delta.x);body.pos.y=q(body.pos.y+contact.delta.y);
      if(prior.tags.jammed){const tags={...body.tags};
-      delete tags.jammed;delete tags.jammedByGate;body.tags=tags;}
+      delete tags.jammed;delete tags.jammedByGate;
+      delete tags.jammedByBody;body.tags=tags;}
     }
    }
    if(!insideFootprint(body.pos,carrier.originMm,
