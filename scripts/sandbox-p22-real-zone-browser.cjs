@@ -123,7 +123,7 @@ const wires=()=>{
   await run('failed');
   assert.equal(await page.$eval('[data-p22-lot="0"]',
    e=>e.dataset.p22LotState),'fail');
-  assert.ok(await page.$eval('[data-p22-case="early-third-feed-inhibited"][data-p22-case-state="fail"]',
+  assert.ok(await page.$$eval('[data-p22-case="early-third-feed-inhibited"][data-p22-case-state="fail"]',
    els=>els.length)>0,'Blind PLC controller must fail before accumulation trip');
   assert.deepEqual(errors.filter(e=>!/WebGL|GPU stall|favicon|swiftshader/i.test(e)),[]);
   console.log('P22 SOURCE-NEGATIVE BROWSER PASS: a program using only accumulationTrip rather than physical zoneFull feeds b3 too early and fails');
