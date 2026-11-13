@@ -10,12 +10,14 @@ export const beltConveyor:EquipmentDef={
   {name:'resetJam',kind:'bool'},{name:'resetRestart',kind:'bool'},
   {name:'speed',kind:'number',unit:'mm/s'}],
  signals:[{name:'moving',kind:'bool'},{name:'jam',kind:'bool'},
-  {name:'restartRequired',kind:'bool'},{name:'speed',kind:'number',unit:'mm/s'}],
+  {name:'restartRequired',kind:'bool'},{name:'obstructionTripped',kind:'bool'},
+  {name:'speed',kind:'number',unit:'mm/s'}],
  params:[spec('lengthMm','Belt length','mm',200,2400,50,600),spec('widthMm','Belt width','mm',150,600,50,300),
  spec('speedMmS','Surface speed','mm/s',50,1000,10,250),
  spec('contactMode','Body collision','0=legacy, 1=swept 3D',0,1,1,0),
   spec('jamResetMode','Jam acknowledgement','0=legacy, 1=PLC reset after repair',0,1,1,0),
-  spec('restartHoldMode','Power restoration inhibit','0=legacy, 1=PLC reset after loss',0,1,1,0)],
+  spec('restartHoldMode','Power restoration inhibit','0=legacy, 1=PLC reset after loss',0,1,1,0),
+  spec('obstructionTripMode','Physical gate obstruction trip','0=legacy, 1=latched PLC reset',0,1,1,0)],
  faults:['belt-slip','belt-jammed','motor-dead'],
  fresh:()=>initial({}),
  step:(state,world,commands,dt,fault,ctx)=>{
@@ -24,11 +26,29 @@ export const beltConveyor:EquipmentDef={
   const actual=run?(fault==='belt-slip'?demanded*.3:demanded):0;
   const resetRequested=flag(commands,'resetJam');
   const resetEdge=resetRequested&&!state.lastJamResetCommand;
-  const latchedMode=param(ctx,'jamResetMode',0)===1;
-  // A NEW PLC reset edge after physical repair clears the latched stop.
-  // Held reset and reset during an unrepaired fault cannot bypass it.
+  const obstructionMode=param(ctx,'obstructionTripMode',0)===1;
+  const collision=obstructionMode?world.bodies.find(b=>b.supportedBy===ctx.id&&
+   b.tags.jammed===true&&typeof b.tags.jammedByGate==='string'&&
+   world.model[b.tags.jammedByGate]?.engaged===true):undefined;
+  // P20 requires the REAL worker-owned originally moving body, real gate
+  // and real physical jam tag, never a teacher-assigned fault or PLC tag.
+  const obstructionGateId=state.stalled&&state.obstructionGateId?
+   state.obstructionGateId:collision?.tags.jammedByGate as string|undefined;
+  const obstructionBodyId=state.stalled&&state.obstructionBodyId?
+   state.obstructionBodyId:collision?.id;
+  const originalBodyPresent=!!obstructionBodyId&&world.bodies.some(b=>
+   b.id===obstructionBodyId&&b.supportedBy===ctx.id);
+  const gateStillBlocking=!!obstructionGateId&&
+   world.model[obstructionGateId]?.engaged===true;
+  const obstructionCanReset=originalBodyPresent&&!gateStillBlocking;
+  const latchedMode=param(ctx,'jamResetMode',0)===1||obstructionMode;
+  // Faults and worker-observed collisions use the same PLC reset input,
+  // but a mechanically EXTENDED gate must be released BEFORE the reset
+  // edge. The original blocked body must still exist on its source belt.
+  const clear=resetEdge&&fault===null&&
+   (!obstructionGateId||obstructionCanReset);
   const stalled=latchedMode?
-   fault==='belt-jammed'||(state.stalled&&!(resetEdge&&fault===null)):
+   fault==='belt-jammed'||!!collision||(state.stalled&&!clear):
    fault==='belt-jammed'||state.stalled;
   // Controller power comes from the actual 24V netlist through the
   // worker-owned bridge, NOT a learner PLC tag or synthetic source input.
@@ -55,10 +75,13 @@ export const beltConveyor:EquipmentDef={
    lastJamResetCommand:resetRequested,lastRestartCommand:restartReset,
    controllerPowerSeen:state.controllerPowerSeen===true||controllerPowered,
    restartPending,restartArmed,
+   obstructionBodyId:stalled?obstructionBodyId:null,
+   obstructionGateId:stalled?obstructionGateId:null,
    faulted:!!fault,stalled}};
  },
  read:(s,w,ctx)=>({moving:s.engaged,jam:s.stalled||w.bodies.some(b=>b.supportedBy===ctx.id&&b.tags.jammed===true),
   restartRequired:s.restartPending===true,
+  obstructionTripped:s.stalled&&!!s.obstructionBodyId,
   speed:s.engaged?s.speedMmS:0}),
  describe:(s,ctx)=>[draw(ctx,'frame','box',vec(param(ctx,'lengthMm',600),param(ctx,'widthMm',300),120),60,
   s.engaged?'#397fa0':'#5f7380')],
