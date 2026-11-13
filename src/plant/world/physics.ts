@@ -120,6 +120,15 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
     body.vel.x=0;body.vel.y=0;
     body.tags={...body.tags,jammed:true,
      jammedByGate:state.obstructionGateId};
+   }else if(mechanicallyStopped&&state.accumulationBlockingBodyId===body.id&&
+      typeof prior.tags.jammedByGate==='string'&&
+      world.model[prior.tags.jammedByGate]?.engaged===true){
+    // Original lead carton stays physically against its original STOPPER
+    // during a following body's accumulated drive-trip. Do not delete this
+    // provenance solely because a stopped belt proposes zero translation.
+    body.vel.x=0;body.vel.y=0;
+    body.tags={...body.tags,jammed:true,
+     jammedByGate:prior.tags.jammedByGate};
    }else if(mechanicallyStopped&&state.accumulationBodyId===body.id&&
       typeof state.accumulationBlockingBodyId==='string'){
     // The original queued body/leader pair is a physical contact witness.
