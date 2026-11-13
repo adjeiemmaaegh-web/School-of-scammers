@@ -24,7 +24,7 @@ describe('P21 original powered PLC / real two-body queue and pusher recovery',()
    expect(lot.genuinePair).toBe(true);
    expect(lot.contactDwellMs).toBeGreaterThanOrEqual(200);
    expect(lot.stoppedUnderLoad).toBe(true);
-   expect(lot.actualGateRetracted).toBe(true);
+   expect(lot.gateRetracted).toBe(true);
    expect(lot.leaderPhysicallyDiverted).toBe(true);
    expect(lot.stopHeldAfterClearance).toBe(true);
    expect(lot.resetFromPlc).toBe(true);
