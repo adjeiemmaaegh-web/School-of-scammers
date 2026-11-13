@@ -31,7 +31,7 @@ export type P23Campaign={
 };
 const wired=(p:ProjectFile,a:string,b:string)=>
  p.wires.some(w=>(w.from===a&&w.to===b)||(w.from===b&&w.to===a));
-export function p23ZonePreflight(p:ProjectFile,sceneId:string):string[]{
+export function p23HandoffPreflight(p:ProjectFile,sceneId:string):string[]{
  const errors=p22ZonePreflight(p,sceneId);
  if(sceneId!==SCENE)return errors;
  // The only second belt must be an actual adjacent, aligned receiver,
@@ -274,11 +274,11 @@ function one(p:ProjectFile,seed:number):P23Lot{
    (error instanceof Error?error.message:String(error))};
  }
 }
-export function runP23ZoneCampaign(p:ProjectFile,sceneId:string):P23Campaign{
+export function runP23HandoffCampaign(p:ProjectFile,sceneId:string):P23Campaign{
  const sourceSignature=projectSignature(p);
  const base={sceneId,sourceSignature,lots:[] as P23Lot[],
   deterministicReplay:false,totalOriginals:0};
- const blockers=p23ZonePreflight(p,sceneId);
+ const blockers=p23HandoffPreflight(p,sceneId);
  if(blockers.length)return {...base,status:'blocked',diagnostic:blockers.join('; ')};
  const lots=[1,42,65535,42].map(seed=>one(p,seed));
  const deterministicReplay=JSON.stringify(lots[1])===JSON.stringify(lots[3]);
