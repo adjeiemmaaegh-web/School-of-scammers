@@ -89,32 +89,44 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
     state.progress>0&&!state.done;
    const speed=state.engaged&&!turning?state.speedMmS:0;
    const targetX=direction.x*speed,targetY=direction.y*speed;
-   body.vel.x=clampVelocity(body.vel.x,targetX,dtMs);
-   body.vel.y=clampVelocity(body.vel.y,targetY,dtMs);
+   // Once a P20 physical obstruction has tripped its source belt, actual
+   // carrier velocity is zero, not merely a gradually easing UI animation.
+   const mechanicallyStopped=carrier.kind==='belt-conveyor'&&
+    carrier.params.obstructionTripMode===1&&state.stalled;
+   body.vel.x=mechanicallyStopped?0:clampVelocity(body.vel.x,targetX,dtMs);
+   body.vel.y=mechanicallyStopped?0:clampVelocity(body.vel.y,targetY,dtMs);
    body.vel.z=0;
    body.supportedBy=carrier.id;
    body.pos.z=q(baseHeight(carrier,state));
    // A locked gate or extended stopper obstructs travel rather than teleporting cargo.
    const proposed=vec(body.vel.x*dtMs/1000,body.vel.y*dtMs/1000,0);
-   const blocked=items.some(item=>BLOCKERS.has(item.kind)&&world.model[item.id]?.engaged&&
+   const blockingGate=items.find(item=>BLOCKERS.has(item.kind)&&world.model[item.id]?.engaged&&
     insideFootprint({x:body.pos.x+proposed.x,y:body.pos.y+proposed.y,z:body.pos.z},
      item.originMm,worldFootprint(item,Math.max(50,item.params.lengthMm??80),
       Math.max(50,item.params.widthMm??200))));
+   const blocked=!!blockingGate;
    const moved={...body,pos:vec(body.pos.x+proposed.x,body.pos.y+proposed.y,body.pos.z)};
    const solidBlocked=newlyContactsStaticSolid(body,moved,items);
    if(blocked||solidBlocked){
-    body.vel.x=0;body.vel.y=0;body.tags={...body.tags,jammed:true};
+    body.vel.x=0;body.vel.y=0;
+    const tags={...body.tags,jammed:true};
+    if(blockingGate)tags.jammedByGate=blockingGate.id;
+    else delete tags.jammedByGate;
+    body.tags=tags;
     if(!prior.tags.jammed)changed=addEvent(changed,{kind:'jam',source:carrier.id,bodyId:body.id,
-     detail:solidBlocked?'Body contacted a fixed solid':'Body blocked by a gate'});
+     detail:solidBlocked?'Body contacted a fixed solid':
+      'Body '+body.id+' physically blocked by extended gate '+(blockingGate?.id??'unknown')});
    }else{
     const contact=collide(body,[...next,...sorted.filter(o=>Number(o.id.slice(1))>Number(body.id.slice(1)))],proposed,
       carrier.params.contactMode===1);
     if(contact.blocked){
-     body.vel.x=0;body.vel.y=0;body.tags={...body.tags,jammed:true};
+     body.vel.x=0;body.vel.y=0;const tags={...body.tags,jammed:true};
+     delete tags.jammedByGate;body.tags=tags;
      if(!prior.tags.jammed)changed=addEvent(changed,{kind:'jam',source:carrier.id,bodyId:body.id,detail:'Body accumulated behind another body'});
     }else{
      body.pos.x=q(body.pos.x+contact.delta.x);body.pos.y=q(body.pos.y+contact.delta.y);
-     if(prior.tags.jammed){const tags={...body.tags};delete tags.jammed;body.tags=tags;}
+     if(prior.tags.jammed){const tags={...body.tags};
+      delete tags.jammed;delete tags.jammedByGate;body.tags=tags;}
     }
    }
    if(!insideFootprint(body.pos,carrier.originMm,
