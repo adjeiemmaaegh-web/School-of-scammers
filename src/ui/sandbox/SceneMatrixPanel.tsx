@@ -14,6 +14,7 @@ import {autoFactoryPreflight,type AutoFactoryResult} from '../../plant/scenes/ma
 import {p16AuditPreflight,type P16AuditResult} from '../../plant/scenes/matrix-p16';
 import type {P17Campaign} from '../../plant/scenes/matrix-p17';
 import {p18Preflight,type P18Result} from '../../plant/scenes/matrix-p18';
+import {p19PowerPreflight,type P19Campaign} from '../../plant/scenes/matrix-p19';
 import {projectSignature} from '../../plant/scenes/commissioning';
 
 type Props={scene:PlantScene;project:ProjectFile;snapshot:RenderSnapshot};
@@ -23,11 +24,14 @@ type Reply={kind:'matrix-result';id:number;result:MatrixResult}|
  {kind:'resilience-result';id:number;result:P16AuditResult}|
  {kind:'material-lots-result';id:number;result:P17Campaign}|
  {kind:'jam-recovery-result';id:number;result:P18Result}|
+ {kind:'power-recovery-result';id:number;result:P19Campaign}|
  {kind:'matrix-error';id:number;message:string};
 export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const spec=matrixSpecFor(scene.id)??expandedSpecFor(scene.id)??advancedSpecFor(scene.id);
  const unsupported=P13_UNSUPPORTED[scene.id];
  const signature=projectSignature(project);
+ const powerBlockers=useMemo(()=>scene.id==='bottle-line'?
+  p19PowerPreflight(project,scene.id):[],[signature,scene.id]);
  const jamBlockers=useMemo(()=>scene.id==='bottle-line'?
   p18Preflight(project,scene.id):[],[signature,scene.id]);
  const resilienceBlockers=useMemo(()=>advancedSpecFor(scene.id)?
@@ -46,6 +50,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const [resilienceReport,setResilienceReport]=useState<P16AuditResult|null>(null);
  const [materialReport,setMaterialReport]=useState<P17Campaign|null>(null);
  const [jamReport,setJamReport]=useState<P18Result|null>(null);
+ const [powerReport,setPowerReport]=useState<P19Campaign|null>(null);
  const [error,setError]=useState<string|null>(null);
  const worker=useRef<Worker|null>(null);
  const nextId=useRef(0);
@@ -55,7 +60,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   worker.current?.terminate();
   worker.current=null;
   setPending(false);setReport(null);setBatchReport(null);setAutoReport(null);
-  setResilienceReport(null);setMaterialReport(null);setJamReport(null);setError(null);
+  setResilienceReport(null);setMaterialReport(null);setJamReport(null);setPowerReport(null);setError(null);
   return ()=>{
    nextId.current++;worker.current?.terminate();worker.current=null;
   };
@@ -72,7 +77,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  </details>:null;
  const debug=Object.keys(snapshot.debugForces??{}).length>0||
   Object.values(snapshot.plcs).some(plc=>Object.keys(plc.debugForces??{}).length>0);
- const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery')=>{
+ const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery'|'run-power-recovery')=>{
   if(pending||blockers.length||debug||snapshot.lastError)return;
   worker.current?.terminate();
   const runId=++nextId.current;
@@ -81,7 +86,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   worker.current=local;
   setPending(true);setError(null);setReport(null);setBatchReport(null);
   setAutoReport(null);setResilienceReport(null);setMaterialReport(null);
-  setJamReport(null);
+  setJamReport(null);setPowerReport(null);
   local.onmessage=(event:MessageEvent<Reply>)=>{
    if(event.data?.id!==runId||worker.current!==local)return;
    local.terminate();worker.current=null;
@@ -94,6 +99,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
    else if(event.data.kind==='resilience-result')setResilienceReport(event.data.result);
    else if(event.data.kind==='material-lots-result')setMaterialReport(event.data.result);
    else if(event.data.kind==='jam-recovery-result')setJamReport(event.data.result);
+   else if(event.data.kind==='power-recovery-result')setPowerReport(event.data.result);
    else setReport(event.data.result);
   };
   local.onerror=()=>{
@@ -177,6 +183,60 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
      This is not a measured industrial throughput rate. Fault repaired:
      {' '}{autoReport.faultRecovered?'yes':'no'}.
      The result is ephemeral, not part of the project.</p>
+   </div>}
+  </section>}
+  {scene.id==='bottle-line'&&<section className="sandbox-p19-power"
+   data-p19-power data-p19-state={pending?'running':powerReport?.status??'setup'}>
+   <h3>P19 · Power-loss and restart-inhibit campaign</h3>
+   <p className="sandbox-help">The same original PLC program must safely
+    withstand six independent interruptions: PLC supply-wire loss and
+    belt drive-power loss at original bottle 1, 2 and 3. Each genuine
+    Worker run verifies physical transport stops, then checks that
+    restored power alone cannot restart the belt. A new powered 24 V
+    maintenance acknowledgement must cause your own PLC Q0.5 reset.
+    The identical workpiece must finish its actual filling and capping.
+    A seventh run repeats one case for exact deterministic evidence.</p>
+   <p className="sandbox-help">Use the optional machine setting
+    restartHoldMode=1, actual belt restartRequired feedback at PLC I1.0
+    and resetRestart Q0.5. Existing jam reset Q0.4 remains independent.
+    This educational power interlock is <strong>not safety-rated</strong>,
+    industrial restart authorization, or real PLC verification.
+    No results or temporary fault switches are saved.</p>
+   {powerBlockers.length>0&&<div data-p19-preflight>
+    <strong>Complete power-restart commissioning first:</strong>
+    <ul>{powerBlockers.map(x=><li key={x}>{x}</li>)}</ul>
+   </div>}
+   <button type="button" className="btn ghost small" data-p19-run-power
+    disabled={pending||!!blockers.length||!!powerBlockers.length||
+     debug||!!snapshot.lastError}
+    onClick={()=>begin('run-power-recovery')}>{pending?
+     'Testing actual PLC and belt outages…':
+     'Test PLC power loss, drive power loss and controlled restart'}</button>
+   {powerReport&&<div data-p19-result data-p19-result-state={powerReport.status}>
+    <p role="status"><strong>{powerReport.status==='passed'?
+     'P19 power-loss campaign passed':'P19 power-loss campaign did not pass'}</strong>.
+     {' '}{powerReport.diagnostic}</p>
+    <p className="sandbox-help">Original products completed:
+     {' '}{powerReport.completedOriginalProducts}/
+     {powerReport.totalOriginalProducts} across six independent runs.
+     Product/model-only evidence, not industrial safety certification.</p>
+    <ol>{powerReport.episodes.map((ep,i)=><li key={i}
+     data-p19-episode={i} data-p19-episode-state={ep.passed?'pass':'fail'}>
+      <strong>{ep.passed?'✓':'○'} {ep.kind}</strong>
+      {' '}· original bottle {ep.faultAtProduct} · lot {ep.materialSeed}
+      {' '}· accepted {ep.completed}/3 ·
+      restored supply: {ep.powerRestored?'yes':'no'} ·
+      restart inhibited: {ep.restartLatched?'yes':'no'}.
+      <details><summary>Physical and PLC evidence</summary>
+       <ul>{ep.cases.map(c=><li key={c.id}
+        data-p19-case={c.id} data-p19-case-state={c.pass?'pass':'fail'}>
+        {c.pass?'✓':'○'} {c.id}: {c.detail}
+       </li>)}</ul>
+      </details>
+     </li>)}</ol>
+    <p data-p19-replay={powerReport.deterministicReplay?'pass':'fail'}>
+     Exact supply-interruption replay:
+     {' '}{powerReport.deterministicReplay?'passed':'failed'}.</p>
    </div>}
   </section>}
   {scene.id==='bottle-line'&&<section className="sandbox-p18-jam"
