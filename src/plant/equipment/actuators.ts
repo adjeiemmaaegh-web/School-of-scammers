@@ -28,7 +28,8 @@ export const stopper:EquipmentDef={
   // A different carton or loss of contact restarts the dwell at zero.
   const monitored=param(ctx,'holdSensorMode',0)===1;
   const original=monitored&&engaged?w.bodies.find(b=>b.supportedBy!==null&&
-   b.tags.jammed===true&&b.tags.jammedByGate===ctx.id):undefined;
+   b.tags.jammed===true&&b.tags.jammedByGate===ctx.id&&
+   insideFootprint(b.pos,ctx.originMm,vec(140,260,0))):undefined;
   const priorSame=!!original&&s.heldContactBodyId===original.id;
   const dwell=param(ctx,'holdDwellMs',200);
   const heldContactMs=original?
