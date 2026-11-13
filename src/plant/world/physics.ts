@@ -107,7 +107,19 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    const blocked=!!blockingGate;
    const moved={...body,pos:vec(body.pos.x+proposed.x,body.pos.y+proposed.y,body.pos.z)};
    const solidBlocked=newlyContactsStaticSolid(body,moved,items);
-   if(blocked||solidBlocked){
+   // A P20 gate trip has ALREADY been witnessed by the worker physics and
+   // latched by the source belt on the prior substep. While the belt is
+   // physically stopped at the contact boundary, proposed travel is zero;
+   // testing only this zero-length move would falsely clear the original
+   // jam provenance and make sensor/body evidence inconsistent. Preserve the
+   // real original contact ID until an authenticated post-clearance reset
+   // restarts motion; then normal collision physics removes the tags.
+   if(mechanicallyStopped&&state.obstructionBodyId===body.id&&
+      typeof state.obstructionGateId==='string'){
+    body.vel.x=0;body.vel.y=0;
+    body.tags={...body.tags,jammed:true,
+     jammedByGate:state.obstructionGateId};
+   }else if(blocked||solidBlocked){
     body.vel.x=0;body.vel.y=0;
     const tags:Body['tags']={...body.tags,jammed:true};
     if(blockingGate)tags.jammedByGate=blockingGate.id;
