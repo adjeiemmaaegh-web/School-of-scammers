@@ -108,8 +108,12 @@ function one(p:ProjectFile,seed:number):P22Lot{
    if(w.plantWorld.world.spawnedCount===2&&count(w)===2&&
     signal(w,'belt','zoneFull')&&!signal(w,'belt','accumulationTripped')){
     fullBeforeTrip=true;
+    // The plant publishes its output after the current 50ms scan; the
+    // authentic PLC input image receives that signal on the NEXT scan.
+    // Require both true physical occupation and actual electrically
+    // received I0.5 before proceeding, while still BEFORE the P21 trip.
     plcFull=plc(w)?.io.inputs.some(i=>i.terminal==='I0.5'&&i.on)===true;
-    break;
+    if(plcFull)break;
    }
   }
   const initialZoneCount=count(w);
