@@ -28,6 +28,9 @@ export type EquipmentState={
  lastCommand:boolean;elapsedMs:number;stalled:boolean;faulted:boolean;
  heldBodyId?:string|null;routeMetalLatched?:boolean;activeBodyId?:string|null;
  lastPlaceCommand?:boolean;lastJamResetCommand?:boolean;
+ /** P19 opt-in 24V controller/drive outage recovery; never persisted as project data. */
+ lastRestartCommand?:boolean;restartPending?:boolean;restartArmed?:boolean;
+ controllerPowerSeen?:boolean;
  slots?:Record<string,string>;phase?:number;
 };
 export type EquipmentPlacement={
