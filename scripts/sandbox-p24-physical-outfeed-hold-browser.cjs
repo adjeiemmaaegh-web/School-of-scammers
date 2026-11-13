@@ -48,9 +48,9 @@ const wires=()=>{
   ['scene-supply.M0','outstop.M-'],
   ['scene-supply.P24','outstop.L+'],
   ['scene-supply.M0','outstop.M'],
-  ['outstop.OUT_extended','scene-plc.I0.9'],
-  ['outstop.OUT_retracted','scene-plc.I0.10'],
-  ['outstop.OUT_heldLoad','scene-plc.I0.11'],
+  ['outstop.OUT_extended','scene-plc.I1.1'],
+  ['outstop.OUT_retracted','scene-plc.I1.2'],
+  ['outstop.OUT_heldLoad','scene-plc.I1.3'],
  ];
  return pairs.map(([from,to],i)=>({id:'p24-real-wire-'+i,from,to}));
 };
@@ -127,9 +127,9 @@ const wires=()=>{
    'p24-release'].includes(c.id)),false);
   assert.equal(JSON.stringify(p).includes('heldContactBodyId'),false);
   assert.equal(p.wires.some(w=>w.from==='outstop.OUT_heldLoad'),true);
-  console.log('P24 POSITIVE PASS: original physical 200ms outstop hold I0.11, early release refused, Q0.6 release and real b3');
+  console.log('P24 POSITIVE PASS: original physical 200ms outstop hold I1.3, early release refused, Q0.6 release and real b3');
   // Negative: a PLC releasing based on I0.7 receiver-full instead of actual
-  // jam-dwell I0.11 must drop outstop Q0.6 prematurely, before contact.
+  // jam-dwell I1.3 must drop outstop Q0.6 prematurely, before contact.
   await page.evaluate(key=>{
    const p=JSON.parse(localStorage.getItem(key));
    const previous='IF In8 AND In11 AND In9 THEN Released := TRUE; END_IF;';
