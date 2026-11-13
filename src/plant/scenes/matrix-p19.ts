@@ -103,6 +103,7 @@ function restore(w:WorldState,kind:P19Outage,wireId:string):WorldState{
   id:'belt',fault:null},{k:'run'}]).world);
 }
 function one(p:ProjectFile,kind:P19Outage,index:number,seed:number):P19Episode{
+ const sourceSignature=projectSignature(p);
  const base={kind,faultAtProduct:index,materialSeed:seed,
   produced:0,completed:0,targetBodyId:null as string|null,materialSequence:'',
   trace:[] as P17MaterialTrace[],lostPowerVerified:false,
@@ -216,7 +217,7 @@ function one(p:ProjectFile,kind:P19Outage,index:number,seed:number):P19Episode{
     detail:'Original PLC Q0.5 issued new resetRestart edge after real I0.7 maintenance pulse and resumed original item'},
    {id:'quality-and-conservation',pass:finished&&processed&&conserved(world),
     detail:'All three original physical cylinders met >=500mL fill and bottle-specific cap with no material loss or duplicate'},
-   {id:'no-source-mutation',pass:projectSignature(p)===projectSignature(p),
+   {id:'no-source-mutation',pass:projectSignature(p)===sourceSignature,
     detail:'Private electrical fault, maintenance button and item states never applied to the learner source'},
   ];
   const success=checks.every(c=>c.pass);
