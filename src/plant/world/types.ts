@@ -33,7 +33,8 @@ export type EquipmentState={
  /** P20 original physical gate/body provenance; cleared only by recovered belt reset. */
  obstructionGateId?:string|null;obstructionBodyId?:string|null;
  /** P21 opt-in sustained original body-to-body queue detection and restart. */
- accumulationContactMs?:number;accumulationBodyId?:string|null;
+ accumulationContactMs?:number;queueContactBodyId?:string|null;
+ queueContactLeaderId?:string|null;accumulationBodyId?:string|null;
  accumulationBlockingBodyId?:string|null;
  controllerPowerSeen?:boolean;
  slots?:Record<string,string>;phase?:number;
