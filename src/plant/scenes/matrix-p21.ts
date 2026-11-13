@@ -55,7 +55,7 @@ export function p21AccumulationPreflight(p:ProjectFile,sceneId:string):string[]{
  if(p.params?.belt?.accumulationDwellMs!==200)
   problems.push('Set accumulationDwellMs=200 to distinguish brief contacts from sustained queue');
  const placement=(id:string)=>p.components.find(c=>c.id===id);
- for(const [id,x] of [['feeder',430],['belt',455],['stopper',481],['pusher',473]] as const){
+ for(const [id,x] of [['feeder',430],['belt',455],['stopper',481],['pusher',479]] as const){
   const c=placement(id);
   if(!c||c.x!==x||c.y!==225)
    problems.push('Place '+id+' at training coordinates x='+x+', y=225 on the original lane');
