@@ -7,12 +7,15 @@ import type {EquipmentState} from '../world/types';
 export const beltConveyor:EquipmentDef={
  kind:'belt-conveyor',label:'Variable-speed belt conveyor',footprint:vec(600,300,120),
  commands:[{name:'run',kind:'bool'},{name:'reverse',kind:'bool'},
-  {name:'resetJam',kind:'bool'},{name:'speed',kind:'number',unit:'mm/s'}],
- signals:[{name:'moving',kind:'bool'},{name:'jam',kind:'bool'},{name:'speed',kind:'number',unit:'mm/s'}],
+  {name:'resetJam',kind:'bool'},{name:'resetRestart',kind:'bool'},
+  {name:'speed',kind:'number',unit:'mm/s'}],
+ signals:[{name:'moving',kind:'bool'},{name:'jam',kind:'bool'},
+  {name:'restartRequired',kind:'bool'},{name:'speed',kind:'number',unit:'mm/s'}],
  params:[spec('lengthMm','Belt length','mm',200,2400,50,600),spec('widthMm','Belt width','mm',150,600,50,300),
  spec('speedMmS','Surface speed','mm/s',50,1000,10,250),
  spec('contactMode','Body collision','0=legacy, 1=swept 3D',0,1,1,0),
-  spec('jamResetMode','Jam acknowledgement','0=legacy, 1=PLC reset after repair',0,1,1,0)],
+  spec('jamResetMode','Jam acknowledgement','0=legacy, 1=PLC reset after repair',0,1,1,0),
+  spec('restartHoldMode','Power restoration inhibit','0=legacy, 1=PLC reset after loss',0,1,1,0)],
  faults:['belt-slip','belt-jammed','motor-dead'],
  fresh:()=>initial({}),
  step:(state,world,commands,dt,fault,ctx)=>{
@@ -27,13 +30,35 @@ export const beltConveyor:EquipmentDef={
   const stalled=latchedMode?
    fault==='belt-jammed'||(state.stalled&&!(resetEdge&&fault===null)):
    fault==='belt-jammed'||state.stalled;
-  const engaged=run&&!stalled;
+  // Controller power comes from the actual 24V netlist through the
+  // worker-owned bridge, NOT a learner PLC tag or synthetic source input.
+  const controllerPowered=commands.controllerPowered!==false;
+  const restartMode=param(ctx,'restartHoldMode',0)===1;
+  const newlyLostController=state.controllerPowerSeen===true&&!controllerPowered;
+  const restartReset=flag(commands,'resetRestart');
+  const restartEdge=restartReset&&!state.lastRestartCommand;
+  let restartPending=restartMode&&(state.restartPending===true||
+   newlyLostController||fault==='motor-dead');
+  let restartArmed=restartMode&&state.restartArmed===true;
+  // A held HIGH reset never clears an outage. Observe LOW while restored,
+  // then a fresh energized reset edge. This is a teaching interlock, not
+  // certified machine safety or hardware restart supervision.
+  if(restartPending){
+   if(!controllerPowered||fault!==null)restartArmed=false;
+   else if(!restartReset)restartArmed=true;
+   if(restartEdge&&state.restartArmed===true&&controllerPowered&&
+      fault===null&&!stalled){restartPending=false;restartArmed=false;}
+  }else restartArmed=false;
+  const engaged=run&&!stalled&&!restartPending&&controllerPowered;
   return {world,state:{...state,engaged,
    speedMmS:q(engaged?(flag(commands,'reverse')?-actual:actual):0),
-   lastJamResetCommand:resetRequested,
+   lastJamResetCommand:resetRequested,lastRestartCommand:restartReset,
+   controllerPowerSeen:state.controllerPowerSeen===true||controllerPowered,
+   restartPending,restartArmed,
    faulted:!!fault,stalled}};
  },
  read:(s,w,ctx)=>({moving:s.engaged,jam:s.stalled||w.bodies.some(b=>b.supportedBy===ctx.id&&b.tags.jammed===true),
+  restartRequired:s.restartPending===true,
   speed:s.engaged?s.speedMmS:0}),
  describe:(s,ctx)=>[draw(ctx,'frame','box',vec(param(ctx,'lengthMm',600),param(ctx,'widthMm',300),120),60,
   s.engaged?'#397fa0':'#5f7380')],
