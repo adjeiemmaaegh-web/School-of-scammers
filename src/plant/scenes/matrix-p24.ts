@@ -52,18 +52,18 @@ export function p24HoldPreflight(p:ProjectFile,sceneId:string):string[]{
   [SUPPLY+'.M0','outstop.M-'],
   [SUPPLY+'.P24','outstop.L+'],
   [SUPPLY+'.M0','outstop.M'],
-  ['outstop.OUT_extended',PLC+'.I0.9'],
-  ['outstop.OUT_retracted',PLC+'.I0.10'],
-  ['outstop.OUT_heldLoad',PLC+'.I0.11'],
+  ['outstop.OUT_extended',PLC+'.I1.1'],
+  ['outstop.OUT_retracted',PLC+'.I1.2'],
+  ['outstop.OUT_heldLoad',PLC+'.I1.3'],
  ] as const)if(!wired(p,a,b))
   errors.push('Connect genuine powered downstream stopper '+a+' to '+b);
- for(const pin of ['Q0.6','I0.9','I0.10','I0.11']){
+ for(const pin of ['Q0.6','I1.1','I1.2','I1.3']){
   const terminal=PLC+'.'+pin;
   if(p.wires.filter(w=>w.from===terminal||w.to===terminal).length!==1)
    errors.push('PLC '+pin+' must be exclusive to genuine downstream hardware');
  }
- if(p.wires.some(w=>w.from===PLC+'.I0.8'||w.to===PLC+'.I0.8'))
-  errors.push('Reserve PLC I0.8 for the private powered release operator');
+ if(p.wires.some(w=>w.from===PLC+'.I1.0'||w.to===PLC+'.I1.0'))
+  errors.push('Reserve PLC I1.0 for the private powered release operator');
  if(p.components.some(c=>[START,ACK,REQUEST,RELEASE].includes(c.id)))
   errors.push('Remove conflicting P24 test-only switch IDs');
  return [...new Set(errors)];
@@ -77,7 +77,7 @@ function privateProject(p:ProjectFile):ProjectFile{
   {id:'p24-request-power',from:SUPPLY+'.P24',to:REQUEST+'.A'},
   {id:'p24-request-in',from:REQUEST+'.B',to:PLC+'.I0.6'},
   {id:'p24-release-power',from:SUPPLY+'.P24',to:RELEASE+'.A'},
-  {id:'p24-release-in',from:RELEASE+'.B',to:PLC+'.I0.8'}];
+  {id:'p24-release-in',from:RELEASE+'.B',to:PLC+'.I1.0'}];
  return {...p,components:[...p.components,
   {id:START,kind:'start',x:870,y:383,pressed:false},
   {id:ACK,kind:'start',x:870,y:426,pressed:false},
@@ -234,11 +234,11 @@ function one(p:ProjectFile,seed:number):P24Lot{
    body(w,'b2')?.supportedBy==='receiver'&&conserved(w.plantWorld.world),
    'Original b2 physically advances at least 35 mm on actual PLC-driven receiver, not inertial edge crossing');
   // FIRST attempt a premature release with b2 only at the receiver entrance.
-  // A PLC that reacts to I0.8 alone, or only receiver I0.7, is unsafe.
+  // A PLC that reacts to I1.0 alone, or only receiver I0.7, is unsafe.
   const plcOn=(state:WorldState,pin:string):boolean=>
    plc(state)?.io.inputs.some(i=>i.terminal===pin&&i.on)===true;
   const stopExtended=signal(w,'outstop','extended')&&
-   plcOn(w,'I0.9')&&plc(w)?.outputs['Q0.6']===true&&
+   plcOn(w,'I1.1')&&plc(w)?.outputs['Q0.6']===true&&
    !signal(w,'outstop','heldLoad');
   w=operate(w,RELEASE,true);
   let earlyDrop=plc(w)?.outputs['Q0.6']===false;
@@ -249,10 +249,10 @@ function one(p:ProjectFile,seed:number):P24Lot{
    signal(w,'outstop','extended')&&!signal(w,'outstop','heldLoad')&&
    body(w,'b2')?.supportedBy==='receiver';
   check('early-release-held-until-real-contact',prematureBlocked,
-   'Powered I0.8 while original b2 is entering destination must NOT release gate Q0.6 before 200ms jam contact');
+   'Powered I1.0 while original b2 is entering destination must NOT release gate Q0.6 before 200ms jam contact');
   // No synthetic extra body: existing b2 must physically reach an extended
   // downstream gate and continuously JAM it for 200ms. The same worker model
-  // provides heldLoad, wired through the real 24V bridge into PLC I0.11.
+  // provides heldLoad, wired through the real 24V bridge into PLC I1.3.
   let held=false,heldSignal=false,holdMs=0;
   for(let k=0;k<240;k++){
    w=scan(w);
@@ -264,13 +264,13 @@ function one(p:ProjectFile,seed:number):P24Lot{
       signal(w,'outstop','extended')&&signal(w,'outstop','heldLoad')&&
       holdMs>=200&&signal(w,'receiver','zoneFull')){
     held=true;
-    heldSignal=plcOn(w,'I0.11');
+    heldSignal=plcOn(w,'I1.3');
     if(heldSignal)break;
    }
   }
   check('200ms-original-outstop-contact',held&&heldSignal&&
    plc(w)?.outputs['Q0.6']===true&&holdMs>=200,
-   'Same genuine b2 blocks Q0.6-actuated outstop for >=200ms continuous physical jam; actual heldLoad energizes PLC I0.11');
+   'Same genuine b2 blocks Q0.6-actuated outstop for >=200ms continuous physical jam; actual heldLoad energizes PLC I1.3');
   const lockedX=body(w,'b2')?.pos.x??NaN;
   w=scan(w,10);
   const stationary=held&&signal(w,'receiver','moving')&&
@@ -282,29 +282,29 @@ function one(p:ProjectFile,seed:number):P24Lot{
   // Source is empty; a separate authentic 24V demand cannot pulse feeder
   // while the held original b2 physically occupies the receiving belt.
   const trulyFull=signal(w,'receiver','zoneFull')&&
-   count(w)===0&&plcOn(w,'I0.7')&&plcOn(w,'I0.11');
+   count(w)===0&&plcOn(w,'I0.7')&&plcOn(w,'I1.3');
   w=operate(w,REQUEST,true);
   let earlyThirdCoil=plc(w)?.outputs['Q0.0']===true;
   for(let i=0;i<2;i++){w=scan(w);earlyThirdCoil ||= plc(w)?.outputs['Q0.0']===true;}
   const receiverInhibited=trulyFull&&!earlyThirdCoil&&
    w.plantWorld.world.spawnedCount===2;
   check('held-receiver-inhibits-new-feed',receiverInhibited,
-   'Source empty but downstream real I0.7/I0.11 HIGH: PLC must inhibit Q0.0 and b3');
+   'Source empty but downstream real I0.7/I1.3 HIGH: PLC must inhibit Q0.0 and b3');
   w=operate(w,REQUEST,false);
-  // A FRESH powered release I0.8 now follows real same-body contact+dwell.
-  // The learner must drop Q0.6 and wait for actual retract limit I0.10.
+  // A FRESH powered release I1.0 now follows real same-body contact+dwell.
+  // The learner must drop Q0.6 and wait for actual retract limit I1.2.
   w=operate(w,RELEASE,true);
-  let releaseInput=plcOn(w,'I0.8');
+  let releaseInput=plcOn(w,'I1.0');
   let releasedCoil=plc(w)?.outputs['Q0.6']===false;
   for(let k=0;k<4;k++){
-   w=scan(w);releaseInput ||= plcOn(w,'I0.8');
+   w=scan(w);releaseInput ||= plcOn(w,'I1.0');
    releasedCoil ||= plc(w)?.outputs['Q0.6']===false;
   }
   w=operate(w,RELEASE,false);
   let retracted=false;
   for(let k=0;k<40;k++){
    w=scan(w);
-   if(signal(w,'outstop','retracted')&&plcOn(w,'I0.10')&&
+   if(signal(w,'outstop','retracted')&&plcOn(w,'I1.2')&&
       !signal(w,'outstop','heldLoad')&&
       (body(w,'b2')?.pos.x??-Infinity)>lockedX+10){
     retracted=true;break;
@@ -312,7 +312,7 @@ function one(p:ProjectFile,seed:number):P24Lot{
   }
   const genuineRelease=held&&releaseInput&&releasedCoil&&retracted;
   check('24v-release-physical-stop-and-original-b2',genuineRelease,
-   'PLC receives powered I0.8 after I0.11 contact, Q0.6 drops, I0.10 confirms retracted gate, original b2 moves again');
+   'PLC receives powered I1.0 after I1.3 contact, Q0.6 drops, I1.2 confirms retracted gate, original b2 moves again');
   let clearedReceiver=false;
   for(let k=0;k<240;k++){
    w=scan(w);
@@ -374,6 +374,6 @@ export function runP24HoldCampaign(p:ProjectFile,sceneId:string):P24Campaign{
  return {...base,status:passed?'passed':'failed',lots,
   deterministicReplay,totalOriginals,
   diagnostic:passed?
-   'Three seeded original-body lots: source recovery, receiver handoff, Q0.6 stopper 200ms same-body physical hold/I0.11, premature release rejection, true I0.8 request, I0.10 retraction and fresh b3 after exit. Exact replay. Model only.':
+   'Three seeded original-body lots: source recovery, receiver handoff, Q0.6 stopper 200ms same-body physical hold/I1.3, premature release rejection, true I1.0 request, I1.2 retraction and fresh b3 after exit. Exact replay. Model only.':
    'Physical same-carton stopper dwell, premature release, powered hold feedback, actual release, receiver backpressure or replay failed'};
 }
