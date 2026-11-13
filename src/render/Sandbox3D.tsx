@@ -5,17 +5,33 @@
  *
  * Original low-poly equipment geometry, no proprietary meshes or trademarks.
  */
-import { useMemo, useRef, type DragEvent } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { Grid, Html, OrbitControls, GizmoHelper, GizmoViewport } from '@react-three/drei';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
+import { Grid, Html, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import { CatmullRomCurve3, Plane, Raycaster, Vector2, Vector3, type Camera } from 'three';
-import { COMPONENTS, type ComponentKind } from '../components/registry';
+import { COMPONENTS, componentKinds, type ComponentKind } from '../components/registry';
 import type { PlacedComponent, ProjectFile, RenderSnapshot, XY } from '../sim/signals';
 import type { Parcel } from '../plant/sorting-conveyor';
 import { supportsWebGL } from '../components/SceneShell';
 import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-coordinates';
 import { perDeviceLive } from '../sim/device-state';
+import { PlantWorld3D } from './PlantWorld3D';
+import { PLANT_EQUIPMENT } from '../plant/equipment';
+import { footprintOf } from '../workspace/floor-plan';
+import { clampPlacement } from '../workspace/geometry';
+import type { GridStep } from '../workspace/types';
+import { WorkcellCameraRig } from './WorkcellCameraRig';
+import { frameEntireWorkcell,initialNavigationPose, type CameraPose, type WorkcellCameraMode } from './workcell-camera';
+import {
+  assess3DPlacement, placementMessage, previewDimensions,
+  type PlacementAssessment,
+} from './scene-authoring';
 
+const additiveSelection = (value: unknown): boolean => {
+  const event = value as { ctrlKey?: boolean; metaKey?: boolean;
+    nativeEvent?: { ctrlKey?: boolean; metaKey?: boolean } };
+  return Boolean(event.ctrlKey || event.metaKey || event.nativeEvent?.ctrlKey || event.nativeEvent?.metaKey);
+};
 const COLORS = {
   chassis: '#35546b', steel: '#829bb0', panel: '#192b3c', light: '#d3e4ef',
   live: '#20d6a6', off: '#52677c', highlight: '#ffa633', cable: '#7793ad',
@@ -200,6 +216,28 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
     </mesh>)}
     <mesh position={[0, 0.96, 0]}><boxGeometry args={[0.8, 0.09, 0.68]} /><meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.26} /></mesh>
   </group>;
+  if (kind === 'three-phase-supply') return <group>
+    <mesh position={[0,0.55,0]}><boxGeometry args={[1.22,0.96,0.78]}/>
+      <meshStandardMaterial color="#526d87" metalness={0.3}/></mesh>
+    {[-0.26,0,0.26].map((x,i)=><mesh key={i} position={[x,0.78,-0.42]}>
+      <boxGeometry args={[0.18,0.26,0.06]}/>
+      <meshStandardMaterial color={active?'#d7bb76':'#66737e'} emissive={active?'#54401d':'#000000'}/>
+    </mesh>)}
+    <mesh position={[0,1.08,0]}><boxGeometry args={[1.1,0.10,0.74]}/>
+      <meshStandardMaterial color="#ac9b70"/></mesh>
+  </group>;
+  if (kind === 'star-delta-drive') return <group>
+    <mesh position={[0,0.32,0]} rotation={[0,0,Math.PI/2]}>
+      <cylinderGeometry args={[0.42,0.42,1.24,18]}/>
+      <meshStandardMaterial color={active?'#437f92':'#607588'} metalness={0.48}/></mesh>
+    <mesh position={[0,0.80,-0.23]}><boxGeometry args={[0.94,0.45,0.32]}/>
+      <meshStandardMaterial color="#4e617b"/></mesh>
+    {[-0.27,0,0.27].map((x,i)=><mesh key={i} position={[x,0.86,-0.405]}>
+      <boxGeometry args={[0.18,0.16,0.05]}/>
+      <meshStandardMaterial color={active?'#5bcaaa':'#bfa46c'} emissive={active?'#164334':'#000000'}/></mesh>)}
+    <mesh position={[0,0.06,0]}><boxGeometry args={[1.48,0.12,0.9]}/>
+      <meshStandardMaterial color="#6d7480"/></mesh>
+  </group>;
   if (kind === 'supply') return <group>
     <mesh position={[0, 0.43, 0]}><boxGeometry args={[1.04, 0.76, 0.74]} /><meshStandardMaterial color={COLORS.chassis} /></mesh>
     <mesh position={[0, 0.56, -0.38]}><boxGeometry args={[0.73, 0.19, 0.04]} /><meshStandardMaterial color={COLORS.panel} /></mesh>
@@ -216,26 +254,52 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
   </group>;
 }
 
-function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect }: {
-  c: PlacedComponent; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean };
-  editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
-  onTerminal: (id: string) => void; onOperate: (id: string) => void; onSelect: (id: string) => void;
+function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPress, onLabelPress, placeKind, onMoveDrag, onEndDrag, onFocus }: {
+  c: PlacedComponent; project: ProjectFile; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean };
+  editable: boolean; selected: boolean; selectedTerminal: string | null; moveTarget: string | null;
+  onTerminal: (id: string) => void; onOperate: (id: string) => void;
+  onSelect: (id: string, additive: boolean) => void;
+  onPress: (event: ThreeEvent<PointerEvent>, id: string) => void;
+  onLabelPress: (event: ReactPointerEvent<HTMLDivElement>, id: string) => void;
+  placeKind:ComponentKind | '';
+  onMoveDrag: (event: ThreeEvent<PointerEvent>) => void;
+  onEndDrag: (event: ThreeEvent<PointerEvent>) => void;
+  onFocus: (id: string) => void;
 }) {
   const [x, y, z] = worldPosition(c);
   const def = COMPONENTS[c.kind];
-  return <group position={[x, y, z]}>
-    <mesh position={[0, 0.035, 0]} onClick={e => { e.stopPropagation(); onSelect(c.id); }}>
-      <boxGeometry args={[1.5, 0.08, 1.2]} />
-      <meshStandardMaterial color={moveTarget === c.id ? COLORS.highlight : COLORS.panel} />
+  const plant = Boolean(PLANT_EQUIPMENT[c.kind]);
+  const footprint = plant ? footprintOf(c, project.params) : null;
+  // P3 equipment uses the real worker-owned 3D shapes, not duplicated large
+  // placeholder housings. Its outline is only a selection/drag affordance.
+  return <group position={[x, y, z]} rotation={[0, -(c.yawDeg ?? 0) * Math.PI / 180, 0]}>
+    <mesh position={[0, plant ? 0.02 : 0.035, 0]}
+      onPointerDown={e => onPress(e, c.id)}
+      onPointerMove={onMoveDrag} onPointerUp={onEndDrag}
+      onDoubleClick={e => { e.stopPropagation(); onFocus(c.id); }}>
+      <boxGeometry args={[plant ? (footprint!.yawDeg === 90 || footprint!.yawDeg === 270 ? footprint!.depth : footprint!.width)/100 : 1.5,
+        plant ? 0.025 : 0.08,
+        plant ? (footprint!.yawDeg === 90 || footprint!.yawDeg === 270 ? footprint!.width : footprint!.depth)/100 : 1.2]} />
+      {plant
+        ? <meshStandardMaterial color={selected || moveTarget === c.id ? COLORS.highlight : COLORS.panel}
+            transparent opacity={selected || moveTarget === c.id ? 0.55 : 0.15} depthWrite={false} />
+        : <meshStandardMaterial color={selected || moveTarget === c.id ? COLORS.highlight : COLORS.panel} />}
     </mesh>
-    <group onClick={e => { e.stopPropagation(); onSelect(c.id); }}>
+    {!plant && <group onPointerDown={e => onPress(e, c.id)}
+      onPointerMove={onMoveDrag} onPointerUp={onEndDrag}
+      onDoubleClick={e => { e.stopPropagation(); onFocus(c.id); }}>
       <DeviceSculpture kind={c.kind} active={active} pressed={c.pressed} motorAngleRad={motorAngleRad}
         parcel={c.kind === 'conveyor' ? parcel : null}
         tankLevelMl={c.kind === 'tank' ? tankLevelMl : undefined}
         rod={c.kind === 'cylinder' ? rod : undefined} lamps={c.kind === 'stacklight' ? lamps : undefined} />
-    </group>
+    </group>}
     <Html position={[0, 1.22, 0]} center distanceFactor={11}>
-      <div className="sandbox-3d-label">
+      <div className="sandbox-3d-label" data-3d-drag-handle={c.id}
+        title="Select the machine; drag this 3D-anchored label to reposition it while paused"
+        onPointerDown={event=>{
+          if((event.target as HTMLElement).closest('button'))return;
+          onLabelPress(event,c.id);
+        }}>
         <strong>{def.label}</strong>
         <small>{c.kind === 'revmotor' ? (direction ?? 'stopped').toUpperCase() :
           c.kind === 'forwardcontactor' || c.kind === 'reversecontactor' ? (active ? 'CLOSED' : 'OPEN') :
@@ -267,7 +331,11 @@ function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, ro
       const selected = selectedTerminal === fullId;
       const position: [number, number, number] = [t.side === 'left' ? -0.64 : 0.64, 0.35, (t.y - 65) / 120];
       return <group key={t.name} position={position}>
-        <mesh onClick={e => { e.stopPropagation(); if (editable) onTerminal(fullId); }}>
+        <mesh onPointerDown={e => {
+            e.stopPropagation();
+            // Parent shell owns placement; clicking a terminal cannot emit a second place.
+          }}
+          onClick={e => { e.stopPropagation(); if (editable&&!placeKind) onTerminal(fullId); }}>
           <sphereGeometry args={[0.105, 12, 8]} />
           <meshStandardMaterial color={selected ? COLORS.highlight : COLORS.light}
             emissive={selected ? COLORS.highlight : '#000000'} emissiveIntensity={0.35} />
@@ -276,8 +344,11 @@ function Device3D({ c, active, motorAngleRad, direction, parcel, tankLevelMl, ro
           <button type="button" className={`sandbox-3d-terminal ${selected ? 'selected' : ''}`}
             data-scene-terminal-id={fullId} disabled={!editable}
             aria-label={`Connect ${fullId} in 3D`}
-            onPointerDown={e => e.stopPropagation()}
-            onClick={e => { e.stopPropagation(); onTerminal(fullId); }}>{t.name}</button>
+            onPointerDown={e => {
+              e.stopPropagation();
+              // Parent shell owns placement; never place on both pointer-down and click.
+            }}
+            onClick={e => { e.stopPropagation(); if(!placeKind)onTerminal(fullId); }}>{t.name}</button>
         </Html>
       </group>;
     })}
@@ -303,19 +374,225 @@ function Cable3D({ project, from, to, live }: { project: ProjectFile; from: stri
   </mesh>;
 }
 
-function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPlaceAt }: {
-  project: ProjectFile; snapshot: RenderSnapshot; editable: boolean;
-  selectedTerminal: string | null; moveTarget: string | null;
+/** Accessible, camera-anchored move/rotate handles. The renderer never
+ * changes project state itself: every click dispatches existing worker edits.
+ */
+function SceneTransformGizmo({component,grid,onMove,onRotate}:{
+  component:PlacedComponent;grid:GridStep;
+  onMove:(id:string,to:XY)=>void;onRotate:(id:string,turns:-1|1)=>void;
+}){
+ const [x,,z]=worldPosition(component);
+ const move=(dx:number,dy:number)=>onMove(component.id,
+   clampPlacement({x:component.x+dx,y:component.y+dy},grid));
+ return <Html position={[x,1.7,z]} center distanceFactor={10}
+   zIndexRange={[20000000,19000000]}
+   style={{pointerEvents:'auto'}}>
+   <div className="p7-3d-gizmo" data-p7-gizmo={component.id}
+      role="group" aria-label={`Transform ${component.id} in 3D scene`}
+      onPointerDown={e=>e.stopPropagation()}
+      onPointerUp={e=>e.stopPropagation()}>
+     <button type="button" data-p7-transform="west" onClick={e=>{e.stopPropagation();move(-grid,0);}}
+       title="Move west by one selected grid interval">←</button>
+     <button type="button" data-p7-transform="north" onClick={e=>{e.stopPropagation();move(0,-grid);}}
+       title="Move north by one grid interval">↑</button>
+     <button type="button" data-p7-transform="south" onClick={e=>{e.stopPropagation();move(0,grid);}}
+       title="Move south by one grid interval">↓</button>
+     <button type="button" data-p7-transform="east" onClick={e=>{e.stopPropagation();move(grid,0);}}
+       title="Move east by one grid interval">→</button>
+     <button type="button" data-p7-transform="rotate" onClick={e=>{e.stopPropagation();onRotate(component.id,1);}}
+       title="Rotate selected machine by exactly 90 degrees">↻90°</button>
+   </div>
+ </Html>;
+}
+
+type DeviceDrag = {
+  id: string; pointerId: number; start: {x:number;z:number};
+  origin: XY; preview: XY;
+};
+
+/** This scene owns camera and pointer gestures, NEVER PLC or physics state.
+ * A dragged machine is a temporary ghost until the worker acknowledges 'move'.
+ */
+function Workbench({ project, snapshot, editable, grid, mode, fitRequest, placeKind, alignSensor,
+  showZones, showSignals, hover, selectedDeviceIds, selectedTerminal, moveTarget,
+  onTerminal, onOperate, onSelect, onPlaceAt, onPreview, onMove, onRotate, onCameraPose }: {
+  project: ProjectFile; snapshot: RenderSnapshot; editable: boolean; grid: GridStep;
+  mode:WorkcellCameraMode;fitRequest:number;
+  placeKind:ComponentKind | ''; alignSensor:boolean;
+  showZones:boolean; showSignals:boolean;
+  hover:PlacementAssessment|null;
+  selectedDeviceIds: readonly string[]; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
-  onSelect: (id: string) => void; onPlaceAt: (at: XY) => void;
+  onSelect: (id: string, additive: boolean) => void; onPlaceAt: (at: XY) => void;
+  onMove: (id:string,at:XY)=>void;
+  onPreview:(assessment:PlacementAssessment|null)=>void;
+  onRotate:(id:string,turns:-1|1)=>void;
+  onCameraPose:(pose:CameraPose)=>void;
 }) {
+  const { camera, gl } = useThree();
+  const [interest,setInterest]=useState<[number,number,number]>([0,0,0]);
+  useEffect(()=>{
+    if(!fitRequest||mode!=='orbit')return;
+    const framing=frameEntireWorkcell(project);
+    setInterest(framing.target);
+    camera.position.set(...framing.position);
+    camera.lookAt(...framing.target);
+  // Explicit user-triggered fit only: subsequent PLC scans, equipment motion
+  // and rerenders must not unexpectedly move the learner's 3D camera.
+  },[fitRequest]);
+  const [drag,setDrag]=useState<DeviceDrag|null>(null);
+  const currentDrag=useRef<DeviceDrag|null>(null);
+  const poseCallback=useRef(onCameraPose);
+  poseCallback.current=onCameraPose;
+  // Direct, mouse-driven drag uses a ray through the current perspective camera.
+  // The worker's project is unchanged until pointer release and acknowledgement.
+  const floorFromClient=(clientX:number,clientY:number):{x:number;z:number}|null=>{
+    const bounds=gl.domElement.getBoundingClientRect();
+    const pointer=new Vector2(
+      ((clientX-bounds.left)/bounds.width)*2-1,
+      -((clientY-bounds.top)/bounds.height)*2+1,
+    );
+    const ray=new Raycaster(); ray.setFromCamera(pointer,camera);
+    const hit=new Vector3();
+    // HTML labels and terminal controls float above the machine. Project
+    // their pointer back to the ACTUAL 3D factory click surface at y=-0.09 m
+    // so an overlaid terminal does not offset the equipment being placed.
+    return ray.ray.intersectPlane(new Plane(new Vector3(0,1,0),.09),hit)
+      ? {x:hit.x,z:hit.z} : null;
+  };
+  const floorPoint=(event:ThreeEvent<PointerEvent>)=>
+    floorFromClient(event.nativeEvent.clientX,event.nativeEvent.clientY);
+  const assessPoint=(point:{x:number;z:number}):PlacementAssessment|null=>
+    placeKind?assess3DPlacement(project,placeKind,projectPlacement(point),grid,alignSensor):null;
+  const previewAtPoint=(point:{x:number;z:number}|null)=>
+    onPreview(point?assessPoint(point):null);
+  const focus=(id:string)=>{
+    const item=project.components.find(c=>c.id===id);
+    if(!item)return;
+    const [x,,z]=worldPosition(item);
+    setInterest([x,0.3,z]);
+  };
+  const start=(event:ThreeEvent<PointerEvent>,id:string)=>{
+    if(event.button!==0)return;
+    event.stopPropagation();
+    if(placeKind)return; // Shell click capture owns placement exactly once.
+    const additive=additiveSelection(event);
+    onSelect(id,additive);
+    if(!editable||mode!=='orbit'||additive)return;
+    const item=project.components.find(c=>c.id===id);
+    const point=floorPoint(event);
+    if(!item||!point)return;
+    const next:DeviceDrag={
+      id,pointerId:event.pointerId,start:point,
+      origin:{x:item.x,y:item.y},preview:{x:item.x,y:item.y},
+    };
+    currentDrag.current=next;setDrag(next);
+    const target=event.target;
+    if(target && 'setPointerCapture' in target && typeof target.setPointerCapture==='function')
+      target.setPointerCapture(event.pointerId);
+  };
+  const startLabel=(event:ReactPointerEvent<HTMLDivElement>,id:string)=>{
+    if(event.button!==0)return;
+    event.stopPropagation();
+    if(placeKind)return; // Shell click capture owns placement exactly once.
+    const additive=event.ctrlKey||event.metaKey;
+    onSelect(id,additive);
+    if(!editable||mode!=='orbit'||additive)return;
+    const item=project.components.find(c=>c.id===id);
+    const point=floorFromClient(event.clientX,event.clientY);
+    if(!item||!point)return;
+    const next:DeviceDrag={
+      id,pointerId:event.pointerId,start:point,
+      origin:{x:item.x,y:item.y},preview:{x:item.x,y:item.y},
+    };
+    currentDrag.current=next;setDrag(next);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const translated=(gesture:DeviceDrag,point:{x:number;z:number}):XY=>
+    clampPlacement({
+      x:gesture.origin.x+(point.x-gesture.start.x)*100,
+      y:gesture.origin.y+(point.z-gesture.start.z)*100,
+    },grid);
+  const moveGesture=(event:ThreeEvent<PointerEvent>)=>{
+    if(placeKind){
+      previewAtPoint(floorPoint(event));return;
+    }
+    const active=currentDrag.current;
+    if(!active||active.pointerId!==event.pointerId)return;
+    event.stopPropagation();
+    const point=floorPoint(event);if(!point)return;
+    const next={...active,preview:translated(active,point)};
+    currentDrag.current=next;setDrag(next);
+  };
+  const endGesture=(event:ThreeEvent<PointerEvent>)=>{
+    const active=currentDrag.current;
+    if(!active||active.pointerId!==event.pointerId)return;
+    event.stopPropagation();
+    const point=floorPoint(event);
+    const to=point?translated(active,point):active.preview;
+    currentDrag.current=null;setDrag(null);
+    const target=event.target;
+    if(target && 'hasPointerCapture' in target && typeof target.hasPointerCapture==='function' &&
+      'releasePointerCapture' in target && typeof target.releasePointerCapture==='function' &&
+      target.hasPointerCapture(event.pointerId))
+      target.releasePointerCapture(event.pointerId);
+    if(editable&&(to.x!==active.origin.x||to.y!==active.origin.y))
+      onMove(active.id,to);
+  };
+  // R3F object hits are useful for starting the gesture, but listeners at the
+  // viewport/window level own the continuation. Dragging outside a small
+  // photoeye/roller should not silently lose the final authoritative edit.
+  useEffect(()=>{
+    if(!drag)return;
+    const pointerId=drag.pointerId;
+    const follow=(event:PointerEvent)=>{
+      const active=currentDrag.current;
+      if(!active||event.pointerId!==pointerId)return;
+      const point=floorFromClient(event.clientX,event.clientY);
+      if(!point)return;
+      const next={...active,preview:translated(active,point)};
+      currentDrag.current=next;setDrag(next);
+    };
+    const release=(event:PointerEvent)=>{
+      const active=currentDrag.current;
+      if(!active||event.pointerId!==pointerId)return;
+      const point=floorFromClient(event.clientX,event.clientY);
+      const target=point?translated(active,point):active.preview;
+      currentDrag.current=null;setDrag(null);
+      if(editable&&(target.x!==active.origin.x||target.y!==active.origin.y))
+        onMove(active.id,target);
+    };
+    const cancel=(event:PointerEvent)=>{
+      if(event.pointerId!==pointerId)return;
+      currentDrag.current=null;setDrag(null);
+    };
+    window.addEventListener('pointermove',follow);
+    window.addEventListener('pointerup',release);
+    window.addEventListener('pointercancel',cancel);
+    return ()=>{
+      window.removeEventListener('pointermove',follow);
+      window.removeEventListener('pointerup',release);
+      window.removeEventListener('pointercancel',cancel);
+    };
+  // Hook applies to one active gesture. Geometry and grid are locked at
+  // pointer down; a project update can occur only after release.
+  },[drag?.pointerId,grid,editable,camera,gl,onMove]);
+  useEffect(()=>{if(!placeKind)onPreview(null);},[placeKind,onPreview]);
+  const preview=drag&&project.components.find(c=>c.id===drag.id);
+  const plan=preview?footprintOf(preview,project.params):null;
+  const ghost=drag?worldPosition(drag.preview):null;
   return <>
     <color attach="background" args={['#0c1927']} />
     <ambientLight intensity={1.1} />
     <directionalLight position={[-4, 9, 6]} intensity={1.7} />
     <directionalLight position={[8, 4, -5]} intensity={0.6} color="#a5d5ff" />
     <mesh position={[0, -0.09, 0]} rotation={[-Math.PI / 2, 0, 0]}
-      onClick={event => { if (moveTarget && editable) { event.stopPropagation(); onPlaceAt(projectPlacement(event.point)); } }}>
+      onPointerMove={event=>{if(placeKind)previewAtPoint(event.point);}}
+      onClick={event => {
+        if(placeKind)return; // Parent shell owns the whole 3D viewport click.
+        if(moveTarget&&editable){event.stopPropagation();onPlaceAt(projectPlacement(event.point));}
+      }}
+      onDoubleClick={event=>{if(mode==='orbit'){event.stopPropagation();setInterest([event.point.x,0,event.point.z]);}}}>
       <planeGeometry args={[11.3, 6.3]} />
       <meshStandardMaterial color="#152a3d" />
     </mesh>
@@ -324,7 +601,12 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
       fadeDistance={35} infiniteGrid={false} />
     {project.wires.map(w => <Cable3D key={w.id} project={project} from={w.from} to={w.to}
       live={snapshot.voltages[w.from] === 24 && snapshot.voltages[w.to] === 24} />)}
-    {project.components.map(c => <Device3D key={c.id} c={c} editable={editable}
+    <PlantWorld3D project={project} scene={snapshot.plantWorld}
+      selectedIds={selectedDeviceIds} showZones={showZones} showSignals={showSignals}
+      onPointerDownPart={start} onPointerMovePart={moveGesture}
+      onPointerUpPart={endGesture} onFocusPart={focus} />
+    {project.components.map(c => <Device3D key={c.id} c={c} project={project} editable={editable}
+       selected={selectedDeviceIds.includes(c.id)}
       motorAngleRad={c.kind === 'revmotor' ? snapshot.reverseMotorAngleRad : snapshot.motorAngles[c.id] ?? snapshot.motorAngleRad}
       direction={c.kind === 'revmotor' ? snapshot.motorDirection : undefined}
       parcel={c.kind === 'conveyor' ? snapshot.lanes[c.id]?.parcel ?? null : null} tankLevelMl={c.kind === 'tank' ? snapshot.vessels[c.id]?.levelMl ?? 0 : 0}
@@ -338,31 +620,106 @@ function Workbench({ project, snapshot, editable, selectedTerminal, moveTarget, 
         c.kind === 'levelprobe' ? snapshot.io.TankHigh :
         c.kind === 'estop' ? !c.pressed :
         c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false)}
-      onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect} />)}
-    <OrbitControls makeDefault enablePan enableZoom enableRotate
-      minDistance={4.4} maxDistance={23} minPolarAngle={0.1} maxPolarAngle={Math.PI / 2.05}
-      target={[0, 0, 0]} />
-    <GizmoHelper alignment="bottom-right" margin={[76, 76]}><GizmoViewport axisColors={['#d45b59', '#4db987', '#549fea']} labelColor="#ffffff" /></GizmoHelper>
+      onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect}
+      onPress={start} onLabelPress={startLabel}
+      placeKind={placeKind}
+      onMoveDrag={moveGesture} onEndDrag={endGesture} onFocus={focus} />)}
+    {placeKind&&hover&&<mesh raycast={()=>{}}
+      position={[worldPosition(hover.at)[0],.055,worldPosition(hover.at)[2]]}>
+      <boxGeometry args={[previewDimensions(hover.footprint)[0],.075,
+        previewDimensions(hover.footprint)[1]]}/>
+      <meshBasicMaterial color={hover.overlappingCarriers.length?'#e9a44e':
+        hover.mountedTo?'#35c7a8':'#5ed0ee'} transparent opacity={.38}
+        wireframe depthWrite={false}/>
+    </mesh>}
+    {selectedDeviceIds.length===1&&editable&&mode==='orbit'&&
+      project.components.filter(c=>c.id===selectedDeviceIds[0]).map(c=>
+        <SceneTransformGizmo key={c.id} component={c} grid={grid}
+          onMove={onMove} onRotate={onRotate}/>)}
+    {ghost&&preview&&plan&&<mesh raycast={()=>{}} position={[ghost[0],0.075,ghost[2]]}>
+      <boxGeometry args={[plan.width/100,.06,plan.depth/100]} />
+      <meshBasicMaterial color="#ffa633" transparent opacity={.42} depthWrite={false} wireframe />
+    </mesh>}
+    <WorkcellCameraRig mode={mode} editableCamera={!drag} project={project}
+      interest={interest} onPose={pose=>poseCallback.current(pose)} />
+    <GizmoHelper alignment="bottom-right" margin={[76, 76]}>
+      <GizmoViewport axisColors={['#d45b59', '#4db987', '#549fea']} labelColor="#ffffff" />
+    </GizmoHelper>
   </>;
 }
 
 export type Sandbox3DProps = {
   project: ProjectFile; snapshot: RenderSnapshot;
-  editable: boolean; selectedTerminal: string | null; moveTarget: string | null;
-  selectedDeviceId: string | null; onSelectDevice: (id: string) => void;
+  editable: boolean; grid?: GridStep; selectedTerminal: string | null; moveTarget: string | null;
+  selectedDeviceId: string | null; selectedDeviceIds?: readonly string[];
+  onSelectDevice: (id: string, additive?: boolean) => void;
   onTerminal: (id: string) => void;
   onOperate: (id: string) => void;
   onPlace: (kind: ComponentKind, at: XY) => void;
   onMove: (id: string, at: XY) => void;
   onMoveFinished: () => void;
+  onRotate: (id:string,turns:-1|1)=>void;
+  onOpenWiring:()=>void;
+  onTrainingOperator:(enabled:boolean,pose:CameraPose|null)=>void;
 };
 export function Sandbox3D(props: Sandbox3DProps) {
   const available = useMemo(supportsWebGL, []);
   const camera = useRef<Camera | null>(null);
+  const [cameraMode,setCameraMode]=useState<WorkcellCameraMode>('orbit');
+  const [fitRequest,setFitRequest]=useState(0);
+  const [cameraPose,setCameraPose]=useState<CameraPose|null>(null);
+  const [operatorEnabled,setOperatorEnabled]=useState(false);
+  const operatorLive=useRef(false),operatorSender=useRef(props.onTrainingOperator);
+  operatorLive.current=operatorEnabled;operatorSender.current=props.onTrainingOperator;
+  useEffect(()=>()=>{if(operatorLive.current)operatorSender.current(false,null);},[]);
+  const onCameraPose=(pose:CameraPose)=>{
+   setCameraPose(pose);
+   if(operatorEnabled&&cameraMode==='first-person')props.onTrainingOperator(true,pose);
+  };
+  const [placementKind,setPlacementKind]=useState<ComponentKind | ''>('');
+  const [alignSensor,setAlignSensor]=useState(true);
+  const [showZones,setShowZones]=useState(true);
+  const [showSignals,setShowSignals]=useState(true);
+  const [hover,setHover]=useState<PlacementAssessment|null>(null);
+  const onPreview=(assessment:PlacementAssessment|null)=>{
+    setHover(previous=>previous?.at.x===assessment?.at.x&&
+      previous?.at.y===assessment?.at.y&&previous?.footprint.kind===assessment?.footprint.kind&&
+      previous?.mountedTo===assessment?.mountedTo?previous:assessment);
+  };
+  useEffect(()=>{
+    const cancel=(event:KeyboardEvent)=>{
+      if(event.key==='Escape')setPlacementKind('');
+    };
+    window.addEventListener('keydown',cancel);
+    return ()=>window.removeEventListener('keydown',cancel);
+  },[]);
   const onPlaceAt = (at: XY) => {
     if (!props.moveTarget) return;
     props.onMove(props.moveTarget, at);
     props.onMoveFinished();
+  };
+  // A machine may project an HTML terminal on top of the factory floor.
+  // While placing, the whole scene area is one hit surface: resolve the
+  // actual perspective ray once in the capture phase instead of depending on
+  // which mesh or floating label receives the click.
+  const clickPlacement = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if(!available || !props.editable || !placementKind || event.button!==0 || !camera.current)return;
+    const target=event.target as HTMLElement;
+    if(target.closest('.sandbox-3d-camera-controls, .p7-3d-authoring, .p7-3d-preview, .p7-3d-gizmo'))return;
+    const canvas=event.currentTarget.querySelector<HTMLCanvasElement>('.sandbox-three-canvas canvas');
+    if(!canvas)return;
+    const rect=canvas.getBoundingClientRect();
+    if(event.clientX<rect.left || event.clientX>rect.right ||
+       event.clientY<rect.top || event.clientY>rect.bottom)return;
+    const pointer=new Vector2((event.clientX-rect.left)/rect.width*2-1,
+      -((event.clientY-rect.top)/rect.height*2-1));
+    const ray=new Raycaster();ray.setFromCamera(pointer,camera.current);
+    const hit=new Vector3();
+    if(!ray.ray.intersectPlane(new Plane(new Vector3(0,1,0),.09),hit))return;
+    event.preventDefault();event.stopPropagation();
+    const assessment=assess3DPlacement(props.project,placementKind,
+      projectPlacement(hit),props.grid??5,alignSensor);
+    props.onPlace(placementKind,assessment.at);
   };
   const drop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -376,16 +733,76 @@ export function Sandbox3D(props: Sandbox3DProps) {
     ray.setFromCamera(mouse, camera.current);
     const point = new Vector3();
     if (ray.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), 0), point)) {
-      props.onPlace(kind, projectPlacement(point));
+      const assessment=assess3DPlacement(props.project,kind,projectPlacement(point),
+        props.grid??5,alignSensor);
+      props.onPlace(kind,assessment.at);
     }
   };
   return <div className="sandbox-3d-shell" aria-label="Interactive 3D industrial automation workspace"
+    onClickCapture={clickPlacement}
     onDragOver={event => { if (props.editable && available) event.preventDefault(); }} onDrop={drop}>
+    <div className="sandbox-3d-camera-controls" role="group" aria-label="3D navigation camera">
+      {([
+        ['orbit','Orbit'],['fly','Fly'],['first-person','First Person'],
+      ] as const).map(([id,label])=><button key={id} type="button"
+        data-3d-camera-mode={id} aria-pressed={cameraMode===id}
+        disabled={!available} onClick={()=>{
+         if(id!=='first-person'&&operatorEnabled){
+          props.onTrainingOperator(false,null);setOperatorEnabled(false);
+         }
+         setCameraMode(id);setCameraPose(null);
+        }}>
+        {label}</button>)}
+      <button type="button" data-3d-fit-scene
+        disabled={!available} title="Frame all placed equipment in the real 3D camera"
+        onClick={()=>{
+         if(operatorEnabled){props.onTrainingOperator(false,null);setOperatorEnabled(false);}
+         setCameraMode('orbit');setFitRequest(n=>n+1);
+        }}>
+        Fit scene
+      </button>
+      <label className="p7-3d-check" title="Explicit teaching-person proxy in the worker, never real-person tracking">
+        <input type="checkbox" data-p8-training-operator
+          disabled={!available||cameraMode!=='first-person'} checked={operatorEnabled}
+          onChange={event=>{
+           setOperatorEnabled(event.target.checked);
+           props.onTrainingOperator(event.target.checked,
+             event.target.checked?(cameraPose??initialNavigationPose('first-person')):null);
+          }}/>
+        Simulate operator in opted-in sensors
+      </label>
+    </div>
+    <div className="p7-3d-authoring" role="group" aria-label="3D factory authoring" data-p7-3d-authoring>
+      <label>3D placement
+        <select data-p7-place-kind aria-label="3D equipment placement tool"
+          disabled={!props.editable||!available} value={placementKind}
+          onChange={event=>{setPlacementKind(event.target.value as ComponentKind | '');setHover(null);}}>
+          <option value="">Select / drag machines</option>
+          {componentKinds.map(kind=><option key={kind} value={kind}>{COMPONENTS[kind].label}</option>)}
+        </select>
+      </label>
+      <label className="p7-3d-check"><input type="checkbox" data-p7-align-sensor
+        checked={alignSensor} onChange={event=>setAlignSensor(event.target.checked)}/>
+        Align sensing zone to carrier</label>
+      <label className="p7-3d-check"><input type="checkbox" data-p7-zones
+        checked={showZones} onChange={event=>setShowZones(event.target.checked)}/>
+        Sensor regions</label>
+      <label className="p7-3d-check"><input type="checkbox" data-p7-live-signals
+        checked={showSignals} onChange={event=>setShowSignals(event.target.checked)}/>
+        Selected I/O</label>
+      <button type="button" data-p7-wire onClick={props.onOpenWiring}>Wire PLC terminals</button>
+    </div>
     {available ? <Canvas className="sandbox-three-canvas" dpr={[1, 1.5]}
       gl={{ antialias: true, powerPreference: 'low-power' }}
       camera={{ position: [7, 8.5, 10], fov: 42, near: 0.1, far: 120 }}
       onCreated={state => { camera.current = state.camera; state.camera.lookAt(0, 0, 0); }}>
       <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
+        grid={props.grid??5} mode={cameraMode} fitRequest={fitRequest} onMove={props.onMove}
+        placeKind={placementKind} alignSensor={alignSensor} showZones={showZones}
+        showSignals={showSignals} hover={hover} onPreview={onPreview}
+        onRotate={props.onRotate}
+        onCameraPose={onCameraPose}
+        selectedDeviceIds={props.selectedDeviceIds ?? []}
         selectedTerminal={props.selectedTerminal} moveTarget={props.moveTarget}
         onTerminal={props.onTerminal} onOperate={props.onOperate}
         onSelect={props.onSelectDevice} onPlaceAt={onPlaceAt} />
@@ -393,9 +810,29 @@ export function Sandbox3D(props: Sandbox3DProps) {
       <strong>3D renderer unavailable on this device</strong>
       <p>The PLC simulator still runs. Use the component patch panel below to wire, operate and inspect devices without WebGL.</p>
     </div>}
+    {placementKind&&hover&&available&&<div className="p7-3d-preview"
+      role="status" data-p7-place-feedback>{placementMessage(hover)}
+      <span> · {Math.round(hover.at.x)}, {Math.round(hover.at.y)}</span>
+    </div>}
     <div className="sandbox-3d-hud">
-      <span>3D WORKBENCH · Orbit: drag · Pan: right-drag · Zoom: wheel</span>
-      <span>{props.moveTarget ? 'Move selected: click the workbench floor' : props.selectedDeviceId ? `Selected: ${props.selectedDeviceId}` : 'Select a device or terminal'}</span>
+      <output data-p7-worker-bodies aria-label="Bodies in authoritative simulated plant">
+        {props.snapshot.plantWorld.world.bodies.length} worker bodies
+        {props.snapshot.plantWorld.world.bodies.map(body=>
+          <span key={body.id} data-p7-worker-body={body.id}
+            data-p7-body-mm-x={body.pos.x} data-p7-body-mm-y={body.pos.y}
+            aria-label={`Simulated body ${body.id} at ${Math.round(body.pos.x)} by ${Math.round(body.pos.y)} millimetres`}/>)}
+      </output>
+      <span data-3d-camera-status>{cameraMode==='orbit'
+        ? '3D ORBIT · Drag to rotate · Right drag to pan · Wheel zoom · Double-click to focus'
+        : cameraMode==='fly'
+        ? '3D FLY · Focus scene, WASD to move · Q/E height · Right drag to look'
+        : '3D FIRST PERSON · Eye height 1.8 m · Focus scene, WASD to walk · Right drag to look'}
+        {cameraMode!=='orbit'&&cameraPose
+          ? ` · Camera ${cameraPose.x.toFixed(2)}, ${cameraPose.y.toFixed(2)}, ${cameraPose.z.toFixed(2)} m` : ''}</span>
+      <span>{placementKind?'Click the 3D floor or existing machinery to place '+COMPONENTS[placementKind].label :
+        props.moveTarget ? 'Move selected: click the 3D workbench floor' :
+        props.selectedDeviceId ? `Selected: ${props.selectedDeviceId} · Drag the model to move (paused)`
+        : 'Select a 3D machine or terminal · paused editing'}</span>
     </div>
   </div>;
 }
