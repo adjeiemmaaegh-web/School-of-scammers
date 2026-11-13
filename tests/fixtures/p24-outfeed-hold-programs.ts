@@ -1,4 +1,4 @@
-/** P24 instructor-only genuine Q0.6 stopper, sensor I0.11 and PLC sequence.
+/** P24 instructor-only genuine Q0.6 stopper, sensor I1.3 and PLC sequence.
  * This is test-only source and is NOT bundled in the learner application.
  */
 import {p23ReferenceProject} from './p23-handoff-programs';
@@ -18,8 +18,8 @@ export function p24ReferenceProject(kind:P24Controller='correct'):ProjectFile{
   (kind==='no-stop'?'Out6 := FALSE;':'Out6 := NOT Released;')+
   ' IF '+releaseCondition+' THEN Released := TRUE; END_IF;'+
   ' Out0 := '+(kind==='never-third'?'FALSE':
-   'In6 AND NOT In5 AND NOT In1'+(kind==='unsafe-third'?'':' AND NOT In7')+
-   ' AND In10 AND Released')+
+   (kind==='unsafe-third'?'In6 AND NOT In5 AND NOT In1':
+    'In6 AND NOT In5 AND NOT In1 AND NOT In7 AND In10 AND Released'))+
   '; IF Out0 THEN Phase := 8; END_IF;';
  const code=sourceBefore
   .replace(' In7 : BOOL;', ' In7 : BOOL;\n In8 : BOOL;\n In9 : BOOL;\n In10 : BOOL;\n In11 : BOOL;')
@@ -38,9 +38,9 @@ export function p24ReferenceProject(kind:P24Controller='correct'):ProjectFile{
   ['scene-supply.M0','outstop.M-'],
   ['scene-supply.P24','outstop.L+'],
   ['scene-supply.M0','outstop.M'],
-  ['outstop.OUT_extended','scene-plc.I0.9'],
-  ['outstop.OUT_retracted','scene-plc.I0.10'],
-  ['outstop.OUT_heldLoad','scene-plc.I0.11'],
+  ['outstop.OUT_extended','scene-plc.I1.1'],
+  ['outstop.OUT_retracted','scene-plc.I1.2'],
+  ['outstop.OUT_heldLoad','scene-plc.I1.3'],
  ];
  const wires:Wire[]=[...p.wires,...links.map(([from,to],i)=>({
   id:'p24-real-stop-wire-'+i,from,to}))];
