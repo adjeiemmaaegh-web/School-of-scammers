@@ -42,7 +42,14 @@ describe('P21 original powered PLC / real two-body queue and pusher recovery',()
    const result=runP21Accumulation(p21ReferenceProject(kind),'gate-accumulation');
    expect(result.status).toBe('failed');
    expect(result.lots.some(x=>!x.pass)).toBe(true);
-   expect(result.receivedBodies).toBeLessThan(3);
+   if(kind==='early-reset'){
+    // A physically safe interlock may reject an early reset attempt yet
+    // still recover all source bodies after a later legitimate reset.
+    // The unsafe *PLC command* is an assessment failure on its own;
+    // requiring product loss would falsely punish correct plant physics.
+    expect(result.lots.some(l=>l.cases.some(c=>
+     c.id==='early-reset-blocked'&&!c.pass))).toBe(true);
+   }else expect(result.receivedBodies).toBeLessThan(3);
   },120000);
  it('no genuine moving conveyor, collision feedback, pusher wire or bounded option fails closed',()=>{
   const p=p21ReferenceProject();
