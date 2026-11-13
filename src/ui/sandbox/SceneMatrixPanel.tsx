@@ -16,6 +16,7 @@ import type {P17Campaign} from '../../plant/scenes/matrix-p17';
 import {p18Preflight,type P18Result} from '../../plant/scenes/matrix-p18';
 import {p19PowerPreflight,type P19Campaign} from '../../plant/scenes/matrix-p19';
 import {p20ObstructionPreflight,type P20ObstructionResult} from '../../plant/scenes/matrix-p20';
+import {p21AccumulationPreflight,type P21Campaign} from '../../plant/scenes/matrix-p21';
 import {projectSignature} from '../../plant/scenes/commissioning';
 
 type Props={scene:PlantScene;project:ProjectFile;snapshot:RenderSnapshot};
@@ -27,11 +28,14 @@ type Reply={kind:'matrix-result';id:number;result:MatrixResult}|
  {kind:'jam-recovery-result';id:number;result:P18Result}|
  {kind:'power-recovery-result';id:number;result:P19Campaign}|
  {kind:'gate-obstruction-result';id:number;result:P20ObstructionResult}|
+ {kind:'queue-accumulation-result';id:number;result:P21Campaign}|
  {kind:'matrix-error';id:number;message:string};
 export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const spec=matrixSpecFor(scene.id)??expandedSpecFor(scene.id)??advancedSpecFor(scene.id);
  const unsupported=P13_UNSUPPORTED[scene.id];
  const signature=projectSignature(project);
+ const queueBlockers=useMemo(()=>scene.id==='gate-accumulation'?
+  p21AccumulationPreflight(project,scene.id):[],[signature,scene.id]);
  const gateBlockers=useMemo(()=>scene.id==='gate-accumulation'?
   p20ObstructionPreflight(project,scene.id):[],[signature,scene.id]);
  const powerBlockers=useMemo(()=>scene.id==='bottle-line'?
@@ -56,6 +60,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const [jamReport,setJamReport]=useState<P18Result|null>(null);
  const [powerReport,setPowerReport]=useState<P19Campaign|null>(null);
  const [gateReport,setGateReport]=useState<P20ObstructionResult|null>(null);
+ const [queueReport,setQueueReport]=useState<P21Campaign|null>(null);
  const [error,setError]=useState<string|null>(null);
  const worker=useRef<Worker|null>(null);
  const nextId=useRef(0);
@@ -65,7 +70,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   worker.current?.terminate();
   worker.current=null;
   setPending(false);setReport(null);setBatchReport(null);setAutoReport(null);
-  setResilienceReport(null);setMaterialReport(null);setJamReport(null);setPowerReport(null);setGateReport(null);setError(null);
+  setResilienceReport(null);setMaterialReport(null);setJamReport(null);setPowerReport(null);setGateReport(null);setQueueReport(null);setError(null);
   return ()=>{
    nextId.current++;worker.current?.terminate();worker.current=null;
   };
@@ -82,8 +87,9 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  </details>:null;
  const debug=Object.keys(snapshot.debugForces??{}).length>0||
   Object.values(snapshot.plcs).some(plc=>Object.keys(plc.debugForces??{}).length>0);
- const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery'|'run-power-recovery'|'run-gate-obstruction')=>{
-  if(pending||(kind==='run-gate-obstruction'?gateBlockers.length:blockers.length)||
+ const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery'|'run-power-recovery'|'run-gate-obstruction'|'run-queue-accumulation')=>{
+  if(pending||(kind==='run-gate-obstruction'?gateBlockers.length:
+    kind==='run-queue-accumulation'?queueBlockers.length:blockers.length)||
     debug||snapshot.lastError)return;
   worker.current?.terminate();
   const runId=++nextId.current;
@@ -92,7 +98,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   worker.current=local;
   setPending(true);setError(null);setReport(null);setBatchReport(null);
   setAutoReport(null);setResilienceReport(null);setMaterialReport(null);
-  setJamReport(null);setPowerReport(null);setGateReport(null);
+  setJamReport(null);setPowerReport(null);setGateReport(null);setQueueReport(null);
   local.onmessage=(event:MessageEvent<Reply>)=>{
    if(event.data?.id!==runId||worker.current!==local)return;
    local.terminate();worker.current=null;
@@ -107,6 +113,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
    else if(event.data.kind==='jam-recovery-result')setJamReport(event.data.result);
    else if(event.data.kind==='power-recovery-result')setPowerReport(event.data.result);
    else if(event.data.kind==='gate-obstruction-result')setGateReport(event.data.result);
+   else if(event.data.kind==='queue-accumulation-result')setQueueReport(event.data.result);
    else setReport(event.data.result);
   };
   local.onerror=()=>{
@@ -190,6 +197,65 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
      This is not a measured industrial throughput rate. Fault repaired:
      {' '}{autoReport.faultRecovered?'yes':'no'}.
      The result is ephemeral, not part of the project.</p>
+   </div>}
+  </section>}
+  {scene.id==='gate-accumulation'&&<section className="sandbox-p21-queue"
+   data-p21-queue data-p21-state={pending?'running':queueReport?.status??'setup'}>
+   <h3>P21 · Sustained physical carton queue and overload recovery</h3>
+   <p className="sandbox-help">Commission two genuine original feeder cartons.
+    The front carton is physically held at the extended stopper; the
+    second must collide with the FIRST carton for at least 200 ms of
+    continuous worker-owned contact. Only then may the belt report
+    <strong> accumulationTripped</strong> and stop. Your PLC must release
+    the original stopper, activate a REAL pusher to divert the leading
+    carton off the belt, then respond to a fresh powered operator reset.
+    The same trailing carton must travel beyond the gate. No assessment
+    body or PLC coil is faked, and no scores are stored.</p>
+   <p className="sandbox-help">Use accumulationTripMode=1,
+    accumulationDwellMs=200, jamResetMode=1, obstructionTripMode=0 and a
+    600 × 150 mm belt. Place original feeder at (430,225), stopper
+    at (481,225), and pusher at (473,225). Wire actual 24V PLC
+    Q0.0 feeder feed, Q0.1 belt run, Q0.2 stopper extend, Q0.3
+    resetJam, Q0.4 pusher extend. Connect belt accumulationTripped
+    to I0.1, stopper retracted to I0.2 and pusher extended to I0.3.
+    The isolated Worker provides temporary powered Start at I0.0
+    and maintenance acknowledgement at I0.4. This is not a
+    safety-rated or real industrial overload detector.</p>
+   {queueBlockers.length>0&&<div data-p21-preflight>
+    <strong>Complete true two-carton machine commissioning:</strong>
+    <ul>{queueBlockers.map(x=><li key={x}>{x}</li>)}</ul>
+   </div>}
+   <button type="button" className="btn ghost small" data-p21-run-queue
+    disabled={pending||queueBlockers.length>0||debug||!!snapshot.lastError}
+    onClick={()=>begin('run-queue-accumulation')}>{pending?
+     'Checking two real cartons, contact dwell, pusher and PLC…':
+     'Prove physical queue overload, true pusher clearance and PLC reset'}</button>
+   {queueReport&&<div data-p21-result data-p21-result-state={queueReport.status}>
+    <p role="status"><strong>{queueReport.status==='passed'?
+     'P21 original-body accumulation passed':
+     'P21 original-body accumulation did not pass'}</strong>.
+     {' '}{queueReport.diagnostic}</p>
+    <p className="sandbox-help">Original physical cartons:
+     {' '}{queueReport.originalBodies}; received:
+     {' '}{queueReport.receivedBodies}; diverted by real pusher:
+     {' '}{queueReport.divertedBodies}.
+     Model-only evidence; no actual industrial force or machine safety claim.</p>
+    <ol>{queueReport.lots.map((lot,i)=><li key={i}
+     data-p21-lot={i} data-p21-lot-state={lot.pass?'pass':'fail'}>
+     <strong>{lot.pass?'✓':'○'} Lot {lot.seed}</strong>
+     {' '}· leader {lot.leaderId??'missing'} ({lot.leaderMaterial})
+     {' '}· queued {lot.queuedBodyId??'missing'} ({lot.queuedMaterial})
+     {' '}· physical dwell {lot.contactDwellMs} ms
+     <details><summary>Original body and powered PLC evidence</summary>
+      <ul>{lot.cases.map(g=><li key={g.id}
+       data-p21-case={g.id} data-p21-case-state={g.pass?'pass':'fail'}>
+       {g.pass?'✓':'○'} {g.id}: {g.detail}
+      </li>)}</ul>
+     </details>
+    </li>)}</ol>
+    <p data-p21-replay={queueReport.deterministicReplay?'pass':'fail'}>
+     Exact original-worker lot replay:
+     {' '}{queueReport.deterministicReplay?'passed':'failed'}.</p>
    </div>}
   </section>}
   {scene.id==='gate-accumulation'&&<section className="sandbox-p20-obstruction"
