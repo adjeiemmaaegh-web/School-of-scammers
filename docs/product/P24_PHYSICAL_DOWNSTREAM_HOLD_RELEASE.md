@@ -16,19 +16,19 @@ The physical report is **not a force/current/torque measurement, calibrated limi
 
 Reuse P23 feeder, source belt at (455,225), physically accumulated original pair, actual pusher/reset, adjacent 600×150 receiver at (515,225), PLC Q0.5 motor and real I0.7 full-zone feedback. Add one **original outstop at (535,225)**; settings `travelMs=100`, `holdSensorMode=1`, `holdDwellMs=200`, genuine 24V power and return.
 
-New real terminals: `scene-plc.Q0.6 -> outstop.CMD_extend+`, `outstop.OUT_extended -> I0.9`, `outstop.OUT_retracted -> I0.10`, `outstop.OUT_heldLoad -> I0.11`. An independent **privately cloned powered release pushbutton at PLC I0.8** is introduced exclusively during testing, alongside prior START I0.0, ACK I0.4, MORE I0.6. No output forcing or fabricated body injection. All original learner source remains intact.
+New real terminals: `scene-plc.Q0.6 -> outstop.CMD_extend+`, `outstop.OUT_extended -> I1.1`, `outstop.OUT_retracted -> I1.2`, `outstop.OUT_heldLoad -> I1.3`. An independent **privately cloned powered release pushbutton at PLC I1.0** is introduced exclusively during testing, alongside prior START I0.0, ACK I0.4, MORE I0.6. No output forcing or fabricated body injection. All original learner source remains intact.
 
 ## Observable original-body contract
 
 1. Original b1/b2 feeder pulses and source-zone I0.5 pre-trip inhibit; P21 genuine physical contact/dwell jam, powered pusher clears b1, then fresh Q0.3 reset frees same b2.
 2. Original b2 must acquire `supportedBy='receiver'`, genuine motor Q0.5 advances >35 mm, actual I0.7 high.
-3. The operator tries the 24V I0.8 release **before** real downstream contact/dwell; correct PLC must keep Q0.6 energizing the extended stopper (wrong In8-only or In7-only control must fail).
-4. The worker must observe b2 **actually jammed against outstop**, held continuously for >=200 ms; genuine `OUT_heldLoad -> PLC I0.11` high. Same b2 stays stationary for ten more PLC scans even while receiver's actual motor remains powered.
+3. The operator tries the 24V I1.0 release **before** real downstream contact/dwell; correct PLC must keep Q0.6 energizing the extended stopper (wrong In8-only or In7-only control must fail).
+4. The worker must observe b2 **actually jammed against outstop**, held continuously for >=200 ms; genuine `OUT_heldLoad -> PLC I1.3` high. Same b2 stays stationary for ten more PLC scans even while receiver's actual motor remains powered.
 5. With source empty but b2 genuinely held downstream, a powered I0.6 third-feed demand must keep Q0.0 low and preserve original two-body conservation.
-6. A **fresh** powered I0.8 release AFTER actual physical hold feedback must cause the learner PLC to drop Q0.6, physically retract original outstop and electrically observe its true I0.10 limit. Original b2 then advances and eventually exits the actual receiving conveyor; I0.7 drops low.
+6. A **fresh** powered I1.0 release AFTER actual physical hold feedback must cause the learner PLC to drop Q0.6, physically retract original outstop and electrically observe its true I1.2 limit. Original b2 then advances and eventually exits the actual receiving conveyor; I0.7 drops low.
 7. Only after real body exit may a new independent powered I0.6 request create original b3 through Q0.0. Three independently seeded original lots (1, 42, 65535), exact seed-42 replay, nine original boxes across distinct materials, body conservation and immutable test project signature.
 
-Wrong-controller examples: gate releases before physically witnessed I0.11 dwell, gate never energizes, gate never retracts, source-only feeder ignores held receiver, never produces fresh b3 and omits genuine source reset. Blocking preflight rejects missing/miswired terminals, incorrect geometry/dwell/mode, bogus duplicate devices and reserved operator I0.8 conflicts. Instructor-only reference ST lives in `tests/fixtures/p24-outfeed-hold-programs.ts` and never ships in the app.
+Wrong-controller examples: gate releases before physically witnessed I1.3 dwell, gate never energizes, gate never retracts, source-only feeder ignores held receiver, never produces fresh b3 and omits genuine source reset. Blocking preflight rejects missing/miswired terminals, incorrect geometry/dwell/mode, bogus duplicate devices and reserved operator I1.0 conflicts. Instructor-only reference ST lives in `tests/fixtures/p24-outfeed-hold-programs.ts` and never ships in the app.
 
 ## Engineering files and release gates
 
