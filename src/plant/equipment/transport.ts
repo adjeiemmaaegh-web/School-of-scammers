@@ -15,6 +15,10 @@ export const beltConveyor:EquipmentDef={
  signals:[{name:'moving',kind:'bool'},{name:'jam',kind:'bool'},
   {name:'restartRequired',kind:'bool'},{name:'obstructionTripped',kind:'bool'},
   {name:'accumulationTripped',kind:'bool'},{name:'queueDwellMs',kind:'number',unit:'ms'},
+  // P22 zone telemetry is read from real worker-owned body positions, not
+  // inferred from a PLC counter, visual mesh or an assumed feeder pulse.
+  {name:'zoneOccupied',kind:'bool'},{name:'zoneFull',kind:'bool'},
+  {name:'zoneCount',kind:'number',unit:'bodies'},
   {name:'speed',kind:'number',unit:'mm/s'}],
  params:[spec('lengthMm','Belt length','mm',200,2400,50,600),spec('widthMm','Belt width','mm',150,600,50,300),
  spec('speedMmS','Surface speed','mm/s',50,1000,10,250),
@@ -23,7 +27,9 @@ export const beltConveyor:EquipmentDef={
   spec('restartHoldMode','Power restoration inhibit','0=legacy, 1=PLC reset after loss',0,1,1,0),
   spec('obstructionTripMode','Physical gate obstruction trip','0=legacy, 1=latched PLC reset',0,1,1,0),
   spec('accumulationTripMode','Body-to-body accumulation trip','0=legacy, 1=latched',0,1,1,0),
-  spec('accumulationDwellMs','Required continuous queue dwell','ms',100,4000,50,500)],
+  spec('accumulationDwellMs','Required continuous queue dwell','ms',100,4000,50,500),
+  spec('zoneSensorMode','Physical belt-zone occupancy','0=off, 1=actual bodies',0,1,1,0),
+  spec('zoneCapacity','Observed carton capacity','bodies',1,5,1,2)],
  faults:['belt-slip','belt-jammed','motor-dead'],
  fresh:()=>initial({}),
  step:(state,world,commands,dt,fault,ctx)=>{
@@ -121,12 +127,29 @@ export const beltConveyor:EquipmentDef={
     queued.tags.jammedByBody:null,
    faulted:!!fault,stalled}};
  },
- read:(s,w,ctx)=>({moving:s.engaged,jam:s.stalled||w.bodies.some(b=>b.supportedBy===ctx.id&&b.tags.jammed===true),
-  restartRequired:s.restartPending===true,
-  obstructionTripped:s.stalled&&!!s.obstructionBodyId,
-  accumulationTripped:s.stalled&&!!s.accumulationBodyId,
-  queueDwellMs:s.accumulationContactMs??0,
-  speed:s.engaged?s.speedMmS:0}),
+ read:(s,w,ctx)=>{
+  const monitored=param(ctx,'zoneSensorMode',0)===1;
+  const length=param(ctx,'lengthMm',600),width=param(ctx,'widthMm',300);
+  const rotated=ctx.yawDeg===90||ctx.yawDeg===270;
+  const size=vec(rotated?width:length,rotated?length:width,0);
+  // Count only distinct, conserved source bodies that are STILL physically
+  // on this conveyor and inside its actual rotated footprint. Ejected loads,
+  // foreign-belt products, operator sprites and stale tag claims do not count.
+  // This is a bounded lane-occupancy teaching sensor, NOT an inferred force
+  // or machine-safe collision/overfill device.
+  const count=monitored?w.bodies.filter(body=>body.supportedBy===ctx.id&&
+   insideFootprint(body.pos,ctx.originMm,size)).length:0;
+  return {moving:s.engaged,
+   jam:s.stalled||w.bodies.some(b=>b.supportedBy===ctx.id&&b.tags.jammed===true),
+   restartRequired:s.restartPending===true,
+   obstructionTripped:s.stalled&&!!s.obstructionBodyId,
+   accumulationTripped:s.stalled&&!!s.accumulationBodyId,
+   queueDwellMs:s.accumulationContactMs??0,
+   zoneOccupied:count>0,
+   zoneFull:monitored&&count>=param(ctx,'zoneCapacity',2),
+   zoneCount:count,
+   speed:s.engaged?s.speedMmS:0};
+ },
  describe:(s,ctx)=>[draw(ctx,'frame','box',vec(param(ctx,'lengthMm',600),param(ctx,'widthMm',300),120),60,
   s.engaged?'#397fa0':'#5f7380')],
 };
