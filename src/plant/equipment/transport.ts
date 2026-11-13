@@ -4,6 +4,9 @@ import {draw,flag,initial,numeric,param,spec} from '../world/equipment';
 import {clamp,q,vec,insideFootprint} from '../world/math';
 import type {EquipmentState} from '../world/types';
 
+const controllerPoweredForQueue=(commands:Readonly<Record<string,boolean|number>>):boolean=>
+ commands.controllerPowered!==false;
+
 export const beltConveyor:EquipmentDef={
  kind:'belt-conveyor',label:'Variable-speed belt conveyor',footprint:vec(600,300,120),
  commands:[{name:'run',kind:'bool'},{name:'reverse',kind:'bool'},
@@ -11,13 +14,16 @@ export const beltConveyor:EquipmentDef={
   {name:'speed',kind:'number',unit:'mm/s'}],
  signals:[{name:'moving',kind:'bool'},{name:'jam',kind:'bool'},
   {name:'restartRequired',kind:'bool'},{name:'obstructionTripped',kind:'bool'},
+  {name:'accumulationTripped',kind:'bool'},{name:'queueDwellMs',kind:'number',unit:'ms'},
   {name:'speed',kind:'number',unit:'mm/s'}],
  params:[spec('lengthMm','Belt length','mm',200,2400,50,600),spec('widthMm','Belt width','mm',150,600,50,300),
  spec('speedMmS','Surface speed','mm/s',50,1000,10,250),
  spec('contactMode','Body collision','0=legacy, 1=swept 3D',0,1,1,0),
   spec('jamResetMode','Jam acknowledgement','0=legacy, 1=PLC reset after repair',0,1,1,0),
   spec('restartHoldMode','Power restoration inhibit','0=legacy, 1=PLC reset after loss',0,1,1,0),
-  spec('obstructionTripMode','Physical gate obstruction trip','0=legacy, 1=latched PLC reset',0,1,1,0)],
+  spec('obstructionTripMode','Physical gate obstruction trip','0=legacy, 1=latched PLC reset',0,1,1,0),
+  spec('accumulationTripMode','Body-to-body accumulation trip','0=legacy, 1=latched',0,1,1,0),
+  spec('accumulationDwellMs','Required continuous queue dwell','ms',100,4000,50,500)],
  faults:['belt-slip','belt-jammed','motor-dead'],
  fresh:()=>initial({}),
  step:(state,world,commands,dt,fault,ctx)=>{
@@ -36,19 +42,49 @@ export const beltConveyor:EquipmentDef={
    state.obstructionGateId:collision?.tags.jammedByGate as string|undefined;
   const obstructionBodyId=state.stalled&&state.obstructionBodyId?
    state.obstructionBodyId:collision?.id;
+  // P21 does NOT infer a jam from a timer, a PLC register, or a rendered
+  // parcel. Two distinct original worker bodies must actually collide on
+  // this same powered belt. Only their continuous *physical* contact while
+  // commanded to run accumulates bounded dwell time. A transient bump does
+  // not trip the drive; the source IDs remain private equipment evidence.
+  const queueMode=param(ctx,'accumulationTripMode',0)===1;
+  const queued=queueMode&&!state.stalled&&run&&controllerPoweredForQueue(commands)?
+   world.bodies.find(b=>b.supportedBy===ctx.id&&b.tags.jammed===true&&
+    typeof b.tags.jammedByBody==='string'&&b.tags.jammedByBody!==b.id&&
+    world.bodies.some(leader=>leader.id===b.tags.jammedByBody&&
+     leader.supportedBy===ctx.id)):undefined;
+  const samePair=!!queued&&state.accumulationBodyId===queued.id&&
+   state.accumulationBlockingBodyId===queued.tags.jammedByBody;
+  const dwellRequired=param(ctx,'accumulationDwellMs',500);
+  const queueDwellMs=queued?
+   Math.min(dwellRequired,(samePair?(state.accumulationContactMs??0):0)+dt):0;
+  const queueTrip=!!queued&&queueDwellMs>=dwellRequired;
+  const accumulationBodyId=state.stalled&&state.accumulationBodyId?
+   state.accumulationBodyId:queueTrip?queued?.id:null;
+  const accumulationBlockingBodyId=state.stalled&&state.accumulationBlockingBodyId?
+   state.accumulationBlockingBodyId:queueTrip?
+   (queued?.tags.jammedByBody as string|undefined):null;
+  const queuedBodyExists=!!accumulationBodyId&&world.bodies.some(b=>
+   b.id===accumulationBodyId&&b.supportedBy===ctx.id);
+  const leader=world.bodies.find(b=>b.id===accumulationBlockingBodyId);
+  // The leading carton must still EXIST and be physically displaced out
+  // of this source conveyor by the real pusher; deleting it is not a safe
+  // recovery, nor is merely dropping a PLC flag or retracting a gate.
+  const queueClear=queuedBodyExists&&!!leader&&leader.supportedBy!==ctx.id;
   const originalBodyPresent=!!obstructionBodyId&&world.bodies.some(b=>
    b.id===obstructionBodyId&&b.supportedBy===ctx.id);
   const gateStillBlocking=!!obstructionGateId&&
    world.model[obstructionGateId]?.engaged===true;
   const obstructionCanReset=originalBodyPresent&&!gateStillBlocking;
-  const latchedMode=param(ctx,'jamResetMode',0)===1||obstructionMode;
+  const latchedMode=param(ctx,'jamResetMode',0)===1||obstructionMode||queueMode;
   // Faults and worker-observed collisions use the same PLC reset input,
   // but a mechanically EXTENDED gate must be released BEFORE the reset
   // edge. The original blocked body must still exist on its source belt.
   const clear=resetEdge&&fault===null&&
-   (!obstructionGateId||obstructionCanReset);
+   (!obstructionGateId||obstructionCanReset)&&
+   (!accumulationBodyId||queueClear);
   const stalled=latchedMode?
-   fault==='belt-jammed'||!!collision||(state.stalled&&!clear):
+   fault==='belt-jammed'||!!collision||queueTrip||(state.stalled&&!clear):
    fault==='belt-jammed'||state.stalled;
   // Controller power comes from the actual 24V netlist through the
   // worker-owned bridge, NOT a learner PLC tag or synthetic source input.
@@ -77,11 +113,16 @@ export const beltConveyor:EquipmentDef={
    restartPending,restartArmed,
    obstructionBodyId:stalled?obstructionBodyId:null,
    obstructionGateId:stalled?obstructionGateId:null,
+   accumulationBodyId:stalled?accumulationBodyId:null,
+   accumulationBlockingBodyId:stalled?accumulationBlockingBodyId:null,
+   accumulationContactMs:stalled&&!!accumulationBodyId?dwellRequired:queueDwellMs,
    faulted:!!fault,stalled}};
  },
  read:(s,w,ctx)=>({moving:s.engaged,jam:s.stalled||w.bodies.some(b=>b.supportedBy===ctx.id&&b.tags.jammed===true),
   restartRequired:s.restartPending===true,
   obstructionTripped:s.stalled&&!!s.obstructionBodyId,
+  accumulationTripped:s.stalled&&!!s.accumulationBodyId,
+  queueDwellMs:s.accumulationContactMs??0,
   speed:s.engaged?s.speedMmS:0}),
  describe:(s,ctx)=>[draw(ctx,'frame','box',vec(param(ctx,'lengthMm',600),param(ctx,'widthMm',300),120),60,
   s.engaged?'#397fa0':'#5f7380')],
