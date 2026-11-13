@@ -22,7 +22,7 @@ const pairs = [
       await page.$eval(selector, el => el.scrollIntoView({ block: 'center', inline: 'center' }));
       return original(selector, options);
     }; }
-  page.on('pageerror', error => errors.push(String(error)));
+  page.on('pageerror', error => errors.push(error?.stack ?? String(error)));
   page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
   const clickText = async text => {
     const found = await page.evaluate(label => {
@@ -40,7 +40,23 @@ const pairs = [
     { timeout: 5000 }, running ? 'RUNNING' : 'STOPPED');
   try {
     await page.goto(baseUrl + '/sandbox', { waitUntil: 'networkidle0', timeout: 15000 });
-    await page.waitForSelector('.sandbox-3d-shell');
+    await page.waitForSelector('.sandbox-3d-shell',{timeout:12000}).catch(async error=>{
+      const snippet=await page.evaluate(async stack=>{
+        const match=/\((https?:[^)]+\.js):(\d+):(\d+)\)/.exec(stack??'');
+        if(!match)return null;
+        const code=await fetch(match[1]).then(r=>r.text());
+        const line=code.split('\n')[Number(match[2])-1]??'';
+        const col=Number(match[3])-1;
+        return {file:match[1],line:Number(match[2]),column:Number(match[3]),
+          surrounding:line.slice(Math.max(0,col-420),col+420)};
+      },errors.find(x=>x.includes("reading 'p7'"))).catch(e=>String(e));
+      console.error('P7 STARTUP DIAGNOSTICS',JSON.stringify({
+        pageErrors:errors,sourceSnippet:snippet,
+        screen:await page.evaluate(()=>document.body?.innerText?.slice(0,2200)??''),
+        location:page.url(),
+      }));
+      throw error;
+    });
     try {
       await page.waitForFunction(() => !!document.querySelector('.sandbox-three-canvas canvas') ||
         !!document.querySelector('.sandbox-3d-fallback'), { timeout: 15000 });

@@ -1,15 +1,29 @@
 import { useEffect, useState } from 'react';
-import type { RenderSnapshot } from '../sim/signals';
+import type { ProjectFile, RenderSnapshot } from '../sim/signals';
+import { primaryPlcId, programOf } from '../sim/plcs';
+import type { InstructionBreakpoint } from './instruction-breakpoint';
 import { scanTraceCsv, type EdgeDirection, type TagBreakpoint } from './scan-trace';
 
-export function LiveMonitor({ snapshot, onBreakpoint, onTagBreakpoint }: {
-  snapshot: RenderSnapshot; onBreakpoint: (scan: number | null) => void;
+export function LiveMonitor({ snapshot, project, onBreakpoint, onTagBreakpoint, onInstructionBreakpoint }: {
+  snapshot: RenderSnapshot; project?: ProjectFile | null;
+  onBreakpoint: (scan: number | null) => void;
   onTagBreakpoint: (breakpoint: TagBreakpoint | null) => void;
+  onInstructionBreakpoint?: (breakpoint: InstructionBreakpoint | null) => void;
 }) {
   const [target, setTarget] = useState('');
   const [watch, setWatch] = useState('');
   const [edgeTag, setEdgeTag] = useState('Run');
   const [edgeDirection, setEdgeDirection] = useState<EdgeDirection>('rising');
+  const [instructionId, setInstructionId] = useState('');
+  const [instructionMetric, setInstructionMetric] = useState<'edge'|'elapsedMs'|'count'>('edge');
+  const [instructionEdge, setInstructionEdge] = useState<EdgeDirection>('rising');
+  const [instructionThreshold, setInstructionThreshold] = useState('1');
+  const firstProgram = project ? programOf(project, primaryPlcId(project)) : null;
+  const instructions = firstProgram?.language==='fbd' ? firstProgram.fbd.nodes.map(n=>n.id) :
+    firstProgram?.language==='ladder' ? firstProgram.program.rungs.map(r=>r.id) : [];
+  const selectedInstruction = instructions.includes(instructionId) ? instructionId : instructions[0] ?? '';
+  const thresholdNumber = Number(instructionThreshold);
+  const thresholdOK = Number.isSafeInteger(thresholdNumber) && thresholdNumber>=1 && thresholdNumber<=1_000_000_000;
   const boolTags = Object.entries(snapshot.tagValues).filter(([,value]) =>
     typeof value === 'boolean').map(([name]) => name);
   useEffect(() => {
@@ -101,6 +115,50 @@ export function LiveMonitor({ snapshot, onBreakpoint, onTagBreakpoint }: {
       </div>
       {snapshot.breakpointTag && <p role="status">Watching {snapshot.breakpointTag.tag} — {snapshot.breakpointTag.edge} edge</p>}
     </div>
+    {onInstructionBreakpoint && <div className="sandbox-breakpoint-panel">
+      <h3>Rung / function-block breakpoint</h3>
+      <p className="sandbox-help">Inspect the first PLC's actual compiled Ladder rungs or FBD blocks. Pause after a transition, timer elapsed threshold, or counter value threshold. No manual input or actuator forcing is used.</p>
+      <div className="sandbox-breakpoint-fields">
+        <label>Instruction
+          <select aria-label="Breakpoint rung or FBD block" value={selectedInstruction}
+            onChange={event=>setInstructionId(event.target.value)}>
+            {instructions.map(id=><option key={id} value={id}>{id}</option>)}
+          </select>
+        </label>
+        <label>Condition
+          <select aria-label="Instruction breakpoint condition" value={instructionMetric}
+            onChange={event=>setInstructionMetric(event.target.value as 'edge'|'elapsedMs'|'count')}>
+            <option value="edge">BOOL transition</option>
+            <option value="elapsedMs">Timer ET (ms) reached</option>
+            <option value="count">Counter CV reached</option>
+          </select>
+        </label>
+        {instructionMetric==='edge'?<label>Edge
+          <select aria-label="Instruction breakpoint edge" value={instructionEdge}
+            onChange={event=>setInstructionEdge(event.target.value as EdgeDirection)}>
+            <option value="rising">Rising</option><option value="falling">Falling</option>
+            <option value="either">Either</option>
+          </select>
+        </label>:<label>Threshold
+          <input type="number" aria-label="Instruction breakpoint threshold"
+            min={1} max={1_000_000_000} value={instructionThreshold}
+            onChange={event=>setInstructionThreshold(event.target.value)}/>
+        </label>}
+      </div>
+      <div>
+        <button className="btn ghost small" type="button"
+          disabled={snapshot.running||!selectedInstruction||(instructionMetric!=='edge'&&!thresholdOK)}
+          onClick={()=>onInstructionBreakpoint(instructionMetric==='edge'?
+            {id:selectedInstruction,metric:'edge',edge:instructionEdge}:
+            {id:selectedInstruction,metric:instructionMetric,threshold:thresholdNumber})}>Arm instruction</button>
+        <button className="btn ghost small" type="button"
+          disabled={snapshot.running||snapshot.breakpointInstruction===null}
+          onClick={()=>onInstructionBreakpoint(null)}>Clear instruction</button>
+      </div>
+      {snapshot.breakpointInstruction&&<p role="status">Armed {snapshot.breakpointInstruction.id}
+        {' · '}{snapshot.breakpointInstruction.metric}</p>}
+      {firstProgram?.language==='st'&&<p className="sandbox-help">Instruction-level breakpoints are available in Ladder and FBD; use BOOL tag edges or scan numbers for ST.</p>}
+    </div>}
     <div className="sandbox-scan-history">
       <div className="sandbox-section-head">
         <div><span className="eyebrow">PLC debugger</span><h3>Scan history</h3></div>
