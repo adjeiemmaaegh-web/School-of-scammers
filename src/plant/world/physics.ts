@@ -109,7 +109,7 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    const solidBlocked=newlyContactsStaticSolid(body,moved,items);
    if(blocked||solidBlocked){
     body.vel.x=0;body.vel.y=0;
-    const tags={...body.tags,jammed:true};
+    const tags:Body['tags']={...body.tags,jammed:true};
     if(blockingGate)tags.jammedByGate=blockingGate.id;
     else delete tags.jammedByGate;
     body.tags=tags;
@@ -120,7 +120,7 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
     const contact=collide(body,[...next,...sorted.filter(o=>Number(o.id.slice(1))>Number(body.id.slice(1)))],proposed,
       carrier.params.contactMode===1);
     if(contact.blocked){
-     body.vel.x=0;body.vel.y=0;const tags={...body.tags,jammed:true};
+     body.vel.x=0;body.vel.y=0;const tags:Body['tags']={...body.tags,jammed:true};
      delete tags.jammedByGate;body.tags=tags;
      if(!prior.tags.jammed)changed=addEvent(changed,{kind:'jam',source:carrier.id,bodyId:body.id,detail:'Body accumulated behind another body'});
     }else{
