@@ -180,7 +180,10 @@ function one(p:ProjectFile,seed:number):P21Lot{
   // Intentionally premature operator acknowledgement while the leading
   // original carton remains on the belt must not energize resetJam.
   w=checked(tick(w,[{k:'operate',id:ACK,pressed:true}]).world);
-  let earlyCoil=false;
+  // The PLC may issue a forbidden one-scan Q on the SAME scan the powered
+  // button is pressed. Observe that exact scan, not only later snapshots;
+  // otherwise a malicious/transient early reset can evade the assessor.
+  let earlyCoil=plc(w)?.outputs['Q0.3']===true;
   for(let k=0;k<3;k++){
    w=scan(w);
    earlyCoil=earlyCoil||plc(w)?.outputs['Q0.3']===true;
