@@ -17,6 +17,7 @@ import {p18Preflight,type P18Result} from '../../plant/scenes/matrix-p18';
 import {p19PowerPreflight,type P19Campaign} from '../../plant/scenes/matrix-p19';
 import {p20ObstructionPreflight,type P20ObstructionResult} from '../../plant/scenes/matrix-p20';
 import {p21AccumulationPreflight,type P21Campaign} from '../../plant/scenes/matrix-p21';
+import {p22ZonePreflight,type P22Campaign} from '../../plant/scenes/matrix-p22';
 import {projectSignature} from '../../plant/scenes/commissioning';
 
 type Props={scene:PlantScene;project:ProjectFile;snapshot:RenderSnapshot};
@@ -29,11 +30,14 @@ type Reply={kind:'matrix-result';id:number;result:MatrixResult}|
  {kind:'power-recovery-result';id:number;result:P19Campaign}|
  {kind:'gate-obstruction-result';id:number;result:P20ObstructionResult}|
  {kind:'queue-accumulation-result';id:number;result:P21Campaign}|
+ {kind:'zone-backpressure-result';id:number;result:P22Campaign}|
  {kind:'matrix-error';id:number;message:string};
 export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const spec=matrixSpecFor(scene.id)??expandedSpecFor(scene.id)??advancedSpecFor(scene.id);
  const unsupported=P13_UNSUPPORTED[scene.id];
  const signature=projectSignature(project);
+ const zoneBlockers=useMemo(()=>scene.id==='gate-accumulation'?
+  p22ZonePreflight(project,scene.id):[],[signature,scene.id]);
  const queueBlockers=useMemo(()=>scene.id==='gate-accumulation'?
   p21AccumulationPreflight(project,scene.id):[],[signature,scene.id]);
  const gateBlockers=useMemo(()=>scene.id==='gate-accumulation'?
@@ -61,6 +65,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const [powerReport,setPowerReport]=useState<P19Campaign|null>(null);
  const [gateReport,setGateReport]=useState<P20ObstructionResult|null>(null);
  const [queueReport,setQueueReport]=useState<P21Campaign|null>(null);
+ const [zoneReport,setZoneReport]=useState<P22Campaign|null>(null);
  const [error,setError]=useState<string|null>(null);
  const worker=useRef<Worker|null>(null);
  const nextId=useRef(0);
@@ -70,7 +75,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   worker.current?.terminate();
   worker.current=null;
   setPending(false);setReport(null);setBatchReport(null);setAutoReport(null);
-  setResilienceReport(null);setMaterialReport(null);setJamReport(null);setPowerReport(null);setGateReport(null);setQueueReport(null);setError(null);
+  setResilienceReport(null);setMaterialReport(null);setJamReport(null);setPowerReport(null);setGateReport(null);setQueueReport(null);setZoneReport(null);setZoneReport(null);setError(null);
   return ()=>{
    nextId.current++;worker.current?.terminate();worker.current=null;
   };
@@ -87,9 +92,10 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  </details>:null;
  const debug=Object.keys(snapshot.debugForces??{}).length>0||
   Object.values(snapshot.plcs).some(plc=>Object.keys(plc.debugForces??{}).length>0);
- const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery'|'run-power-recovery'|'run-gate-obstruction'|'run-queue-accumulation')=>{
+ const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery'|'run-power-recovery'|'run-gate-obstruction'|'run-queue-accumulation'|'run-zone-backpressure')=>{
   if(pending||(kind==='run-gate-obstruction'?gateBlockers.length:
-    kind==='run-queue-accumulation'?queueBlockers.length:blockers.length)||
+    kind==='run-queue-accumulation'?queueBlockers.length:
+     kind==='run-zone-backpressure'?zoneBlockers.length:blockers.length)||
     debug||snapshot.lastError)return;
   worker.current?.terminate();
   const runId=++nextId.current;
@@ -114,6 +120,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
    else if(event.data.kind==='power-recovery-result')setPowerReport(event.data.result);
    else if(event.data.kind==='gate-obstruction-result')setGateReport(event.data.result);
    else if(event.data.kind==='queue-accumulation-result')setQueueReport(event.data.result);
+   else if(event.data.kind==='zone-backpressure-result')setZoneReport(event.data.result);
    else setReport(event.data.result);
   };
   local.onerror=()=>{
@@ -197,6 +204,54 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
      This is not a measured industrial throughput rate. Fault repaired:
      {' '}{autoReport.faultRecovered?'yes':'no'}.
      The result is ephemeral, not part of the project.</p>
+   </div>}
+  </section>}
+  {scene.id==='gate-accumulation'&&<section className="sandbox-p22-zone"
+   data-p22-zone data-p22-state={pending?'running':zoneReport?.status??'setup'}>
+   <h3>P22 · Real belt occupancy, PLC feeder inhibit and third-carton release</h3>
+   <p className="sandbox-help">Enable original belt zoneSensorMode=1 and
+    zoneCapacity=2. Original worker-owned zoneCount, zoneOccupied and zoneFull
+    reflect conserved cartons physically supported within this conveyor,
+    not PLC counters, rendered meshes or assumed feeder pulses.
+    Wire belt.OUT_zoneFull to genuine PLC I0.5. The private offline worker
+    supplies a temporary 24 V third-carton request at I0.6.</p>
+   <p className="sandbox-help">Your own PLC must inhibit Q0.0 upon the
+    third-carton request when two real cartons occupy the source lane,
+    BEFORE P21's timed accumulation stop. Then physically retract the gate,
+    divert original b1 with the powered pusher, wait for a fresh reset and
+    recover original b2 before supplying a NEW requested b3. This is
+    limited educational occupancy telemetry, not certified machine guarding.</p>
+   {zoneBlockers.length>0&&<div data-p22-preflight>
+    <strong>Prepare the original source lane and 24 V I/O:</strong>
+    <ul>{zoneBlockers.map(x=><li key={x}>{x}</li>)}</ul>
+   </div>}
+   <button type="button" className="btn ghost small" data-p22-run-zone
+    disabled={pending||zoneBlockers.length>0||debug||!!snapshot.lastError}
+    onClick={()=>begin('run-zone-backpressure')}>{pending?
+     'Testing genuine PLC feed inhibition and physical originals…':
+     'Prove zone-full feeder inhibit, original recovery and b3 release'}</button>
+   {zoneReport&&<div data-p22-result data-p22-result-state={zoneReport.status}>
+    <p role="status"><strong>{zoneReport.status==='passed'?
+     'P22 physical backpressure control passed':
+     'P22 physical backpressure control did not pass'}</strong>.
+     {' '}{zoneReport.diagnostic}</p>
+    <p className="sandbox-help">Original feeder-generated cartons:
+     {' '}{zoneReport.totalOriginals} in three independent material lots;
+     source-only evidence, invalidated on edit, never saved as a certificate.</p>
+    <ol>{zoneReport.lots.map((lot,i)=><li key={i}
+     data-p22-lot={i} data-p22-lot-state={lot.pass?'pass':'fail'}>
+     <strong>{lot.pass?'✓':'○'} Lot {lot.seed}</strong>
+     {' '}· pre-trip count {lot.initialZoneCount}
+     {' '}· original IDs {lot.originalIds.join(', ')||'missing'}
+     <details><summary>Original-body / powered PLC checks</summary>
+      <ul>{lot.cases.map(c=><li key={c.id}
+       data-p22-case={c.id} data-p22-case-state={c.pass?'pass':'fail'}>
+       {c.pass?'✓':'○'} {c.id}: {c.detail}</li>)}</ul>
+      <p>{lot.diagnostic}</p>
+     </details>
+    </li>)}</ol>
+    <p data-p22-replay={zoneReport.deterministicReplay?'pass':'fail'}>
+     Exact seed replay: {zoneReport.deterministicReplay?'passed':'failed'}.</p>
    </div>}
   </section>}
   {scene.id==='gate-accumulation'&&<section className="sandbox-p21-queue"
