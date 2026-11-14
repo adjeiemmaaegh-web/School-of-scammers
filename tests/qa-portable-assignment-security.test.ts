@@ -36,7 +36,7 @@ describe('Repository QA: portable untrusted assessment boundary',()=>{
   {...assignment,formatVersion:22},
   {...assignment,seed:NaN},
   {...assignment,seed:-1},
-  {...assignment,mode:'learning'},
+  {...assignment,mode:'adversarial'},
   {...assignment,trade:'other'},
   {...assignment,createdAt:'not a date'},
  ])('rejects malformed imported assignment with correct top-level kind: %#',x=>{
