@@ -98,6 +98,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p25-stuck-outfeed-retry-browser.cjs
       - name: QA untrusted share codes, prototype routes and malformed assessment results
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/qa-share-code-browser.cjs
+      - name: P0 sandbox project startup hydration, damaged-backup recovery and stale-tab autosave protection
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-project-storage-browser.cjs
       - name: P6 visual workcell - build PLC conveyor/turntable line from empty 2D floor without WebGL
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-floor-plan-browser.cjs
       - name: UX-first workbench - workflow, device inspector and responsive design
