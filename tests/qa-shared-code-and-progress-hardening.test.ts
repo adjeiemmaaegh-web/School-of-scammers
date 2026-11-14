@@ -18,7 +18,12 @@ const result:AttemptResult={
  rubric:{score:80,max:100,passed:true,safetyHold:false,
   criteria:[{id:'wiring',label:'Wiring',max:100,earned:80,reason:'Verified in simulation'}]},
 };
-const forged=(data:unknown)=>Buffer.from(JSON.stringify(data)).toString('base64url');
+const base64url=(bytes:Uint8Array)=> {
+ let raw='';
+ for(const value of bytes)raw+=String.fromCharCode(value);
+ return btoa(raw).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+};
+const forged=(data:unknown)=>base64url(new TextEncoder().encode(JSON.stringify(data)));
 
 describe('untrusted externally supplied offline assessment codes',()=>{
  it('accepts and roundtrips genuine assignment and rich result, including Unicode labels',()=>{
@@ -66,7 +71,7 @@ describe('untrusted externally supplied offline assessment codes',()=>{
   expect(()=>decodeResult('a'.repeat(1_000_004))).toThrow(/oversized/i);
   expect(()=>decodeResult(forged({kind:'skills-lab-result'}))).toThrow();
   // A string with broken UTF8 bytes must not silently accept replacement chars.
-  expect(()=>decodeAssignment(Buffer.from([0xff,0xff]).toString('base64url'))).toThrow();
+  expect(()=>decodeAssignment(base64url(new Uint8Array([0xff,0xff])))).toThrow();
  });
 });
 describe('local progress corruption and object-key safety',()=>{
