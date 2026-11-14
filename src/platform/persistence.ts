@@ -21,7 +21,7 @@ const own=(v:unknown):v is Record<string,unknown>=>v!==null&&
  typeof v==='object'&&!Array.isArray(v);
 const finite=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v);
 const count=(v:unknown,max:number):v is number=>
- Number.isSafeInteger(v)&&typeof v==='number'&&v>=0&&v<=max;
+ typeof v==='number'&&Number.isSafeInteger(v)&&v>=0&&v<=max;
 const textField=(v:unknown,max:number):v is string=>
  typeof v==='string'&&v.length>0&&v.length<=max&&
  !/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v);
@@ -139,27 +139,40 @@ const PROGRESS_KEY = 'skills-lab:progress:v1';
 
 export type ProgressMap = Record<string, { bestScore: number; attempts: number; passed: boolean }>;
 
-export function loadProgress(): ProgressMap {
-  try {
-    const raw = localStorage.getItem(PROGRESS_KEY);
-    return raw ? (JSON.parse(raw) as ProgressMap) : {};
-  } catch {
-    return {};
+/** Progress is also an untrusted localStorage input, possibly edited or
+ * damaged by another tab/extension. Return only bounded, typed entries.
+ * This prevents a malformed entry from breaking recordProgress/TradeLadder.
+ */
+export function loadProgress():ProgressMap{
+ try{
+  const raw=localStorage.getItem(PROGRESS_KEY);
+  if(!raw||raw.length>150000)return {};
+  const decoded:unknown=JSON.parse(raw);
+  if(!own(decoded))return {};
+  const safe:ProgressMap={};
+  for(const [id,value] of Object.entries(decoded).slice(0,256)){
+   if(!/^[A-Za-z0-9_-]{1,80}$/.test(id)||
+    ['__proto__','constructor','prototype'].includes(id)||!own(value)||
+    !finite(value.bestScore)||value.bestScore<0||value.bestScore>100||
+    !count(value.attempts,10000000)||typeof value.passed!=='boolean')continue;
+   safe[id]={bestScore:value.bestScore,attempts:value.attempts,passed:value.passed};
   }
+  return safe;
+ }catch{return {};}
 }
-
-export function recordProgress(exerciseId: string, score: number, passed: boolean): ProgressMap {
-  const map = loadProgress();
-  const prev = map[exerciseId] ?? { bestScore: 0, attempts: 0, passed: false };
-  map[exerciseId] = {
-    bestScore: Math.max(prev.bestScore, score),
-    attempts: prev.attempts + 1,
-    passed: prev.passed || passed,
-  };
-  try {
-    localStorage.setItem(PROGRESS_KEY, JSON.stringify(map));
-  } catch {
-    /* storage unavailable — progress is a convenience, ignore */
-  }
-  return map;
+export function recordProgress(exerciseId:string,score:number,passed:boolean):ProgressMap{
+ if(!/^[A-Za-z0-9_-]{1,80}$/.test(exerciseId)||
+  ['__proto__','constructor','prototype'].includes(exerciseId)||
+  !finite(score)||score<0||score>100||typeof passed!=='boolean')
+  throw new Error('Invalid local progress input');
+ const map=loadProgress();
+ const prev=map[exerciseId]??{bestScore:0,attempts:0,passed:false};
+ map[exerciseId]={
+  bestScore:Math.max(prev.bestScore,score),
+  attempts:Math.min(10000000,prev.attempts+1),
+  passed:prev.passed||passed,
+ };
+ try{localStorage.setItem(PROGRESS_KEY,JSON.stringify(map));}
+ catch{/* Convenience progress only; the learner can continue offline. */}
+ return map;
 }
