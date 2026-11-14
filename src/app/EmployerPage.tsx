@@ -31,7 +31,7 @@ export function EmployerPage() {
       exerciseVersion: def.version,
       mode: 'assessment',
       seed: Math.floor(Math.random() * 1_000_000) + 1,
-      label: label.trim() || undefined,
+      label: label.trim().slice(0,512) || undefined,
       createdAt: new Date().toISOString(),
     };
     setAssignment(a);
@@ -68,6 +68,7 @@ export function EmployerPage() {
               <span>Label (optional)</span>
               <input
                 type="text"
+                maxLength={512}
                 value={label}
                 placeholder="e.g. Maintenance tech — final round"
                 onChange={(e) => setLabel(e.target.value)}
@@ -118,6 +119,7 @@ function ReviewResult() {
       <p className="muted small">Paste the result code your candidate sends back. These offline codes are unsigned and can be altered or fabricated; use them for training review only, not identity verification or certification.</p>
       <textarea
         className="code-input"
+        maxLength={2_000_008}
         value={raw}
         onChange={(e) => setRaw(e.target.value)}
         placeholder="Paste result code here…"
