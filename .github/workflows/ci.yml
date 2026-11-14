@@ -152,6 +152,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
       - name: Offline deep-link and lazy-lab cache acceptance
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/offline-acceptance.cjs
+      - name: QA untrusted assessment/result codes - recoverable candidate and employer browser rendering
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/qa-untrusted-shared-codes-browser.cjs
       - name: Automated WCAG accessibility and keyboard skip-navigation audit
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/accessibility-acceptance.cjs
       - name: No-WebGL low-resource browser functionality
