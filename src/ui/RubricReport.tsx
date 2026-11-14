@@ -59,12 +59,12 @@ export function RubricReport({
       {result.evidence.length > 0 && (
         <div className="action-trail">
           <button className="hints-toggle" onClick={() => setTrailOpen(!trailOpen)} aria-expanded={trailOpen}>
-            <span className="panel-eyebrow">Action trail · {result.evidence.length} steps</span>
+            <span className="panel-eyebrow">Action trail · {result.evidence.length} recorded (latest 300 shown)</span>
             <span>{trailOpen ? '−' : '+'}</span>
           </button>
           {trailOpen && (
             <ol className="trail-list">
-              {result.evidence.map((e) => (
+              {result.evidence.slice(-300).map((e) => (
                 <li key={e.index} className={e.accepted ? '' : 'rejected'}>
                   <span className="trail-time tabular">{fmtTime(e.at)}</span>
                   <span className="trail-detail">
