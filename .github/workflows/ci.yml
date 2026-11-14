@@ -191,6 +191,16 @@ jobs:
           else
             echo "npm audit returned nonzero - review findings, not legal signoff" > qa-artifacts/audit-status.txt
           fi
+      - name: Capture exact Git source snapshot for full-repository static QA
+        run: |
+          mkdir -p qa-artifacts
+          git archive --format=tar HEAD | gzip -9 > qa-artifacts/source-snapshot.tar.gz
+      - name: Upload complete exact-commit Git source QA snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: plc-complete-source-audit
+          path: qa-artifacts/source-snapshot.tar.gz
+          if-no-files-found: error
       - name: Upload dependency and source provenance evidence
         if: always()
         uses: actions/upload-artifact@v4
