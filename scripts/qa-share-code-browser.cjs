@@ -34,7 +34,7 @@ const code=value=>Buffer.from(JSON.stringify(value),'utf8').toString('base64url'
   await page.evaluate(hash=>{location.hash='#a='+hash;},code(assignment(42)));
   await page.waitForSelector('.exam-notes',{timeout:15000});
   assert.match(await page.$eval('main',e=>e.textContent),/Before you begin/);
-  await page.$eval('button',buttons=>{
+  await page.$$eval('button',buttons=>{
    const begin=Array.from(buttons).find(b=>b.textContent.includes('Begin assessment'));
    if(!begin)throw Error('Valid candidate assignment had no start button');
    begin.click();
