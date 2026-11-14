@@ -388,7 +388,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     } catch (e) { setClientError(e instanceof Error ? e.message : 'Project import failed'); }
     ev.target.value = '';
   };
-  const editable = !snapshot?.running;
+  // A saved project must finish Worker hydration before the user can change it.
+  // Otherwise an early insert/move may apply to the blank startup world.
+  const editable = storageReady && !snapshot?.running;
   // Several PLCs: the programming dock, live I/O lamps and monitor follow the selected PLC.
   const plcList = project ? plcComponents(project) : [];
   const activePlcId = plcList.find(c => c.id === selectedPlcId)?.id ?? plcList[0]?.id;
