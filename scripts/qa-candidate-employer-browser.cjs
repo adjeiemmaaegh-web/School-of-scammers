@@ -39,7 +39,7 @@ const initial={
   });
   await page.waitForFunction(()=>document.querySelectorAll('.evidence-row').length===1,
    {timeout:8000});
-  assert.equal(await page.$eval('.evidence-row',els=>els.length),1,
+  assert.equal(await page.$$eval('.evidence-row',els=>els.length),1,
    'React StrictMode must record exactly one evidence action per real click');
   const a=await page.$eval('main',x=>x.textContent);
   assert.match(a,/Assessment · exam conditions/);
