@@ -20,6 +20,7 @@ import {p21AccumulationPreflight,type P21Campaign} from '../../plant/scenes/matr
 import {p22ZonePreflight,type P22Campaign} from '../../plant/scenes/matrix-p22';
 import {p23HandoffPreflight,type P23Campaign} from '../../plant/scenes/matrix-p23';
 import {p24HoldPreflight,type P24Campaign} from '../../plant/scenes/matrix-p24';
+import {p25FaultRetryPreflight,type P25Campaign} from '../../plant/scenes/matrix-p25';
 import {projectSignature} from '../../plant/scenes/commissioning';
 
 type Props={scene:PlantScene;project:ProjectFile;snapshot:RenderSnapshot};
@@ -35,11 +36,14 @@ type Reply={kind:'matrix-result';id:number;result:MatrixResult}|
  {kind:'zone-backpressure-result';id:number;result:P22Campaign}|
  {kind:'two-belt-handoff-result';id:number;result:P23Campaign}|
  {kind:'outfeed-hold-result';id:number;result:P24Campaign}|
+ {kind:'stuck-outfeed-retry-result';id:number;result:P25Campaign}|
  {kind:'matrix-error';id:number;message:string};
 export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const spec=matrixSpecFor(scene.id)??expandedSpecFor(scene.id)??advancedSpecFor(scene.id);
  const unsupported=P13_UNSUPPORTED[scene.id];
  const signature=projectSignature(project);
+ const faultRetryBlockers=useMemo(()=>scene.id==='gate-accumulation'?
+  p25FaultRetryPreflight(project,scene.id):[],[signature,scene.id]);
  const holdBlockers=useMemo(()=>scene.id==='gate-accumulation'?
   p24HoldPreflight(project,scene.id):[],[signature,scene.id]);
  const handoffBlockers=useMemo(()=>scene.id==='gate-accumulation'?
@@ -76,6 +80,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  const [zoneReport,setZoneReport]=useState<P22Campaign|null>(null);
  const [handoffReport,setHandoffReport]=useState<P23Campaign|null>(null);
  const [holdReport,setHoldReport]=useState<P24Campaign|null>(null);
+ const [faultRetryReport,setFaultRetryReport]=useState<P25Campaign|null>(null);
  const [error,setError]=useState<string|null>(null);
  const worker=useRef<Worker|null>(null);
  const nextId=useRef(0);
@@ -85,7 +90,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   worker.current?.terminate();
   worker.current=null;
   setPending(false);setReport(null);setBatchReport(null);setAutoReport(null);
-  setResilienceReport(null);setMaterialReport(null);setJamReport(null);setPowerReport(null);setGateReport(null);setQueueReport(null);setZoneReport(null);setHandoffReport(null);setHoldReport(null);setError(null);
+  setResilienceReport(null);setMaterialReport(null);setJamReport(null);setPowerReport(null);setGateReport(null);setQueueReport(null);setZoneReport(null);setHandoffReport(null);setHoldReport(null);setFaultRetryReport(null);setError(null);
   return ()=>{
    nextId.current++;worker.current?.terminate();worker.current=null;
   };
@@ -102,12 +107,13 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
  </details>:null;
  const debug=Object.keys(snapshot.debugForces??{}).length>0||
   Object.values(snapshot.plcs).some(plc=>Object.keys(plc.debugForces??{}).length>0);
- const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery'|'run-power-recovery'|'run-gate-obstruction'|'run-queue-accumulation'|'run-zone-backpressure'|'run-two-belt-handoff'|'run-outfeed-hold-release')=>{
+ const begin=(kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery'|'run-power-recovery'|'run-gate-obstruction'|'run-queue-accumulation'|'run-zone-backpressure'|'run-two-belt-handoff'|'run-outfeed-hold-release'|'run-stuck-outfeed-retry')=>{
   if(pending||(kind==='run-gate-obstruction'?gateBlockers.length:
     kind==='run-queue-accumulation'?queueBlockers.length:
      kind==='run-zone-backpressure'?zoneBlockers.length:
      kind==='run-two-belt-handoff'?handoffBlockers.length:
-     kind==='run-outfeed-hold-release'?holdBlockers.length:blockers.length)||
+     kind==='run-outfeed-hold-release'?holdBlockers.length:
+     kind==='run-stuck-outfeed-retry'?faultRetryBlockers.length:blockers.length)||
     debug||snapshot.lastError)return;
   worker.current?.terminate();
   const runId=++nextId.current;
@@ -118,6 +124,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   setAutoReport(null);setResilienceReport(null);setMaterialReport(null);
   setJamReport(null);setPowerReport(null);setGateReport(null);setQueueReport(null);
   setZoneReport(null);setHandoffReport(null);setHoldReport(null);
+  setFaultRetryReport(null);
   local.onmessage=(event:MessageEvent<Reply>)=>{
    if(event.data?.id!==runId||worker.current!==local)return;
    local.terminate();worker.current=null;
@@ -136,6 +143,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
    else if(event.data.kind==='zone-backpressure-result')setZoneReport(event.data.result);
    else if(event.data.kind==='two-belt-handoff-result')setHandoffReport(event.data.result);
    else if(event.data.kind==='outfeed-hold-result')setHoldReport(event.data.result);
+   else if(event.data.kind==='stuck-outfeed-retry-result')setFaultRetryReport(event.data.result);
    else setReport(event.data.result);
   };
   local.onerror=()=>{
@@ -219,6 +227,61 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
      This is not a measured industrial throughput rate. Fault repaired:
      {' '}{autoReport.faultRecovered?'yes':'no'}.
      The result is ephemeral, not part of the project.</p>
+   </div>}
+  </section>}
+  {scene.id==='gate-accumulation'&&<section className="sandbox-p25-fault"
+   data-p25-fault data-p25-state={pending?'running':faultRetryReport?.status??'setup'}>
+   <h3>P25 · Genuine stuck outfeed, fault-latched alarm and fresh PLC retry</h3>
+   <p className="sandbox-help">Keep P24's original paired-carton accumulation,
+    200ms held-load sensor and powered downstream stopper. Add a real
+    24 V pilot lamp named <strong>outfeed-alarm</strong> at (710,480).
+    Wire scene-plc.Q0.7 to outfeed-alarm.L+ and scene-supply.M0 to
+    outfeed-alarm.M-. The private worker adds a fresh independently powered
+    maintenance retry at PLC I1.4, separate from first release I1.0.</p>
+   <p className="sandbox-help">The original b2 physically jams against
+    outstop, then the worker registers a genuine <strong>stuck-extended</strong>
+    equipment fault. Your PLC attempts Q0.6 release, observes that the
+    REAL I1.2 retracted-limit stays LOW, times out, reasserts Q0.6 and
+    electrically energizes the Q0.7 pilot lamp. A new feeder demand is
+    inhibited and the original carton stays conserved. Physically repairing
+    the fault alone cannot auto-release the carton; a NEW powered I1.4
+    maintenance retry must permit physical retraction, clear the lamp,
+    discharge original b2 and only then feed b3. No PLC coils are forced
+    by the instructor, and no score is persisted or certified.</p>
+   {faultRetryBlockers.length>0&&<div data-p25-preflight>
+    <strong>Prepare the original powered fault-recovery cell:</strong>
+    <ul>{faultRetryBlockers.map(x=><li key={x}>{x}</li>)}</ul>
+   </div>}
+   <button type="button" className="btn ghost small" data-p25-run-fault
+    disabled={pending||faultRetryBlockers.length>0||debug||!!snapshot.lastError}
+    onClick={()=>begin('run-stuck-outfeed-retry')}>{pending?
+     'Testing actual outstop mechanical fault and PLC retry…':
+     'Prove real stuck gate, latched alarm, physical repair and fresh retry'}</button>
+   {faultRetryReport&&<div data-p25-result
+    data-p25-result-state={faultRetryReport.status}>
+    <p role="status"><strong>{faultRetryReport.status==='passed'?
+     'P25 original-body mechanical fault recovery passed':
+     'P25 mechanical fault recovery did not pass'}</strong>.
+     {' '}{faultRetryReport.diagnostic}</p>
+    <p className="sandbox-help">Original feeder cartons:
+     {' '}{faultRetryReport.totalOriginals} across three material lots;
+     physical teaching model only, results invalidated on project edits,
+     never a safety certificate.</p>
+    <ol>{faultRetryReport.lots.map((lot,i)=><li key={i}
+     data-p25-lot={i} data-p25-lot-state={lot.pass?'pass':'fail'}>
+     <strong>{lot.pass?'✓':'○'} Lot {lot.seed}</strong>
+     {' '}· real fault {lot.injectedFault?'yes':'no'}
+     {' '}· powered alarm {lot.realLampPowered?'yes':'no'}
+     {' '}· bodies {lot.originalIds.join(', ')||'missing'}
+     <details><summary>Worker physics, circuit solver and PLC evidence</summary>
+      <ul>{lot.cases.map(c=><li key={c.id}
+       data-p25-case={c.id} data-p25-case-state={c.pass?'pass':'fail'}>
+       {c.pass?'✓':'○'} {c.id}: {c.detail}</li>)}</ul>
+      <p>{lot.diagnostic}</p>
+     </details>
+    </li>)}</ol>
+    <p data-p25-replay={faultRetryReport.deterministicReplay?'pass':'fail'}>
+     Seed-42 replay: {faultRetryReport.deterministicReplay?'passed':'failed'}.</p>
    </div>}
   </section>}
   {scene.id==='gate-accumulation'&&<section className="sandbox-p24-hold"
