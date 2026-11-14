@@ -1,0 +1,56 @@
+name: PLC Skills Lab - Repository QA and Security
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-and-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact lockfile dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Inventory complete source and security surface
+        run: node scripts/qa-static-inventory.cjs
+      - name: Unit adversarial assessment/trade/persistence boundaries
+        run: npx vitest run tests/qa-trust-boundaries.test.ts
+      - name: Audit production and complete npm dependency tree
+        run: node scripts/qa-dependency-audit.cjs
+      - name: Preserve QA security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plc-repository-qa-security
+          path: |
+            qa-artifacts/qa-static-inventory.json
+            qa-artifacts/npm-audit-production.json
+            qa-artifacts/npm-audit-complete.json
+            qa-artifacts/qa-advisory-summary.json
+          if-no-files-found: warn
+  native-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact lockfile dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install pinned Vitest 5.1-compatible V8 coverage provider for CI only
+        run: npm install --no-save --package-lock=false --no-audit --no-fund @vitest/coverage-v8@5.1.0
+      - name: Execute all repository native tests with V8 source coverage
+        run: npx vitest run --coverage --coverage.all --coverage.reporter=json-summary --coverage.reporter=text-summary
+      - name: Preserve full-source coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plc-repository-qa-coverage
+          path: coverage/coverage-summary.json
+          if-no-files-found: warn
