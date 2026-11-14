@@ -75,7 +75,7 @@ function validResult(value:unknown):AttemptResult{
   criteria.push({id:raw.id,label:raw.label,max:raw.max,
    earned:raw.earned,reason:raw.reason});
  }
- if(!Array.isArray(value.evidence)||value.evidence.length>1000)
+ if(!Array.isArray(value.evidence)||value.evidence.length>400)
   throw new Error('Invalid result evidence length');
  const evidence:AttemptResult['evidence']=[];
  for(const raw of value.evidence){
