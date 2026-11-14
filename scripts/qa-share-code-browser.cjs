@@ -27,6 +27,23 @@ const code=value=>Buffer.from(JSON.stringify(value),'utf8').toString('base64url'
   assert.match(await page.$eval('.field-error',e=>e.textContent),/Invalid assignment/i);
   assert.equal(await page.$$eval('button',els=>els.some(e=>e.textContent.includes('Begin assessment'))),false);
   console.log('QA CANDIDATE PASS: invalid assignment link rejected before learner assessment starts');
+  const assignment=(seed)=>({kind:'skills-lab-assignment',
+   formatVersion:1,trade:'plc',exerciseId:'plc-conveyor-start',
+   exerciseVersion:'1.0',mode:'assessment',seed,
+   createdAt:'2026-11-14T11:00:00.000Z'});
+  await page.evaluate(hash=>{location.hash='#a='+hash;},code(assignment(42)));
+  await page.waitForSelector('.exam-notes',{timeout:15000});
+  assert.match(await page.$eval('main',e=>e.textContent),/Before you begin/);
+  await page.$eval('button',buttons=>{
+   const begin=buttons.find(b=>b.textContent.includes('Begin assessment'));
+   if(!begin)throw Error('Valid candidate assignment had no start button');
+   begin.click();
+  });
+  await page.waitForFunction(()=>!document.querySelector('.exam-notes'),{timeout:15000});
+  await page.evaluate(hash=>{location.hash='#a='+hash;},code(assignment(43)));
+  await page.waitForSelector('.exam-notes',{timeout:15000});
+  assert.match(await page.$eval('main',e=>e.textContent),/Before you begin/);
+  console.log('QA CANDIDATE STATE PASS: changing assignment hash resets exam introduction');
   await page.goto(BASE+'/employer',{waitUntil:'networkidle0',timeout:45000});
   await page.type('.code-input',code({kind:'skills-lab-result'}));
   await page.click('.review-card button');
