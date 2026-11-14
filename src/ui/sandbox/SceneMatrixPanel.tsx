@@ -279,23 +279,16 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   </section>}
   {scene.id==='gate-accumulation'&&<section className="sandbox-p24-hold"
    data-p24-hold data-p24-state={pending?'running':holdReport?.status??'setup'}>
-   <h3>P24 · Real 200ms downstream carton hold, powered release and feeder inhibit</h3>
-   <p className="sandbox-help">Continue the original two-belt P23 factory.
-    Add real stopper <strong>outstop</strong> at (535,225) on the receiving
-    belt: travelMs=100, holdSensorMode=1 and holdDwellMs=200.
-    Wire powered PLC Q0.6 to outstop.CMD_extend+, and power the stopper
-    and return through the genuine 24V supply. Connect its actual feedback:
-    OUT_extended → PLC I1.1, OUT_retracted → PLC I1.2, and original worker
-    OUT_heldLoad → PLC I1.3. The private worker supplies a release button
-    through powered I1.0, distinct from I0.6 fresh-carton demand.</p>
-   <p className="sandbox-help">The same original b2 must enter the independently
-    powered receiver, physically stop against the extended outstop for 200ms,
-    and make I1.3 HIGH. An early release request cannot clear Q0.6 before
-    physical contact. With b2 still held, fresh feeder demand cannot energize
-    Q0.0. A new powered release after actual dwell must retract the gate,
-    move that same b2 out of the receiver, and only then allow new original
-    b3. The native hold detector is off in legacy scenes and is not a
-    calibrated force sensor or industrial guarding system.</p>
+   <h3>P24 · Physical carton hold and PLC release</h3>
+   <p className="sandbox-help">In the P23 cell, place
+    <strong> outstop</strong> at (535,225) with travelMs=100,
+    holdSensorMode=1 and holdDwellMs=200. Connect Q0.6 to its extend
+    command, supply 24 V/return, and wire extended I1.1, retracted
+    I1.2 and held-load I1.3. A private powered I1.0 button requests release.</p>
+   <p className="sandbox-help">Original b2 must remain held for 200ms
+    before the PLC can release it, inhibit Q0.0 while the receiver is full,
+    and clear before b3 feeds. Legacy mode stays off; this is not
+    calibrated industrial guarding.</p>
    {holdBlockers.length>0&&<div data-p24-preflight>
     <strong>Complete original physical outfeed commissioning:</strong>
     <ul>{holdBlockers.map(x=><li key={x}>{x}</li>)}</ul>
