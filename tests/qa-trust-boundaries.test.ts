@@ -20,7 +20,12 @@ const result:AttemptResult={
  rubric:{score:75,max:100,passed:true,safetyHold:false,
   criteria:[{id:'start',label:'Start sequence',max:100,earned:75,reason:'Physical PLC sequence accepted'}]},
 };
-const code=(data:unknown)=>Buffer.from(JSON.stringify(data),'utf8').toString('base64url');
+const base64url=(bytes:Uint8Array):string=>{
+ let text='';
+ for(const byte of bytes)text+=String.fromCharCode(byte);
+ return btoa(text).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+};
+const code=(data:unknown)=>base64url(new TextEncoder().encode(JSON.stringify(data)));
 afterEach(()=>vi.unstubAllGlobals());
 describe('QA: browser-facing share codes are untrusted payloads',()=>{
  it('round-trips real assignment and result including UTF-8 labels and evidence',()=>{
@@ -66,7 +71,7 @@ describe('QA: browser-facing share codes are untrusted payloads',()=>{
   expect(()=>decodeAssignment('not+base64')).toThrow();
  });
  it('rejects malformed UTF-8 and malformed base64 without reaching the review UI',()=>{
-  expect(()=>decodeResult(Buffer.from([0xff,0xfe,0xfd]).toString('base64url'))).toThrow();
+  expect(()=>decodeResult(base64url(Uint8Array.from([0xff,0xfe,0xfd])))).toThrow();
   expect(()=>decodeAssignment('abcde')).toThrow();
  });
  it('does not return unknown extra fields as trusted assignment or grading fields',()=>{
