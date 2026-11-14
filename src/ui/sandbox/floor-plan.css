@@ -1,0 +1,71 @@
+/* P6 original top-down workcell editor, available without WebGL. */
+.floor-plan-panel {
+  border:1px solid var(--line);border-radius:9px;
+  padding:10px;background:var(--surface);min-width:0;
+}
+.floor-plan-controls {
+  display:flex;align-items:end;flex-wrap:wrap;gap:8px 12px;
+  margin-bottom:8px;
+}
+.floor-plan-controls label {
+  display:flex;flex-direction:column;gap:4px;font-size:12px;
+  font-weight:600;color:var(--muted);
+}
+.floor-plan-controls select {
+  font:12px var(--body);max-width:min(260px,100%);min-height:34px;
+  color:var(--ink);background:var(--surface-2);border:1px solid var(--line);
+  border-radius:6px;padding:5px 7px;
+}
+.floor-plan-controls .floor-plan-wires {
+  flex-direction:row;align-items:center;gap:6px;min-height:32px;
+}
+.floor-plan-controls input {width:15px;height:15px}
+.floor-plan-controls :is(button,select,input):focus-visible {
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+.floor-plan-help {
+  font:12px/1.5 var(--body);color:var(--muted);
+  margin:5px 0 10px;max-width:74ch;
+}
+.floor-plan-svg {
+  display:block;width:100%;height:auto;aspect-ratio:1080 / 580;
+  border:1px solid var(--line);border-radius:7px;
+  touch-action:none;user-select:none;
+}
+.floor-plan-device {cursor:grab;outline:none}
+.floor-plan-device:active {cursor:grabbing}
+.floor-plan-device .floor-plan-shape {
+  stroke:#7ba4c2;stroke-width:2;fill:#284a62;
+  transition:stroke 90ms ease;
+}
+.floor-plan-device .floor-plan-shape.is-carrier {fill:#246276;stroke:#a2c5d7}
+.floor-plan-device .floor-plan-shape.is-active {fill:#236c59}
+.floor-plan-device.is-selected .floor-plan-shape,
+.floor-plan-device:focus-visible .floor-plan-shape {
+  stroke:#ffc16a;stroke-width:4;
+}
+.floor-plan-device text {
+  font:700 11px var(--body);fill:#f1f7fa;paint-order:stroke;
+  stroke:#192d3e;stroke-width:2px;stroke-linejoin:round;
+}
+.floor-plan-device .floor-plan-device-id {font:10px var(--mono)}
+.floor-plan-direction {stroke:#fcd491;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.floor-plan-wire {stroke:#7b9bb2;opacity:.65;stroke-width:2.2;stroke-dasharray:7 4;fill:none}
+.floor-plan-parcel text {
+  font:700 11px var(--mono);fill:#17232b;stroke:none;
+}
+.floor-plan-empty {font:700 18px var(--body);fill:#c3d9e8}
+.floor-plan-status {display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;
+  color:var(--muted);font:11px/1.45 var(--body)}
+.floor-plan-overlap {color:#a96725}
+.p5-organized .p5-floor-stage {display:none}
+.p5-organized .p5-layout[data-p5-view-active="plan"] .p5-floor-stage {display:block}
+.p5-organized .p5-layout[data-p5-view-active="plan"] .p5-physical-stage {display:none}
+@media(max-width:570px){
+ .floor-plan-panel{padding:7px}
+ .floor-plan-controls{align-items:stretch}
+ .floor-plan-controls label:first-child{flex:1;min-width:160px}
+ .floor-plan-controls select{max-width:100%}
+ .floor-plan-svg {min-height:230px}
+}
+@media(prefers-reduced-motion:reduce){.floor-plan-device .floor-plan-shape{transition:none}}

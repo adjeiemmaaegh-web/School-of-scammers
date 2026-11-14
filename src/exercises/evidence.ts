@@ -20,6 +20,8 @@ export function evidenceFromCommand(cmd: Command): { action: string; detail: str
     case 'operate': return { action: 'operate', detail: `${cmd.pressed ? 'Pressed' : 'Released'} ${cmd.id}` };
     case 'operateToggle': return { action: 'operate', detail: `Operated ${cmd.id}` };
     case 'operateProtection': return { action: 'operate', detail: `${cmd.action} ${cmd.id}` };
+    case 'setParam': return { action: 'configure', detail: `Set ${cmd.key} of ${cmd.id} to ${cmd.value}` };
+    case 'configureIo': return { action: 'configure', detail: `Renamed I/O tags of ${cmd.plc}` };
     case 'feedParcel': return { action: 'feed', detail: `Fed a ${cmd.kind} parcel` };
     case 'setMeterProbe': return {
       action: 'setMeterProbe',

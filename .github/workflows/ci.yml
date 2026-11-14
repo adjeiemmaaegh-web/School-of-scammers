@@ -37,53 +37,129 @@ jobs:
           done
           curl --silent --fail http://127.0.0.1:4173/ > /dev/null
       - name: Open sandbox P1 - place, wire, program, run and test failures
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-browser-acceptance.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-browser-acceptance.cjs
+      - name: P1 advanced authoring - select, duplicate, undo, redo, rotate, copy, paste and reload
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p1-workspace-browser.cjs
+      - name: P6 primary 3D workcell - Fly First Person and direct worker validated model dragging
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-3d-workcell-browser.cjs
+      - name: P7 3D factory commissioning - empty real 3D floor, PLC16 ST, 23 wires, worker parcel
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p7-3d-commissioning-browser.cjs
+      - name: P7 3D physical clearance - reject co-located carriers while preserving sensor mounting
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p7-clearance-browser.cjs
+      - name: P7 offline reusable 3D assemblies - save, reload, worker paste and delete
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p7-assemblies-browser.cjs
+      - name: P8 worker optics - real PLC16 ST, feeder, body and opt-in rotated rack obstruction
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p8-optical-browser.cjs
+      - name: P8 conveyor physical contact - real worker jam vs legacy free flow
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p8-jam-browser.cjs
+      - name: P8 offline assembly orientation - rotate worker-accepted 3D station and preserve wires
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p8-assembly-rotation-browser.cjs
+      - name: P8 explicit operator detection - First Person worker target through photoeye and PLC
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p8-training-operator-browser.cjs
+      - name: P8 offline hierarchy - two independently wired cells composed and worker-pasted
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p8-composed-assembly-browser.cjs
+      - name: P9 original scenes - search, 21 editable factories, safe replacement and yaw/elevation
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p9-21-scenes-browser.cjs
+      - name: P10 commissioning - worker-powered PLC, direct IO and no invented physical outcome
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p10-commissioning-browser.cjs
+      - name: P11 ordered scene assessment - real PLC16 ST, indexed rotary, witnessed separate worker scans
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p11-chronological-assessment-browser.cjs
+      - name: P12 independent PLC input/fault matrix - correct program passes, constant-on logic fails
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p12-multicase-browser.cjs
+      - name: P13 eleven additional PLC/factory matrices - real reject gate, false logic and unsupported bottle case
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p13-expanded-matrix-browser.cjs
+      - name: P14 real physical bottle and advanced material cases - worker dose, cap, repair and wrong-program refusal
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p14-physical-bottle-browser.cjs
+      - name: P15 repeated physical product batch - three bottles, per-body cap, conservation and wrong PLC rejection
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p15-multiproduct-browser.cjs
+      - name: P15 autonomous material sorting - actual PLC sensors, two physical receiving conveyors, robot fault recovery
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p15-autonomous-robot-browser.cjs
+      - name: P15 autonomous gantry, pallet and bottle - independently wired real PLC sensor-feedback production
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p15-autonomous-factory-browser.cjs
+      - name: P16 fault-position resilience and replay - real robot and bottle PLCs with four adversarial controls
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p16-resilience-browser.cjs
+      - name: P17 seeded material quality - three real feeder lots, material sorting, filling and deterministic replay
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p17-material-lots-browser.cjs
+      - name: P18 physically latched conveyor jam - PLC acknowledgement, same-bottle recovery and faulty reset rejection
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p18-conveyor-jam-browser.cjs
+      - name: P19 real PLC supply and drive power-loss - restart inhibit, operator acknowledgement, original bottle quality and source-negative
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p19-power-restart-browser.cjs
+      - name: P20 physics-origin gate obstruction - actual original body collision, PLC stopper clearance and fresh reset
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p20-physical-obstruction-browser.cjs
+      - name: P21 genuine two-carton accumulation - contact dwell, physical powered pusher diversion and post-clearance reset
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p21-real-queue-browser.cjs
+      - name: P22 genuine full-lane occupancy, PLC feeder inhibit, post-clearance third original carton and source-negative
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p22-real-zone-browser.cjs
+      - name: P23 two-belt handoff, downstream I0.7 feeder inhibit, powered receiver and source-negative
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p23-two-belt-handoff-browser.cjs
+      - name: P24 original-body 200ms physical outfeed hold, powered PLC release and premature-release negative
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p24-physical-outfeed-hold-browser.cjs
+      - name: P25 actual outstop stuck-extended, latched 24V lamp, repair without auto-resume and fresh I1.4 retry
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p25-stuck-outfeed-retry-browser.cjs
+      - name: QA untrusted share codes, prototype routes and malformed assessment results
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/qa-share-code-browser.cjs
+      - name: P0 sandbox project startup hydration, damaged-backup recovery and stale-tab autosave protection
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-project-storage-browser.cjs
+      - name: P6 visual workcell - build PLC conveyor/turntable line from empty 2D floor without WebGL
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-floor-plan-browser.cjs
       - name: UX-first workbench - workflow, device inspector and responsive design
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux-acceptance.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-ux-acceptance.cjs
+      - name: Integrated numeric PLC and P5 workspace - real wiring/view browser E2E
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p5-workspace-browser.cjs
       - name: P2 PLC programming - real multi-rung timers and Structured Text E2E
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-browser-acceptance.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p2-browser-acceptance.cjs
+      - name: P2 visual FBD - edit graph, compile, PLC-driven motor latch, stop and persistence
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p2-fbd-browser.cjs
       - name: P2 typed numeric PLC - INT, ADD and comparator 3D motor browser E2E
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p2-numeric-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p2-numeric-browser.cjs
       - name: P3 3D sorting - powered conveyor, photoeye, diverter and wrong PLC logic
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-sorting-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p3-sorting-browser.cjs
       - name: P3 3D tank - wired pump, high-level switch and drain valve browser E2E
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p3-tank-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p3-tank-browser.cjs
+      - name: P3 world integrated - real PLC to feeder to body to geometric sensor browser
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p3-plant-browser.cjs
+      - name: Combined three-conveyor turntable - PLC, two sensors, body transfers, ST and reload
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-three-conveyor-turntable-browser.cjs
+      - name: Analog process I/O - numeric tank signal drives ST-controlled pump over isolated wire
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-analog-browser.cjs
+      - name: P4 400V starter - real phase conductors, PLC-driven star/delta and thermal telemetry E2E
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p4-star-delta-browser.cjs
       - name: P4 electrical panel - breaker, overload, pilot lamp and 24V multimeter browser E2E
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-panel-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p4-panel-browser.cjs
       - name: P4 3D reversing - physical dual NC interlocks and motor direction browser E2E
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-reversing-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p4-reversing-browser.cjs
       - name: P5 troubleshooting - hidden fault, symptom-only alarm, multimeter diagnosis and part replacement
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-faults-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p5-faults-browser.cjs
       - name: P5 sensor troubleshooting - stuck photoeye lies to the PLC on the running sorting line
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-sensor-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p5-sensor-browser.cjs
       - name: Multi-PLC - two panels, per-PLC Ladder/ST programs, PLC-to-PLC signalling over a shared common
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-multiplc-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p7-multiplc-browser.cjs
       - name: Relay and cylinder - hard-wired relay latch with no PLC, PLC-driven pneumatic cylinder with limit switches
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p13-relay-cylinder-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p13-relay-cylinder-browser.cjs
       - name: Cylinder faults and stack light - PLC-driven stack light, no-air and dead-limit-switch faults, repair clears the alarm
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p14-cylinder-faults-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p14-cylinder-faults-browser.cjs
       - name: On-delay relay and device settings - hard-wired timer, dial set in the inspector, TIMING then CONTACTS ON, reset on early release
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p15-timer-relay-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p15-timer-relay-browser.cjs
       - name: Configurable I/O - a 16/16 PLC with named tags in both banks, refused renames, persistence
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p12-configurable-io-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p12-configurable-io-browser.cjs
       - name: Authored plant - build a two-station plant from an empty floor through the UI, commission, troubleshoot, reload
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p11-authored-plant-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p11-authored-plant-browser.cjs
       - name: Per-instance plant - two conveyor lanes and two tanks, each with its own PLC, devices and counters
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p10-multiplant-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p10-multiplant-browser.cjs
       - name: Product structure - simulator-first home, primary navigation, separate Learn and Assessments sections
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/simulator-first-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/simulator-first-browser.cjs
       - name: Edit plant - one-click panels, remove with cleanup, undo, first-PLC promotion, Delete key
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-edit-plant-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p8-edit-plant-browser.cjs
       - name: P6 scenarios - graded by outcome on the real sandbox, employer to candidate to review
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p6-scenario-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p6-scenario-browser.cjs
       - name: Browser smoke - routes, machine control, meter, assessment and mobile
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/browser-acceptance.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/browser-acceptance.cjs
       - name: Offline deep-link and lazy-lab cache acceptance
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/offline-acceptance.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/offline-acceptance.cjs
       - name: Automated WCAG accessibility and keyboard skip-navigation audit
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/accessibility-acceptance.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/accessibility-acceptance.cjs
       - name: No-WebGL low-resource browser functionality
-        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/cpu-fallback-acceptance.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/cpu-fallback-acceptance.cjs
       - name: Install Firefox and Linux WebKit for browser acceptance
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.64.1

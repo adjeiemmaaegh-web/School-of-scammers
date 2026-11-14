@@ -29,7 +29,9 @@ export function CandidatePage() {
   const [manual, setManual] = useState('');
 
   useEffect(() => {
-    const onHash = () => setState(readAssignmentFromHash());
+    // Opening a different assignment must show its exam introduction again,
+    // never inherit the previous candidate's 'started' state.
+    const onHash = () => { setState(readAssignmentFromHash()); setStarted(false); };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -45,6 +47,7 @@ export function CandidatePage() {
   const loadManual = () => {
     try {
       setState({ assignment: decodeAssignment(manual) });
+      setStarted(false);
     } catch (e) {
       setState({ error: e instanceof Error ? e.message : 'Invalid code.' });
     }

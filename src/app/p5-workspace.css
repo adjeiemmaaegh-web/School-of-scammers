@@ -1,0 +1,336 @@
+/* P5-UX workspace organization. Original industrial UI; no simulator semantics here.
+ * All physical/electrical/PLC truth remains in the existing Web Worker.
+ */
+.p5-organized {
+  padding-top:10px;
+  --p5-panel:var(--surface);
+  --p5-edge:var(--line);
+}
+.p5-organized :is(button,summary,a,input,select):focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
+.p5-organized .sandbox-masthead {
+  align-items:center;
+  gap:12px;
+  padding:5px 0 10px;
+}
+.p5-organized .sandbox-masthead h1 {
+  font-size:clamp(19px,2.5vw,27px);
+  letter-spacing:-.025em;
+  margin:3px 0 3px;
+}
+.p5-organized .sandbox-breadcrumb {margin-bottom:5px}
+.p5-organized .sandbox-masthead-lede {font-size:12px;line-height:1.4}
+.p5-organized .sandbox-project-meta {padding:10px 13px;min-width:220px;border-radius:9px}
+
+.p5-menu-bar {
+  display:flex;flex-wrap:wrap;align-items:center;gap:3px;
+  padding:4px 7px;background:var(--surface);
+  border:1px solid var(--line);border-radius:9px 9px 0 0;
+}
+.p5-menu-bar details {position:relative}
+.p5-menu-bar summary {
+  list-style:none;user-select:none;cursor:pointer;padding:8px 11px;
+  color:var(--ink);font:600 12px var(--body);border-radius:6px;
+}
+.p5-menu-bar summary::-webkit-details-marker {display:none}
+.p5-menu-bar summary::after {content:' ▾';color:var(--muted)}
+.p5-menu-bar details[open] summary,.p5-menu-bar summary:hover {
+  background:var(--surface-2);
+}
+.p5-menu-content {
+  position:absolute;top:calc(100% + 4px);left:0;z-index:25;
+  display:grid;gap:3px;min-width:225px;max-width:330px;
+  padding:7px;background:var(--surface);border:1px solid var(--line);
+  box-shadow:0 14px 35px var(--scene-shadow);border-radius:10px;
+}
+.p5-menu-content button {
+  border:0;background:transparent;color:var(--ink);font:12px var(--body);
+  cursor:pointer;text-align:left;padding:9px 10px;border-radius:6px;
+}
+.p5-menu-content button:hover:not(:disabled){background:var(--surface-2)}
+.p5-menu-content button:disabled{opacity:.45;cursor:not-allowed}
+.p5-menu-content span{font:11px/1.5 var(--body);padding:7px;color:var(--muted)}
+.p5-help {
+  border:1px solid var(--line);border-top:0;border-radius:0 0 8px 8px;
+  padding:12px 14px;background:var(--surface-2);font-size:12px;line-height:1.55;
+}
+.p5-organized .sandbox-workflow {
+  border-radius:0 0 9px 9px;margin:0 0 7px;padding:3px;
+}
+.p5-organized .sandbox-workflow button {padding:7px 9px}
+.p5-organized .sandbox-workflow-number {width:24px;height:24px;font-size:10px}
+.p5-organized .sandbox-workflow strong {font-size:12px}
+.p5-organized .sandbox-workflow small {font-size:10px}
+.p5-organized .sandbox-toolbar {
+  padding:7px 9px;gap:6px;margin-bottom:7px;border-radius:8px;
+}
+.p5-organized .sandbox-toolbar .btn{padding:7px 11px}
+.p5-view-tools {
+  display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;
+  padding:7px 9px;margin-bottom:9px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:8px;
+}
+.p5-view-tools [role="group"]{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.p5-view-tools button {
+  padding:7px 9px;border:1px solid transparent;border-radius:6px;
+  background:transparent;color:var(--ink);font:600 11px var(--body);cursor:pointer;
+}
+.p5-view-tools button:hover:not(:disabled){background:var(--surface)}
+.p5-view-tools button[aria-pressed="true"] {
+  background:var(--surface);border-color:var(--accent);
+  box-shadow:inset 0 -2px var(--accent);
+}
+.p5-view-tools button:disabled{opacity:.45;cursor:not-allowed}
+.p5-panel-toggles{margin-left:auto}
+.p5-panel-toggles button {border-color:var(--line)}
+.p5-organized .p5-layout {
+  display:grid;grid-template-columns:minmax(205px,220px) minmax(0,1fr) minmax(225px,250px);
+  align-items:start;gap:9px;
+}
+.p5-organized .p5-layout.p5-no-library {
+  grid-template-columns:minmax(0,1fr) minmax(225px,250px);
+}
+.p5-organized .p5-layout.p5-no-inspector {
+  grid-template-columns:minmax(205px,220px) minmax(0,1fr);
+}
+.p5-organized .p5-layout.p5-no-library.p5-no-inspector{
+  grid-template-columns:minmax(0,1fr);
+}
+.p5-organized .sandbox-palette {
+  padding:11px;position:sticky;top:calc(var(--app-header-h,64px) + 75px);
+  max-height:calc(100vh - var(--app-header-h,64px) - 95px);overflow:auto;
+  scrollbar-width:thin;
+}
+.p5-organized .sandbox-rail-heading {margin-bottom:9px}
+.p5-organized .sandbox-rail-heading h2 {font-size:17px}
+.p5-device-families {display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
+.p5-device-families button {
+  background:var(--surface-2);border:1px solid var(--line);
+  border-radius:6px;color:var(--ink);padding:6px 7px;
+  font:11px var(--body);cursor:pointer;
+}
+.p5-device-families button[aria-pressed="true"]{
+  border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));
+  font-weight:700;
+}
+.p5-organized .sandbox-palette-list{grid-template-columns:1fr;gap:5px}
+.p5-organized .sandbox-palette-item{min-height:53px;padding:7px}
+.p5-organized .sandbox-palette-item small{font-size:10px;line-height:1.35}
+.p5-organized .sandbox-device-glyph{width:34px;height:34px}
+.p5-organized .sandbox-main {min-width:0}
+.p5-logical-heading {
+  display:none;gap:5px;margin-bottom:8px;padding:12px 13px;
+  background:var(--surface);border:1px solid var(--line);border-radius:8px;
+}
+.p5-logical-heading strong{font-size:15px}
+.p5-logical-heading span{font-size:12px;color:var(--muted)}
+.p5-organized .p5-layout[data-p5-view-active="logical"] .p5-logical-heading{display:grid}
+.p5-organized .p5-layout[data-p5-view-active="logical"] .p5-physical-stage{display:none}
+.p5-organized .sandbox-scene-heading {margin-bottom:5px}
+.p5-organized .sandbox-scene-heading h2 {font-size:17px}
+.p5-organized .sandbox-3d-shell {
+  height:clamp(440px,55vh,760px);min-height:420px;
+  border-radius:8px;
+}
+.p5-organized .sandbox-3d-empty {margin-top:5px}
+.p5-organized .p5-logical-stage {
+  margin-top:8px;overflow:auto;scrollbar-width:thin;
+  max-height:205px;
+}
+.p5-organized .p5-layout[data-p5-view-active="logical"] .p5-logical-stage {
+  max-height:clamp(480px,66vh,830px);margin-top:0;
+}
+.p5-organized .p5-layout[data-p5-view-active="logical"] .sandbox-device-list {
+  grid-template-columns:repeat(auto-fit,minmax(195px,1fr));
+}
+.p5-organized .sandbox-status {padding:9px;margin-top:8px}
+.p5-organized .sandbox-status .sandbox-lamps{max-height:76px;overflow:auto}
+.p5-inspector-slot{min-width:0}
+.p5-organized .p5-inspector-slot .sandbox-inspector {
+  min-width:0;padding:12px;position:sticky;
+  top:calc(var(--app-header-h,64px) + 75px);
+  max-height:calc(100vh - var(--app-header-h,64px) - 95px);
+  overflow:auto;scrollbar-width:thin;
+}
+.p5-simulation-status {
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px 15px;
+  margin-top:8px;padding:11px 14px;
+  border-radius:8px;background:#152f42;color:#e7f1fa;
+  font:12px var(--body);
+}
+.p5-simulation-status strong{font-weight:800;color:#b2f0d5}
+.p5-simulation-status span{color:#d3e5ef}
+.p5-simulation-status code{color:#fff}
+.p5-simulation-status .p5-status-warning{color:#ffe0a1}
+.p5-engineering-dock {margin-top:8px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+.p5-dock-heading {
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 12px;
+  border-bottom:1px solid var(--line);
+}
+.p5-dock-heading strong{font-size:13px;margin-right:8px}
+.p5-dock-heading div[role="group"]{display:flex;flex-wrap:wrap;gap:5px}
+.p5-dock-heading button{
+  border:1px solid var(--line);border-radius:7px;
+  padding:7px 10px;background:var(--surface-2);color:var(--ink);
+  font:11px var(--body);cursor:pointer;
+}
+.p5-dock-heading button[aria-pressed="true"]{
+  border-color:var(--accent);box-shadow:inset 0 -2px var(--accent);font-weight:700;
+}
+.p5-dock-heading>button:last-child{margin-left:auto}
+.p5-organized .p5-engineering-dock .sandbox-bottom {
+  margin:0;padding:12px;
+  grid-template-columns:minmax(0,1.7fr) minmax(285px,.95fr);
+}
+.p5-organized .p5-engineering-dock[data-p5-dock="diagnostics"] .sandbox-bottom {
+  grid-template-columns:minmax(0,1.1fr) minmax(320px,1.45fr);
+}
+.p5-organized .p5-engineering-dock .sandbox-instruments {
+  max-height:min(800px,75vh);overflow:auto;scrollbar-width:thin;
+}
+.p5-organized .p5-engineering-dock .sandbox-program-dock{min-width:0}
+.p5-organized .sandbox-disclaimer {font-size:11px;line-height:1.6;margin-top:16px}
+@media(max-width:1190px){
+  .p5-organized .p5-layout,
+  .p5-organized .p5-layout.p5-no-inspector{
+    grid-template-columns:minmax(190px,215px) minmax(0,1fr);
+  }
+  .p5-organized .p5-layout.p5-no-library,
+  .p5-organized .p5-layout.p5-no-library.p5-no-inspector{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .p5-organized .p5-inspector-slot{grid-column:1/-1}
+  .p5-organized .p5-inspector-slot .sandbox-inspector{
+    position:static;max-height:none;
+  }
+}
+@media(max-width:880px){
+  .p5-organized .p5-layout,
+  .p5-organized .p5-layout.p5-no-inspector,
+  .p5-organized .p5-layout.p5-no-library,
+  .p5-organized .p5-layout.p5-no-library.p5-no-inspector{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .p5-organized .sandbox-palette{
+    position:static;max-height:300px;
+  }
+  .p5-organized .sandbox-palette-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .p5-organized .p5-inspector-slot{grid-column:auto}
+  .p5-organized .p5-engineering-dock .sandbox-bottom,
+  .p5-organized .p5-engineering-dock[data-p5-dock="diagnostics"] .sandbox-bottom{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .p5-organized .p5-engineering-dock[data-p5-dock="program"] .sandbox-instruments{display:none}
+  .p5-organized .p5-engineering-dock[data-p5-dock="diagnostics"] .sandbox-program-dock{display:none}
+  .p5-organized .p5-engineering-dock .sandbox-instruments{max-height:none}
+}
+@media(max-width:570px){
+  .p5-organized .sandbox-masthead h1{font-size:21px}
+  .p5-menu-bar{gap:1px}
+  .p5-menu-bar summary{padding:8px 7px;font-size:11px}
+  .p5-menu-content{min-width:200px}
+  .p5-view-tools{align-items:stretch}
+  .p5-view-tools [role="group"]{width:100%}
+  .p5-panel-toggles{margin-left:0}
+  .p5-organized .sandbox-palette-list{grid-template-columns:1fr}
+  .p5-organized .sandbox-3d-shell{height:430px;min-height:400px}
+  .p5-organized .p5-logical-stage{max-height:180px}
+  .p5-organized .p5-layout[data-p5-view-active="logical"] .p5-logical-stage{max-height:67vh}
+  .p5-simulation-status{font-size:11px}
+  .p5-dock-heading>button:last-child{margin-left:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .p5-organized *, .p5-organized *::before, .p5-organized *::after {
+    scroll-behavior:auto!important;transition-duration:0ms!important;
+  }
+}
+
+/* The new Logical view is an actual spatial diagram of project components/wires.
+ * Route strokes are neutral: only the worker, never SVG color, can claim power.
+ */
+.p5-organized .p5-logical-board{display:none}
+.p5-organized .p5-layout[data-p5-view-active="logical"] .p5-logical-board{display:block}
+.p5-logical-scroll{
+  position:relative;overflow:auto;scrollbar-width:thin;
+  height:clamp(490px,65vh,780px);
+  border:1px solid var(--line);border-radius:9px;background:var(--scene-bg);
+}
+.p5-logical-canvas{
+  position:relative;box-sizing:border-box;width:1080px;min-height:580px;
+  background-image:
+    linear-gradient(color-mix(in srgb,var(--scene-line) 13%,transparent) 1px,transparent 1px),
+    linear-gradient(90deg,color-mix(in srgb,var(--scene-line) 13%,transparent) 1px,transparent 1px);
+  background-size:25px 25px;
+}
+.p5-logical-wires{
+  position:absolute;left:0;top:0;z-index:1;
+  overflow:visible;pointer-events:none;
+}
+.p5-logical-wires path{
+  fill:none;stroke:var(--scene-line);stroke-width:2.5;
+  opacity:.9;stroke-linecap:round;stroke-linejoin:round;
+}
+.p5-logical-node{
+  position:absolute;z-index:2;box-sizing:border-box;width:170px;
+  border:2px solid var(--scene-line);border-radius:10px;
+  background:var(--surface);color:var(--ink);
+  box-shadow:0 4px 12px var(--scene-shadow);
+  display:flex;flex-direction:column;align-items:center;gap:8px;padding:9px 9px 13px;
+  text-align:center;
+}
+.p5-logical-node.is-selected{outline:3px solid var(--accent);outline-offset:2px}
+.p5-logical-device-title{
+  max-width:145px;padding:5px 2px;border:0;border-radius:5px;background:transparent;
+  color:var(--ink);font:700 12px var(--body);cursor:pointer;white-space:normal;
+}
+.p5-logical-device-title:hover{text-decoration:underline}
+.p5-logical-node>code{font:10px var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.p5-logical-state{
+  margin-top:5px;border:1px solid var(--line);padding:4px 8px;
+  font:10px var(--mono);border-radius:6px;color:var(--muted);
+}
+.p5-logical-terminal{
+  position:absolute;z-index:3;min-width:34px;min-height:19px;padding:2px 4px;
+  border:1px solid var(--scene-line);background:var(--surface-2);color:var(--ink);
+  border-radius:4px;font:10px var(--mono);cursor:crosshair;white-space:nowrap;
+}
+.p5-logical-terminal.left{left:-4px}
+.p5-logical-terminal.right{right:-4px}
+.p5-logical-terminal.is-selected{
+  background:var(--accent);color:var(--accent-ink);outline:2px solid var(--accent);
+}
+.p5-logical-terminal:disabled{cursor:not-allowed;opacity:.55}
+.p5-logical-empty{
+  position:absolute;left:220px;top:155px;
+  width:430px;max-width:calc(100% - 260px);
+  display:grid;gap:10px;padding:22px;border:1px dashed var(--scene-line);
+  border-radius:10px;background:var(--surface);color:var(--ink);
+}
+.p5-logical-empty strong{font-size:18px}
+.p5-logical-empty span{font-size:13px;color:var(--muted)}
+.p5-logical-board>.sandbox-help{margin:8px 2px 4px;line-height:1.5}
+.p5-organized .p5-layout[data-p5-view-active="logical"] .p5-logical-stage{
+  max-height:275px;
+}
+@media(max-width:570px){
+  .p5-logical-scroll{height:58vh;min-height:390px}
+}
+
+/* Drei Html device labels use very high internal z-index values. Confine those
+ * labels to the 3D scene's stacking context so they can never cover the sticky
+ * project toolbar when the long engineering page is scrolled.
+ * AppHeader z=20 > toolbar z=9 > isolated 3D scene z=0.
+ */
+.p5-organized .sandbox-3d-shell {
+  position:relative;
+  z-index:0;
+  isolation:isolate;
+}
+/* Bound all canvas-attached Html portals to the workspace column as well. */
+.p5-organized .sandbox-main {
+  position:relative;
+  z-index:0;
+  isolation:isolate;
+}

@@ -10,7 +10,7 @@ export type TagBreakpoint = { tag: string; edge: EdgeDirection };
 export type ScanTrace = {
   scan: number;
   simulatedMs: number;
-  language: 'ladder' | 'st';
+  language: 'ladder' | 'st' | 'fbd';
   start: boolean;
   stopOK: boolean;
   run: boolean;
@@ -35,7 +35,7 @@ export function validateTagBreakpoint(value: unknown, names: ReadonlySet<string>
     (bp.edge === 'rising' || bp.edge === 'falling' || bp.edge === 'either');
 }
 export function buildScanTrace(input: {
-  scan: number; simulatedMs: number; language: 'ladder' | 'st';
+  scan: number; simulatedMs: number; language: 'ladder' | 'st' | 'fbd';
   start: boolean; stopOK: boolean; run: boolean; plcPowered: boolean;
   contactorOn: boolean; motorOn: boolean; ladderSteps: readonly LadderStep[];
   breakpoint: string | null;

@@ -18,7 +18,7 @@ export const DEFAULT_ST_SOURCE = [
 ].join('\n');
 
 /** Tag names a program may use without declaring: the controller's own inputs and outputs, plus the idle placeholder. */
-const builtInsOf = (names: IoNames) => new Set([...names.inputs, ...names.outputs, 'Unused']);
+const builtInsOf = (names: IoNames) => new Set([...names.inputs, ...names.numericInputs, ...names.outputs, 'Unused']);
 const safeTag = (tag: string) => /^[A-Za-z][A-Za-z0-9_.]{0,39}$/.test(tag) &&
   !['__proto__', 'constructor', 'prototype'].includes(tag.toLowerCase());
 
@@ -32,6 +32,9 @@ export function validateSandboxProgram(program: LadderDocument, names: IoNames =
   if (symbols.length > MAX_SANDBOX_SYMBOLS) errors.push(`Sandbox supports at most ${MAX_SANDBOX_SYMBOLS} local tags`);
   for (const tag of symbols) if (builtIns.has(tag) || !safeTag(tag)) errors.push(`Invalid or reserved local tag: ${tag}`);
   const numeric = new Set(symbols.filter(tag => ['INT','DINT','REAL'].includes(program.symbols![tag].type ?? 'BOOL')));
+  // The current Ladder numeric operand engine supports declared local registers only.
+  // Real physical numeric inputs are exposed through ST until the Ladder operand API is extended.
+  const physicalNumeric = new Set(names.numericInputs);
   const numericOperand = (operand: NumericOperand, index: number, description: string) => {
     if (operand.kind === 'tag' && !numeric.has(operand.name))
       errors.push(`Rung ${index}: ${description} ${operand.name} must be a declared numeric local tag`);
@@ -62,7 +65,7 @@ export function validateSandboxProgram(program: LadderDocument, names: IoNames =
     for (const element of rung.elements) {
       if (element.type === 'contact') {
         if (!known.has(element.tag)) errors.push(`Rung ${index + 1}: unknown contact ${element.tag}`);
-        if (numeric.has(element.tag)) errors.push(`Rung ${index + 1}: numeric ${element.tag} requires comparison, not a BOOL contact`);
+        if (numeric.has(element.tag) || physicalNumeric.has(element.tag)) errors.push(`Rung ${index + 1}: numeric ${element.tag} requires comparison, not a BOOL contact`);
       }
       if (element.type === 'branch') {
         if (element.alternatives.length !== 2 ||
@@ -70,7 +73,7 @@ export function validateSandboxProgram(program: LadderDocument, names: IoNames =
           errors.push(`Rung ${index + 1}: sandbox editor supports two one-contact parallel paths`);
         for (const path of element.alternatives)
           for (const contact of path)
-            if (numeric.has(contact.tag)) errors.push(`Rung ${index + 1}: numeric ${contact.tag} cannot be a BOOL branch contact`);
+            if (numeric.has(contact.tag) || physicalNumeric.has(contact.tag)) errors.push(`Rung ${index + 1}: numeric ${contact.tag} cannot be a BOOL branch contact`);
       }
     }
   }
@@ -84,10 +87,15 @@ export function compileSandboxST(source: string, names: IoNames = LEGACY_NAMES):
   if (compiled.declarations.length) {
     const inputs = compiled.declarations.filter(d => d.scope === 'input');
     for (const decl of inputs) {
-      if (!names.inputs.some(tag => tag.toLowerCase() === decl.name.toLowerCase()) || decl.type !== 'BOOL')
-        throw new SyntaxError(names === LEGACY_NAMES
-          ? `Unsupported VAR_INPUT ${decl.name}; use BOOL Start, StopOK, Photoeye, TankHigh and ReverseRequest`
-          : `Unsupported VAR_INPUT ${decl.name}; use BOOL ${names.inputs.join(', ')}`);
+      const digital = names.inputs.some(tag => tag.toLowerCase() === decl.name.toLowerCase());
+      const numeric = names.numericInputs.some(tag => tag.toLowerCase() === decl.name.toLowerCase());
+      if (numeric && (decl.type === 'REAL' || decl.type === 'LREAL')) continue;
+      if (digital && decl.type === 'BOOL') continue;
+      if (numeric) throw new SyntaxError('Numeric VAR_INPUT ' + decl.name + ' must be REAL or LREAL');
+      throw new SyntaxError(names === LEGACY_NAMES
+        ? 'Unsupported VAR_INPUT ' + decl.name + '; use BOOL Start, StopOK, Photoeye, TankHigh and ReverseRequest'
+        : 'Unsupported VAR_INPUT ' + decl.name + '; use BOOL ' + names.inputs.join(', ') +
+          (names.numericInputs.length ? ' or REAL ' + names.numericInputs.join(', ') : ''));
     }
     if (names.requireRun) {
       const run = compiled.declarations.find(d => d.name.toLowerCase() === 'run');

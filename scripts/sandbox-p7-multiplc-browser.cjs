@@ -31,18 +31,62 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       const b = [...document.querySelectorAll('button')].find(el => el.textContent.trim() === label);
       if (!b || b.disabled) return false; b.click(); return true;
     }, text);
-    assert.ok(ok, `Expected enabled button: ${text}`);
+    assert.ok(ok, 'Expected enabled button: ' + text);
+    // Worker commands are asynchronous: wait for the Run/Pause acknowledgement.
+    if (text === '▶ Run') await page.waitForFunction(
+      () => [...document.querySelectorAll('.sandbox-toolbar button')].some(b => b.textContent.trim() === 'Pause'),
+      { timeout: 12000 });
+    if (text === 'Pause') await page.waitForFunction(
+      () => [...document.querySelectorAll('.sandbox-toolbar button')].some(b => b.textContent.trim() === '▶ Run' && !b.disabled),
+      { timeout: 12000 });
+    if (text === 'Reset scan state') await page.waitForFunction(
+      () => document.querySelector('.sandbox-scan')?.textContent.trim() === 'Scan 0',
+      { timeout: 12000 });
   };
   const wire = async (a, b) => {
-    await page.click(`[data-terminal-id="${a}"]`);
-    await page.waitForFunction(id => document.querySelector(`[data-terminal-id="${id}"]`)?.classList.contains('selected'), {}, a);
-    await page.click(`[data-terminal-id="${b}"]`);
+    const before = await page.$$eval('.sandbox-wire-list > div', rows => rows.length);
+    await page.click('[data-terminal-id="' + a + '"]');
+    await page.waitForFunction(id => document.querySelector('[data-terminal-id="' + id + '"]')?.classList.contains('selected'), {}, a);
+    await page.click('[data-terminal-id="' + b + '"]');
+    // Confirm worker has added this connection before selecting the next pair.
+    await page.waitForFunction(expected => document.querySelectorAll('.sandbox-wire-list > div').length === expected,
+      { timeout: 12000 }, before + 1);
   };
-  const status = (id, want, timeout = 9000) => page.waitForFunction((dev, expected) =>
-    document.querySelector(`[data-device-id="${dev}"] .sandbox-device-status`)?.textContent.trim() === expected,
-    { timeout }, id, want);
+  const status = async (id, want, timeout = 12000) => {
+    try {
+      await page.waitForFunction((dev, expected) =>
+        document.querySelector('[data-device-id="' + dev + '"] .sandbox-device-status')?.textContent.trim() === expected,
+        { timeout }, id, want);
+    } catch (error) {
+      const actual = await page.evaluate(dev => ({
+        status: document.querySelector('[data-device-id="' + dev + '"] .sandbox-device-status')?.textContent.trim(),
+        scan: document.querySelector('.sandbox-scan')?.textContent.trim(),
+        running: [...document.querySelectorAll('.sandbox-toolbar button')].some(b => b.textContent.trim() === 'Pause'),
+        buttons: [...document.querySelectorAll('.sandbox-device .sandbox-operate')].map(b => ({
+          device: b.closest('[data-device-id]')?.getAttribute('data-device-id'),
+          pressed: b.classList.contains('pressed'),
+        })),
+        alert: document.querySelector('[role="alert"]')?.textContent.trim(),
+      }), id);
+      console.error('P7 STATUS DIAGNOSTIC', JSON.stringify({ id, want, actual }));
+      throw error;
+    }
+  };
   const statusNow = id => page.$eval(`[data-device-id="${id}"] .sandbox-device-status`, e => e.textContent.trim());
-  const toggle = id => page.click(`[data-device-id="${id}"] .sandbox-operate`);
+  const toggle = async id => {
+    const selector = '[data-device-id="' + id + '"] .sandbox-operate';
+    const previous = await page.$eval(selector, button => button.classList.contains('pressed'));
+    await page.click(selector);
+    // The worker, not the click event, must acknowledge the button state change.
+    await page.waitForFunction((sel, expected) => document.querySelector(sel)?.classList.contains('pressed') === expected,
+      { timeout: 12000 }, selector, !previous);
+  };
+  const waitScans = async count => {
+    const from = await page.$eval('.sandbox-scan', el => Number((el.textContent.match(/\d+/) || ['0'])[0]));
+    await page.waitForFunction(target =>
+      Number((document.querySelector('.sandbox-scan')?.textContent.match(/\d+/) || ['0'])[0]) >= target,
+      { timeout: 15000 }, from + count);
+  };
   const lamp = name => page.evaluate(n => [...document.querySelectorAll('.sandbox-lamps span')]
     .find(e => e.textContent.trim() === n)?.classList.contains('lit') ?? null, name);
   const paused = () => page.waitForFunction(() => [...document.querySelectorAll('.sandbox-toolbar button')]
@@ -88,14 +132,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     assert.equal(await statusNow('motor-2'), 'STOPPED', 'Panel 2 must not move when panel 1 starts');
     assert.equal(await statusNow('contactor-2'), 'COIL OFF');
     await toggle('start-1'); // release
-    await sleep(700);
+    await waitScans(5);
     assert.equal(await statusNow('motor-1'), 'RUNNING', 'PLC 1 latched the motor');
 
     // 4. Panel 2 (a different PLC, a different language) starts, seals in and stops on its own.
     await toggle('start-2');
     await status('motor-2', 'RUNNING');
     await toggle('start-2');
-    await sleep(700);
+    await waitScans(5);
     assert.equal(await statusNow('motor-2'), 'RUNNING', 'PLC 2 (Structured Text) latched its motor');
     // The live I/O lamps follow the selected PLC.
     await page.click('[data-plc-tab="plc-2"]');
@@ -118,10 +162,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await clickText('▶ Run');
     await toggle('start-1');
     await status('motor-1', 'RUNNING');
-    await sleep(900);
+    await waitScans(5);
     assert.equal(await statusNow('motor-2'), 'STOPPED', 'No shared common yet: the supplies are isolated, nothing crosses');
     assert.equal(await lamp('Start'), false);
-    await toggle('start-1'); await toggle('stop-1'); await sleep(500); await toggle('stop-1');
+    await toggle('start-1'); await toggle('stop-1'); await waitScans(3); await toggle('stop-1');
     await clickText('Pause'); await paused();
     await wire('supply-1.M0', 'supply-2.M0');
     await clickText('Reset scan state');

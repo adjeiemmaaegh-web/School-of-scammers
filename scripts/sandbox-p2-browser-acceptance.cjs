@@ -95,7 +95,22 @@ const clickText = async (page, label) => {
     await clickText(page,'Pause');
     await page.waitForFunction(() => [...document.querySelectorAll('.sandbox-toolbar button')].some(x => x.textContent.trim() === '▶ Run'));
     await clickText(page,'Reset scan state');
-    await page.type('input[aria-label="Breakpoint scan number"]','3');
+    // P5-UX adds a larger workspace tree: wait for the worker reset snapshot,
+    // not merely the reset button click, before testing a future breakpoint.
+    await page.waitForFunction(() => document.querySelector('.sandbox-scan')?.textContent.trim()==='Scan 0',
+      {timeout:10000});
+    // Native controlled-input setter avoids Puppeteer typing into a previously
+    // focused element after the reorganized dock causes a scroll and re-render.
+    await page.$eval('input[aria-label="Breakpoint scan number"]', input => {
+      const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+      set.call(input,'3');input.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+    await page.waitForFunction(() => {
+      const panel=document.querySelector('.sandbox-breakpoint-panel');
+      const set=Array.from(panel?.querySelectorAll('button')??[]).find(b=>b.textContent.trim()==='Set');
+      return panel?.querySelector('input[aria-label="Breakpoint scan number"]')?.value==='3' &&
+        !!set && !set.disabled;
+    },{timeout:10000});
     await clickText(page,'Set');
     await page.waitForFunction(() => document.querySelector('.sandbox-breakpoint-panel')?.textContent.includes('Armed at scan 3'));
     await clickText(page,'▶ Run');

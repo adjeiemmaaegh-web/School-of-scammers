@@ -40,3 +40,12 @@ Select **Place 3D tank layout** from an empty project: supply (25,25), PLC (310,
 ## Acceptance suggestion
 
 Use the preview to build the sorting circuit from blank equipment, connect the 16 real terminals, edit the Ladder example, press Run and START, feed a marked parcel and a plain parcel, then deliberately remove the photoeye OUT wire or set Sort false; confirm actual route counts change. Stop/Reset must suspend movement. Verify on physical target Windows devices independently before accepting graphics/performance. Do not merge PR #14–17, deploy or activate monetization without separate explicit authorization.
+
+
+## Numeric signal bridge (proposed in PR #29; pending CI and review)
+
+This optional integration increment connects existing deterministic tank volume to a PLC16 Structured Text numeric input. The tank now exposes a logical `LEVEL` signal in millilitres; PLC16 has two separate numeric terminals `AI0` / `AI1`, fixed ST tags `Analog0` / `Analog1` declared as `REAL` (or `LREAL`). Learners can connect `tank.LEVEL` to `plc16.AI0` and write ST that switches a *real wired* 24 V pump based on measured tank level. The previous settled plant reading is sampled at the next 50 ms scan boundary; no independent animation or wall-clock data is used.
+
+Signal wiring remains in the project JSON, validates one numeric source per input and rejects 24V/numeric cross-wiring. Numeric links are kept out of the idealized 24V circuit solver and participate in normal wire-open faults. An ST program that declares a disconnected numeric input triggers the existing fail-closed PLC scan instead of replacing that valid 0 reading with a fictional measurement. Numeric readings, physical units and connection state appear in the main workbench live I/O area.
+
+**Limitations.** This is **engineering-unit numeric data**, not an ADC, calibrated sensor, 0–10 V loop, 4–20 mA circuit, real process accuracy or hardware certification. Initial source is tank volume only; no generic load cell model or analog output is implemented here. Analog tags are fixed, and external numeric inputs in Ladder arithmetic/compare are pending. The Phase A weighing cell must use its own co-developed geometry-derived kilogram reading, connected through the integrator's separate numeric link API; never simulate the weigh cell as a 24V BOOL. Physical integration and performance acceptance are not claimed. Validation evidence must be taken from the PR's actual CI runs.

@@ -5,15 +5,16 @@ export type STSignals=Readonly<Record<string,STValue>>;
 export type STType='BOOL'|'INT'|'DINT'|'REAL'|'LREAL';
 export type STDeclaration={name:string;type:STType;scope:'input'|'output'|'local';initial:STValue};
 type Token={value:string;offset:number};
-type Expression={kind:'literal';value:STValue}|{kind:'read';name:string}|{kind:'unary';op:string;inner:Expression}|{kind:'binary';op:string;left:Expression;right:Expression};
-type Statement={kind:'assign';name:string;expr:Expression}|{kind:'if';branches:{when:Expression;body:Statement[]}[];otherwise:Statement[]}|{kind:'case';selector:Expression;arms:{value:STValue;body:Statement[]}[];otherwise:Statement[]}|{kind:'for';counter:string;from:Expression;to:Expression;step:Expression;body:Statement[]};
+type Expression={kind:'literal';value:STValue}|{kind:'read';name:string}|{kind:'unary';op:string;inner:Expression}|{kind:'binary';op:string;left:Expression;right:Expression}|{kind:'call';name:'ABS'|'MIN'|'MAX'|'LIMIT';args:Expression[]};
+type Statement={kind:'assign';name:string;expr:Expression}|{kind:'if';branches:{when:Expression;body:Statement[]}[];otherwise:Statement[]}|{kind:'case';selector:Expression;arms:{value:STValue;body:Statement[]}[];otherwise:Statement[]}|{kind:'for';counter:string;from:Expression;to:Expression;step:Expression;body:Statement[]}|{kind:'while';condition:Expression;body:Statement[]};
 export type STProgram={source:string;bodySource:string;statements:readonly Statement[];referencedInputs:string[];assignedOutputs:string[];declarations:readonly STDeclaration[]};
 export type STResult={outputs:Record<string,STValue>;signals:Record<string,STValue>;assignments:{tag:string;value:STValue}[];memory:Record<string,STValue>};
 const keyword=(s:string)=>s.toUpperCase();
 const identifier=/^[A-Za-z][A-Za-z0-9_]*$/;
 const number=/^(?:\d+(?:\.\d+)?|\.\d+)$/;
+const BUILTINS = new Set(['ABS','MIN','MAX','LIMIT']);
 const precedence:Readonly<Record<string,number>>={OR:1,XOR:2,AND:3,'=':4,'<>':4,'<':4,'<=':4,'>':4,'>=':4,'+':5,'-':5,'*':6,'/':6,MOD:6};
-const RESERVED=new Set(['IF','THEN','ELSIF','ELSE','END_IF','AND','OR','XOR','NOT','TRUE','FALSE','MOD','VAR','VAR_INPUT','VAR_OUTPUT','END_VAR','BOOL','INT','DINT','REAL','LREAL','CASE','OF','END_CASE','FOR','TO','BY','DO','END_FOR']);
+const RESERVED=new Set(['IF','THEN','ELSIF','ELSE','END_IF','AND','OR','XOR','NOT','TRUE','FALSE','MOD','VAR','VAR_INPUT','VAR_OUTPUT','END_VAR','BOOL','INT','DINT','REAL','LREAL','CASE','OF','END_CASE','FOR','TO','BY','DO','END_FOR','WHILE','END_WHILE']);
 function tokenize(source:string):Token[]{
  if(typeof source!=='string'||source.length>12000)throw new RangeError('Structured Text must be at most 12,000 characters');
  const tokens:Token[]=[];
@@ -22,7 +23,7 @@ function tokenize(source:string):Token[]{
   if(source.slice(i,i+2)==='//'){const end=source.indexOf('\n',i+2);i=end<0?source.length:end+1;continue;}
   if(source.slice(i,i+2)==='(*'){const end=source.indexOf('*)',i+2);if(end<0)throw new SyntaxError(`Unterminated comment at ${i}`);i=end+2;continue;}
   const rest=source.slice(i);
-  const match=/^(?:(?:\d+(?:\.\d+)?|\.\d+)(?![A-Za-z_])|[A-Za-z][A-Za-z0-9_]*|:=|<=|>=|<>|[=<>+*\/\-();:])/.exec(rest);
+  const match=/^(?:(?:\d+(?:\.\d+)?|\.\d+)(?![A-Za-z_])|[A-Za-z][A-Za-z0-9_]*|:=|<=|>=|<>|[=<>+*\/\-();:,])/.exec(rest);
   if(!match)throw new SyntaxError(`Unexpected character at ${i}: ${source[i]}`);
   tokens.push({value:match[0],offset:i});i+=match[0].length;
   if(tokens.length>3000)throw new RangeError('Structured Text token limit (3,000) exceeded');
@@ -51,6 +52,18 @@ export function compileStructuredText(source:string):STProgram{
   else if(u==='NOT'||t==='+'||t==='-')left={kind:'unary',op:u,inner:expression(7,depth+1)};
   else if(u==='TRUE'||u==='FALSE')left={kind:'literal',value:u==='TRUE'};
   else if(number.test(t)){const value=Number(t);if(!Number.isFinite(value))fail('Nonfinite numeric literal');left={kind:'literal',value};}
+  else if(identifier.test(t)&&BUILTINS.has(u)&&peek()==='('){
+   next();const args:Expression[]=[];
+   if(peek()!==')'){
+    do{args.push(expression(1,depth+1));if(args.length>4)fail('Too many function arguments');}
+    while(accept(','));
+   }
+   requireToken(')');
+   if((u==='ABS'&&args.length!==1)||(u==='LIMIT'&&args.length!==3)||
+      ((u==='MIN'||u==='MAX')&&(args.length<2||args.length>4)))
+     fail('Unsupported function arity '+u);
+   left={kind:'call',name:u as 'ABS'|'MIN'|'MAX'|'LIMIT',args};
+  }
   else if(identifier.test(t)&&!RESERVED.has(u)){reads.set(u,reads.get(u)??t);left={kind:'read',name:u};}
   else fail(`Expected expression, found ${t}`);
   while(true){const op=upper(),prec=precedence[op];if(prec===undefined||prec<minPrec)break;next();const right=expression(prec+1,depth+1);left={kind:'binary',op,left,right};}
@@ -125,6 +138,11 @@ export function compileStructuredText(source:string):STProgram{
     if(!arms.length)fail('CASE requires at least one arm');
     const otherwise=accept('ELSE')?statements(new Set(['END_CASE']),depth+1):[];
     requireToken('END_CASE');requireToken(';');result.push({kind:'case',selector,arms,otherwise});
+   }else if(accept('WHILE')){
+    const condition=expression();requireToken('DO');
+    const body=statements(new Set(['END_WHILE']),depth+1);
+    requireToken('END_WHILE');requireToken(';');
+    result.push({kind:'while',condition,body});
    }else if(accept('FOR')){
     const counterName=readName(),counter=keyword(counterName);if(!writes.has(counter))writes.set(counter,counterName);
     requireToken(':=');const from=expression();requireToken('TO');const to=expression();
@@ -153,7 +171,8 @@ export function compileStructuredText(source:string):STProgram{
     const type=table.get(stmt.counter)?.type;
     if(type!=='INT'&&type!=='DINT')throw new SyntaxError('FOR counter must be declared INT or DINT');
     validateFor(stmt.body);
-   }else if(stmt.kind==='if'){for(const arm of stmt.branches)validateFor(arm.body);validateFor(stmt.otherwise);}
+   }else if(stmt.kind==='while'){validateFor(stmt.body);}
+   else if(stmt.kind==='if'){for(const arm of stmt.branches)validateFor(arm.body);validateFor(stmt.otherwise);}
    else if(stmt.kind==='case'){for(const arm of stmt.arms)validateFor(arm.body);validateFor(stmt.otherwise);}
   }};
   validateFor(compiled);
@@ -172,6 +191,14 @@ function evaluate(expr:Expression,signals:STSignals):STValue{
  }
  if(expr.kind==='unary'){
   const v=evaluate(expr.inner,signals);return expr.op==='NOT'?!bool(v):expr.op==='-'?-numeric(v):+numeric(v);
+ }
+ if(expr.kind==='call'){
+  const args=expr.args.map(a=>numeric(evaluate(a,signals)));
+  const result=expr.name==='ABS'?Math.abs(args[0]):expr.name==='MIN'?Math.min(...args):
+    expr.name==='MAX'?Math.max(...args):Math.max(args[0],Math.min(args[1],args[2]));
+  if(expr.name==='LIMIT'&&args[0]>args[2])throw new RangeError('LIMIT requires lower bound <= upper bound');
+  if(!Number.isFinite(result))throw new RangeError('Nonfinite ST function result');
+  return result;
  }
  const left=evaluate(expr.left,signals);
  // IEC boolean expressions do not have JS side-effect semantics; short-circuit is valid here.
@@ -262,6 +289,12 @@ export function executeStructuredText(program:STProgram,inputs:STSignals,previou
     const selected=evaluate(statement.selector,values);
     const arm=statement.arms.find(entry=>typeof entry.value===typeof selected&&entry.value===selected);
     run(arm?.body??statement.otherwise,depth+1);
+   }else if(statement.kind==='while'){
+    let iterations=0;
+    while(bool(evaluate(statement.condition,values))){
+     if(++iterations>400)throw new RangeError('WHILE iteration budget exceeded (400)');
+     run(statement.body,depth+1);
+    }
    }else if(statement.kind==='for'){
     if(inputKeys.has(statement.counter))throw new Error('Cannot use input as FOR counter');
     const from=numeric(evaluate(statement.from,values)),to=numeric(evaluate(statement.to,values)),step=numeric(evaluate(statement.step,values));

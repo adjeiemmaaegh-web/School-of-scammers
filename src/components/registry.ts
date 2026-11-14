@@ -1,6 +1,8 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
-export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor';
-export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' };
+import { EQUIPMENT } from '../plant/equipment';
+import type { EquipmentDef } from '../plant/world/equipment';
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive';
+export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' | 'three-phase' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
 export const isPlcKind = (kind: string): boolean => kind === 'plc' || kind === 'plc16';
@@ -11,8 +13,10 @@ const plc16Terminals = (): Terminal[] => [
   { name: 'L+', side: 'left', y: 8, role: 'supply' }, { name: 'M', side: 'left', y: 18, role: 'return' },
   ...PLC16_INPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'left', y: 30 + i * 6.5, role: 'input' })),
   ...PLC16_OUTPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'right', y: 30 + i * 6.5, role: 'output' })),
+  { name:'AI0',side:'left',y:142,role:'analog-input' },
+  { name:'AI1',side:'left',y:153,role:'analog-input' },
 ];
-export const COMPONENTS: Record<ComponentKind, Definition> = {
+const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
   stacklight: { kind: 'stacklight', label: 'Stack light (R/Y/G)', help: 'Three 24V signal lamps on one column: R, Y and G each to the common M-', terminals: [
     { name: 'R', side: 'left', y: 32, role: 'load' }, { name: 'Y', side: 'left', y: 62, role: 'load' },
     { name: 'G', side: 'left', y: 92, role: 'load' }, { name: 'M-', side: 'left', y: 122, role: 'load' }] },
@@ -60,7 +64,8 @@ export const COMPONENTS: Record<ComponentKind, Definition> = {
     { name: 'OUT', side: 'right', y: 75, role: 'output' }] },
   diverter: { kind: 'diverter', label: '24V diverter', help: 'Solenoid/actuator; wired Q0.1 selects reject lane at station', terminals: [
     { name: 'A1', side: 'left', y: 47, role: 'load' }, { name: 'A2', side: 'left', y: 93, role: 'load' }] },
-  tank: { kind: 'tank', label: '3D process tank', help: 'Passive 1000 ml teaching vessel. Locate inlet pump, level probe and outlet valve nearby.', terminals: [] },
+  tank: { kind: 'tank', label: '3D process tank', help: 'Passive 1000 ml teaching vessel; LEVEL is the simulated 0–1000 ml reading, isolated from the 24V circuit.', terminals: [
+    { name: 'LEVEL', side: 'right', y: 75, role: 'analog-output' }] },
   pump: { kind: 'pump', label: '24V inlet pump', help: 'Q0.2 Fill output energises the 180 ml/s illustrative inlet pump', terminals: [
     { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
   levelprobe: { kind: 'levelprobe', label: 'High-level switch', help: '24V high-side switch with 750/600 ml hysteresis, output to PLC I0.3', terminals: [
@@ -88,9 +93,66 @@ export const COMPONENTS: Record<ComponentKind, Definition> = {
     { name: 'IN', side: 'left', y: 50, role: 'passive' }, { name: 'OUT', side: 'right', y: 50, role: 'passive' }] },
   overload: { kind: 'overload', label: 'Overload NC auxiliary', help: 'Manual instructional trip/reset opens 95-96 in the contactor coil path; no thermal/current curve', terminals: [
     { name: '95', side: 'left', y: 50, role: 'passive' }, { name: '96', side: 'right', y: 50, role: 'passive' }] },
+  'three-phase-supply': { kind: 'three-phase-supply', label: 'Virtual 400V three-phase source',
+    help: 'Separate 400V teaching domain; cannot wire to 24V controls. Original model, no real mains equivalence.',
+    terminals: [
+      { name: 'L1', side: 'right', y: 34, role: 'three-phase' },
+      { name: 'L2', side: 'right', y: 60, role: 'three-phase' },
+      { name: 'L3', side: 'right', y: 86, role: 'three-phase' },
+      { name: 'PE', side: 'right', y: 112, role: 'three-phase' }] },
+  'star-delta-drive': { kind: 'star-delta-drive', label: 'Wired star/delta teaching motor',
+    help: 'Connect matching L1/L2/L3 to a separate virtual three-phase source; wire MAIN+, STAR+, DELTA+ to genuine 24V PLC outputs. Models interlock, speed, current and thermal trip; not rated equipment.',
+    terminals: [
+      { name: 'L1', side: 'left', y: 12, role: 'three-phase' },
+      { name: 'L2', side: 'left', y: 30, role: 'three-phase' },
+      { name: 'L3', side: 'left', y: 48, role: 'three-phase' },
+      { name: 'PE', side: 'left', y: 66, role: 'three-phase' },
+      { name: 'MAIN+', side: 'left', y: 90, role: 'load' },
+      { name: 'STAR+', side: 'left', y: 108, role: 'load' },
+      { name: 'DELTA+', side: 'left', y: 126, role: 'load' },
+      { name: 'RESET+', side: 'left', y: 144, role: 'load' },
+      { name: 'M-', side: 'right', y: 160, role: 'load' },
+      { name: 'L+', side: 'right', y: 16, role: 'supply' },
+      { name: 'M', side: 'right', y: 34, role: 'return' },
+      { name: 'READY_OUT', side: 'right', y: 61, role: 'output' },
+      { name: 'TRIP_OUT', side: 'right', y: 89, role: 'output' },
+      { name: 'STAR_OUT', side: 'right', y: 117, role: 'output' },
+      { name: 'DELTA_OUT', side: 'right', y: 145, role: 'output' }] },
   lamp: { kind: 'lamp', label: '24V pilot lamp', help: 'Illuminates only when its two actual 24V DC terminals are energized', terminals: [
     { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
 };
+/** The registry drives both palette and terminal patchboard; equipment is not duplicated. */
+const plantTerminals=(def:EquipmentDef):Terminal[]=>{
+ const terms:Terminal[]=[];
+ const digital=def.commands.filter(ch=>ch.kind==='bool');
+ const analogCommands=def.commands.filter(ch=>ch.kind==='number');
+ const digitalSignals=def.signals.filter(ch=>ch.kind==='bool');
+ const numericSignals=def.signals.filter(ch=>ch.kind==='number');
+ if(digital.length) {
+  digital.forEach((ch,i)=>terms.push({name:'CMD_'+ch.name+'+',side:'left',y:24+i*14,role:'load'}));
+  terms.push({name:'M-',side:'left',y:24+digital.length*14,role:'load'});
+ }
+ if(digitalSignals.length||numericSignals.length){
+  terms.push({name:'L+',side:'right',y:18,role:'supply'});
+  terms.push({name:'M',side:'right',y:32,role:'return'});
+ }
+ digitalSignals.forEach((ch,i)=>terms.push({
+  name:'OUT_'+ch.name,side:'right',y:50+i*12,role:'output',
+ }));
+ numericSignals.forEach((ch,i)=>terms.push({
+  name:'AN_'+ch.name,side:'right',y:65+(i+digitalSignals.length)*12,role:'analog-output',
+ }));
+ analogCommands.forEach((ch,i)=>terms.push({
+  name:'SET_'+ch.name,side:'left',y:125+i*10,role:'analog-input',
+ }));
+ return terms;
+};
+const generatedPlant=Object.fromEntries(EQUIPMENT.map(def=>[def.kind,{
+ kind:def.kind,label:def.label,help:'Deterministic, bounded plant equipment. '+def.commands.length+
+ ' command channels, '+def.signals.length+' sensor channels; simplified physical model.',
+ terminals:plantTerminals(def),
+}])) as Record<string,Definition>;
+export const COMPONENTS={...EXISTING_COMPONENTS,...generatedPlant} as Record<ComponentKind,Definition>;
 export const componentKinds = Object.keys(COMPONENTS) as ComponentKind[];
 export function terminalExists(terminalId: string, components: readonly { id: string; kind: ComponentKind }[]): boolean {
   const dot = terminalId.indexOf('.');

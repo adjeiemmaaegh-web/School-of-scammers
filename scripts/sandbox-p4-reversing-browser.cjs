@@ -22,16 +22,40 @@ async function clickText(page,name) {
  const ok=await page.evaluate(x=>{const b=[...document.querySelectorAll('button')]
   .find(el=>el.textContent.trim()===x);
   if(!b||b.disabled)return false;b.click();return true;},name);
- assert.ok(ok,`Expected enabled button: ${name}`);
+ assert.ok(ok,'Expected enabled button: '+name);
+ // Run/Pause are worker commands. Never operate a machine before the new mode is reflected in the UI.
+ if(name==='▶ Run')await page.waitForFunction(()=>
+   [...document.querySelectorAll('.sandbox-toolbar button')].some(b=>b.textContent.trim()==='Pause'),{timeout:12000});
+ if(name==='Pause')await page.waitForFunction(()=>
+   [...document.querySelectorAll('.sandbox-toolbar button')].some(b=>b.textContent.trim()==='▶ Run'&&!b.disabled),{timeout:12000});
 }
 async function clickDevice(page,id) {
- await page.click(`[data-device-id="${id}"] .sandbox-operate`);
+ const selector='[data-device-id="'+id+'"] .sandbox-operate';
+ const before=await page.$eval(selector,el=>el.classList.contains('pressed'));
+ await page.click(selector);
+ await page.waitForFunction((sel,want)=>document.querySelector(sel)?.classList.contains('pressed')===want,
+   {timeout:12000},selector,!before);
+}
+async function setDevicePressed(page,id,want) {
+ const selector='[data-device-id="'+id+'"] .sandbox-operate';
+ const now=await page.$eval(selector,el=>el.classList.contains('pressed'));
+ if(now!==want)await clickDevice(page,id);
+ assert.equal(await page.$eval(selector,el=>el.classList.contains('pressed')),want,id+' physical button precondition');
 }
 async function wire(page,a,b) {
- await page.click(`[data-terminal-id="${a}"]`);
- await page.waitForFunction(id=>document.querySelector(`[data-terminal-id="${id}"]`)
+ const count=await page.$$eval('.sandbox-wire-list > div',rows=>rows.length);
+ await page.click('[data-terminal-id="'+a+'"]');
+ await page.waitForFunction(id=>document.querySelector('[data-terminal-id="'+id+'"]')
   ?.classList.contains('selected'),{},a);
- await page.click(`[data-terminal-id="${b}"]`);
+ await page.click('[data-terminal-id="'+b+'"]');
+ await page.waitForFunction(n=>document.querySelectorAll('.sandbox-wire-list > div').length===n,
+   {timeout:12000},count+1);
+}
+async function waitScans(page,count) {
+ const from=await page.$eval('.sandbox-scan',el=>Number((el.textContent.match(/\d+/)||['0'])[0]));
+ await page.waitForFunction(target=>
+   Number((document.querySelector('.sandbox-scan')?.textContent.match(/\d+/)||['0'])[0])>=target,
+   {timeout:15000},from+count);
 }
 async function direction(page,value) {
  await page.waitForFunction(expected=>
@@ -70,7 +94,7 @@ async function direction(page,value) {
   await clickDevice(page,'start-5'); // release
   // The opposite command alone cannot reverse an active latched drive.
   await clickDevice(page,'reversebutton-6');
-  await new Promise(resolve=>setTimeout(resolve,300));
+  await waitScans(page,5);
   assert.equal(await page.$eval('[data-direction]',e=>e.textContent),'FORWARD');
   await clickDevice(page,'reversebutton-6');
   await clickDevice(page,'stop-7'); // stop NC opens
@@ -81,7 +105,7 @@ async function direction(page,value) {
   assert.equal(await page.$eval('[data-reverse-contactor]',e=>e.textContent),'CLOSED');
   await clickDevice(page,'reversebutton-6'); // release
   await clickDevice(page,'start-5'); // opposite command while reverse latched
-  await new Promise(resolve=>setTimeout(resolve,300));
+  await waitScans(page,5);
   assert.equal(await page.$eval('[data-direction]',e=>e.textContent),'REVERSE');
   await clickDevice(page,'start-5'); // release
   await clickDevice(page,'stop-7'); await direction(page,'STOPPED'); await clickDevice(page,'stop-7');
@@ -95,7 +119,7 @@ async function direction(page,value) {
   await clickText(page,'▶ Run');
   await page.waitForFunction(()=>[...document.querySelectorAll('.sandbox-lamps span')].some(e=>
     e.textContent.trim()==='ReverseRequest'&&e.classList.contains('lit')));
-  await new Promise(resolve=>setTimeout(resolve,350));
+  await waitScans(page,5);
   assert.equal(await page.$eval('[data-direction]',e=>e.textContent),'STOPPED');
   assert.equal(await page.$eval('[data-interlock]',e=>e.textContent),'NORMAL');
   await clickDevice(page,'start-5');await clickDevice(page,'reversebutton-6');
@@ -125,9 +149,15 @@ async function direction(page,value) {
   });
   assert.ok(removed,'Should be able to disconnect actual reverse NC interlock wire');
   await page.waitForFunction(()=>document.querySelectorAll('.sandbox-wire-list > div').length===20);
+  // Earlier scenarios exercise and release these buttons. Normalize the worker-acknowledged
+  // physical state before the last test: otherwise a stale PRESSED state can turn a click
+  // into a release and produce a false failure under a slow CI runner.
+  await setDevicePressed(page,'start-5',false);
+  await setDevicePressed(page,'stop-7',false);
+  await setDevicePressed(page,'reversebutton-6',false);
   await clickText(page,'▶ Run');
   const startStatusBefore=await page.$eval('[data-device-id="start-5"] .sandbox-device-status',e=>e.textContent.trim());
-  await clickDevice(page,'start-5');
+  await setDevicePressed(page,'start-5',true);
   try{await page.waitForFunction(()=>[...document.querySelectorAll('.sandbox-lamps span')].some(e=>
     e.textContent.trim()==='Forward'&&e.classList.contains('lit')));}
   catch(error){
@@ -141,7 +171,7 @@ async function direction(page,value) {
     console.error('DIAGNOSTIC start-before-click=',startStatusBefore,JSON.stringify(state));
     throw error;
   }
-  await new Promise(resolve=>setTimeout(resolve,400));
+  await waitScans(page,5);
   assert.equal(await page.$eval('[data-forward-contactor]',e=>e.textContent),'OPEN');
   assert.equal(await page.$eval('[data-direction]',e=>e.textContent),'STOPPED');
   assert.deepEqual(errors,[]);

@@ -83,6 +83,7 @@ const PLC_B = ['VAR_INPUT', '  Start : BOOL;', '  StopOK : BOOL;', '  TankHigh :
     await page.evaluate(() => localStorage.clear());
     await page.click('[data-cta="simulator"]');
     await page.waitForSelector('.sandbox-toolbar', { timeout: 15000 });
+    await page.waitForSelector('.sandbox-palette-item:not([disabled])', { timeout: 15000 }); // editing is disabled until the saved project has hydrated
     assert.deepEqual(await counts(), { d: 0, w: 0 }, 'An empty floor');
 
     // 1. Build: place every device from the library.

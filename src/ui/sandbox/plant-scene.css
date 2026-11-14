@@ -1,0 +1,78 @@
+/* P3 source-only authoring gallery, scoped to open sandbox. */
+.sandbox-plant-scenes,.sandbox-p3-world { margin:10px 0; padding:14px; }
+.sandbox-plant-scenes>summary,.sandbox-p3-world>summary { cursor:pointer;font-weight:700;font-size:14px; }
+.sandbox-plant-scene-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:12px; }
+.sandbox-plant-scene-choice { padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);display:grid;align-content:start;gap:8px; }
+.sandbox-plant-scene-choice>p,.sandbox-plant-scene-choice details p { font-size:12px;line-height:1.5;color:var(--muted); }
+.sandbox-plant-scene-choice details { max-width:100%;font-size:12px; }
+.sandbox-plant-scene-choice details summary { cursor:pointer; }
+.sandbox-plant-st { white-space:pre-wrap;max-height:180px;overflow:auto;font:11px var(--mono);
+ background:var(--surface);padding:10px;border:1px solid var(--line);border-radius:7px; }
+.sandbox-p3-signal-list { display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:10px; }
+.sandbox-p3-signal-list section { padding:10px;border:1px solid var(--line);border-radius:8px; }
+.sandbox-p3-signal-list strong { font-size:12px; }
+.sandbox-p3-signal-list p { overflow-wrap:anywhere;font:11px var(--mono); }
+.sandbox-p3-signal-list label { display:grid;gap:5px;font-size:11px; }
+.sandbox-p3-signal-list select { background:var(--surface);color:var(--ink);padding:6px;border:1px solid var(--line); }
+@media(max-width:530px){.sandbox-plant-scene-grid,.sandbox-p3-signal-list{grid-template-columns:1fr}}
+
+/* P9 original scene explorer: compact filters and accessible 21-scene cards. */
+.sandbox-p9-scene-filter {display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;
+  margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:8px;}
+.sandbox-p9-scene-filter label {display:grid;gap:4px;flex:1 1 185px;font-size:12px;}
+.sandbox-p9-scene-filter input,.sandbox-p9-scene-filter select {
+  width:100%;min-height:36px;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink);border-radius:6px;padding:7px 9px;font:inherit;
+}
+.sandbox-p9-scene-filter [data-p9-scene-count] {flex:1 1 100%;margin:0;}
+.sandbox-p9-scene-meta {font-size:11px;line-height:1.4;color:var(--muted);}
+.sandbox-plant-scene-choice [data-p9-scene-confirm-warning] {color:var(--ink);
+  border-left:3px solid var(--line);padding-left:8px;margin:0;}
+.sandbox-plant-scene-choice .sandbox-actions {display:flex;flex-wrap:wrap;gap:6px;}
+@media(max-width:530px) {.sandbox-p9-scene-filter label{flex-basis:100%;}}
+
+/* P10 training diagnostics — read-only worker preflight, not certification. */
+.sandbox-p10-commissioning {margin:10px 0;padding:14px;}
+.sandbox-p10-commissioning>summary {cursor:pointer;font-weight:700;font-size:13px;}
+.sandbox-p10-commissioning>summary .sandbox-help {font-weight:400;}
+.sandbox-p10-checks {display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+ gap:10px;margin:12px 0;padding:0;list-style:none;}
+.sandbox-p10-checks li {display:flex;align-items:start;gap:9px;min-width:0;
+ padding:10px;border:1px solid var(--line);background:var(--surface-2);
+ border-radius:8px;}
+.sandbox-p10-checks li>span {font-size:20px;line-height:1.1;}
+.sandbox-p10-checks strong {display:block;font-size:12px;line-height:1.4;}
+.sandbox-p10-stage {display:block;font-size:10px;color:var(--muted);margin-top:2px;}
+.sandbox-p10-checks p {font-size:11px;line-height:1.5;margin-top:6px;
+ color:var(--muted);overflow-wrap:anywhere;}
+.sandbox-p10-checks [data-p10-check-state="pass"]>span {color:var(--ink);}
+.sandbox-p10-checks [data-p10-check-state="pending"]>span {color:var(--muted);}
+
+/* P11 bounded worker-evidence trial is a learning record, not a certification. */
+.sandbox-p11-assessment {margin:10px 0;padding:14px;}
+.sandbox-p11-assessment>summary {cursor:pointer;font-weight:700;font-size:13px;}
+.sandbox-p11-assessment>summary .sandbox-help {font-weight:400;}
+.sandbox-p11-goals li {min-height:92px;}
+.sandbox-p11-goals li[data-p11-trial-state="observed"] {border-style:solid;}
+.sandbox-p11-goals li[data-p11-trial-state="pending"] {border-style:dashed;}
+.sandbox-p11-goals li>span {min-width:19px;text-align:center;}
+.sandbox-p11-goals strong {font-size:12px;}
+.sandbox-p11-assessment [data-p11-trial-hint] {
+ border-left:2px solid var(--line);padding-left:9px;margin-top:10px;
+}
+
+/* P12 independent worker program challenges: evidence, not certification. */
+.sandbox-p12-matrix {margin:10px 0;padding:14px;}
+.sandbox-p12-matrix>summary {cursor:pointer;font-weight:700;font-size:13px;}
+.sandbox-p12-matrix>summary .sandbox-help {font-weight:400;}
+.sandbox-p12-matrix [data-p12-preflight] {margin:9px 0;padding:9px;
+ border:1px solid var(--line);border-radius:8px;font-size:12px;}
+.sandbox-p12-matrix [data-p12-preflight] ul {margin:6px 0 0;padding-left:18px;}
+.sandbox-p12-matrix-results {list-style:none;padding:0;margin:12px 0;
+ display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;}
+.sandbox-p12-matrix-results li {border:1px solid var(--line);
+ background:var(--surface-2);padding:10px;border-radius:8px;}
+.sandbox-p12-matrix-results li[data-p12-case-state="fail"] {border-style:dashed;}
+.sandbox-p12-matrix-results strong {font-size:12px;}
+.sandbox-p12-matrix-results p {font-size:11px;line-height:1.5;
+ margin:6px 0 0;overflow-wrap:anywhere;}

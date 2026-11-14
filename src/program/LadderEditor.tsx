@@ -19,7 +19,7 @@ const operationFor = (kind: string, target: string): RungOperation | undefined =
   if (kind === 'ton' || kind === 'tof' || kind === 'rto' || kind === 'tp') return { kind, presetMs: 250 };
   if (kind === 'ctu') return { kind: 'ctu', preset: 2 };
   if (kind === 'ctd') return { kind: 'ctd', preset: 2, loadTag: 'Unused' };
-  if (kind === 'osr' || kind === 'osf') return { kind };
+  if (kind === 'osr' || kind === 'osf' || kind === 'set' || kind === 'reset') return { kind };
   if (kind === 'compare') return {kind:'compare',left:{kind:'literal',value:0},
     comparator:'ge',right:{kind:'literal',value:1}};
   if (kind === 'move') return {kind:'move',target,left:{kind:'literal',value:0}};
@@ -191,6 +191,7 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
                 <option value="ctu">CTU · count up</option>
                 <option value="ctd">CTD · count down</option>
                 <option value="osr">OSR · rising pulse</option><option value="osf">OSF · falling pulse</option>
+                <option value="set">SET · retain coil ON</option><option value="reset">RESET · retain coil OFF</option>
                 <option value="compare">Compare numeric values</option>
                 <option value="move" disabled={!numericTags.length}>MOV · assign numeric</option>
                 <option value="add" disabled={!numericTags.length}>ADD · arithmetic</option>

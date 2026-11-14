@@ -10,7 +10,7 @@ export type NumericRungOperation =
   | { kind: 'compare'; left: NumericOperand; comparator: 'eq' | 'ne' | 'lt' | 'le' | 'gt' | 'ge'; right: NumericOperand }
   | { kind: 'move'; target: string; left: NumericOperand }
   | { kind: 'add' | 'sub' | 'mul' | 'div'; target: string; left: NumericOperand; right: NumericOperand };
-export type RungOperation = { kind: 'coil' | 'osr' | 'osf' } |
+export type RungOperation = { kind: 'coil' | 'osr' | 'osf' | 'set' | 'reset' } |
   { kind: 'ton' | 'tof' | 'rto' | 'tp'; presetMs: number; resetTag?: string } |
   { kind: 'ctu'; preset: number; resetTag?: string } | { kind: 'ctd'; preset: number; loadTag: string } |
   NumericRungOperation;
@@ -56,14 +56,19 @@ export function validateLadder(doc: LadderDocument): string[] {
       }
     }
   }
-  const ids = new Set<string>(); const coils = new Set<string>();
+  const ids = new Set<string>(); const coils = new Map<string, Set<string>>();
   for (const [index, rung] of doc.rungs.entries()) {
     if (!rung || typeof rung !== 'object') { errors.push(`Rung ${index}: invalid rung`); continue; }
     if (typeof rung.id !== 'string' || !rung.id || ids.has(rung.id)) errors.push(`Rung ${index}: duplicate or missing id`);
     ids.add(rung.id);
     if (typeof rung.coil !== 'string' || !tagOK(rung.coil)) errors.push(`Rung ${index}: invalid coil`);
-    if (coils.has(rung.coil)) errors.push(`Rung ${index}: duplicate output tag ${rung.coil}`);
-    coils.add(rung.coil);
+    const previousCoil=coils.get(rung.coil);
+    const currentKind=rung.operation?.kind??'coil';
+    if(previousCoil && !(previousCoil.size===1 && ['set','reset'].includes(currentKind) &&
+        [...previousCoil].every(previous=>['set','reset'].includes(previous)&&previous!==currentKind)))
+      errors.push(`Rung ${index}: duplicate output tag ${rung.coil}`);
+    if(previousCoil) previousCoil.add(currentKind);
+    else coils.set(rung.coil,new Set([currentKind]));
     if (!Array.isArray(rung.elements) || rung.elements.length === 0) { errors.push(`Rung ${index}: empty logic`); continue; }
     for (const element of rung.elements) {
       if (!element || typeof element !== 'object') { errors.push(`Rung ${index}: invalid element`); continue; }
@@ -73,7 +78,7 @@ export function validateLadder(doc: LadderDocument): string[] {
       } else errors.push(`Rung ${index}: unknown element`);
     }
     const op = rung.operation;
-    if (op && (typeof op !== 'object' || !['coil','ton','tof','rto','tp','ctu','ctd','osr','osf','compare','move','add','sub','mul','div'].includes(op.kind))) errors.push(`Rung ${index}: invalid operation`);
+    if (op && (typeof op !== 'object' || !['coil','ton','tof','rto','tp','ctu','ctd','osr','osf','set','reset','compare','move','add','sub','mul','div'].includes(op.kind))) errors.push(`Rung ${index}: invalid operation`);
     if (op?.kind === 'compare' && (!validNumericOperand(op.left) || !validNumericOperand(op.right) ||
       !['eq','ne','lt','le','gt','ge'].includes(op.comparator)))
       errors.push(`Rung ${index}: invalid numeric comparator`);
@@ -100,18 +105,34 @@ export type LadderResult = { outputs: Record<string, boolean>; steps: readonly L
   numericValues: Record<string, number> };
 /** Each scan samples inputs once, then evaluates rungs in document order. Timers use simulation time, never wall time. */
 export function executeLadder(doc: LadderDocument, inputs: Inputs, previousCoils: Readonly<Record<string, boolean>> = {},
-  previousMemory: LadderMemory = {}, deltaMs = 20, previousNumeric: Readonly<Record<string, number>> = {}): LadderResult {
+  previousMemory: LadderMemory = {}, deltaMs = 20, previousNumeric: Readonly<Record<string, number>> = {},
+  localForces: Readonly<Record<string, Signal>> = {}): LadderResult {
   const errors = validateLadder(doc);
   if (errors.length) throw new Error(errors.join('; '));
   if (!Number.isSafeInteger(deltaMs) || deltaMs < 1 || deltaMs > 1000) throw new RangeError('Scan interval must be 1..1000 ms');
   const definitions = doc.symbols ?? {};
+  // Defense in depth: only typed local tags can be overridden; physical inputs
+  // and hardware safety wiring are never part of this force map.
+  for (const [tag,override] of Object.entries(localForces)) {
+    const def=definitions[tag];
+    if(!def)throw new Error('Cannot force a physical or undeclared tag: '+tag);
+    const type=numericType(def);
+    if(type==='BOOL'){
+      if(typeof override!=='boolean')throw new TypeError('BOOL force requires boolean: '+tag);
+    }else{
+      if(typeof override!=='number')throw new TypeError('Numeric force requires a number: '+tag);
+      checkedNumber(type,override,tag);
+    }
+  }
   const numericValues: Record<string, number> = {};
   for (const [name, definition] of Object.entries(definitions)) {
     const type = numericType(definition);
     if (type !== 'BOOL')
-      numericValues[name] = checkedNumber(type, previousNumeric[name] ?? (typeof definition.initial === 'number' ? definition.initial : 0), name);
+      numericValues[name] = checkedNumber(type, typeof localForces[name]==='number' ? localForces[name] as number :
+        previousNumeric[name] ?? (typeof definition.initial === 'number' ? definition.initial : 0), name);
   }
-  const signals: Record<string, Signal> = { ...previousCoils, ...numericValues, ...inputs };
+  const boolForces=Object.fromEntries(Object.entries(localForces).filter(([,v])=>typeof v==='boolean'));
+  const signals: Record<string, Signal> = { ...previousCoils, ...numericValues, ...boolForces, ...inputs };
   const operand = (value: NumericOperand): number => {
     if (value.kind === 'literal') return value.value;
     const number = numericValues[value.name];
@@ -134,7 +155,11 @@ export function executeLadder(doc: LadderDocument, inputs: Inputs, previousCoils
     const old = previousMemory[rung.id] ?? { elapsedMs: 0, done: false, count: 0, lastEnable: false };
     let elapsedMs = 0; let count = old.count; let result = energized;
     let numericResult: number | undefined;
-    if (op.kind === 'ton') {
+    if (op.kind === 'set') {
+      result = energized || read(signals,rung.coil);
+    } else if (op.kind === 'reset') {
+      result = !energized && read(signals,rung.coil);
+    } else if (op.kind === 'ton') {
       elapsedMs = energized ? Math.min(op.presetMs, old.elapsedMs + deltaMs) : 0;
       result = energized && elapsedMs >= op.presetMs;
     } else if (op.kind === 'tof') {
@@ -179,14 +204,18 @@ export function executeLadder(doc: LadderDocument, inputs: Inputs, previousCoils
         const next = op.kind === 'move' ? lhs : op.kind === 'add' ? lhs + rhs :
           op.kind === 'sub' ? lhs - rhs : op.kind === 'mul' ? lhs * rhs : lhs / rhs;
         numericResult = checkedNumber(type, next, op.target);
+        if(typeof localForces[op.target]==='number') numericResult=checkedNumber(type,localForces[op.target] as number,op.target);
         numericValues[op.target] = numericResult;
-        signals[op.target] = numericResult;
+        signals[op.target] = numericValues[op.target];
       }
     } else if (op.kind === 'osr') {
       result = energized && !old.lastEnable;
     } else if (op.kind === 'osf') {
       result = !energized && old.lastEnable;
     }
+    // A local BOOL force overrides that symbol's published local memory only.
+    // The sandbox contract prohibits putting mapped physical outputs in symbols.
+    if(typeof localForces[rung.coil]==='boolean')result=localForces[rung.coil] as boolean;
     memory[rung.id] = { elapsedMs, count, done: result, lastEnable: energized };
     outputs[rung.coil] = result; signals[rung.coil] = result;
     steps.push({ rungId: rung.id, energized, coil: rung.coil, result, operation: op.kind, elements: trace,
