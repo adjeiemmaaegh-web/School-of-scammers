@@ -29,6 +29,8 @@ import { scenarioStorageKey, type ScenarioRequest, type ScenarioSession } from '
 import { getScenario } from '../exercises/catalogue';
 import type { AttemptResult, EvidenceEvent, RubricResult } from '../platform/types';
 import type { Command, ProjectFile, RenderSnapshot, WorkerResponse } from '../sim/signals';
+import { validateProject } from '../sim/orchestrator';
+import { readSandboxProject, persistSandboxProject, sandboxRecoveryKey } from '../platform/sandbox-project-storage';
 import './sandbox.css';
 import './p5-workspace.css';
 
@@ -86,6 +88,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [workspaceHelp,setWorkspaceHelp] = useState(false);
   const [activeStage, setActiveStage] = useState<'build' | 'wire' | 'program' | 'test'>('build');
   const [localSave, setLocalSave] = useState<'pending' | 'saved' | 'failed'>('pending');
+  const [storageReady, setStorageReady] = useState(false);
+  const storageRawRef = useRef<string|null>(null);
+  const storageBlockedRef = useRef(false);
+  const bootstrapLoadPendingRef = useRef(false);
   const [events, setEvents] = useState<string[]>([]);
   const [clientError, setClientError] = useState<string | null>(null);
   const worker = useRef<Worker | null>(null);
@@ -122,6 +128,18 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     engine.onmessage = (ev: MessageEvent<WorkerResponse>) => {
       if (ev.data?.kind !== 'snapshot') return;
       setSnapshot(ev.data.snapshot);
+      // The initial Worker snapshot is blank; never autosave it over a project
+      // while a validated saved project is still awaiting its load ACK.
+      if (bootstrapLoadPendingRef.current && ev.data.requestId === 0) {
+        bootstrapLoadPendingRef.current = false;
+        if (ev.data.snapshot.lastError) {
+          storageBlockedRef.current = true;
+          setLocalSave('failed');
+          setClientError('The simulation rejected saved project data; the original browser copy was not overwritten.');
+        } else if (!storageBlockedRef.current) setStorageReady(true);
+      } else if (!bootstrapLoadPendingRef.current && !storageBlockedRef.current) {
+        setStorageReady(true);
+      }
       const acknowledged=ev.data.requestIds??(ev.data.requestId===undefined?[]:[ev.data.requestId]);
       let record=false;
       for(const id of acknowledged){
@@ -149,11 +167,29 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     engine.onerror = () => setClientError('Simulation worker failed. Reload the page to restart the sandbox.');
     startedAt.current = Date.now();
     try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) engine.postMessage({ kind: 'commands', commands: [{ k: 'loadProject', project: JSON.parse(saved) }] });
-      else if (scenario) engine.postMessage({ kind: 'commands', commands: [
-        { k: 'loadProject', project: scenario.def.starter(scenario.seed) }] });
-      if (scenario) {
+      const stored = readSandboxProject(localStorage, storageKey, validateProject);
+      storageRawRef.current = stored.observedRaw;
+      storageBlockedRef.current = !stored.saveAllowed;
+      if (stored.warning) {
+        setClientError(stored.warning);
+        if (!stored.saveAllowed) setLocalSave('failed');
+      }
+      if (stored.project) {
+        bootstrapLoadPendingRef.current = true;
+        engine.postMessage({ kind: 'commands', requestId: 0,
+          commands: [{ k: 'loadProject', project: stored.project }] });
+      } else if (scenario && !storageBlockedRef.current) {
+        bootstrapLoadPendingRef.current = true;
+        engine.postMessage({ kind: 'commands', requestId: 0,
+          commands: [{ k: 'loadProject', project: scenario.def.starter(scenario.seed) }] });
+      }
+    } catch {
+      storageBlockedRef.current = true;
+      setLocalSave('failed');
+      setClientError('Browser project storage is unavailable; autosave is disabled to protect existing data. Export your project as JSON.');
+    }
+    if (scenario) {
+      try {
         const attempt = localStorage.getItem(attemptKey);
         if (attempt) {
           const parsed = JSON.parse(attempt) as { startedAt: number; evidence: EvidenceEvent[]; result: AttemptResult | null };
@@ -162,20 +198,34 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           resultRef.current = parsed.result;
           setResult(parsed.result);
         }
-      }
-    } catch { setClientError('Saved project could not be read; starting with a blank workspace.'); }
+      } catch { setClientError('Saved assessment attempt could not be read; original attempt bytes were not overwritten.'); }
+    }
     return () => { engine.terminate(); worker.current = null; };
   }, []);
   useEffect(() => {
-    if (!project) return;
+    if (!project || !storageReady || storageBlockedRef.current) return;
     try {
-      localStorage.setItem(storageKey, JSON.stringify(project));
+      storageRawRef.current = persistSandboxProject(
+        localStorage, storageKey, project, storageRawRef.current, validateProject);
       setLocalSave('saved');
-    } catch {
+    } catch (e) {
+      storageBlockedRef.current = true;
       setLocalSave('failed');
-      setClientError('Local browser storage is full. Export your project as JSON to keep it.');
+      setClientError(e instanceof Error ? e.message + ' Export your project as JSON.' :
+        'Autosave failed. Export your project as JSON.');
     }
-  }, [project, storageKey]);
+  }, [project, storageKey, storageReady]);
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== storageKey || event.storageArea !== localStorage ||
+          event.newValue === storageRawRef.current) return;
+      storageBlockedRef.current = true;
+      setLocalSave('failed');
+      setClientError('This sandbox project changed in another tab. Autosave is paused to prevent overwriting; export your work as JSON.');
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [storageKey]);
   useEffect(() => {
     if (!scenario || !project) return;
     try { localStorage.setItem(attemptKey, JSON.stringify({ startedAt: startedAt.current, evidence, result })); }
@@ -203,7 +253,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     if (!scenario || !scenario.allowRestart) return;
     if (scenario.onRestart) {
       // Start a brand-new attempt: forget this one and let the page remount with a fresh seed.
-      try { localStorage.removeItem(storageKey); localStorage.removeItem(attemptKey); } catch { /* nothing stored */ }
+      try { localStorage.removeItem(storageKey); localStorage.removeItem(sandboxRecoveryKey(storageKey)); localStorage.removeItem(attemptKey); } catch { /* nothing stored */ }
       scenario.onRestart();
       return;
     }
