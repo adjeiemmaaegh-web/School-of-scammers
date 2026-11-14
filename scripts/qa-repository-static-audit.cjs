@@ -20,26 +20,26 @@ for(const dir of ['src','tests','scripts','public','qa','.github'])walk(dir);
 const src=all.filter(x=>x.startsWith('src/')&&/\.(tsx?|css)$/.test(x));
 const sourceCode=all.filter(x=>x.startsWith('src/')&&/\.tsx?$/.test(x));
 const checkers=[
- ['dangerouslySetInnerHTML',/\bdangerouslySetInnerHTML\s*=/g],
- ['innerHTML write',/\.innerHTML\s*=/g],
- ['dynamic code eval',/\beval\s*\(/g],
- ['dynamic Function constructor',/\bnew\s+Function\s*\(/g],
- ['outerHTML write',/\.outerHTML\s*=/g],
- ['document.write',/\bdocument\.write\s*\(/g],
- ['network fetch',/\bfetch\s*\(/g],
- ['WebSocket',/\bnew\s+WebSocket\s*\(/g],
- ['XHR',/\bnew\s+XMLHttpRequest\s*\(/g],
- ['storage localStorage',/\blocalStorage\s*\.|\blocalStorage\s*\[/g],
- ['storage indexedDB',/\bindexedDB\s*\.|\bindexedDB\s*\[/g],
- ['iframe',/<iframe\b/g],
- ['postMessage',/\.postMessage\s*\(/g],
+ ['dangerouslySetInnerHTML',/\bdangerouslySetInnerHTML\s*=/],
+ ['innerHTML write',/\.innerHTML\s*=/],
+ ['dynamic code eval',/\beval\s*\(/],
+ ['dynamic Function constructor',/\bnew\s+Function\s*\(/],
+ ['outerHTML write',/\.outerHTML\s*=/],
+ ['document.write',/\bdocument\.write\s*\(/],
+ ['network fetch',/\bfetch\s*\(/],
+ ['WebSocket',/\bnew\s+WebSocket\s*\(/],
+ ['XHR',/\bnew\s+XMLHttpRequest\s*\(/],
+ ['storage localStorage',/\blocalStorage\s*\.|\blocalStorage\s*\[/],
+ ['storage indexedDB',/\bindexedDB\s*\.|\bindexedDB\s*\[/],
+ ['iframe',/<iframe\b/],
+ ['postMessage',/\.postMessage\s*\(/],
 ];
 const findings={};for(const [name] of checkers)findings[name]=[];
 const hardSecretPatterns=[
- /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
- /\bghp_[A-Za-z0-9]{30,}\b/g,
- /\bsk_live_[A-Za-z0-9]{20,}\b/g,
- /\bAKIA[0-9A-Z]{16}\b/g,
+ /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
+ /\bghp_[A-Za-z0-9]{30,}\b/,
+ /\bsk_live_[A-Za-z0-9]{20,}\b/,
+ /\bAKIA[0-9A-Z]{16}\b/,
 ];
 const highRiskSecrets=[];
 for(const file of sourceCode){
