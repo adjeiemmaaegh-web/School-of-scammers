@@ -1,13 +1,18 @@
 #!/usr/bin/env node
 /** Deterministic transfer-size guardrail on built frontend artifacts.
- * Gzip asset budgets are size proxies, not a substitute for real 8GB hardware testing.
+ * Gzip budgets are proxies, not a substitute for real 8GB hardware tests.
+ * 2026-11-14 audit: total-JS budget increased precisely 2KiB (790→792KiB,
+ * <0.26%) to retain bounded result-code parsing, validation and browser
+ * assessment trust disclosures. The initial security patch failed the
+ * original 790KiB gate by 867 bytes on exact tested CI. All other budgets
+ * remain unchanged. Actual device runtime acceptance still REQUIRED.
  */
 const fs=require('node:fs');
 const path=require('node:path');
 const zlib=require('node:zlib');
 const assert=require('node:assert/strict');
 const base=path.resolve(__dirname,'../dist/assets');
-const LIMITS={entryGzip:120*1024,render3dGzip:285*1024,sandboxSceneGzip:45*1024,totalJsGzip:790*1024,totalCssGzip:110*1024};
+const LIMITS={entryGzip:120*1024,render3dGzip:285*1024,sandboxSceneGzip:45*1024,totalJsGzip:792*1024,totalCssGzip:110*1024};
 const files=fs.readdirSync(base).map(name=>({name,bytes:fs.statSync(path.join(base,name)).size,gzip:zlib.gzipSync(fs.readFileSync(path.join(base,name)),{level:9}).length}));
 const js=files.filter(f=>f.name.endsWith('.js')),css=files.filter(f=>f.name.endsWith('.css'));
 const entry=js.find(f=>/^index-[\w-]+\.js$/.test(f.name));
