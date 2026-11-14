@@ -67,7 +67,7 @@ export function CandidatePage() {
           <div className="card">
             <label className="field">
               <span>Assignment code</span>
-              <textarea className="code-input" rows={3} value={manual} onChange={(e) => setManual(e.target.value)} placeholder="Paste assignment code…" />
+              <textarea className="code-input" rows={3} maxLength={21_854} value={manual} onChange={(e) => setManual(e.target.value)} placeholder="Paste assignment code…" />
             </label>
             <button className="btn primary" onClick={loadManual} disabled={!manual.trim()}>Open task</button>
           </div>
