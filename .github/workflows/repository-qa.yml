@@ -20,6 +20,10 @@ jobs:
         run: node scripts/qa-static-inventory.cjs
       - name: Unit adversarial assessment/trade/persistence boundaries
         run: npx vitest run tests/qa-trust-boundaries.test.ts
+      - name: Additional standalone factory acceptance and scan-debugger verification
+        run: |
+          PATH="$PWD/node_modules/.bin:$PATH" node qa/verify-fat.cjs
+          PATH="$PWD/node_modules/.bin:$PATH" node qa/verify-scan-debugger.cjs
       - name: Audit production and complete npm dependency tree
         run: node scripts/qa-dependency-audit.cjs
       - name: Preserve QA security reports
