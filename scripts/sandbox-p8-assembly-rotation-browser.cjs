@@ -22,6 +22,13 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   return p?.components?.length===number;
  },{timeout:15000},n);
  const place=async label=>{
+  // Project edits are intentionally gated until the saved Worker has
+  // acknowledged startup hydration; wait for the actual enabled control.
+  await page.waitForFunction(value=>{
+   const button=[...document.querySelectorAll('.sandbox-palette-item')]
+     .find(el=>el.querySelector('strong')?.textContent.trim()===value);
+   return !!button&&!button.disabled;
+  },{timeout:15000},label);
   const ok=await page.evaluate(value=>{
    const button=[...document.querySelectorAll('.sandbox-palette-item')]
      .find(el=>el.querySelector('strong')?.textContent.trim()===value);
@@ -77,6 +84,10 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   await page.waitForSelector('[data-assembly-select]');
   assert.equal(await page.$eval('[data-assembly-select]',el=>el.options.length),2);
   await page.select('[data-assembly-rotation]','1');
+  await page.waitForFunction(()=>{
+   const button=document.querySelector('[data-assembly-insert]');
+   return !!button&&!button.disabled;
+  },{timeout:15000});
   await page.click('[data-assembly-insert]');
   await count(4);
   await page.waitForFunction(()=>{
