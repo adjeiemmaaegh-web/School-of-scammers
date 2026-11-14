@@ -20,8 +20,11 @@ const result:AttemptResult={
   criteria:[{id:'sensor',label:'Observed the limit',max:10,earned:10,
    reason:'Electrical terminal correctly measured'}]},
 };
-const raw=(x:unknown)=>Buffer.from(JSON.stringify(x),'utf8')
- .toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const raw=(x:unknown)=>{
+ const bytes=new TextEncoder().encode(JSON.stringify(x));
+ return btoa(Array.from(bytes,c=>String.fromCharCode(c)).join(''))
+  .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+};
 afterEach(()=>vi.unstubAllGlobals());
 describe('Repository QA: portable untrusted assessment boundary',()=>{
  it('round-trips valid Unicode assignments and bounded result evidence',()=>{
