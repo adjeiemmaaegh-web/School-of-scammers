@@ -42,6 +42,8 @@ jobs:
         run: node scripts/qa-csp-runtime-browser.cjs
       - name: QA employer/candidate end-to-end code validation, assignment identity and result integrity
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/qa-candidate-employer-browser.cjs
+      - name: QA every ranked PLC and CCTV exercise route, interactive control and UI errors
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/qa-cross-trade-browser.cjs
       - name: Open sandbox P1 - place, wire, program, run and test failures
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-browser-acceptance.cjs
       - name: P1 advanced authoring - select, duplicate, undo, redo, rotate, copy, paste and reload
