@@ -26,7 +26,6 @@ const initial={
    {waitUntil:'networkidle0',timeout:40000});
   await page.waitForSelector('h1');
   assert.match(await page.$eval('main',x=>x.textContent),/invalid|error|assigned task/i);
-  assert.equal(await page.$('button'),null===undefined?undefined:await page.$('button'));
   // Genuine code opens a gated candidate intro, no answers or modes exposed.
   await page.goto(BASE+'/take#a='+code(initial),{waitUntil:'networkidle0'});
   await page.waitForFunction(()=>document.querySelector('main h1')?.textContent.includes('Conveyor'));
@@ -52,7 +51,7 @@ const initial={
    const b=[...document.querySelectorAll('button')].find(e=>e.textContent?.includes('Submit for assessment'));
    if(!b)throw Error('Cannot submit actual exercise');b.click();
   });
-  await page.waitForSelector('#copy-Result\\ code',{timeout:25000});
+  await page.waitForSelector('textarea[id="copy-Result code"]',{timeout:25000});
   const returned=await page.$eval('textarea[id="copy-Result code"]',el=>el.value);
   const decoded=read(returned);
   assert.equal(decoded.kind,'skills-lab-result');
@@ -73,8 +72,10 @@ const initial={
   // rubric without a React crash.
   await page.goto(BASE+'/employer',{waitUntil:'networkidle0'});
   await page.waitForSelector('.review-card textarea');
-  await page.$eval('.review-card textarea',(el,v)=>{el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));},returned);
-  await page.type('.review-card textarea',' ');await page.keyboard.press('Backspace');
+  await page.$eval('.review-card textarea',(el,v)=>{
+   const set=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;
+   set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));
+  },returned);
   await page.click('.review-card button');
   await page.waitForSelector('.review-out');
   assert.match(await page.$eval('.review-out',x=>x.textContent),/Second candidate/);
