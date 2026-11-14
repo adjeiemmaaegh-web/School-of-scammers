@@ -30,8 +30,10 @@ export function allTrades(): TradeMeta[] {
   return [...available, ...COMING_SOON];
 }
 
+/** Route parameters are untrusted: '__proto__' and 'constructor' are NOT
+ * trade modules, even though they resolve on Object.prototype. */
 export function getTrade(id: TradeId | string): TradeModule | undefined {
-  return MODULES[id];
+  return Object.hasOwn(MODULES,id) ? MODULES[id] : undefined;
 }
 
 export function getExercise(exerciseId: string): ExerciseDefinition | undefined {
