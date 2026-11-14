@@ -43,7 +43,7 @@ const ST = ['VAR_INPUT', '  Go : BOOL;', '  Extended : BOOL;', '  Retracted : BO
     await page.goto(base + '/sandbox', { waitUntil: 'networkidle0', timeout: 20000 });
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle0' });
-    await page.waitForSelector('.sandbox-palette-item');
+    await page.waitForSelector('.sandbox-palette-item:not([disabled])');
 
     /* ---- A. hard-wired relay latch, no PLC ---- */
     for (const l of ['24V supply', 'START NO', 'STOP NC', '24V control relay', '24V pilot lamp', '24V pilot lamp']) { await place(l); await sleep(70); }
@@ -74,7 +74,7 @@ const ST = ['VAR_INPUT', '  Go : BOOL;', '  Extended : BOOL;', '  Retracted : BO
     await sleep(500); // let the cleared project be saved before reloading (reloading also restarts the id counter)
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 0, { timeout: 6000 });
-    await page.waitForSelector('.sandbox-palette-item');
+    await page.waitForSelector('.sandbox-palette-item:not([disabled])');
     for (const l of ['24V supply', 'Virtual PLC 16/16', 'START NO', 'Pneumatic cylinder']) { await place(l); await sleep(70); }
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 4, { timeout: 8000 });
     const [S2, P, GO, C] = ['supply-1', 'plc16-2', 'start-3', 'cylinder-4'];

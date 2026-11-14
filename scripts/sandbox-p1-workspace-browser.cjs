@@ -33,7 +33,7 @@ const STORAGE = 'efo-open-sandbox-project-v1';
     await page.goto(base + '/sandbox', { waitUntil: 'networkidle0', timeout: 20000 });
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle0' });
-    await page.waitForSelector('.sandbox-palette-item');
+    await page.waitForSelector('.sandbox-palette-item:not([disabled])');
 
     // P1 authoring without selecting a lesson, question or grading screen.
     const place = async label => {

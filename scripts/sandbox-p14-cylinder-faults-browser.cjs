@@ -50,7 +50,7 @@ const ST = ['VAR_INPUT', '  Go : BOOL;', '  Extended : BOOL;', '  Retracted : BO
     await page.goto(base + '/sandbox', { waitUntil: 'networkidle0', timeout: 20000 });
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle0' });
-    await page.waitForSelector('.sandbox-palette-item');
+    await page.waitForSelector('.sandbox-palette-item:not([disabled])');
     for (const l of ['24V supply', 'Virtual PLC 16/16', 'START NO', 'Pneumatic cylinder', 'Stack light (R/Y/G)']) { await place(l); await sleep(70); }
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 5, { timeout: 8000 });
     const [S, P, GO, C, L] = ['supply-1', 'plc16-2', 'start-3', 'cylinder-4', 'stacklight-5'];
