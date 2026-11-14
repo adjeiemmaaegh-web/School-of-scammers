@@ -41,29 +41,32 @@ export function useExercise<S, A>(
   seed = 1,
 ): ExerciseController<S, A> {
   const startRef = useRef<number>(Date.now());
-  const [state, setState] = useState<S>(() => def.init(seed));
-  const [evidence, setEvidence] = useState<EvidenceEvent[]>([]);
+  // State and its evidence must commit atomically: calling setEvidence from
+  // inside a setState updater is an impure React update. StrictMode can replay
+  // that updater and append duplicate assessed actions for one real click.
+  const [session, setSession] = useState<{state:S;evidence:EvidenceEvent[]}>(() =>
+    ({state:def.init(seed),evidence:[]}));
+  const {state,evidence}=session;
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<AttemptResult | null>(null);
 
   const dispatch = useCallback(
     (action: A) => {
       if (submitted) return;
-      setState((prev) => {
-        const { next, event } = def.reduce(prev, action);
-        if (event) {
-          setEvidence((log) => [
-            ...log,
-            {
-              index: log.length + 1,
-              at: Date.now() - startRef.current,
-              action: event.action,
-              detail: event.detail,
-              accepted: event.accepted,
-            },
-          ]);
-        }
-        return next;
+      const at=Math.max(0,Date.now()-startRef.current);
+      setSession(prev=>{
+        const {next,event}=def.reduce(prev.state,action);
+        if(!event)return {state:next,evidence:prev.evidence};
+        const log=prev.evidence;
+        const entry:EvidenceEvent={
+          index:(log.at(-1)?.index??0)+1,at,
+          action:event.action,detail:event.detail,accepted:event.accepted,
+        };
+        const combined=[...log,entry];
+        // Prevent unlimited DOM/JSON growth in long-lived local-only sessions.
+        // The index remains monotonic even after older entries are evicted.
+        return {state:next,evidence:combined.length>2000?
+          combined.slice(-2000):combined};
       });
     },
     [def, submitted],
@@ -105,8 +108,7 @@ export function useExercise<S, A>(
 
   const reset = useCallback(() => {
     startRef.current = Date.now();
-    setState(def.init(seed));
-    setEvidence([]);
+    setSession({state:def.init(seed),evidence:[]});
     setSubmitted(false);
     setResult(null);
   }, [def, seed]);

@@ -31,7 +31,7 @@ export function EmployerPage() {
       exerciseVersion: def.version,
       mode: 'assessment',
       seed: Math.floor(Math.random() * 1_000_000) + 1,
-      label: label.trim() || undefined,
+      label: label.trim().slice(0,512) || undefined,
       createdAt: new Date().toISOString(),
     };
     setAssignment(a);
@@ -44,7 +44,7 @@ export function EmployerPage() {
         <nav className="crumbs"><Link to="/">Home</Link><span>/</span><strong>Employer</strong></nav>
         <span className="eyebrow">For employers &amp; interviewers</span>
         <h1 className="page-title">Set up a practical test</h1>
-        <p className="sub">Pick a realistic, ranked exercise and send it to a candidate. They complete it under exam conditions; you get back an evidence-backed result to review below.</p>
+        <p className="sub">Pick a practical exercise and send it to a candidate. Returned codes show locally reported evidence; without a signed server or identity checks, results cannot prove who completed the work.</p>
 
         <div className="employer-grid">
           <div className="card">
@@ -68,6 +68,7 @@ export function EmployerPage() {
               <span>Label (optional)</span>
               <input
                 type="text"
+                maxLength={512}
                 value={label}
                 placeholder="e.g. Maintenance tech — final round"
                 onChange={(e) => setLabel(e.target.value)}
@@ -115,9 +116,10 @@ function ReviewResult() {
   return (
     <div className="card review-card">
       <h2 className="card-title">3 · Review a returned result</h2>
-      <p className="muted small">Paste the result code your candidate sends back:</p>
+      <p className="muted small">Paste the result code your candidate sends back. These offline codes are unsigned and can be altered or fabricated; use them for training review only, not identity verification or certification.</p>
       <textarea
         className="code-input"
+        maxLength={2_000_008}
         value={raw}
         onChange={(e) => setRaw(e.target.value)}
         placeholder="Paste result code here…"
