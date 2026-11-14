@@ -32,6 +32,15 @@ const initial={
   assert.match(await page.$eval('main',x=>x.textContent),/QA hiring review/);
   await page.click('button.btn.primary.block');
   await page.waitForSelector('.exercise-shell');
+  await page.evaluate(()=>{
+   const btn=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='Record visual inspection');
+   if(!btn)throw Error('QA original exercise action not found');
+   btn.click();
+  });
+  await page.waitForFunction(()=>document.querySelectorAll('.evidence-row').length===1,
+   {timeout:8000});
+  assert.equal(await page.$eval('.evidence-row',els=>els.length),1,
+   'React StrictMode must record exactly one evidence action per real click');
   const a=await page.$eval('main',x=>x.textContent);
   assert.match(a,/Assessment · exam conditions/);
   // Switching assignment on the SAME tab must not inherit prior started state.
