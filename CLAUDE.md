@@ -10,6 +10,7 @@
    **Sandbox breadth (several PLCs/panels, and what comes next):** `docs/product/SANDBOX_BREADTH_PROGRESS.md` — multiple PLCs and supplies, per-PLC programs, isolation semantics, honest limits.
    **P6 scenarios & assessment on the sandbox:** `docs/product/P6_SCENARIOS_PROGRESS.md` — scenario exercises graded by outcome through the real `tick()`, the Work order workbench, the employer → candidate → review flow, and the honesty limits of a frontend-only assessment.
    **Plant library (co-developer brief):** `docs/product/PLANT_LIBRARY_BRIEF.md` — the contract for the physics core, equipment types and scenes written by the co-developer; the integrator owns orchestrator, registry, 3D wiring and tests.
+   **Factory slices P6–P25 (3D builder, 25 equipment models, 21 scenes, worker-verified scenarios):** `docs/product/FACTORY_SLICES_INDEX.md` — index of the archived per-slice evidence records; read `RELEASE_READINESS_2026-11-15.md` for current gates.
    **P5 faults & diagnostics:** `docs/product/P5_FAULTS_PROGRESS.md` — seeded/hidden fault injection that changes real solver inputs, symptom-only alarms, repair, and what is still open.
 3. `.claude/skills/automation-platform/SKILL.md` — the day-to-day developer guide and recipes. **Follow it when writing simulator code.**
 4. `docs/product/HANDOVER_CHECKLIST.md` — current status and what's next.

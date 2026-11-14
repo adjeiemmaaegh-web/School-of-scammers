@@ -12,7 +12,7 @@
 > [#47](https://github.com/adjeiemmaaegh-web/School-of-scammers/pull/47)
 > (bounded P7 software closure, exact-head QA required).
 > These draft capabilities must not be mistaken for deployed `main` behavior.
-> See [P7 evidence and open gates](docs/product/P7_ADVANCED_3D_FACTORY_EDITOR.md)
+> See [P7 evidence and open gates](docs/product/archive/factory-slices/P7_ADVANCED_3D_FACTORY_EDITOR.md)
 > for what remains unverified, especially real PLC hardware, 3D parity and
 > physical low-spec Windows acceptance.
 
