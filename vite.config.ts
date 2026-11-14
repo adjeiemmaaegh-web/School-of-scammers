@@ -1,3 +1,5 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-export default defineConfig({ plugins: [react()] });
+// Match tsconfig's existing ES2022 language baseline. This avoids
+// redundant downlevel output and reduces total compressed JavaScript.
+export default defineConfig({ plugins: [react()], build: { target: 'es2022' } });
