@@ -231,23 +231,16 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
   </section>}
   {scene.id==='gate-accumulation'&&<section className="sandbox-p25-fault"
    data-p25-fault data-p25-state={pending?'running':faultRetryReport?.status??'setup'}>
-   <h3>P25 · Genuine stuck outfeed, fault-latched alarm and fresh PLC retry</h3>
-   <p className="sandbox-help">Keep P24's original paired-carton accumulation,
-    200ms held-load sensor and powered downstream stopper. Add a real
-    24 V pilot lamp named <strong>outfeed-alarm</strong> at (710,480).
-    Wire scene-plc.Q0.7 to outfeed-alarm.L+ and scene-supply.M0 to
-    outfeed-alarm.M-. The private worker adds a fresh independently powered
-    maintenance retry at PLC I1.4, separate from first release I1.0.</p>
-   <p className="sandbox-help">The original b2 physically jams against
-    outstop, then the worker registers a genuine <strong>stuck-extended</strong>
-    equipment fault. Your PLC attempts Q0.6 release, observes that the
-    REAL I1.2 retracted-limit stays LOW, times out, reasserts Q0.6 and
-    electrically energizes the Q0.7 pilot lamp. A new feeder demand is
-    inhibited and the original carton stays conserved. Physically repairing
-    the fault alone cannot auto-release the carton; a NEW powered I1.4
-    maintenance retry must permit physical retraction, clear the lamp,
-    discharge original b2 and only then feed b3. No PLC coils are forced
-    by the instructor, and no score is persisted or certified.</p>
+   <h3>P25 · Faulted outfeed and verified PLC recovery</h3>
+   <p className="sandbox-help">Keep the P24 cell. Add a 24 V
+    <strong> outfeed-alarm</strong> lamp at (710,480): PLC Q0.7 to
+    lamp L+, supply M0 to M-. A private powered I1.4 button tests
+    maintenance retry separately from I1.0 release.</p>
+   <p className="sandbox-help">The original b2 encounters a real
+    <strong> stuck-extended</strong> stopper fault. Your PLC must detect
+    missing retracted feedback I1.2, latch a Q0.7 lamp alarm and block
+    new feeding. Repair alone must not restart; fresh I1.4 retry must
+    release b2 before b3 can feed. No forced outputs or certified score.</p>
    {faultRetryBlockers.length>0&&<div data-p25-preflight>
     <strong>Prepare the original powered fault-recovery cell:</strong>
     <ul>{faultRetryBlockers.map(x=><li key={x}>{x}</li>)}</ul>
