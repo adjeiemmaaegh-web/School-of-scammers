@@ -159,13 +159,13 @@ function ExercisePlayerInner({
           <div className="panel">
             <div className="panel-head">
               <span className="panel-eyebrow">Evidence trail</span>
-              <span className="tabular muted">{ctl.evidence.length}</span>
+              <span className="tabular muted">{ctl.evidence.length} recorded · latest 100 shown</span>
             </div>
             <div className="evidence-log" aria-live="polite">
               {ctl.evidence.length === 0 ? (
                 <p className="muted small">No actions recorded yet.</p>
               ) : (
-                ctl.evidence.slice().reverse().map((e) => (
+                ctl.evidence.slice(-100).reverse().map((e) => (
                   <div key={e.index} className={`evidence-row ${e.accepted ? '' : 'rejected'}`}>
                     <code>#{e.index} {e.action}</code>
                     <p>{e.detail}</p>
