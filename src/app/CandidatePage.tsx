@@ -103,7 +103,7 @@ export function CandidatePage() {
             <p>{def.scenario}</p>
             <ul className="exam-notes">
               <li>This is an assessment — hints and solutions are withheld.</li>
-              <li>Every action you take is recorded as evidence.</li>
+              <li>Recent learner actions are recorded as local evidence (up to 2,000; no independent identity verification).</li>
               <li>When you submit, you'll get a result code to send back to your employer.</li>
               <li>Estimated time: ~{def.estMinutes} minutes.</li>
             </ul>
