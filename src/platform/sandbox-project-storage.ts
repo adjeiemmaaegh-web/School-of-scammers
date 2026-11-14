@@ -35,8 +35,14 @@ export function readSandboxProject(store:SandboxStorage,key:string,validate:Sand
         const project=parse(backup,validate);
         let preserved=false;
         try{
-          store.setItem(sandboxDamagedKey(key),primary);
-          preserved=store.getItem(sandboxDamagedKey(key))===primary;
+          const damagedKey=sandboxDamagedKey(key);
+          const earlierDamaged=store.getItem(damagedKey);
+          if(earlierDamaged===primary)preserved=true;
+          else if(earlierDamaged===null){
+            store.setItem(damagedKey,primary);
+            preserved=store.getItem(damagedKey)===primary;
+          }
+          // A distinct older damaged file is never silently overwritten.
         }catch{/* Do not overwrite an unpreserved damaged original. */}
         return {project,source:'recovery',observedRaw:primary,saveAllowed:preserved,
           warning:preserved

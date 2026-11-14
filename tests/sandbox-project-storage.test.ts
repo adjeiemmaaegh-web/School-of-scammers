@@ -60,6 +60,15 @@ describe('sandbox project recovery and stale-write protection',()=>{
   expect(s.getItem(KEY)).toBe('{broken');
   expect(()=>persistSandboxProject(s,KEY,r.project!,r.observedRaw,validateProject)).toThrow(/not preserved/);
  });
+ it('never overwrites a distinct older damaged revision when a second primary becomes corrupt',()=>{
+  const s=store();s.setItem(KEY,'{second-damaged');
+  s.setItem(sandboxRecoveryKey(KEY),JSON.stringify(withSupply()));
+  s.setItem(sandboxDamagedKey(KEY),'{first-damaged');
+  const r=readSandboxProject(s,KEY,validateProject);
+  expect(r.source).toBe('recovery');expect(r.saveAllowed).toBe(false);
+  expect(s.getItem(sandboxDamagedKey(KEY))).toBe('{first-damaged');
+  expect(s.getItem(KEY)).toBe('{second-damaged');
+ });
  it('rejects overwrite when another tab changes the primary after opening',()=>{
   const s=store();const prior=JSON.stringify(project());s.setItem(KEY,prior);
   const opened=readSandboxProject(s,KEY,validateProject);
