@@ -29,7 +29,7 @@ export function CandidatePage() {
   const [manual, setManual] = useState('');
 
   useEffect(() => {
-    const onHash = () => setState(readAssignmentFromHash());
+    const onHash = () => { setStarted(false); setState(readAssignmentFromHash()); };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -37,14 +37,18 @@ export function CandidatePage() {
   const exerciseDef = useMemo(() => (assignment ? getExercise(assignment.exerciseId) : undefined), [assignment]);
   const scenarioDef = useMemo(() => (assignment ? getScenarioMeta(assignment.exerciseId) : undefined), [assignment]);
   const def = exerciseDef ?? scenarioDef;
-  const session = useMemo<ScenarioRequest | null>(() => (assignment && scenarioDef ? {
+  // IDs and JSON shape alone do not identify the assigned exercise. Reject
+  // incompatible versions/trades instead of silently grading a different task.
+  const assignmentMatches=!!assignment&&!!def&&assignment.mode==='assessment'&&
+    assignment.trade===def.trade&&assignment.exerciseVersion===def.version;
+  const session = useMemo<ScenarioRequest | null>(() => (assignmentMatches && assignment && scenarioDef ? {
     scenarioId: scenarioDef.id, mode: 'assessment', seed: assignment.seed, allowRestart: false, assignment,
-    resultActions: (result: AttemptResult) => <ReturnCode result={result} />,
-  } : null), [assignment, scenarioDef]);
+    resultActions: (result: AttemptResult) => <ReturnCode result={result} originalAssignment={assignment!} />,
+  } : null), [assignmentMatches, assignment, scenarioDef]);
 
   const loadManual = () => {
     try {
-      setState({ assignment: decodeAssignment(manual) });
+      const decoded=decodeAssignment(manual); setStarted(false); setState({ assignment: decoded });
     } catch (e) {
       setState({ error: e instanceof Error ? e.message : 'Invalid code.' });
     }
@@ -72,13 +76,13 @@ export function CandidatePage() {
     );
   }
 
-  if (!def) {
+  if (!assignmentMatches) {
     return (
       <>
         <AppHeader />
         <main id="main" className="wrap page narrow">
           <h1 className="page-title">This task isn't available</h1>
-          <p className="sub">The assignment refers to an exercise this version doesn't have (<code>{assignment.exerciseId}</code>).</p>
+          <p className="sub">This assignment's exercise, trade, mode or version is not available in this build (<code>{assignment.exerciseId}</code>, version {assignment.exerciseVersion}). Request a compatible assignment instead of attempting a different assessment.</p>
           <Link className="btn ghost" to="/">← Home</Link>
         </main>
       </>
@@ -119,23 +123,28 @@ export function CandidatePage() {
       <AppHeader />
       <main id="main" className="wrap wrap-wide page">
         <ExercisePlayer
+          key={`${assignment.exerciseId}:${assignment.seed}:${assignment.createdAt}`}
           def={exerciseDef!}
           initialMode="assessment"
           seed={assignment.seed}
           allowModeSwitch={false}
           allowReset={false}
-          resultActions={(result: AttemptResult) => <ReturnCode result={result} />}
+          resultActions={(result: AttemptResult) => <ReturnCode result={result} originalAssignment={assignment} />}
         />
       </main>
     </>
   );
 }
 
-function ReturnCode({ result }: { result: AttemptResult }) {
+function ReturnCode({result,originalAssignment}:{result:AttemptResult;originalAssignment:Assignment}){
+  // The exercise controller reconstructs a local session assignment. Preserve
+  // the *issued* employer assignment identity, label, seed and createdAt in
+  // the export so reviewers can at least compare the submitted code.
+  const portable:AttemptResult={...result,assignment:originalAssignment};
   return (
     <div className="return-code">
-      <p className="muted small">Send this result code back to your employer:</p>
-      <CopyField label="Result code" value={encodeResult(result)} textarea />
+      <p className="muted small">Send this locally generated result code back to your employer. Codes are unsigned and editable; they cannot prove who completed a task.</p>
+      <CopyField label="Result code" value={encodeResult(portable)} textarea />
     </div>
   );
 }
