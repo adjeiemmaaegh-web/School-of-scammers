@@ -63,13 +63,13 @@ export function p25FaultRetryPreflight(p:ProjectFile,sceneId:string):string[]{
 }
 function privateProject(p:ProjectFile):ProjectFile{
  const wires:Wire[]=[...p.wires,
-  {id:'p25-start-power',from:SUPPLY+'.P25',to:START+'.A'},
+  {id:'p25-start-power',from:SUPPLY+'.P24',to:START+'.A'},
   {id:'p25-start-in',from:START+'.B',to:PLC+'.I0.0'},
-  {id:'p25-ack-power',from:SUPPLY+'.P25',to:ACK+'.A'},
+  {id:'p25-ack-power',from:SUPPLY+'.P24',to:ACK+'.A'},
   {id:'p25-ack-in',from:ACK+'.B',to:PLC+'.I0.4'},
-  {id:'p25-request-power',from:SUPPLY+'.P25',to:REQUEST+'.A'},
+  {id:'p25-request-power',from:SUPPLY+'.P24',to:REQUEST+'.A'},
   {id:'p25-request-in',from:REQUEST+'.B',to:PLC+'.I0.6'},
-  {id:'p25-release-power',from:SUPPLY+'.P25',to:RELEASE+'.A'},
+  {id:'p25-release-power',from:SUPPLY+'.P24',to:RELEASE+'.A'},
   {id:'p25-release-in',from:RELEASE+'.B',to:PLC+'.I1.0'},
   {id:'p25-retry-power',from:SUPPLY+'.P24',to:RETRY+'.A'},
   {id:'p25-retry-in',from:RETRY+'.B',to:PLC+'.I1.4'}];
