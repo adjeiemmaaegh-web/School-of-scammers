@@ -238,15 +238,23 @@
     overscroll-behavior:contain;
     scrollbar-width:thin;
   }
-  .efo-ux2-shell .p5-physical-stage {min-height:0}
-  .efo-ux2-shell .sandbox-3d-shell {
-    height:clamp(220px,calc(100dvh - 450px),650px);
-    min-height:220px;
-    max-height:100%;
-  }
-  .efo-ux2-shell .p5-logical-scroll {
-    height:clamp(220px,calc(100dvh - 455px),650px);
+  /* The visible 3D scene must fit the allocated viewport, not merely be
+     clipped by overflow:hidden on the parent. Secondary scene controls
+     remain scrollable inside the central workspace when needed. */
+  .efo-ux2-shell .p5-physical-stage {
+    height:100%;
     min-height:0;
+  }
+  .efo-ux2-shell .sandbox-3d-shell {
+    height:max(145px,calc(100% - 51px));
+    min-height:145px;
+    max-height:calc(100% - 51px);
+  }
+  .efo-ux2-shell .p5-logical-board {height:100%;min-height:0}
+  .efo-ux2-shell .p5-logical-scroll {
+    height:max(160px,calc(100% - 48px));
+    min-height:0;
+    max-height:calc(100% - 48px);
   }
   .efo-ux2-shell .p5-inspector-slot {
     min-height:0;
@@ -340,5 +348,9 @@
 @media (min-width:768px) and (max-height:760px) {
   .efo-ux2-shell .sandbox-masthead {padding:0;min-height:0}
   .efo-ux2-shell .p5-engineering-dock {flex-basis:clamp(126px,23vh,175px)}
-  .efo-ux2-shell .sandbox-3d-shell {height:clamp(200px,calc(100dvh - 405px),520px);min-height:200px}
+  .efo-ux2-shell .sandbox-3d-shell {
+    height:max(145px,calc(100% - 51px));
+    min-height:145px;
+    max-height:calc(100% - 51px);
+  }
 }
