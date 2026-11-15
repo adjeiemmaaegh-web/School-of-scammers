@@ -51,6 +51,16 @@ const viewports=[
           canvas:boxes(canvas),outerOverflow:getComputedStyle(document.body).overflow,
           paletteTiles:document.querySelectorAll('.ux2-equipment-tile').length,
           thumbnailCount:document.querySelectorAll('.ux2-equipment-tile svg').length,
+          fullyVisibleTiles:(()=>{
+            const list=document.querySelector('.sandbox-palette-list');
+            if(!list)return 0;
+            const available=list.getBoundingClientRect();
+            return [...list.querySelectorAll('.ux2-equipment-tile')].filter(el=>{
+              const box=el.getBoundingClientRect();
+              return box.width>20&&box.height>50&&
+                box.top>=available.top-1&&box.bottom<=available.bottom+1;
+            }).length;
+          })(),
         };
       });
       assert.ok(measurements.document[0]<=viewport.width+2,
@@ -67,6 +77,9 @@ const viewports=[
         'UX2 palette must show registered equipment at '+viewport.name);
       assert.equal(measurements.thumbnailCount,measurements.paletteTiles,
         'Every visible equipment tile has an original SVG illustration');
+      assert.ok(measurements.fullyVisibleTiles>=2,
+        'At least one illustrated equipment row must be entirely visible without scrolling the library at '+
+        viewport.name+': '+JSON.stringify(measurements));
       assert.ok(measurements.dock?.h>=24,
         'Engineering dock controls must remain available (collapsed is OK): '+
         viewport.name+' '+JSON.stringify(measurements));
