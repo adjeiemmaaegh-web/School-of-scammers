@@ -38,6 +38,8 @@ jobs:
           curl -fsS http://127.0.0.1:4173/ > /dev/null
       - name: Validate fixed-screen PC and tablet workbench with real worker
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux2-stage1-browser.cjs
+      - name: Regression - 3D factory PLC16 commissioning and floor raycasts
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-3d-commissioning-browser.cjs
       - name: Upload geometries and viewport screenshots
         if: always()
         uses: actions/upload-artifact@v4
