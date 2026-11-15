@@ -6,6 +6,7 @@ import { LogicalWiringCanvas } from '../ui/sandbox/LogicalWiringCanvas';
 import { WorkspaceAuthoringBar } from '../ui/sandbox/WorkspaceAuthoringBar';
 import { WorkspaceSelectionPanel } from '../ui/sandbox/WorkspaceSelectionPanel';
 import { AssemblyLibrary } from '../ui/sandbox/AssemblyLibrary';
+import { EquipmentThumbnail } from '../ui/sandbox/EquipmentThumbnail';
 import { makeFragment } from '../workspace/clipboard';
 import { recordChange, emptyHistory, undoHistory, redoHistory } from '../workspace/history';
 import { workspaceShortcut } from '../workspace/keyboard';
@@ -33,6 +34,7 @@ import { validateProject } from '../sim/orchestrator';
 import { readSandboxProject, persistSandboxProject, sandboxRecoveryKey } from '../platform/sandbox-project-storage';
 import './sandbox.css';
 import './p5-workspace.css';
+import './ux2-workbench.css';
 
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
@@ -273,7 +275,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       setDockExpanded(true);
       setDockFocus(stage==='program'?'program':'diagnostics');
     }
-    document.getElementById(`sandbox-stage-${stage}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // UX2 open workbench keeps the page fixed; workflow modes switch active panels.
+    // Retain legacy scroll navigation for scenario/assessment sessions until migration.
+    if (scenario) document.getElementById(`sandbox-stage-${stage}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const uniqueId = (prefix: string): string => {
     let id = '';
@@ -536,8 +540,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   });
   return <>
     <AppHeader />
-    <main id="main" className="sandbox-page sandbox-ux p5-organized wrap wrap-wide"
-      data-p5-workspace="organized">
+    <main id="main" className={`sandbox-page sandbox-ux p5-organized wrap wrap-wide${scenario ? '' : ' efo-ux2-shell'}`}
+      data-p5-workspace="organized" data-ux2-workbench={scenario ? undefined : 'pc-tablet'}>
       <header className="sandbox-masthead">
         <div>
           <p className="sandbox-breadcrumb"><Link to="/">Skills Lab</Link><span>/</span> {scenario ? 'Scenario' : 'Simulator'} <span>/</span> {scenario ? scenario.def.title : 'Open workspace'}</p>
@@ -596,6 +600,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         <details><summary>Help</summary><div className="p5-menu-content">
           <button type="button" onClick={()=>setWorkspaceHelp(v=>!v)}>Toggle workspace instructions</button>
           <span>Alt+1 logical · Alt+2 3D · Alt+3 plan · Ctrl+S export · Esc cancel</span>
+          <span>Educational model only: no real PLC firmware, certified electrical protection, safety-rated E-stop, or field hardware equivalence.</span>
         </div></details>
       </nav>
       {workspaceHelp&&<aside className="p5-help" aria-label="Workspace instructions">
@@ -676,7 +681,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <button type="button" disabled={!editable} onClick={()=>{setWorkspaceView('logical');setActiveStage('wire');}}>
             Wire terminals</button>
           <button type="button" onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);
-            document.getElementById('sandbox-stage-test')?.scrollIntoView({block:'nearest'});}}>
+            if (scenario) document.getElementById('sandbox-stage-test')?.scrollIntoView({block:'nearest'});}}>
             Measure / diagnose</button>
         </div>
         <div className="p5-panel-toggles" role="group" aria-label="Workspace panels">
@@ -713,8 +718,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             {visibleKinds.map(kind => <button key={kind} draggable={editable}
               onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}
               onClick={() => place(kind)} disabled={!editable}
-              className="sandbox-palette-item">
-              <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
+              title={`Place ${COMPONENTS[kind].label}. ${COMPONENTS[kind].help}`}
+              className={`sandbox-palette-item${scenario ? '' : ' ux2-equipment-tile'}`}>
+              {!scenario ? <span className="ux2-equipment-illustration" aria-hidden="true">
+                <EquipmentThumbnail kind={kind} />
+              </span> : <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
                 {kind === 'plc' ? 'PLC' : kind === 'plc16' ? '16/16' : kind === 'relay' ? 'RLY' : kind === 'timerelay' ? 'TDR' : kind === 'cylinder' ? 'CYL' : kind === 'stacklight' ? 'STK' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
                   kind === 'conveyor' ? 'BELT' : kind === 'photoeye' ? 'EYE' :
                   kind === 'diverter' ? 'DIV' : kind === 'tank' ? 'TANK' :
@@ -723,9 +731,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                   kind === 'overload' ? 'OL' : kind === 'reversebutton' ? 'REV' :
                   kind === 'forwardcontactor' ? 'KF' : kind === 'reversecontactor' ? 'KR' :
                   kind === 'revmotor' ? 'M↔' : kind === 'lamp' ? 'LED' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
-              </span>
-              <span><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
-              <span className="sandbox-add-device" aria-hidden="true">+</span>
+              </span>}
+              <span className={scenario ? undefined : 'ux2-equipment-name'}><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
+              <span className={`sandbox-add-device${scenario ? '' : ' ux2-add-device'}`} aria-hidden="true">+</span>
             </button>)}
             {!visibleKinds.length && <p className="sandbox-help" role="status">No devices match your search. Try “motor” or “PLC”.</p>}
           </div>
@@ -1060,7 +1068,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         {selectedTerminal&&<span>Wiring from <code>{selectedTerminal}</code></span>}
         {(clientError||snapshot?.lastError)&&<span className="p5-status-warning">Action error — inspect message above</span>}
       </div>
-      <section className="p5-engineering-dock" data-p5-dock={dockFocus}>
+      <section className={`p5-engineering-dock${dockExpanded ? '' : ' ux2-dock-collapsed'}`} data-p5-dock={dockFocus}>
         <header className="p5-dock-heading">
           <strong>Engineering dock</strong>
           <div role="group" aria-label="Dock panels">
