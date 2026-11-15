@@ -15,7 +15,7 @@ const dir='qa-artifacts/ux3-real-workcells';
 const targets=[
  {id:'mixing-tank',kind:'mixer',name:'process-machinery',width:1366,height:768},
  {id:'bottle-line',kind:'filler',name:'bottle-filling-line',width:1366,height:768},
- {id:'sorting-line',kind:'roller-conveyor',name:'sorting-conveyor',width:1024,height:768},
+ {id:'sorting-line',kind:'belt-conveyor',name:'sorting-conveyor',width:1024,height:768},
 ];
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
