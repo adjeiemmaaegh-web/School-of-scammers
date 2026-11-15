@@ -114,7 +114,12 @@ const viewports=[
     await page.$eval(`[data-p5-pin="${plcId}.L+"]`,el=>el.click());
     await page.waitForFunction(()=>document.querySelectorAll('[data-p5-wire]').length===1,
       {timeout:10000});
-    assert.equal(await page.$$eval('.sandbox-wire-list>div',els=>els.length),1,
+    // Compact PC/tablet opens the dock collapsed: reveal it before checking
+    // the diagnostic wire list. The logical canvas itself already proves the
+    // worker accepted a real connection.
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
+    await page.waitForSelector('.sandbox-wire-list > div',{timeout:10000});
+    assert.equal(await page.$eval('.sandbox-wire-list>div',els=>els.length),1,
       'Wire command reached real worker and diagnostic list');
     await page.click('[data-p5-view="physical"]');
     await page.waitForFunction(()=>!!document.querySelector('.sandbox-three-canvas canvas')||
