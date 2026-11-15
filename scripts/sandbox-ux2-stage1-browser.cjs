@@ -181,6 +181,24 @@ const viewports=[
     assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+2),
       true,'Dock operations do not create outer-page scrolling');
     assert.deepEqual(uncaught,[],'No unhandled errors in UX2 browser route');
+
+    // Tablet touch alternative to HTML5 drag/drop: an illustrated device tile
+    // must create a genuine worker-owned device via a touch-generated click.
+    // Keep the responsive viewport desktop-style (isMobile:false).
+    await page.setViewport({width:1024,height:768,deviceScaleFactor:1,
+      isMobile:false,hasTouch:true});
+    await page.goto(base+'/sandbox',{waitUntil:'networkidle0'});
+    await page.waitForSelector('.ux2-equipment-tile');
+    await page.tap('.sandbox-toolbar button:first-child'); // New blank project
+    await page.tap('[data-p5-view="logical"]');
+    await page.tap('[data-p5-category="plc"]');
+    await page.tap('.ux2-equipment-tile');
+    await page.waitForFunction(()=>document.querySelectorAll('[data-p5-logical-device]').length===1,
+      {timeout:12000});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+2),
+      true,'Tablet touch placement retains no outer-page scrolling');
+    assert.deepEqual(uncaught,[],'No unhandled errors after touch-generated placement');
+    console.log('UX2 TABLET TOUCH PASS: virtual PLC tile tap -> actual worker device; no page scrolling');
     console.log('UX2 STAGE-ONE ACCEPTANCE PASS: PC/tablet layout, SVG tiles, worker placement, real wiring, dock');
     console.log('3D drop: '+(graphical3D?'executed':'unverified due to missing WebGL'));
   } finally { await browser.close(); }
