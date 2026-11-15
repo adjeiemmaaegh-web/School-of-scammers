@@ -135,7 +135,7 @@ export function frameEntireWorkcell(
 export function initialOrbitFraming(
  project:Pick<ProjectFile,'components'|'params'>,
 ):{target:[number,number,number];position:[number,number,number]}{
- if(project.components.length===0 || project.components.length>4)
+ if(project.components.length===0 || project.components.length>8)
   return {target:[0,0,0],position:[7,8.5,10]};
  return frameEntireWorkcell(project);
 }
