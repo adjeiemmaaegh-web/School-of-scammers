@@ -77,6 +77,24 @@ const targets=[
       'true','Program shortcut still selects corresponding workflow');
     assert.equal(await page.$eval('.p5-engineering-dock .p5-dock-heading button[aria-expanded]',
       e=>e.getAttribute('aria-expanded')),'true','Program expands real engineering dock');
+    // Panel controls resize the actual grid, persist outside project files
+    // and never introduce page-level scrolling.
+    await page.click('.p5-menu-bar details:nth-child(5) > summary');
+    await page.focus('[data-ux2-resize="library"]');
+    const oldSize=await page.$eval('[data-ux2-resize="library"]',el=>Number(el.value));
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(old=>Number(JSON.parse(localStorage.getItem('efo-ux2-layout-v1'))?.library)>old,
+      {timeout:5000},oldSize);
+    const adjusted=await page.evaluate(()=>({
+      library:document.querySelector('.sandbox-palette')?.getBoundingClientRect().width,
+      stored:JSON.parse(localStorage.getItem('efo-ux2-layout-v1')??'null')?.library,
+      height:document.documentElement.scrollHeight,
+    }));
+    assert.ok(adjusted.library>=oldSize+9,'Library resize updates real workspace grid');
+    assert.ok(adjusted.height<=innerHeight+2,'Resizing must not create page scroll');
+    await page.reload({waitUntil:'networkidle0'});
+    assert.equal(await page.$eval('[data-ux2-resize="library"]',el=>Number(el.value)),adjusted.stored,
+      'Panel layout persists across reload independent of project storage');
     assert.deepEqual(pageErrors,[],'No uncaught UI errors');
     console.log('UX2 STAGE2 ACCEPTANCE PASS: compact 2-row workspace commands, all five viewports, live controls');
   } finally {await browser.close();}
