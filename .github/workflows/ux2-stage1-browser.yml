@@ -11,6 +11,7 @@ on:
       - 'scripts/sandbox-ux2-stage2-browser.cjs'
       - 'scripts/sandbox-p7-3d-commissioning-browser.cjs'
       - 'scripts/sandbox-p12-multicase-browser.cjs'
+      - 'scripts/sandbox-p5-workspace-browser.cjs'
       - '.github/workflows/ux2-stage1-browser.yml'
   workflow_dispatch:
 permissions:
@@ -48,6 +49,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-3d-commissioning-browser.cjs
       - name: Regression - P12 factory challenge launch from clipped scene panel
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p12-multicase-browser.cjs
+      - name: Regression - P5 original equipment family, real wiring and dock workflows
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-workspace-browser.cjs
       - name: Upload geometries and viewport screenshots
         if: always()
         uses: actions/upload-artifact@v4
