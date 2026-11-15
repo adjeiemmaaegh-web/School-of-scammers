@@ -8,6 +8,8 @@ on:
       - 'src/ui/sandbox/EquipmentThumbnail.tsx'
       - 'scripts/sandbox-ux2-stage1-browser.cjs'
       - 'src/app/ux2-command-layout.css'
+      - 'src/app/ux4-canvas-focus.css'
+      - 'scripts/sandbox-ux4-canvas-focus-browser.cjs'
       - 'scripts/sandbox-ux2-stage2-browser.cjs'
       - 'scripts/sandbox-p7-3d-commissioning-browser.cjs'
       - 'scripts/sandbox-p12-multicase-browser.cjs'
@@ -46,6 +48,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux2-stage1-browser.cjs
       - name: Verify compact command panels at five PC and tablet resolutions
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux2-stage2-browser.cjs
+      - name: UX4 real-browser canvas focus at five viewports
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux4-canvas-focus-browser.cjs
       - name: Regression - 3D factory PLC16 commissioning and floor raycasts
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-3d-commissioning-browser.cjs
       - name: Regression - P12 factory challenge launch from clipped scene panel
@@ -62,6 +66,7 @@ jobs:
           path: |
             qa-artifacts/ux2-stage1/
             qa-artifacts/ux2-stage2/
+            qa-artifacts/ux4-canvas-focus/
           if-no-files-found: ignore
           retention-days: 7
       - name: Surface preview diagnostics when failed
