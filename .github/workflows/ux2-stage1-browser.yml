@@ -7,6 +7,7 @@ on:
       - 'src/app/ux2-workbench.css'
       - 'src/ui/sandbox/EquipmentThumbnail.tsx'
       - 'scripts/sandbox-ux2-stage1-browser.cjs'
+      - 'scripts/sandbox-p7-3d-commissioning-browser.cjs'
       - '.github/workflows/ux2-stage1-browser.yml'
   workflow_dispatch:
 permissions:
