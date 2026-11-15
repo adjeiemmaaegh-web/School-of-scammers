@@ -70,6 +70,11 @@ const reverseWireGuide = 'P4 forward/reverse (21 wires): supply P24 → breaker 
  */
 export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest } = {}) {
   // Resolved here, inside the lazy workbench chunk, so linking pages stay light.
+  // Coarse-pointer tablets use explicit tap-to-place rather than unreliable
+  // native HTML5 drag (which can consume synthesized touch clicks).
+  // Pointer-fine PCs retain genuine draggable equipment tiles.
+  const primaryTouch = typeof window !== 'undefined' &&
+    window.matchMedia('(pointer: coarse)').matches;
   const scenario = useMemo<ScenarioSession | undefined>(() => {
     const def = request ? getScenario(request.scenarioId) : undefined;
     if (!request || !def) return undefined;
@@ -767,7 +772,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <p className="sandbox-library-help">Drag an available device onto the 3D floor or 2D plan,
             or click to place it. The registry determines what really works. Pause to edit.</p>
           <div className="sandbox-palette-list">
-            {visibleKinds.map(kind => <button key={kind} draggable={editable}
+            {visibleKinds.map(kind => <button key={kind} draggable={editable && !primaryTouch}
               onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}
               onClick={() => place(kind)} disabled={!editable}
               title={`Place ${COMPONENTS[kind].label}. ${COMPONENTS[kind].help}`}
