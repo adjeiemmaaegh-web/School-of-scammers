@@ -337,6 +337,11 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
     {def.terminals.map(t => {
       const fullId = `${c.id}.${t.name}`;
       const selected = selectedTerminal === fullId;
+      // Gallery scenes contain many live PLC pins: keep the true terminal
+      // model and mapping, but display pins contextually after selecting the
+      // corresponding device. Hand-built P7 commissioning keeps its existing
+      // always-visible terminal targets for precision wiring acceptance.
+      const showTerminal = !galleryScene || selected || selected;
       const position: [number, number, number] = [t.side === 'left' ? -0.64 : 0.64, 0.35, (t.y - 65) / 120];
       return <group key={t.name} position={position}>
         <mesh onPointerDown={e => {
@@ -349,8 +354,9 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
             emissive={selected ? COLORS.highlight : '#000000'} emissiveIntensity={0.35} />
         </mesh>
         <Html position={[t.side === 'left' ? -0.14 : 0.14, 0.09, 0]} center distanceFactor={12}>
-          <button type="button" className={`sandbox-3d-terminal ${selected ? 'selected' : ''}`}
+          <button type="button" className={`sandbox-3d-terminal ${selected ? 'selected' : ''} ${showTerminal ? '' : 'ux3-hidden-terminal'}`}
             data-scene-terminal-id={fullId} disabled={!editable}
+            tabIndex={showTerminal ? 0 : -1} aria-hidden={!showTerminal}
             aria-label={`Connect ${fullId} in 3D`}
             onPointerDown={e => {
               e.stopPropagation();
