@@ -495,3 +495,9 @@
     line-height:1.15;
   }
 }
+
+@media (min-width:768px) and (max-width:899px) and (min-height:720px) {
+  .efo-ux2-shell .sandbox-palette .sandbox-rail-heading small {
+    display:none; /* device count is still available in the searchable list */
+  }
+}
