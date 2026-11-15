@@ -33,6 +33,12 @@ const sizes=[
    const before=await page.evaluate(()=>localStorage.getItem('efo-open-sandbox-project-v1'));
    await page.click('[data-efo-canvas-focus-toggle]');
    await page.waitForSelector('main.efo-workspace-focused');
+   // React Three Fiber updates its canvas on ResizeObserver; checking on the
+   // same layout tick would measure the stale pre-focus canvas dimensions.
+   await page.waitForFunction(()=>{
+     const r=document.querySelector('.sandbox-three-canvas canvas')?.getBoundingClientRect();
+     return !!r && r.width*r.height/(innerWidth*innerHeight)>=0.90;
+   },{timeout:8000}).catch(()=>{});
    const state=await page.evaluate(()=>{
     const box=sel=>{
       const n=document.querySelector(sel);
@@ -42,13 +48,16 @@ const sizes=[
     };
     const hidden=sel=>{
       const n=document.querySelector(sel);
-      return !n||getComputedStyle(n).display==='none';
+      return !n||!n.getClientRects().length||getComputedStyle(n).display==='none';
     };
     const canvas=box('.sandbox-three-canvas canvas');
     return {
       viewport:[innerWidth,innerHeight],
       main:box('main.efo-workspace-focused'),
       stage:box('.p5-layout'),
+      sandboxMain:box('.sandbox-main'),
+      physical:box('.p5-physical-stage'),
+      shell:box('.sandbox-3d-shell'),
       canvas,
       canvasRatio:canvas?canvas.w*canvas.h/(innerWidth*innerHeight):0,
       mastheadHidden:hidden('.sandbox-masthead'),
