@@ -605,3 +605,49 @@
   padding:4px;
 }
 .efo-ux2-shell .p7-3d-authoring button {padding:4px 6px}
+
+/* UX3: the desktop simulator is a working application, not a marketing page.
+   The 60px "Design. Wire. Program. Run." masthead stole vertical canvas
+   room in every actual screenshot. Keep project/mode/save state visible
+   in a slim workstation strip rather than delete the project identity. */
+@media (min-width:768px) and (min-height:720px) {
+  .efo-ux2-shell .sandbox-masthead {
+    height:30px;
+    min-height:30px;
+    max-height:30px;
+    padding:0 4px;
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    box-sizing:border-box;
+  }
+  .efo-ux2-shell .sandbox-masthead > div:first-child {display:none}
+  .efo-ux2-shell .sandbox-project-meta {
+    flex-direction:row;
+    align-items:center;
+    gap:10px;
+    height:28px;
+    max-height:28px;
+    padding:2px 10px;
+    min-width:0;
+    max-width:100%;
+    border-radius:5px;
+    box-sizing:border-box;
+  }
+  .efo-ux2-shell .sandbox-project-meta .sandbox-work-status {
+    margin:0;
+    white-space:nowrap;
+    font-size:9px;
+  }
+  .efo-ux2-shell .sandbox-project-meta strong {
+    font-size:11px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:350px;
+  }
+  .efo-ux2-shell .sandbox-project-meta small {
+    font-size:9px;
+    white-space:nowrap;
+  }
+}
