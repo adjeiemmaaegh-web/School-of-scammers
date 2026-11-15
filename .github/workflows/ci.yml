@@ -112,6 +112,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-ux-acceptance.cjs
       - name: Integrated numeric PLC and P5 workspace - real wiring/view browser E2E
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p5-workspace-browser.cjs
+      - name: UX2 Stage 1 PC/tablet - viewport, illustrated drag/drop and real worker commands
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-ux2-stage1-browser.cjs
       - name: P2 PLC programming - real multi-rung timers and Structured Text E2E
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p2-browser-acceptance.cjs
       - name: P2 visual FBD - edit graph, compile, PLC-driven motor latch, stop and persistence

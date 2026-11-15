@@ -1,0 +1,69 @@
+name: UX2 Stage 1 - PC and Tablet Workbench
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/app/SandboxPage.tsx'
+      - 'src/app/ux2-workbench.css'
+      - 'src/ui/sandbox/EquipmentThumbnail.tsx'
+      - 'scripts/sandbox-ux2-stage1-browser.cjs'
+      - 'src/app/ux2-command-layout.css'
+      - 'scripts/sandbox-ux2-stage2-browser.cjs'
+      - 'scripts/sandbox-p7-3d-commissioning-browser.cjs'
+      - 'scripts/sandbox-p12-multicase-browser.cjs'
+      - 'scripts/sandbox-p5-workspace-browser.cjs'
+      - 'scripts/sandbox-p8-edit-plant-browser.cjs'
+      - '.github/workflows/ux2-stage1-browser.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ux2-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Restore deterministic dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck and compile the app
+        run: npm run build
+      - name: Install browser test runner
+        run: |
+          npm install --no-save --no-audit --no-fund puppeteer@24.31.0
+          npx puppeteer browsers install chrome
+      - name: Start Vite preview
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 > /tmp/ux2-preview.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:4173/ > /dev/null
+      - name: Validate fixed-screen PC and tablet workbench with real worker
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux2-stage1-browser.cjs
+      - name: Verify compact command panels at five PC and tablet resolutions
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux2-stage2-browser.cjs
+      - name: Regression - 3D factory PLC16 commissioning and floor raycasts
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-3d-commissioning-browser.cjs
+      - name: Regression - P12 factory challenge launch from clipped scene panel
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p12-multicase-browser.cjs
+      - name: Regression - P5 original equipment family, real wiring and dock workflows
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-workspace-browser.cjs
+      - name: Regression - P8 edit/undo/PLC promotion with fixed-page workbench
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p8-edit-plant-browser.cjs
+      - name: Upload geometries and viewport screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux2-pc-tablet-stage1-screenshots
+          path: |
+            qa-artifacts/ux2-stage1/
+            qa-artifacts/ux2-stage2/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Surface preview diagnostics when failed
+        if: failure()
+        run: tail -n 200 /tmp/ux2-preview.log || true

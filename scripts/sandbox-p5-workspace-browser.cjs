@@ -48,9 +48,26 @@ const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
     const palette=await page.$$eval('.sandbox-palette-item',els=>els.map(e=>e.textContent.trim()));
     assert.ok(palette.length>=2,'Controller models in family');
     assert.ok(palette.every(s=>/PLC/i.test(s)),'PLC family excludes unrelated devices');
+    await page.$eval('.sandbox-palette-item',el=>el.scrollIntoView({block:'center'}));
+    const hit=await page.$eval('.sandbox-palette-item',el=>{
+      const rect=el.getBoundingClientRect();
+      const front=document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2);
+      return {kind:el.textContent?.slice(0,100),hit:front?.tagName,
+        hitClass:front?.getAttribute('class'),onTile:el===front||el.contains(front),
+        frontHtml:front?.outerHTML?.slice(0,220)};
+    });
+    console.log('P5 UX2 FIRST-PLACEMENT HIT',JSON.stringify(hit));
     await page.click('.sandbox-palette-item');
     await page.waitForFunction(()=>document.querySelectorAll('[data-p5-logical-device]').length===1,
-      {timeout:15000});
+      {timeout:15000}).catch(async error=>{
+        const debug=await page.evaluate(()=>({
+          devices:document.querySelectorAll('[data-p5-logical-device]').length,
+          view:document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active'),
+          errors:[...document.querySelectorAll('[role="alert"]')].map(x=>x.textContent),
+          palette:document.querySelector('.sandbox-palette-item')?.textContent,
+        }));
+        throw new Error('P5 UX2 first placement unreachable: '+JSON.stringify({hit,debug,cause:String(error)}));
+      });
     let afterPlacement=await page.$eval('.sandbox-scene-stat',el=>el.textContent.trim());
     assert.notEqual(afterPlacement,countBefore,'Placement is a real project mutation');
     await page.click('[data-p5-category="all"]');

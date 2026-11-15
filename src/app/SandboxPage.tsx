@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, isPlcKind, type ComponentKind } from '../components/registry';
 import { IoMappingPanel } from '../ui/sandbox/IoMappingPanel';
@@ -6,6 +6,7 @@ import { LogicalWiringCanvas } from '../ui/sandbox/LogicalWiringCanvas';
 import { WorkspaceAuthoringBar } from '../ui/sandbox/WorkspaceAuthoringBar';
 import { WorkspaceSelectionPanel } from '../ui/sandbox/WorkspaceSelectionPanel';
 import { AssemblyLibrary } from '../ui/sandbox/AssemblyLibrary';
+import { EquipmentThumbnail } from '../ui/sandbox/EquipmentThumbnail';
 import { makeFragment } from '../workspace/clipboard';
 import { recordChange, emptyHistory, undoHistory, redoHistory } from '../workspace/history';
 import { workspaceShortcut } from '../workspace/keyboard';
@@ -33,9 +34,28 @@ import { validateProject } from '../sim/orchestrator';
 import { readSandboxProject, persistSandboxProject, sandboxRecoveryKey } from '../platform/sandbox-project-storage';
 import './sandbox.css';
 import './p5-workspace.css';
+import './ux2-workbench.css';
+import './ux2-command-layout.css';
 
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
+const UX2_LAYOUT_KEY = 'efo-ux2-layout-v1';
+type UiPanelSizes = {library:number;inspector:number;dock:number};
+const defaultPanelSizes:UiPanelSizes = {library:228,inspector:238,dock:205};
+const panelSize = (value:unknown,fallback:number,min:number,max:number) =>
+  typeof value==='number'&&Number.isFinite(value) ? Math.min(max,Math.max(min,value)) : fallback;
+const initialPanelSizes = ():UiPanelSizes => {
+  if(typeof window==='undefined')return defaultPanelSizes;
+  try {
+    const stored=JSON.parse(window.localStorage.getItem(UX2_LAYOUT_KEY)??'null') as Partial<UiPanelSizes>|null;
+    if(!stored||typeof stored!=='object')return defaultPanelSizes;
+    return {
+      library:panelSize(stored.library,228,160,320),
+      inspector:panelSize(stored.inspector,238,190,350),
+      dock:panelSize(stored.dock,205,125,390),
+    };
+  }catch{return defaultPanelSizes;}
+};
 const CANVAS_W = 1080, CANVAS_H = 580, BOX_W = 170;
 const wireGuide = 'Supply P24 → PLC L+, START A, STOP A, contactor 13. Supply M0 → PLC M, contactor A2, motor M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → contactor A1; contactor 14 → motor L+.';
 const twoPanelWireGuide = 'Each panel is wired like the single starter, from its own supply: P24 → PLC L+, START A, STOP A, contactor 13; M0 → PLC M, contactor A2, motor M-; START B → I0.0; STOP B → I0.1; PLC Q0.0 → contactor A1; contactor 14 → motor L+. Panel 2 uses supply-2, plc-2, start-2, stop-2, contactor-2 and motor-2. To make one panel depend on another, tie the two supplies\' M0 terminals together (a shared common) and wire one PLC\'s output (for example plc-1 Q0.0) to the other PLC\'s input (plc-2 I0.0). Without a shared common, two supplies are isolated and no signal can cross. Select a PLC (click it, or use its tab above the editor) to program it separately.';
@@ -50,6 +70,11 @@ const reverseWireGuide = 'P4 forward/reverse (21 wires): supply P24 → breaker 
  */
 export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest } = {}) {
   // Resolved here, inside the lazy workbench chunk, so linking pages stay light.
+  // Coarse-pointer tablets use explicit tap-to-place rather than unreliable
+  // native HTML5 drag (which can consume synthesized touch clicks).
+  // Pointer-fine PCs retain genuine draggable equipment tiles.
+  const primaryTouch = typeof window !== 'undefined' &&
+    window.matchMedia('(pointer: coarse)').matches;
   const scenario = useMemo<ScenarioSession | undefined>(() => {
     const def = request ? getScenario(request.scenarioId) : undefined;
     if (!request || !def) return undefined;
@@ -82,10 +107,22 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [libraryFamily,setLibraryFamily] = useState<DeviceFamily>('all');
   const [workspaceView,setWorkspaceView] = useState<'physical'|'logical'|'plan'>('physical');
   const [libraryExpanded,setLibraryExpanded] = useState(true);
-  const [inspectorExpanded,setInspectorExpanded] = useState(true);
-  const [dockExpanded,setDockExpanded] = useState(true);
+  // Keep the factory visible on narrower PC/tablet screens; Inspector remains one tap away.
+  const [inspectorExpanded,setInspectorExpanded] = useState(() =>
+    !!scenario || typeof window === 'undefined' || window.innerWidth >= 1100);
+  // UX2 gives 1280px-class laptops/tablets priority to the factory viewport.
+  // Full desktop and scenario flows retain their previous expanded defaults.
+  const [dockExpanded,setDockExpanded] = useState(() =>
+    !!scenario || typeof window === 'undefined' || window.innerWidth >= 1400 || window.innerHeight < 720);
   const [dockFocus,setDockFocus] = useState<'program'|'diagnostics'>('program');
   const [workspaceHelp,setWorkspaceHelp] = useState(false);
+  // These affect layout only; they never enter a saved PLC project.
+  const [panelSizes,setPanelSizes] = useState<UiPanelSizes>(initialPanelSizes);
+  useEffect(()=>{
+    if(scenario)return;
+    try{window.localStorage.setItem(UX2_LAYOUT_KEY,JSON.stringify(panelSizes));}
+    catch{/* restrictive storage environments keep in-memory panel sizing */}
+  },[panelSizes,scenario]);
   const [activeStage, setActiveStage] = useState<'build' | 'wire' | 'program' | 'test'>('build');
   const [localSave, setLocalSave] = useState<'pending' | 'saved' | 'failed'>('pending');
   const [storageReady, setStorageReady] = useState(false);
@@ -273,7 +310,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       setDockExpanded(true);
       setDockFocus(stage==='program'?'program':'diagnostics');
     }
-    document.getElementById(`sandbox-stage-${stage}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // UX2 open workbench keeps the page fixed; workflow modes switch active panels.
+    // Retain legacy scroll navigation for scenario/assessment sessions until migration.
+    if (scenario) document.getElementById(`sandbox-stage-${stage}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const uniqueId = (prefix: string): string => {
     let id = '';
@@ -536,12 +575,17 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   });
   return <>
     <AppHeader />
-    <main id="main" className="sandbox-page sandbox-ux p5-organized wrap wrap-wide"
-      data-p5-workspace="organized">
+    <main id="main" className={`sandbox-page sandbox-ux p5-organized wrap wrap-wide${scenario ? '' : ' efo-ux2-shell'}`}
+      data-p5-workspace="organized" data-ux2-workbench={scenario ? undefined : 'pc-tablet'}
+      style={scenario ? undefined : {
+        '--ux2-palette-size': `${panelSizes.library}px`,
+        '--ux2-inspector-size': `${panelSizes.inspector}px`,
+        '--ux2-dock-size': `${panelSizes.dock}px`,
+      } as CSSProperties}>
       <header className="sandbox-masthead">
         <div>
           <p className="sandbox-breadcrumb"><Link to="/">Skills Lab</Link><span>/</span> {scenario ? 'Scenario' : 'Simulator'} <span>/</span> {scenario ? scenario.def.title : 'Open workspace'}</p>
-          <span className="eyebrow">{scenario ? 'Scenario workbench · same simulator as the open sandbox' : '3D engineering workbench · UX preview'}</span>
+          <span className="eyebrow">{scenario ? 'Scenario workbench · same simulator as the open sandbox' : 'Industrial automation engineering workbench'}</span>
           <h1>Design. Wire. Program. Run.</h1>
           <p className="sandbox-masthead-lede">{scenario ? 'Build, wire, program, run and troubleshoot on the real simulator. The result is graded by what your circuit does.' : 'Create an industrial control circuit in 3D, program its PLC, and see exactly what your logic does.'}</p>
         </div>
@@ -553,7 +597,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             project?.components.some(c => c.kind === 'breaker') ? 'Untitled protected 24V DOL panel' :
             project?.components.some(c => c.kind === 'tank') ? 'Untitled tank process project' :
             project?.components.some(c => c.kind === 'conveyor') ?
-            'Untitled conveyor sorting project' : 'Untitled motor-control project'}</strong>
+            'Untitled conveyor sorting project' : 'Untitled automation project'}</strong>
           <small>{localSave === 'saved' ? 'Saved in this browser' :
             localSave === 'failed' ? 'Not saved — export your JSON' : 'Loading local project'}</small>
         </div>
@@ -592,10 +636,26 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <button type="button" onClick={()=>{setWorkspaceView('logical');setActiveStage('wire');}}>Open terminal wiring</button>
           <button type="button" onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);}}>Open virtual instruments</button>
           <button type="button" onClick={()=>{setDockFocus('program');setDockExpanded(true);}}>Open PLC programming</button>
+          {!scenario&&<div className="ux2-panel-settings" role="group" aria-label="Resize workbench panels">
+            <label>Component library width <output>{panelSizes.library}px</output>
+              <input type="range" min="160" max="320" step="10" data-ux2-resize="library"
+                value={panelSizes.library} onChange={e=>setPanelSizes(v=>({...v,library:Number(e.target.value)}))}/>
+            </label>
+            <label>Inspector width <output>{panelSizes.inspector}px</output>
+              <input type="range" min="190" max="350" step="10" data-ux2-resize="inspector"
+                value={panelSizes.inspector} onChange={e=>setPanelSizes(v=>({...v,inspector:Number(e.target.value)}))}/>
+            </label>
+            <label>Engineering dock height <output>{panelSizes.dock}px</output>
+              <input type="range" min="125" max="390" step="5" data-ux2-resize="dock"
+                value={panelSizes.dock} onChange={e=>setPanelSizes(v=>({...v,dock:Number(e.target.value)}))}/>
+            </label>
+            <button type="button" onClick={()=>setPanelSizes(defaultPanelSizes)}>Reset panel sizes</button>
+          </div>}
         </div></details>
         <details><summary>Help</summary><div className="p5-menu-content">
           <button type="button" onClick={()=>setWorkspaceHelp(v=>!v)}>Toggle workspace instructions</button>
           <span>Alt+1 logical · Alt+2 3D · Alt+3 plan · Ctrl+S export · Esc cancel</span>
+          <span>Educational model only: no real PLC firmware, certified electrical protection, safety-rated E-stop, or field hardware equivalence.</span>
         </div></details>
       </nav>
       {workspaceHelp&&<aside className="p5-help" aria-label="Workspace instructions">
@@ -603,6 +663,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         edit the selected PLC program, then Run or Step. Both views share one project and one
         authoritative worker. Values are illustrative educational simulations, not field ratings.
       </aside>}
+      <div className="ux2-command-stack">
       <nav className="sandbox-workflow" aria-label="Sandbox workflow shortcuts">
         {workflow.map((step, index) => <button type="button" key={step.id}
           onClick={() => goToStage(step.id)} aria-pressed={activeStage === step.id}
@@ -676,7 +737,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <button type="button" disabled={!editable} onClick={()=>{setWorkspaceView('logical');setActiveStage('wire');}}>
             Wire terminals</button>
           <button type="button" onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);
-            document.getElementById('sandbox-stage-test')?.scrollIntoView({block:'nearest'});}}>
+            if (scenario) document.getElementById('sandbox-stage-test')?.scrollIntoView({block:'nearest'});}}>
             Measure / diagnose</button>
         </div>
         <div className="p5-panel-toggles" role="group" aria-label="Workspace panels">
@@ -688,6 +749,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             onClick={()=>setDockExpanded(v=>!v)}>Dock</button>
         </div>
       </div>
+      </div>{/* UX2 command stack; legacy/scenario uses display:contents */}
       {(clientError || snapshot?.lastError) && <div role="alert" className="sandbox-alert">{clientError || snapshot?.lastError}</div>}
       {scenario && <ScenarioPanel session={scenario} project={project} evidence={evidence} result={result}
         onSubmit={submitScenario} onRestart={restartScenario} />}
@@ -710,11 +772,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <p className="sandbox-library-help">Drag an available device onto the 3D floor or 2D plan,
             or click to place it. The registry determines what really works. Pause to edit.</p>
           <div className="sandbox-palette-list">
-            {visibleKinds.map(kind => <button key={kind} draggable={editable}
+            {visibleKinds.map(kind => <button key={kind} draggable={editable && !primaryTouch}
               onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}
               onClick={() => place(kind)} disabled={!editable}
-              className="sandbox-palette-item">
-              <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
+              title={`Place ${COMPONENTS[kind].label}. ${COMPONENTS[kind].help}`}
+              className={`sandbox-palette-item${scenario ? '' : ' ux2-equipment-tile'}`}>
+              {!scenario ? <span className={`ux2-equipment-illustration kind-${kind}`} aria-hidden="true">
+                <EquipmentThumbnail kind={kind} />
+              </span> : <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
                 {kind === 'plc' ? 'PLC' : kind === 'plc16' ? '16/16' : kind === 'relay' ? 'RLY' : kind === 'timerelay' ? 'TDR' : kind === 'cylinder' ? 'CYL' : kind === 'stacklight' ? 'STK' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
                   kind === 'conveyor' ? 'BELT' : kind === 'photoeye' ? 'EYE' :
                   kind === 'diverter' ? 'DIV' : kind === 'tank' ? 'TANK' :
@@ -723,9 +788,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                   kind === 'overload' ? 'OL' : kind === 'reversebutton' ? 'REV' :
                   kind === 'forwardcontactor' ? 'KF' : kind === 'reversecontactor' ? 'KR' :
                   kind === 'revmotor' ? 'M↔' : kind === 'lamp' ? 'LED' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
-              </span>
-              <span><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
-              <span className="sandbox-add-device" aria-hidden="true">+</span>
+              </span>}
+              <span className={scenario ? undefined : 'ux2-equipment-name'}><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
+              <span className={`sandbox-add-device${scenario ? '' : ' ux2-add-device'}`} aria-hidden="true">+</span>
             </button>)}
             {!visibleKinds.length && <p className="sandbox-help" role="status">No devices match your search. Try “motor” or “PLC”.</p>}
           </div>
@@ -787,7 +852,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             onSelectDevice={id=>selectDevice(id)} onTerminal={connect} />
           <details id="sandbox-stage-wire" className="sandbox-patch panel p5-logical-stage" open>
             <summary>Component wiring &amp; keyboard controls · {project?.components.length ?? 0} devices</summary>
-            <p className="sandbox-help">These controls access the same terminals and states shown in the 3D workbench. Use them on phones, with a keyboard, or when WebGL is unavailable.</p>
+            <p className="sandbox-help">These controls access the same terminals and states shown in the 3D workbench. Use these keyboard-accessible terminal controls when the 3D view is unavailable or when precise wiring is easier without a mouse.</p>
             <div className="sandbox-device-list">
               {project?.components.map(c => {
                 const def = COMPONENTS[c.kind];
@@ -1060,7 +1125,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         {selectedTerminal&&<span>Wiring from <code>{selectedTerminal}</code></span>}
         {(clientError||snapshot?.lastError)&&<span className="p5-status-warning">Action error — inspect message above</span>}
       </div>
-      <section className="p5-engineering-dock" data-p5-dock={dockFocus}>
+      <section className={`p5-engineering-dock${dockExpanded ? '' : ' ux2-dock-collapsed'}`} data-p5-dock={dockFocus}>
         <header className="p5-dock-heading">
           <strong>Engineering dock</strong>
           <div role="group" aria-label="Dock panels">

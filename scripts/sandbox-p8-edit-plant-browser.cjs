@@ -63,8 +63,29 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await toggle('start-1');
     await sleep(600);
     assert.equal(await statusNow('motor-1'), 'RUNNING', 'The template program latches');
-    // The sticky toolbar must stay clickable after scrolling (it once slid behind the sticky app header).
-    assert.ok(await page.evaluate(() => scrollY) > 100, 'The page scrolled when a device button was pressed');
+    // The classic layout originally scrolled the entire page when an operator
+    // clicked a deep device. UX2 desktop/tablet intentionally retains a fixed
+    // outer workbench and confines overflow to internal panes instead.
+    // Accept only the behavior of the active layout; keep subsequent checks
+    // proving every toolbar action remains unobstructed and clickable.
+    const scrollEvidence=await page.evaluate(()=>({
+      ux2:!!document.querySelector('[data-ux2-workbench="pc-tablet"]')&&
+        innerWidth>=768&&innerHeight>=720,
+      pageY:scrollY,
+      pageHeight:document.documentElement.scrollHeight,
+      viewportHeight:innerHeight,
+      sandboxOverflow:getComputedStyle(document.querySelector('.sandbox-main')).overflowY,
+    }));
+    if(scrollEvidence.ux2){
+      assert.ok(scrollEvidence.pageY<=1&&
+        scrollEvidence.pageHeight<=scrollEvidence.viewportHeight+2,
+        'UX2 should keep the outer page fixed after operating a device: '+JSON.stringify(scrollEvidence));
+      assert.equal(scrollEvidence.sandboxOverflow,'auto',
+        'UX2 must retain internal workspace scrolling for secondary panels');
+    }else{
+      assert.ok(scrollEvidence.pageY>100,
+        'Classic layout should preserve scroll-to-device behavior: '+JSON.stringify(scrollEvidence));
+    }
     assert.equal(await page.evaluate(() => {
       const hidden = [...document.querySelectorAll('.sandbox-toolbar button')].filter(b => !b.closest('details:not([open])')).filter(b => {
         const r = b.getBoundingClientRect();
