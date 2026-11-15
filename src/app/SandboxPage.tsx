@@ -87,7 +87,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   // Keep the factory visible on narrower PC/tablet screens; Inspector remains one tap away.
   const [inspectorExpanded,setInspectorExpanded] = useState(() =>
     !!scenario || typeof window === 'undefined' || window.innerWidth >= 1100);
-  const [dockExpanded,setDockExpanded] = useState(true);
+  // UX2 gives 1280px-class laptops/tablets priority to the factory viewport.
+  // Full desktop and scenario flows retain their previous expanded defaults.
+  const [dockExpanded,setDockExpanded] = useState(() =>
+    !!scenario || typeof window === 'undefined' || window.innerWidth >= 1400);
   const [dockFocus,setDockFocus] = useState<'program'|'diagnostics'>('program');
   const [workspaceHelp,setWorkspaceHelp] = useState(false);
   const [activeStage, setActiveStage] = useState<'build' | 'wire' | 'program' | 'test'>('build');
