@@ -88,7 +88,9 @@ const wires=[
     const target=document.elementFromPoint(x,y);
     const container=el.closest('.sandbox-main');
     return {x,y,box:{top:box.top,bottom:box.bottom,height:box.height},hitTag:target?.tagName,
-      hitClass:target?.getAttribute('class'),sameButton:el===target||el.contains(target),
+      hitClass:target?.getAttribute('class'),hitOuter:target?.outerHTML?.slice(0,400),
+      hitAncestors:(()=>{let e=target;return Array.from({length:5},()=>{if(!e)return null;const t=e.tagName+'#'+e.id+'.'+(e.className?.baseVal??e.className);e=e.parentElement;return t;});})(),
+      sameButton:el===target||el.contains(target),
       outerScrollHeight:document.documentElement.scrollHeight,scrollTop:container?.scrollTop,
       mainRect:container?.getBoundingClientRect().toJSON()};
   });
