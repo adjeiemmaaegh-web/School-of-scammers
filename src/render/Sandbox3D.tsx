@@ -270,6 +270,13 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   const def = COMPONENTS[c.kind];
   const plant = Boolean(PLANT_EQUIPMENT[c.kind]);
   const footprint = plant ? footprintOf(c, project.params) : null;
+  const galleryScene=project.components.some(item=>item.id.startsWith('scene-'));
+  // Large, hand-built commissioning projects retain their original 3D drag
+  // labels: the legacy precision drag acceptance requires a real >=20px hit
+  // target. Original gallery scenes receive compact camera-scaled tags so
+  // they never obscure the physical machine being inspected.
+  const compact=!selected&&project.components.length>2&&
+    (project.components.length<=8||galleryScene);
   // P3 equipment uses the real worker-owned 3D shapes, not duplicated large
   // placeholder housings. Its outline is only a selection/drag affordance.
   return <group position={[x, y, z]} rotation={[0, -(c.yawDeg ?? 0) * Math.PI / 180, 0]}>
@@ -293,15 +300,15 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
         tankLevelMl={c.kind === 'tank' ? tankLevelMl : undefined}
         rod={c.kind === 'cylinder' ? rod : undefined} lamps={c.kind === 'stacklight' ? lamps : undefined} />
     </group>}
-    <Html position={[0, selected ? 1.22 : plant ? .66 : 1.08, 0]} center
-      distanceFactor={selected || project.components.length<=2 ? 11 : 8}>
-      <div className={`sandbox-3d-label ${selected || project.components.length<=2 ? 'ux3-selected-label' : 'ux3-compact-label'}`} data-3d-drag-handle={c.id}
+    <Html position={[0, compact ? (plant ? .66 : 1.08) : 1.22, 0]} center
+      distanceFactor={compact ? 3.8 : 11}>
+      <div className={`sandbox-3d-label ${compact ? 'ux3-compact-label' : 'ux3-selected-label'}`} data-3d-drag-handle={c.id}
         title="Select the machine; drag this 3D-anchored label to reposition it while paused"
         onPointerDown={event=>{
           if((event.target as HTMLElement).closest('button'))return;
           onLabelPress(event,c.id);
         }}>
-        <strong>{selected ? def.label : c.id}</strong>
+        <strong>{compact ? c.id : def.label}</strong>
         <small>{c.kind === 'revmotor' ? (direction ?? 'stopped').toUpperCase() :
           c.kind === 'forwardcontactor' || c.kind === 'reversecontactor' ? (active ? 'CLOSED' : 'OPEN') :
           c.kind === 'motor' ? (active ? 'RUNNING' : 'STOPPED') :
