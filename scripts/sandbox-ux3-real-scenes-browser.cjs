@@ -45,6 +45,22 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
       const project=raw?JSON.parse(raw):null;
       return project?.components?.some(c=>c.kind===kind);
    },{timeout:25000},t.kind);
+   const ui=await page.evaluate(()=>({
+      mode:document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active'),
+      shell:!!document.querySelector('.sandbox-3d-shell'),
+      three:!!document.querySelector('.sandbox-three-canvas canvas'),
+      project:document.querySelector('.sandbox-project-meta')?.textContent?.slice(0,250),
+      alerts:[...document.querySelectorAll('[role="alert"]')].map(el=>el.textContent?.slice(0,200)),
+      root:document.querySelector('main')?.className,
+   }));
+   console.log('UX3 POST-SCENE UI',t.name,JSON.stringify({ui,pageErrors:errors.slice(-6)}));
+   if(ui.mode!=='physical'){
+     await page.click('[data-p5-view="physical"]');
+   }
+   await page.waitForSelector('.sandbox-3d-shell',{timeout:12000}).catch(async err=>{
+     throw new Error('3D shell did not render after worker scene: '+JSON.stringify(ui)+
+       '; pageErrors='+JSON.stringify(errors)+'; '+String(err));
+   });
    await page.$eval('.sandbox-3d-shell',el=>el.scrollIntoView({block:'start'}));
    await page.waitForSelector('[data-3d-fit-scene]',{visible:true,timeout:12000});
    await page.click('[data-3d-fit-scene]');
