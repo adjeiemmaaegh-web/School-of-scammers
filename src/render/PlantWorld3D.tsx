@@ -153,7 +153,7 @@ function Drawing({drawing,kind,progress=0}:{drawing:EquipmentDrawing;kind:string
       {drawing.shape==='box'?<boxGeometry args={[len,height,depth]}/>:
        <cylinderGeometry args={[len/2,len/2,height,20]}/>}
       <meshStandardMaterial color={drawing.colour} metalness={.25} roughness={.6}/>
-   </mesh>
+   </mesh>}
  </group>;
 }
 /** This volume is projected from the *same* sensor-zone descriptor read
