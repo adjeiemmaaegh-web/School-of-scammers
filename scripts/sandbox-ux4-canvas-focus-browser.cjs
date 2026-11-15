@@ -61,6 +61,7 @@ const sizes=[
       canvas,
       canvasRatio:canvas?canvas.w*canvas.h/(innerWidth*innerHeight):0,
       mastheadHidden:hidden('.sandbox-masthead'),
+      navHeaderHidden:hidden('.app-header'),
       toolbarHidden:hidden('.sandbox-toolbar'),
       paletteHidden:hidden('.sandbox-palette'),
       dockHidden:hidden('.p5-engineering-dock'),
@@ -75,7 +76,7 @@ const sizes=[
    assert.equal(state.restorePressed,'true');
    assert.ok(state.canvasRatio>=0.90,'3D canvas occupies <90% viewport at '+t.name+': '+JSON.stringify(state));
    assert.ok(Math.abs(state.main.w-t.w)<=2&&Math.abs(state.main.h-t.h)<=2,'Full content viewport required');
-   assert.ok(state.mastheadHidden&&state.toolbarHidden&&state.paletteHidden&&state.dockHidden&&state.inspectorHidden,
+   assert.ok(state.mastheadHidden&&state.navHeaderHidden&&state.toolbarHidden&&state.paletteHidden&&state.dockHidden&&state.inspectorHidden,
       'Persistent tool chrome must be hidden during canvas focus');
    assert.ok(state.scroll[0]<=t.w+2&&state.scroll[1]<=t.h+2,
       'Focus mode introduced document scroll at '+t.name);
