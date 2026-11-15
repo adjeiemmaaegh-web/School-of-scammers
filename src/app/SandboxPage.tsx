@@ -772,7 +772,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               onClick={() => place(kind)} disabled={!editable}
               title={`Place ${COMPONENTS[kind].label}. ${COMPONENTS[kind].help}`}
               className={`sandbox-palette-item${scenario ? '' : ' ux2-equipment-tile'}`}>
-              {!scenario ? <span className="ux2-equipment-illustration" aria-hidden="true">
+              {!scenario ? <span className={`ux2-equipment-illustration kind-${kind}`} aria-hidden="true">
                 <EquipmentThumbnail kind={kind} />
               </span> : <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
                 {kind === 'plc' ? 'PLC' : kind === 'plc16' ? '16/16' : kind === 'relay' ? 'RLY' : kind === 'timerelay' ? 'TDR' : kind === 'cylinder' ? 'CYL' : kind === 'stacklight' ? 'STK' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
