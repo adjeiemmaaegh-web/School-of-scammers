@@ -50,6 +50,13 @@ const targets=[
           assemblies:rect('.ux2-command-stack > .sandbox-assembly-library'),
           runReachable:reachable,
           runRect:runRect?{left:runRect.left,right:runRect.right,top:runRect.top,bottom:runRect.bottom}:null,
+          toolButtonVisibility:[...document.querySelectorAll('.ux2-command-stack > .p5-view-tools button')].map(el=>{
+            const r=el.getBoundingClientRect();
+            const top=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+            return {text:el.textContent?.trim(),visible:r.width>10&&r.height>10&&
+              r.left>=-1&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1&&
+              !!top&&(el===top||el.contains(top))};
+          }),
         };
       });
       console.log('UX2 STAGE2',t.name,JSON.stringify(state));
@@ -59,6 +66,10 @@ const targets=[
       assert.ok(state.doc[0]<=t.w+2&&state.doc[1]<=t.h+2,
         'Document scroll/overflow at '+t.name+': '+JSON.stringify(state));
       assert.ok(state.runReachable,'Run button not reachable at '+t.name+': '+JSON.stringify(state));
+      assert.ok(state.toolButtonVisibility.length>=8&&
+        state.toolButtonVisibility.every(item=>item.visible),
+        'All View, Wire, Library, Inspector and Dock buttons must fit and be clickable without scrolling at '+
+        t.name+': '+JSON.stringify(state.toolButtonVisibility));
       assert.ok(state.workflow&&state.views&&state.authoring&&state.assemblies,
         'Lost command surfaces at '+t.name);
       await page.screenshot({path:'qa-artifacts/ux2-stage2/'+t.name+'.png'});
