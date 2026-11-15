@@ -115,10 +115,11 @@ const ST = [
  try {
   await page.setViewport({width:1440,height:940,deviceScaleFactor:1});
   await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:30000});
-  // UX4 begins canvas-first. Open real dock before later wiring/ST assertions.
-  await page.click('.p5-dock-heading button[aria-expanded="false"]');
   await page.evaluate(()=>localStorage.clear());
   await page.reload({waitUntil:'networkidle0'});
+  // Reset/reload restores canvas-first defaults: open the real dock *after*
+  // reload so the terminal diagnostics and ST compiler remain mounted.
+  await page.click('.p5-dock-heading button[aria-expanded="false"]');
   await page.waitForSelector('[data-p7-place-kind]',{timeout:20000});
   await page.waitForSelector('.sandbox-three-canvas canvas');
   assert.equal(await page.$eval('[data-p5-view-active]',el=>el.getAttribute('data-p5-view-active')),'physical');
