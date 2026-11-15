@@ -11,7 +11,7 @@ import { OrbitControls } from '@react-three/drei';
 import { Vector3 } from 'three';
 import type { ProjectFile } from '../sim/signals';
 import {
-  advanceCamera, initialNavigationPose, sceneCameraObstacles,
+  advanceCamera, initialNavigationPose, initialOrbitFraming, sceneCameraObstacles,
   type CameraKeys, type CameraPose, type WorkcellCameraMode,
 } from './workcell-camera';
 
@@ -46,7 +46,8 @@ export function WorkcellCameraRig({mode,editableCamera,project,interest,onPose}:
     movingRight.current=false;
     reported.current=null;
     if(mode==='orbit'){
-      camera.position.set(7,8.5,10);
+      const framing=initialOrbitFraming(project);
+      camera.position.set(...framing.position);
       camera.lookAt(interest[0],interest[1],interest[2]);
     }else{
       const start=initialNavigationPose(mode);
