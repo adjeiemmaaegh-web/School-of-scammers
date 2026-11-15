@@ -9,6 +9,7 @@
  *  - reset (allowed in learning mode; disabled after submit in assessment)
  */
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { appendBoundedEvidence } from './evidence-log';
 import type {
   AttemptResult,
   EvidenceEvent,
@@ -41,29 +42,22 @@ export function useExercise<S, A>(
   seed = 1,
 ): ExerciseController<S, A> {
   const startRef = useRef<number>(Date.now());
-  const [state, setState] = useState<S>(() => def.init(seed));
-  const [evidence, setEvidence] = useState<EvidenceEvent[]>([]);
+  // Keep the simulation state and its evidence in one pure updater: React may replay
+  // state updaters during development. A nested state setter could double-log actions.
+  const [session, setSession] = useState<{ state: S; evidence: EvidenceEvent[] }>(() => ({
+    state: def.init(seed), evidence: [],
+  }));
+  const { state, evidence } = session;
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<AttemptResult | null>(null);
 
   const dispatch = useCallback(
     (action: A) => {
       if (submitted) return;
-      setState((prev) => {
-        const { next, event } = def.reduce(prev, action);
-        if (event) {
-          setEvidence((log) => [
-            ...log,
-            {
-              index: log.length + 1,
-              at: Date.now() - startRef.current,
-              action: event.action,
-              detail: event.detail,
-              accepted: event.accepted,
-            },
-          ]);
-        }
-        return next;
+      const elapsedMs = Math.max(0, Date.now() - startRef.current);
+      setSession((prev) => {
+        const { next, event } = def.reduce(prev.state, action);
+        return { state: next, evidence: appendBoundedEvidence(prev.evidence, event, elapsedMs) };
       });
     },
     [def, submitted],
@@ -105,8 +99,7 @@ export function useExercise<S, A>(
 
   const reset = useCallback(() => {
     startRef.current = Date.now();
-    setState(def.init(seed));
-    setEvidence([]);
+    setSession({ state: def.init(seed), evidence: [] });
     setSubmitted(false);
     setResult(null);
   }, [def, seed]);

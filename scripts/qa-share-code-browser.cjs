@@ -29,7 +29,7 @@ const code=value=>Buffer.from(JSON.stringify(value),'utf8').toString('base64url'
   console.log('QA CANDIDATE PASS: invalid assignment link rejected before learner assessment starts');
   const assignment=(seed)=>({kind:'skills-lab-assignment',
    formatVersion:1,trade:'plc',exerciseId:'plc-conveyor-start',
-   exerciseVersion:'1.0',mode:'assessment',seed,
+   exerciseVersion:'1.0.0',mode:'assessment',seed,
    createdAt:'2026-11-14T11:00:00.000Z'});
   await page.evaluate(hash=>{location.hash='#a='+hash;},code(assignment(42)));
   await page.waitForSelector('.exam-notes',{timeout:15000});

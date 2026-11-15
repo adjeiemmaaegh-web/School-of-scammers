@@ -1,6 +1,6 @@
 # EFO Skill Lab — Release Milestone 1 Integration and QA Register
 Date: 2026-11-15
-Status: IN PROGRESS — DRAFT SOURCE ONLY, NOT MERGED OR RELEASED
+Current status: PR #70 DEPLOYED; physical/commercial release acceptance INCOMPLETE. The M1 draft checklist below is historical.
 
 ## Baseline and scope
 - `main` at review: `4b43c77f14a3aa73a7d8df48f2f0aa05fc543b77` (2026-11-09).
@@ -40,3 +40,12 @@ Automated success on a development branch proves only that branch's software tes
 - **Budgets.** The old "sum of every chunk" limit left under 1% headroom. It is now 850 KiB and a new `sandboxRouteGzip` budget (entry + route chunk + 3D scene + renderer + simulation worker, 575 KiB, measured 521 KiB) guards what a learner downloads to open `/sandbox`.
 - **Docs.** The per-slice P6–P25 records moved to `archive/factory-slices/` behind `FACTORY_SLICES_INDEX.md`.
 - **Still open** (not claimed): physical 8 GB/no-GPU measurements, real-browser manual and accessibility passes, controls-engineer review, instructor/student trials, endurance runs, licensing clearance, project durability beyond the guarded autosave, and the two parallel plant representations (the data-driven `electrical-defs`/`params` devices and the `plant/equipment` library) which coexist through one registry but have not been unified.
+
+
+## Post-merge audit and remedial PR — 15 November 2026
+- PR #70 merged as `4e4d5538b30ea562e0bf249eecf6abab173c97cc` and the Vercel production build reached READY. This is not industrial certification or completed product release acceptance.
+- PRs #29–#41 were audited against that exact main tree. All of their changed source/test/script file paths survive; many evolved subsequently. Historical handoffs are archived in `archive/source-handoffs/` and must not be treated as current truth.
+- Alternative QA PRs #66 and #67 left unported browser checks and assessment safeguards. PR #71 addresses candidate assignment identity/version/mode, preservation of issued assignment on return, pure bounded evidence updates, strict deployed CSP, employer/candidate and PLC/CCTV browser regression checks, lockfile/credential QA and accurate docs.
+- PR #71 requires exact-final-head Linux/Windows Edge and repository QA passes, including CSP/Worker startup, share-code negatives and all twenty ranked exercise routes. A retried browser test is FLAKY, not a proven fix for timing sensitivity.
+- Offline assignment and result codes are **unsigned, editable local JSON**. They are training evidence only and cannot authenticate the candidate, certify skills or prove industrial safety.
+- Hardware, instructor, independent controls engineer, endurance, legal/provenance, 8GB Windows, physical PLC and manual-browser acceptance remain OPEN regardless of CI result.

@@ -18,6 +18,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Inventory complete source and security surface
         run: node scripts/qa-static-inventory.cjs
+      - name: Verify npm lockfile roots and detect high-confidence embedded credentials
+        run: node scripts/qa-lockfile-credential-check.cjs
       - name: Unit adversarial assessment/trade/persistence boundaries
         run: npx vitest run tests/qa-trust-boundaries.test.ts
       - name: Additional standalone factory acceptance and scan-debugger verification
@@ -33,6 +35,7 @@ jobs:
           name: plc-repository-qa-security
           path: |
             qa-artifacts/qa-static-inventory.json
+            qa-artifacts/qa-lockfile-credential-check.json
             qa-artifacts/npm-audit-production.json
             qa-artifacts/npm-audit-complete.json
             qa-artifacts/qa-advisory-summary.json

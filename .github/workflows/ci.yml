@@ -98,6 +98,12 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-p25-stuck-outfeed-retry-browser.cjs
       - name: QA untrusted share codes, prototype routes and malformed assessment results
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/qa-share-code-browser.cjs
+      - name: QA employer and candidate issued identity, version and returned evidence in Chromium
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/qa-candidate-employer-browser.cjs
+      - name: QA all 20 ranked PLC and CCTV exercise routes are genuinely playable
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/qa-cross-trade-browser.cjs
+      - name: QA CSP blocks inline script and allows 3D sandbox worker startup
+        run: node scripts/run-browser-step.cjs scripts/qa-csp-runtime-browser.cjs
       - name: P0 sandbox project startup hydration, damaged-backup recovery and stale-tab autosave protection
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-project-storage-browser.cjs
       - name: P6 visual workcell - build PLC conveyor/turntable line from empty 2D floor without WebGL
