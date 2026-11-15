@@ -119,7 +119,7 @@ const viewports=[
     // worker accepted a real connection.
     await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await page.waitForSelector('.sandbox-wire-list > div',{timeout:10000});
-    assert.equal(await page.$eval('.sandbox-wire-list>div',els=>els.length),1,
+    assert.equal(await page.$$eval('.sandbox-wire-list>div',els=>els.length),1,
       'Wire command reached real worker and diagnostic list');
     await page.click('[data-p5-view="physical"]');
     await page.waitForFunction(()=>!!document.querySelector('.sandbox-three-canvas canvas')||
