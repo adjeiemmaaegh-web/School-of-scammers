@@ -173,3 +173,32 @@
     max-height:31px;
   }
 }
+
+
+/* Portrait tablets: wrap canvas and panel tools into fully visible rows.
+   Hiding off-edge Inspector/Dock buttons would defeat a no-scroll
+   engineering workstation; moving them to a second compact line does not. */
+@media (min-width:768px) and (max-width:899px) and (min-height:720px) {
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools {
+    flex-wrap:wrap;
+    overflow:visible;
+    gap:2px 5px;
+    min-height:56px;
+    align-content:center;
+    justify-content:flex-start;
+    padding:3px 5px;
+  }
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools [role="group"] {
+    flex-wrap:nowrap;
+    min-width:0;
+    flex:0 1 auto;
+  }
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools button {
+    padding:3px 5px;
+    font-size:10px;
+    min-height:23px;
+  }
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools .p5-panel-toggles {
+    margin-left:0;
+  }
+}
