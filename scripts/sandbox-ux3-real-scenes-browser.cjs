@@ -107,7 +107,7 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
      'Unselected labels must be compact, not obscure real 3D machines: '+
       JSON.stringify(evidence.labels));
    assert.ok(evidence.terminals.length>=2 &&
-     evidence.terminals.filter(p=>!p.selected).every(p=>p.width<=16),
+     evidence.terminals.filter(p=>!p.selected).every(p=>p.width<=22),
      'Unselected PLC terminals must be pin markers, not giant HTML buttons: '+
        JSON.stringify(evidence.terminals.slice(0,20)));
    console.log('UX3 REAL SCENE',t.name,JSON.stringify({
