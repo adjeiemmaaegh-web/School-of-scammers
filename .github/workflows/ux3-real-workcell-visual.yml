@@ -8,6 +8,7 @@ on:
       - 'src/render/workcell-camera.ts'
       - 'src/render/WorkcellCameraRig.tsx'
       - 'src/render/Sandbox3D.tsx'
+      - 'src/app/ux2-workbench.css'
       - 'scripts/sandbox-ux3-real-scenes-browser.cjs'
       - '.github/workflows/ux3-real-workcell-visual.yml'
   workflow_dispatch:
