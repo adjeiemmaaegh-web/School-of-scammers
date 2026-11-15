@@ -293,8 +293,9 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
         tankLevelMl={c.kind === 'tank' ? tankLevelMl : undefined}
         rod={c.kind === 'cylinder' ? rod : undefined} lamps={c.kind === 'stacklight' ? lamps : undefined} />
     </group>}
-    <Html position={[0, selected ? 1.22 : plant ? .66 : 1.08, 0]} center distanceFactor={selected ? 11 : 8}>
-      <div className={`sandbox-3d-label ${selected ? 'ux3-selected-label' : 'ux3-compact-label'}`} data-3d-drag-handle={c.id}
+    <Html position={[0, selected ? 1.22 : plant ? .66 : 1.08, 0]} center
+      distanceFactor={selected || project.components.length<=2 ? 11 : 8}>
+      <div className={`sandbox-3d-label ${selected || project.components.length<=2 ? 'ux3-selected-label' : 'ux3-compact-label'}`} data-3d-drag-handle={c.id}
         title="Select the machine; drag this 3D-anchored label to reposition it while paused"
         onPointerDown={event=>{
           if((event.target as HTMLElement).closest('button'))return;
