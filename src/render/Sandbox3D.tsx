@@ -21,7 +21,7 @@ import { footprintOf } from '../workspace/floor-plan';
 import { clampPlacement } from '../workspace/geometry';
 import type { GridStep } from '../workspace/types';
 import { WorkcellCameraRig } from './WorkcellCameraRig';
-import { frameEntireWorkcell,initialNavigationPose,initialOrbitFraming, type CameraPose, type WorkcellCameraMode } from './workcell-camera';
+import { frameIndustrialPlant,initialNavigationPose,initialOrbitFraming, type CameraPose, type WorkcellCameraMode } from './workcell-camera';
 import {
   assess3DPlacement, placementMessage, previewDimensions,
   type PlacementAssessment,
@@ -434,13 +434,26 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, placeK
   const [interest,setInterest]=useState<[number,number,number]>(()=>initialOrbitFraming(project).target);
   useEffect(()=>{
     if(!fitRequest||mode!=='orbit')return;
-    const framing=frameEntireWorkcell(project);
+    const framing=frameIndustrialPlant(project);
     setInterest(framing.target);
     camera.position.set(...framing.position);
     camera.lookAt(...framing.target);
-  // Explicit user-triggered fit only: subsequent PLC scans, equipment motion
-  // and rerenders must not unexpectedly move the learner's 3D camera.
+  // Explicit fit respects existing worker-authored plant placements, not
+  // unrelated PLC terminal boxes. No PLC or physics state is changed.
   },[fitRequest]);
+  const previousCount=useRef(project.components.length);
+  useEffect(()=>{
+    const prior=previousCount.current;
+    previousCount.current=project.components.length;
+    if(mode!=='orbit'||prior!==0||project.components.length<3)return;
+    // A gallery scene or bulk project load arrives in one worker snapshot.
+    // Auto-fit ONCE at that transition. Individual user device placement,
+    // later scans and drag edits cannot hijack the camera.
+    const framing=frameIndustrialPlant(project);
+    setInterest(framing.target);
+    camera.position.set(...framing.position);
+    camera.lookAt(...framing.target);
+  },[project.components,mode]);
   const [drag,setDrag]=useState<DeviceDrag|null>(null);
   const currentDrag=useRef<DeviceDrag|null>(null);
   const poseCallback=useRef(onCameraPose);
