@@ -79,7 +79,25 @@ const wires=[
   // anything, even though Puppeteer reports a successful pointer click.
   await page.$eval('[data-p12-matrix]',el=>{el.open=true;});
   await page.waitForFunction(()=>document.querySelector('[data-p12-matrix]')?.open===true);
+  // Verify the action is really hittable in the desktop workbench, rather than
+  // silently clicking an overlay or summary after local panel scrolling.
+  const buttonHit=await page.$eval('[data-p12-run-matrix]',el=>{
+    el.scrollIntoView({block:'center',inline:'nearest'});
+    const box=el.getBoundingClientRect();
+    const x=box.left+box.width/2,y=box.top+box.height/2;
+    const target=document.elementFromPoint(x,y);
+    const container=el.closest('.sandbox-main');
+    return {x,y,box:{top:box.top,bottom:box.bottom,height:box.height},hitTag:target?.tagName,
+      hitClass:target?.getAttribute('class'),sameButton:el===target||el.contains(target),
+      outerScrollHeight:document.documentElement.scrollHeight,scrollTop:container?.scrollTop,
+      mainRect:container?.getBoundingClientRect().toJSON()};
+  });
+  console.log('P12 UX2 ACTION HIT',JSON.stringify(buttonHit));
   await page.click('[data-p12-run-matrix]');
+  console.log('P12 UX2 POST CLICK',JSON.stringify(await page.evaluate(()=>({
+    state:document.querySelector('[data-p12-matrix]')?.getAttribute('data-p12-state'),
+    pendingText:document.querySelector('[data-p12-run-matrix]')?.textContent,
+  }))));
   await awaitResult('passed');
   const checks=await page.$$eval('[data-p12-case]',es=>es.map(e=>({
    id:e.getAttribute('data-p12-case'),state:e.getAttribute('data-p12-case-state'),
