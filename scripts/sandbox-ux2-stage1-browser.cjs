@@ -51,6 +51,27 @@ const viewports=[
           canvas:boxes(canvas),outerOverflow:getComputedStyle(document.body).overflow,
           paletteTiles:document.querySelectorAll('.ux2-equipment-tile').length,
           thumbnailCount:document.querySelectorAll('.ux2-equipment-tile svg').length,
+          paletteDebug:(()=>{
+            const parent=document.querySelector('.sandbox-palette');
+            const list=document.querySelector('.sandbox-palette-list');
+            const heading=parent?.querySelector('.sandbox-rail-heading');
+            const search=parent?.querySelector('.sandbox-library-search');
+            const first=list?.querySelector('.ux2-equipment-tile');
+            const p=first?.getBoundingClientRect();
+            const layer=p?document.elementFromPoint(p.x+p.width/2,p.y+p.height/2):null;
+            const px=(el)=>{
+              const r=el?.getBoundingClientRect();
+              return r?{x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)}:null;
+            };
+            return {container:px(parent),heading:px(heading),search:px(search),
+              filter:px(parent?.querySelector('.p5-device-families')),
+              list:px(list),first:px(first),
+              parentScrollTop:parent?.scrollTop,listScrollTop:list?.scrollTop,
+              firstDisplay:first?getComputedStyle(first).display:null,
+              firstOpacity:first?getComputedStyle(first).opacity:null,
+              atCenter:layer?.tagName,
+              onTile:!!(first&&layer&&(first===layer||first.contains(layer)))};
+          })(),
           fullyVisibleTiles:(()=>{
             const list=document.querySelector('.sandbox-palette-list');
             if(!list)return 0;
