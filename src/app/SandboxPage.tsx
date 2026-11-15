@@ -35,6 +35,7 @@ import { readSandboxProject, persistSandboxProject, sandboxRecoveryKey } from '.
 import './sandbox.css';
 import './p5-workspace.css';
 import './ux2-workbench.css';
+import './ux2-command-layout.css';
 
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
@@ -613,6 +614,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         edit the selected PLC program, then Run or Step. Both views share one project and one
         authoritative worker. Values are illustrative educational simulations, not field ratings.
       </aside>}
+      <div className="ux2-command-stack">
       <nav className="sandbox-workflow" aria-label="Sandbox workflow shortcuts">
         {workflow.map((step, index) => <button type="button" key={step.id}
           onClick={() => goToStage(step.id)} aria-pressed={activeStage === step.id}
@@ -698,6 +700,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             onClick={()=>setDockExpanded(v=>!v)}>Dock</button>
         </div>
       </div>
+      </div>{/* UX2 command stack; legacy/scenario uses display:contents */}
       {(clientError || snapshot?.lastError) && <div role="alert" className="sandbox-alert">{clientError || snapshot?.lastError}</div>}
       {scenario && <ScenarioPanel session={scenario} project={project} evidence={evidence} result={result}
         onSubmit={submitScenario} onRestart={restartScenario} />}
