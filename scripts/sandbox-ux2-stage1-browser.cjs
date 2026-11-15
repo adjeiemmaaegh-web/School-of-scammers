@@ -18,8 +18,6 @@ const viewports=[
   {width:1024,height:768,name:'tablet-landscape'},
   {width:768,height:1024,name:'tablet-portrait'},
 ];
-const firstButtonWith=(items,text)=>items.find(el=>el.textContent?.includes(text));
-
 (async()=>{
   const browser=await puppeteer.launch({headless:true,args:[
     '--no-sandbox','--disable-setuid-sandbox','--enable-webgl',
@@ -113,6 +111,8 @@ const firstButtonWith=(items,text)=>items.find(el=>el.textContent?.includes(text
     assert.equal(await page.$$eval('.sandbox-wire-list>div',els=>els.length),1,
       'Wire command reached real worker and diagnostic list');
     await page.click('[data-p5-view="physical"]');
+    await page.waitForFunction(()=>!!document.querySelector('.sandbox-three-canvas canvas')||
+      !!document.querySelector('.sandbox-3d-fallback'),{timeout:15000});
     const render=await page.evaluate(()=>({
       canvas:!!document.querySelector('.sandbox-three-canvas canvas'),
       fallback:!!document.querySelector('.sandbox-3d-fallback'),
