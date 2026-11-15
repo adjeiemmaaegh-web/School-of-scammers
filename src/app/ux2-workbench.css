@@ -93,7 +93,7 @@
 .efo-ux2-shell .sandbox-library-help {display:none}
 .efo-ux2-shell .sandbox-palette-item.ux2-equipment-tile:disabled {cursor:not-allowed;opacity:.45}
 
-@media (min-width:768px) {
+@media (min-width:768px) and (min-height:720px) {
   body:has(.efo-ux2-shell) {overflow:hidden}
   main.efo-ux2-shell {
     display:flex;
@@ -316,7 +316,7 @@
   }
   .efo-ux2-shell .sandbox-disclaimer {display:none}
 }
-@media (min-width:768px) and (max-width:1099px) {
+@media (min-width:768px) and (min-height:720px) and (max-width:1099px) {
   .efo-ux2-shell .p5-layout,
   .efo-ux2-shell .p5-layout.p5-no-inspector {
     position:relative;
@@ -345,7 +345,7 @@
   .efo-ux2-shell .p5-engineering-dock[data-p5-dock="diagnostics"] .sandbox-program-dock {display:none}
   .efo-ux2-shell .sandbox-masthead .sandbox-project-meta {max-width:44%}
 }
-@media (min-width:768px) and (max-height:760px) {
+@media (min-width:768px) and (min-height:720px) and (max-height:760px) {
   .efo-ux2-shell .sandbox-masthead {padding:0;min-height:0}
   .efo-ux2-shell .p5-engineering-dock {flex-basis:clamp(126px,23vh,175px)}
   .efo-ux2-shell .sandbox-3d-shell {
