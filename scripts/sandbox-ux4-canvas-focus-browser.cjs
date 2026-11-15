@@ -107,6 +107,12 @@ const sizes=[
     await page.click('[data-p5-view="'+view+'"]');
     await page.click('[data-efo-canvas-focus-toggle]');
     await page.waitForSelector('main.efo-workspace-focused');
+    // Switching from 2D back to 3D mounts a fresh WebGL canvas. Wait for its
+    // ResizeObserver to claim the newly expanded viewport before measuring.
+    await page.waitForFunction(sel=>{
+      const r=document.querySelector(sel)?.getBoundingClientRect();
+      return !!r && r.height>=650;
+    },{timeout:8000},selector).catch(()=>{});
     const rect=await page.$eval(selector,el=>({display:getComputedStyle(el).display,h:el.getBoundingClientRect().height}));
     assert.notEqual(rect.display,'none','Workspace view unavailable in focus: '+view);
     assert.ok(rect.h>=650,'Workspace view too short in focus: '+view+' '+JSON.stringify(rect));
