@@ -35,6 +35,9 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   await page.evaluate(()=>localStorage.clear());
   await page.reload({waitUntil:'networkidle0'});
   await page.waitForSelector('.sandbox-three-canvas',{timeout:20000});
+  // The UX4 canvas-first desktop starts with Inspector collapsed. Reveal the
+  // actual coordinate editor before asserting worker-acknowledged positioning.
+  await page.click('.p5-panel-toggles button:nth-child(2)[aria-pressed="false"]');
   assert.equal(await page.$eval('[data-p5-view-active]',el=>el.getAttribute('data-p5-view-active')),'physical',
    'An industrial scene opens in 3D by default, not a 2D plan');
   assert.equal(await page.$eval('[data-3d-camera-mode="orbit"]',el=>el.getAttribute('aria-pressed')),'true');
