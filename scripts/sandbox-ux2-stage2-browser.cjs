@@ -91,7 +91,7 @@ const targets=[
       height:document.documentElement.scrollHeight,
     }));
     assert.ok(adjusted.library>=oldSize+9,'Library resize updates real workspace grid');
-    assert.ok(adjusted.height<=innerHeight+2,'Resizing must not create page scroll');
+    assert.ok(adjusted.height<=770,'Resizing must not create page scroll at the 1366×768 test viewport');
     await page.reload({waitUntil:'networkidle0'});
     assert.equal(await page.$eval('[data-ux2-resize="library"]',el=>Number(el.value)),adjusted.stored,
       'Panel layout persists across reload independent of project storage');
