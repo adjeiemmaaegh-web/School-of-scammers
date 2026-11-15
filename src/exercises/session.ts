@@ -27,5 +27,5 @@ export interface ScenarioSession extends Omit<ScenarioRequest, 'scenarioId'> {
 }
 
 /** Browser-local storage key for one attempt, so a reload resumes it. */
-export const scenarioStorageKey = (s: Pick<ScenarioSession, 'def' | 'mode' | 'seed'>): string =>
-  `efo-scenario-v1:${s.def.id}:${s.mode}:${s.seed}`;
+export const scenarioStorageKey = (s: Pick<ScenarioSession, 'def' | 'mode' | 'seed'> & Partial<Pick<ScenarioSession, 'assignment'>>): string =>
+  `efo-scenario-v1:${s.def.id}:${s.mode}:${s.seed}${s.assignment ? `:${s.assignment.createdAt}` : ''}`;

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { decodeAssignment, encodeResult } from '../platform/persistence';
+import { isIssuedAssessmentCompatible, preserveIssuedAssignment } from '../platform/assessment-integrity';
 import { getExercise } from '../trades/registry';
 import { getScenarioMeta } from '../exercises/meta';
 import type { ScenarioRequest } from '../exercises/session';
@@ -39,10 +40,11 @@ export function CandidatePage() {
   const exerciseDef = useMemo(() => (assignment ? getExercise(assignment.exerciseId) : undefined), [assignment]);
   const scenarioDef = useMemo(() => (assignment ? getScenarioMeta(assignment.exerciseId) : undefined), [assignment]);
   const def = exerciseDef ?? scenarioDef;
-  const session = useMemo<ScenarioRequest | null>(() => (assignment && scenarioDef ? {
+  const assignmentMatches = isIssuedAssessmentCompatible(assignment, def);
+  const session = useMemo<ScenarioRequest | null>(() => (assignmentMatches && assignment && scenarioDef ? {
     scenarioId: scenarioDef.id, mode: 'assessment', seed: assignment.seed, allowRestart: false, assignment,
-    resultActions: (result: AttemptResult) => <ReturnCode result={result} />,
-  } : null), [assignment, scenarioDef]);
+    resultActions: (result: AttemptResult) => <ReturnCode result={result} originalAssignment={assignment!} />,
+  } : null), [assignmentMatches, assignment, scenarioDef]);
 
   const loadManual = () => {
     try {
@@ -75,13 +77,13 @@ export function CandidatePage() {
     );
   }
 
-  if (!def) {
+  if (!assignmentMatches) {
     return (
       <>
         <AppHeader />
         <main id="main" className="wrap page narrow">
           <h1 className="page-title">This task isn't available</h1>
-          <p className="sub">The assignment refers to an exercise this version doesn't have (<code>{assignment.exerciseId}</code>).</p>
+          <p className="sub">The assigned exercise, trade, mode or version does not match this build (<code>{assignment.exerciseId}</code>, version {assignment.exerciseVersion}). Request a compatible assignment.</p>
           <Link className="btn ghost" to="/">← Home</Link>
         </main>
       </>
@@ -102,7 +104,7 @@ export function CandidatePage() {
             <p>{def.scenario}</p>
             <ul className="exam-notes">
               <li>This is an assessment — hints and solutions are withheld.</li>
-              <li>Every action you take is recorded as evidence.</li>
+              <li>Recent learner actions are recorded as local evidence (up to 400); no independent identity verification.</li>
               <li>When you submit, you'll get a result code to send back to your employer.</li>
               <li>Estimated time: ~{def.estMinutes} minutes.</li>
             </ul>
@@ -115,30 +117,32 @@ export function CandidatePage() {
 
   if (session) return <Suspense fallback={<main id="main" className="wrap wrap-wide page">
     <p role="status">Loading the 3D engineering workbench…</p></main>}>
-    <SandboxPage key={`${session.scenarioId}:${session.seed}`} scenario={session} /></Suspense>;
+    <SandboxPage key={`${session.scenarioId}:${session.seed}:${assignment.createdAt}`} scenario={session} /></Suspense>;
 
   return (
     <>
       <AppHeader />
       <main id="main" className="wrap wrap-wide page">
         <ExercisePlayer
+          key={`${assignment.exerciseId}:${assignment.exerciseVersion}:${assignment.seed}:${assignment.createdAt}`}
           def={exerciseDef!}
           initialMode="assessment"
           seed={assignment.seed}
           allowModeSwitch={false}
           allowReset={false}
-          resultActions={(result: AttemptResult) => <ReturnCode result={result} />}
+          resultActions={(result: AttemptResult) => <ReturnCode result={result} originalAssignment={assignment} />}
         />
       </main>
     </>
   );
 }
 
-function ReturnCode({ result }: { result: AttemptResult }) {
+function ReturnCode({ result, originalAssignment }: { result: AttemptResult; originalAssignment: Assignment }) {
+  const portableResult = preserveIssuedAssignment(result, originalAssignment);
   return (
     <div className="return-code">
-      <p className="muted small">Send this result code back to your employer:</p>
-      <CopyField label="Result code" value={encodeResult(result)} textarea />
+      <p className="muted small">Send this locally generated result code to your employer. Offline codes are unsigned and can be edited; they do not prove identity or certification.</p>
+      <CopyField label="Result code" value={encodeResult(portableResult)} textarea />
     </div>
   );
 }
