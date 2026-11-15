@@ -549,6 +549,11 @@
   background:#3b90aa;
   box-shadow:0 1px 3px #0006;
   overflow:hidden;
+  /* Physical Html perspective magnifies nearby terminals. Reducing the
+     unselected overlay screen footprint preserves pin identity and keeps
+     actual equipment visible. Focusing/hovering restores a readable label. */
+  transform:scale(.65);
+  transform-origin:50% 50%;
 }
 .sandbox-3d-terminal:hover,
 .sandbox-3d-terminal:focus-visible,
@@ -565,6 +570,7 @@
   overflow:visible;
   position:relative;
   z-index:20;
+  transform:scale(1);
 }
 .sandbox-3d-terminal.selected {
   color:#241500;
