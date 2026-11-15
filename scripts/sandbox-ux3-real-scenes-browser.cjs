@@ -83,6 +83,16 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
        viewport:[innerWidth,innerHeight],
        status:document.querySelector('.sandbox-3d-hud')?.textContent?.slice(0,220),
        mode:document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active'),
+       labels:[...document.querySelectorAll('.sandbox-3d-label')].map(el=>({
+         text:el.querySelector('strong')?.textContent,
+         compact:el.classList.contains('ux3-compact-label'),
+         width:Math.round(el.getBoundingClientRect().width),
+         height:Math.round(el.getBoundingClientRect().height),
+       })),
+       terminals:[...document.querySelectorAll('.sandbox-3d-terminal')].map(el=>({
+         width:Math.round(el.getBoundingClientRect().width),
+         selected:el.classList.contains('selected'),
+       })),
      };
    },t.kind);
    assert.ok(evidence.realWorkerScene,'Worker must own the selected scene: '+JSON.stringify(evidence));
@@ -91,7 +101,19 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
      'Factory viewport must remain useful: '+JSON.stringify(evidence));
    assert.ok(evidence.scroll[0]<=t.width+2&&evidence.scroll[1]<=t.height+2,
      'No outer-page scrolling: '+JSON.stringify(evidence));
-   console.log('UX3 REAL SCENE',t.name,JSON.stringify(evidence));
+   assert.ok(evidence.labels.length>=2 &&
+     evidence.labels.filter(l=>l.compact).length>=2 &&
+     evidence.labels.filter(l=>l.compact).every(l=>l.width<=110&&l.height<=32),
+     'Unselected labels must be compact, not obscure real 3D machines: '+
+      JSON.stringify(evidence.labels));
+   assert.ok(evidence.terminals.length>=2 &&
+     evidence.terminals.filter(p=>!p.selected).every(p=>p.width<=16),
+     'Unselected PLC terminals must be pin markers, not giant HTML buttons: '+
+       JSON.stringify(evidence.terminals.slice(0,20)));
+   console.log('UX3 REAL SCENE',t.name,JSON.stringify({
+     ...evidence,labels:evidence.labels.slice(0,15),
+     terminals:evidence.terminals.length,
+   }));
    await page.screenshot({path:dir+'/'+t.name+'-'+t.width+'x'+t.height+'.png'});
   }
   assert.deepEqual(errors,[],'Real WebGL scene and worker actions have no uncaught page errors');
