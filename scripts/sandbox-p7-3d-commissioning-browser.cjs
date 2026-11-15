@@ -115,6 +115,8 @@ const ST = [
  try {
   await page.setViewport({width:1440,height:940,deviceScaleFactor:1});
   await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:30000});
+  // UX4 begins canvas-first. Open real dock before later wiring/ST assertions.
+  await page.click('.p5-dock-heading button[aria-expanded="false"]');
   await page.evaluate(()=>localStorage.clear());
   await page.reload({waitUntil:'networkidle0'});
   await page.waitForSelector('[data-p7-place-kind]',{timeout:20000});
