@@ -580,7 +580,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       <header className="sandbox-masthead">
         <div>
           <p className="sandbox-breadcrumb"><Link to="/">Skills Lab</Link><span>/</span> {scenario ? 'Scenario' : 'Simulator'} <span>/</span> {scenario ? scenario.def.title : 'Open workspace'}</p>
-          <span className="eyebrow">{scenario ? 'Scenario workbench · same simulator as the open sandbox' : '3D engineering workbench · UX preview'}</span>
+          <span className="eyebrow">{scenario ? 'Scenario workbench · same simulator as the open sandbox' : 'Industrial automation engineering workbench'}</span>
           <h1>Design. Wire. Program. Run.</h1>
           <p className="sandbox-masthead-lede">{scenario ? 'Build, wire, program, run and troubleshoot on the real simulator. The result is graded by what your circuit does.' : 'Create an industrial control circuit in 3D, program its PLC, and see exactly what your logic does.'}</p>
         </div>
@@ -592,7 +592,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             project?.components.some(c => c.kind === 'breaker') ? 'Untitled protected 24V DOL panel' :
             project?.components.some(c => c.kind === 'tank') ? 'Untitled tank process project' :
             project?.components.some(c => c.kind === 'conveyor') ?
-            'Untitled conveyor sorting project' : 'Untitled motor-control project'}</strong>
+            'Untitled conveyor sorting project' : 'Untitled automation project'}</strong>
           <small>{localSave === 'saved' ? 'Saved in this browser' :
             localSave === 'failed' ? 'Not saved — export your JSON' : 'Loading local project'}</small>
         </div>
@@ -847,7 +847,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             onSelectDevice={id=>selectDevice(id)} onTerminal={connect} />
           <details id="sandbox-stage-wire" className="sandbox-patch panel p5-logical-stage" open>
             <summary>Component wiring &amp; keyboard controls · {project?.components.length ?? 0} devices</summary>
-            <p className="sandbox-help">These controls access the same terminals and states shown in the 3D workbench. Use them on phones, with a keyboard, or when WebGL is unavailable.</p>
+            <p className="sandbox-help">These controls access the same terminals and states shown in the 3D workbench. Use these keyboard-accessible terminal controls when the 3D view is unavailable or when precise wiring is easier without a mouse.</p>
             <div className="sandbox-device-list">
               {project?.components.map(c => {
                 const def = COMPONENTS[c.kind];
