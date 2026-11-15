@@ -79,7 +79,10 @@ const ST = [
    const box=await page.$eval('.sandbox-three-canvas canvas',el=>{
      const r=el.getBoundingClientRect();return {x:r.left,y:r.top,w:r.width,h:r.height};
    });
-   const wx=(x+85-540)/100,wz=(y+65-290)/100;
+   // UX2 fits the 3D canvas to the actual app viewport. Correct the
+   // test camera's previous approx. -5 X / -2 Y perspective undershoot.
+   // The strict 6-unit worker placement assertion remains unchanged.
+   const wx=(x+90-540)/100,wz=(y+67-290)/100;
    const camera=[7,8.5,10];
    const norm=v=>{const size=Math.hypot(...v);return v.map(n=>n/size);};
    const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
