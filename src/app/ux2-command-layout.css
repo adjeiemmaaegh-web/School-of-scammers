@@ -1,0 +1,175 @@
+/*
+ * UX2 Stage 2: arrange existing, tested controls into two compact desktop
+ * rows. This sheet only changes geometry: simulator and worker commands are
+ * intentionally left untouched. In legacy short windows and scenarios the
+ * wrapper is display:contents to preserve the previous DOM layout semantics.
+ */
+.ux2-command-stack { display:contents; }
+
+@media (min-width:768px) and (min-height:720px) {
+  .efo-ux2-shell .ux2-command-stack {
+    flex:0 0 auto;
+    display:grid;
+    grid-template-columns:minmax(265px,26%) minmax(300px,31%) minmax(0,1fr);
+    grid-template-areas:
+      "workflow toolbar toolbar"
+      "views views authoring"
+      "assembly assembly assembly";
+    align-items:stretch;
+    gap:3px;
+    width:100%;
+    min-width:0;
+    min-height:0;
+    position:relative;
+  }
+  .efo-ux2-shell .ux2-command-stack > .sandbox-workflow {
+    grid-area:workflow;
+    width:100%;
+    height:auto;
+    min-height:31px;
+    box-sizing:border-box;
+    align-self:stretch;
+    margin:0;
+    padding:1px;
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:2px;
+    overflow:hidden;
+    border-radius:6px;
+  }
+  .efo-ux2-shell .ux2-command-stack > .sandbox-workflow button {
+    justify-content:center;
+    padding:4px 3px;
+    min-width:0;
+    text-align:center;
+  }
+  .efo-ux2-shell .ux2-command-stack > .sandbox-workflow button > span:nth-child(2){
+    min-width:0;
+    display:block;
+  }
+  .efo-ux2-shell .ux2-command-stack > .sandbox-workflow strong{font-size:11px}
+  .efo-ux2-shell .ux2-command-stack > .sandbox-workflow .sandbox-workflow-count,
+  .efo-ux2-shell .ux2-command-stack > .sandbox-workflow .sandbox-workflow-number,
+  .efo-ux2-shell .ux2-command-stack > .sandbox-workflow small {display:none}
+  .efo-ux2-shell .ux2-command-stack > .sandbox-toolbar {
+    grid-area:toolbar;
+    min-width:0;
+    max-width:100%;
+    width:100%;
+    box-sizing:border-box;
+    position:relative;
+    top:auto;
+    z-index:10;
+    align-self:stretch;
+    gap:4px;
+    margin:0;
+    padding:2px 5px;
+    border-radius:6px;
+    box-shadow:none;
+  }
+  .efo-ux2-shell .ux2-command-stack > .sandbox-toolbar .btn{
+    font-size:11px;
+    line-height:1.1;
+    padding:5px 7px;
+    min-height:27px;
+  }
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools {
+    grid-area:views;
+    min-width:0;
+    width:100%;
+    box-sizing:border-box;
+    padding:2px 6px;
+    border-radius:6px;
+    margin:0;
+    min-height:31px;
+    overflow-x:auto;
+    overflow-y:hidden;
+  }
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools button {
+    font-size:10.5px;
+    padding:5px 6px;
+    line-height:1.15;
+    white-space:nowrap;
+  }
+  .efo-ux2-shell .ux2-command-stack > .workspace-editing-strip {
+    grid-area:authoring;
+    min-width:0;
+    max-width:100%;
+    width:100%;
+    box-sizing:border-box;
+    overflow:auto hidden;
+    align-self:stretch;
+    height:33px;
+    max-height:33px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:var(--surface-2);
+    padding:1px 3px;
+  }
+  .efo-ux2-shell .ux2-command-stack .workspace-authoring-bar {
+    display:flex;
+    flex-wrap:nowrap;
+    gap:4px;
+    min-width:max-content;
+    align-items:center;
+    padding:0;
+    min-height:27px;
+  }
+  .efo-ux2-shell .ux2-command-stack .workspace-authoring-bar .btn {
+    min-height:25px;
+    font-size:11px;
+    padding:3px 5px;
+    white-space:nowrap;
+  }
+  .efo-ux2-shell .ux2-command-stack > .sandbox-assembly-library {
+    grid-area:assembly;
+    min-width:0;
+    width:100%;
+    box-sizing:border-box;
+    margin:0;
+    padding:0 7px;
+    border-radius:6px;
+    height:25px;
+    max-height:25px;
+  }
+  .efo-ux2-shell .ux2-command-stack > .sandbox-assembly-library > summary {
+    line-height:24px;
+    font-size:11px;
+  }
+  .efo-ux2-shell .ux2-command-stack > .sandbox-assembly-library[open] {
+    position:absolute;
+    top:calc(100% - 23px);
+    left:0;
+    width:min(620px,100%);
+    height:auto;
+    max-height:60vh;
+    overflow:auto;
+    padding:5px 10px;
+    z-index:25;
+    box-shadow:0 12px 38px var(--scene-shadow);
+    background:var(--surface);
+  }
+}
+@media (min-width:768px) and (max-width:1099px) and (min-height:720px) {
+  .efo-ux2-shell .ux2-command-stack {
+    grid-template-columns:minmax(240px,33%) minmax(0,1fr);
+    grid-template-areas:
+      "workflow toolbar"
+      "views views"
+      "authoring authoring"
+      "assembly assembly";
+  }
+  .efo-ux2-shell .ux2-command-stack > .sandbox-toolbar{
+    flex-wrap:wrap;
+    align-content:center;
+    overflow:visible;
+  }
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools{
+    justify-content:flex-start;
+    overflow-x:auto;
+  }
+  .efo-ux2-shell .ux2-command-stack > .workspace-editing-strip{
+    height:31px;
+    max-height:31px;
+  }
+}
