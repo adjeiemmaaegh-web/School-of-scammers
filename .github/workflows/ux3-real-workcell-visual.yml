@@ -1,0 +1,55 @@
+name: UX3 - Real Industrial Workcell Visual Acceptance
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/render/PlantMachineVisuals.tsx'
+      - 'src/render/PlantWorld3D.tsx'
+      - 'src/render/workcell-camera.ts'
+      - 'src/render/WorkcellCameraRig.tsx'
+      - 'src/render/Sandbox3D.tsx'
+      - 'scripts/sandbox-ux3-real-scenes-browser.cjs'
+      - '.github/workflows/ux3-real-workcell-visual.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-webgl-scenes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reproducible dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck, native tests and compile actual production app
+        run: npm run build
+      - name: Install real Chromium test runtime
+        run: |
+          npm install --no-save --no-audit --no-fund puppeteer@24.31.0
+          npx puppeteer browsers install chrome
+      - name: Serve production build locally
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 > /tmp/ux3-preview.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:4173/ > /dev/null
+      - name: Actual WebGL process, bottle and sorting scenes
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux3-real-scenes-browser.cjs
+      - name: Preserve existing 3D placement, 23-wire commissioning and ST
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-3d-commissioning-browser.cjs
+      - name: Upload ONLY real running application screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux3-real-worker-webgl-scenes
+          path: qa-artifacts/ux3-real-workcells/
+          if-no-files-found: ignore
+          retention-days: 10
+      - name: Preview diagnostics on failure
+        if: failure()
+        run: tail -n 130 /tmp/ux3-preview.log || true
