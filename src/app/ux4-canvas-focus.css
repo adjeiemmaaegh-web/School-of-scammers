@@ -52,6 +52,11 @@
 body:has(main.efo-workspace-focused) {
   overflow:hidden !important;
 }
+/* Remove background navigation from both sight and keyboard focus order while
+   the workbench covers the viewport. Restore it automatically on exit. */
+body:has(main.efo-workspace-focused) .app-header {
+  display:none !important;
+}
 main.efo-workspace-focused {
   position:fixed !important;
   inset:0 !important;
