@@ -90,7 +90,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   // UX2 gives 1280px-class laptops/tablets priority to the factory viewport.
   // Full desktop and scenario flows retain their previous expanded defaults.
   const [dockExpanded,setDockExpanded] = useState(() =>
-    !!scenario || typeof window === 'undefined' || window.innerWidth >= 1400);
+    !!scenario || typeof window === 'undefined' || window.innerWidth >= 1400 || window.innerHeight < 720);
   const [dockFocus,setDockFocus] = useState<'program'|'diagnostics'>('program');
   const [workspaceHelp,setWorkspaceHelp] = useState(false);
   const [activeStage, setActiveStage] = useState<'build' | 'wire' | 'program' | 'test'>('build');
