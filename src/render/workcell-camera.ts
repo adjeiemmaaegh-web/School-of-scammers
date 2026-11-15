@@ -122,3 +122,20 @@ export function frameEntireWorkcell(
  return {target:[cx,0,cz],position:[cx+distance*.65,
   1+distance*.95,cz+distance]};
 }
+
+
+/**
+ * A learner opening a small existing project should see the ACTUAL equipment,
+ * not mostly empty factory grid. Only the initial orbit pose changes; the
+ * camera never writes to or advances the PLC worker and never chases ongoing
+ * movements or subsequent user edits.
+ *
+ * Larger projects retain the original calibrated commissioning camera.
+ */
+export function initialOrbitFraming(
+ project:Pick<ProjectFile,'components'|'params'>,
+):{target:[number,number,number];position:[number,number,number]}{
+ if(project.components.length===0 || project.components.length>4)
+  return {target:[0,0,0],position:[7,8.5,10]};
+ return frameEntireWorkcell(project);
+}
