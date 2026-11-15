@@ -84,6 +84,10 @@ const ST = [
   await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:30000});
   await page.evaluate(()=>localStorage.clear());
   await page.reload({waitUntil:'networkidle0'});
+  // UX4 canvas-first: open actual engineering dock on demand for worker I/O assertions.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
   await page.waitForSelector('[data-p5-view="plan"]',{timeout:15000});
   await page.click('[data-p5-view="plan"]');
   await page.waitForSelector('[data-floor-plan]');
@@ -175,6 +179,10 @@ const ST = [
   assert.equal(project.language,'st');
   assert.match(project.stSource||'',/Out2 := Rotate/);
   await page.reload({waitUntil:'networkidle0'});
+  // UX4 canvas-first: open actual engineering dock on demand for worker I/O assertions.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
   await page.click('[data-p5-view="plan"]');
   await count(10);
   assert.equal((await saved()).wires.length,23);

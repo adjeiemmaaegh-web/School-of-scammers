@@ -54,11 +54,19 @@ const project = {
   try {
     await page.setViewport({ width: 1440, height: 940, deviceScaleFactor: 1 });
     await page.goto(base + '/sandbox', { waitUntil: 'networkidle0', timeout: 20000 });
+  // UX4 canvas-first: open actual engineering dock on demand for worker I/O assertions.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await page.evaluate(data => {
       localStorage.clear();
       localStorage.setItem('efo-open-sandbox-project-v1', JSON.stringify(data));
     }, project);
     await page.reload({ waitUntil: 'networkidle0' });
+  // UX4 canvas-first: open actual engineering dock on demand for worker I/O assertions.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await page.waitForSelector('[data-device-id="ctrl"]');
     await page.waitForSelector('#sandbox-st-source');
     await page.waitForFunction(() => document.querySelector('.sandbox-st-status strong')?.textContent.trim() === 'Compiler OK',
@@ -101,6 +109,10 @@ const project = {
     await page.waitForFunction(() => [...document.querySelectorAll('.sandbox-toolbar button')]
       .some(b => b.textContent.trim() === '▶ Run' && !b.disabled), { timeout: 10000 });
     await page.reload({ waitUntil: 'networkidle0' });
+  // UX4 canvas-first: open actual engineering dock on demand for worker I/O assertions.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-wire-list > div').length === 5, { timeout: 10000 });
     assert.match(await page.$eval('#sandbox-st-source', e => e.value), /Analog0 : REAL/);
     assert.match(await page.$eval('[data-analog-input="AI0"]', e => e.textContent), /tank.LEVEL/);
