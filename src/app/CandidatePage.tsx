@@ -77,7 +77,7 @@ export function CandidatePage() {
     );
   }
 
-  if (!assignmentMatches) {
+  if (!assignmentMatches || !def) {
     return (
       <>
         <AppHeader />
