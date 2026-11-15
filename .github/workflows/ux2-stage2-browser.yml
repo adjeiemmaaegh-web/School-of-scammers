@@ -1,0 +1,54 @@
+name: UX2 Stage 2 - Compact Workbench Commands
+on:
+  pull_request:
+    branches: [engineering/ux2-stage1-workbench-and-palette-20261115]
+    paths:
+      - 'src/app/SandboxPage.tsx'
+      - 'src/app/ux2-command-layout.css'
+      - 'scripts/sandbox-ux2-stage2-browser.cjs'
+      - '.github/workflows/ux2-stage2-browser.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ux2-command-layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Restore dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Check and build
+        run: npm run build
+      - name: Install Chrome and Puppeteer
+        run: |
+          npm install --no-save --no-audit --no-fund puppeteer@24.31.0
+          npx puppeteer browsers install chrome
+      - name: Start preview
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 > /tmp/ux2-s2-preview.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:4173/ > /dev/null
+      - name: Preserve Stage 1 worker and drag-drop acceptance
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux2-stage1-browser.cjs
+      - name: Verify compact toolbars and controls across PCs/tablets
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux2-stage2-browser.cjs
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux2-stage2-command-layout-screenshots
+          path: |
+            qa-artifacts/ux2-stage1/
+            qa-artifacts/ux2-stage2/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Preview diagnostics on failure
+        if: failure()
+        run: tail -n 150 /tmp/ux2-s2-preview.log || true
