@@ -35,6 +35,10 @@ const clickText = async (page, label) => {
   page.on('pageerror', e => errors.push(String(e)));
   try {
     await page.goto(base + '/sandbox', {waitUntil:'networkidle0'});
+  // Canvas-first UX4: request real engineering dock before inspecting worker wires/PLC editor.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await page.waitForSelector('.sandbox-device-list');
     await clickText(page, 'Place starter layout');
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-patch .sandbox-device').length === 6);

@@ -31,6 +31,10 @@ const key='efo-open-sandbox-project-v1';
    await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:20000});
    await page.evaluate(()=>localStorage.clear());
    await page.reload({waitUntil:'networkidle0'});
+  // Canvas-first UX4: request real engineering dock before inspecting worker wires/PLC editor.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
    await page.waitForSelector('[data-starters]');
    await page.click('[data-starters] > summary');
    await page.waitForSelector('[data-add-panel]',{visible:true});
@@ -67,6 +71,10 @@ const key='efo-open-sandbox-project-v1';
    await page.waitForFunction(()=>[...document.querySelectorAll('.sandbox-toolbar button')]
      .some(b=>b.textContent.trim()==='▶ Run'),{timeout:10000});
    await page.reload({waitUntil:'networkidle0'});
+  // Canvas-first UX4: request real engineering dock before inspecting worker wires/PLC editor.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
    await mode('Function Blocks (FBD)');
    const doc=await page.evaluate(id=>JSON.parse(localStorage.getItem(id)||'null'),key);
    assert.equal(doc.language,'fbd');
