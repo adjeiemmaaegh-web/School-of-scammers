@@ -190,11 +190,34 @@ const viewports=[
     await page.goto(base+'/sandbox',{waitUntil:'networkidle0'});
     await page.waitForSelector('.ux2-equipment-tile');
     await page.tap('.sandbox-toolbar button:first-child'); // New blank project
+    await page.waitForFunction(()=>{
+      const p=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')??'null');
+      return p&&p.components.length===0;
+    },{timeout:12000});
     await page.tap('[data-p5-view="logical"]');
+    await page.waitForFunction(()=>document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active')==='logical',
+      {timeout:10000});
     await page.tap('[data-p5-category="plc"]');
-    await page.tap('.ux2-equipment-tile');
+    await page.waitForFunction(()=>document.querySelector('[data-p5-category="plc"]')?.getAttribute('aria-pressed')==='true' &&
+      !!document.querySelector('.ux2-equipment-tile:not([disabled])'),{timeout:10000});
+    console.log('UX2 TABLET TAP PRE',JSON.stringify(await page.evaluate(()=>({
+      tile:document.querySelector('.ux2-equipment-tile')?.textContent,
+      disabled:document.querySelector('.ux2-equipment-tile')?.disabled,
+      count:document.querySelectorAll('[data-p5-logical-device]').length,
+    }))));
+    await page.tap('.ux2-equipment-tile:not([disabled])');
     await page.waitForFunction(()=>document.querySelectorAll('[data-p5-logical-device]').length===1,
-      {timeout:12000});
+      {timeout:12000}).catch(async error=>{
+        const debug=await page.evaluate(()=>({
+          logical:document.querySelectorAll('[data-p5-logical-device]').length,
+          family:document.querySelector('[data-p5-category="plc"]')?.getAttribute('aria-pressed'),
+          tileDisabled:document.querySelector('.ux2-equipment-tile')?.disabled,
+          warnings:[...document.querySelectorAll('[role="alert"]')].map(el=>el.textContent),
+          project:JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null')?.components?.map(e=>e.kind),
+        }));
+        throw new Error('Touch tablet tap did not place a worker component: '+
+          JSON.stringify(debug)+'; '+String(error));
+      });
     assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+2),
       true,'Tablet touch placement retains no outer-page scrolling');
     assert.deepEqual(uncaught,[],'No unhandled errors after touch-generated placement');
