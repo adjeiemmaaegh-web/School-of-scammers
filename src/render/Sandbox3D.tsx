@@ -21,7 +21,7 @@ import { footprintOf } from '../workspace/floor-plan';
 import { clampPlacement } from '../workspace/geometry';
 import type { GridStep } from '../workspace/types';
 import { WorkcellCameraRig } from './WorkcellCameraRig';
-import { frameEntireWorkcell,initialNavigationPose, type CameraPose, type WorkcellCameraMode } from './workcell-camera';
+import { frameEntireWorkcell,initialNavigationPose,initialOrbitFraming, type CameraPose, type WorkcellCameraMode } from './workcell-camera';
 import {
   assess3DPlacement, placementMessage, previewDimensions,
   type PlacementAssessment,
@@ -430,7 +430,7 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, placeK
   onCameraPose:(pose:CameraPose)=>void;
 }) {
   const { camera, gl } = useThree();
-  const [interest,setInterest]=useState<[number,number,number]>([0,0,0]);
+  const [interest,setInterest]=useState<[number,number,number]>(()=>initialOrbitFraming(project).target);
   useEffect(()=>{
     if(!fitRequest||mode!=='orbit')return;
     const framing=frameEntireWorkcell(project);
