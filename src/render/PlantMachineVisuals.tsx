@@ -29,7 +29,7 @@ function Housing({size,colour}:{size:readonly [number,number,number];colour:stri
 /** Accurate body envelope plus visible motor shaft, gearbox, cooling ribs. */
 function MixerMotor({size,colour}:{size:readonly [number,number,number];colour:string}){
  const [w,h,d]=size, radius=Math.min(w,d)*.36;
- return <group name="ux3-process-mixer-motor" data-ux3-model="mixer">
+ return <group name="ux3-process-mixer-motor">
    <mesh position={[0,-h*.37,0]} castShadow>
      <cylinderGeometry args={[radius*.58,radius*.7,h*.15,16]}/>
      <meshStandardMaterial color={DARK} metalness={.58} roughness={.4}/>
@@ -64,7 +64,7 @@ function MixerMotor({size,colour}:{size:readonly [number,number,number];colour:s
 /** A throttling valve has two flanges, a bonnet and a visible live position. */
 function IndustrialValve({size,colour,opening}:{size:readonly [number,number,number];colour:string;opening:number}){
  const [w,h,d]=size;
- return <group name="ux3-process-valve" data-ux3-model="valve">
+ return <group name="ux3-process-valve">
    <mesh position={[0,-h*.12,0]} rotation={[0,0,Math.PI/2]} castShadow>
      <cylinderGeometry args={[d*.32,d*.32,w*.76,20]}/>
      <meshStandardMaterial color={colour} metalness={.52} roughness={.43}/>
@@ -94,7 +94,7 @@ function IndustrialValve({size,colour,opening}:{size:readonly [number,number,num
 
 function HeatingModule({size,colour}:{size:readonly [number,number,number];colour:string}){
  const [w,h,d]=size;
- return <group name="ux3-process-heater" data-ux3-model="heater">
+ return <group name="ux3-process-heater">
    <Housing size={[w*.86,h*.73,d*.87]} colour={DARK}/>
    <mesh position={[0,0,-d*.445]}>
      <boxGeometry args={[w*.72,h*.55,.017]}/>
@@ -113,7 +113,7 @@ function HeatingModule({size,colour}:{size:readonly [number,number,number];colou
 
 function BottleHead({size,colour,cap}:{size:readonly [number,number,number];colour:string;cap:boolean}){
  const [w,h,d]=size;
- return <group name={cap?'ux3-capper-head':'ux3-filler-head'} data-ux3-model={cap?'capper':'filler'}>
+ return <group name={cap?'ux3-capper-head':'ux3-filler-head'}>
    <mesh position={[0,-h*.34,0]}>
      <boxGeometry args={[w*.9,h*.09,d*.88]}/>
      <meshStandardMaterial color={DARK} metalness={.62}/>
