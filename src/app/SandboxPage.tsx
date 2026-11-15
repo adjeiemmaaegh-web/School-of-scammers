@@ -84,7 +84,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [libraryFamily,setLibraryFamily] = useState<DeviceFamily>('all');
   const [workspaceView,setWorkspaceView] = useState<'physical'|'logical'|'plan'>('physical');
   const [libraryExpanded,setLibraryExpanded] = useState(true);
-  const [inspectorExpanded,setInspectorExpanded] = useState(true);
+  // Keep the factory visible on narrower PC/tablet screens; Inspector remains one tap away.
+  const [inspectorExpanded,setInspectorExpanded] = useState(() =>
+    !!scenario || typeof window === 'undefined' || window.innerWidth >= 1100);
   const [dockExpanded,setDockExpanded] = useState(true);
   const [dockFocus,setDockFocus] = useState<'program'|'diagnostics'>('program');
   const [workspaceHelp,setWorkspaceHelp] = useState(false);
