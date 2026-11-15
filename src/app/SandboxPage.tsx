@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, isPlcKind, type ComponentKind } from '../components/registry';
 import { IoMappingPanel } from '../ui/sandbox/IoMappingPanel';
@@ -39,6 +39,23 @@ import './ux2-command-layout.css';
 
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
+const UX2_LAYOUT_KEY = 'efo-ux2-layout-v1';
+type UiPanelSizes = {library:number;inspector:number;dock:number};
+const defaultPanelSizes:UiPanelSizes = {library:228,inspector:238,dock:205};
+const panelSize = (value:unknown,fallback:number,min:number,max:number) =>
+  typeof value==='number'&&Number.isFinite(value) ? Math.min(max,Math.max(min,value)) : fallback;
+const initialPanelSizes = ():UiPanelSizes => {
+  if(typeof window==='undefined')return defaultPanelSizes;
+  try {
+    const stored=JSON.parse(window.localStorage.getItem(UX2_LAYOUT_KEY)??'null') as Partial<UiPanelSizes>|null;
+    if(!stored||typeof stored!=='object')return defaultPanelSizes;
+    return {
+      library:panelSize(stored.library,228,160,320),
+      inspector:panelSize(stored.inspector,238,190,350),
+      dock:panelSize(stored.dock,205,125,390),
+    };
+  }catch{return defaultPanelSizes;}
+};
 const CANVAS_W = 1080, CANVAS_H = 580, BOX_W = 170;
 const wireGuide = 'Supply P24 → PLC L+, START A, STOP A, contactor 13. Supply M0 → PLC M, contactor A2, motor M-. START B → PLC I0.0; STOP B → PLC I0.1; PLC Q0.0 → contactor A1; contactor 14 → motor L+.';
 const twoPanelWireGuide = 'Each panel is wired like the single starter, from its own supply: P24 → PLC L+, START A, STOP A, contactor 13; M0 → PLC M, contactor A2, motor M-; START B → I0.0; STOP B → I0.1; PLC Q0.0 → contactor A1; contactor 14 → motor L+. Panel 2 uses supply-2, plc-2, start-2, stop-2, contactor-2 and motor-2. To make one panel depend on another, tie the two supplies\' M0 terminals together (a shared common) and wire one PLC\'s output (for example plc-1 Q0.0) to the other PLC\'s input (plc-2 I0.0). Without a shared common, two supplies are isolated and no signal can cross. Select a PLC (click it, or use its tab above the editor) to program it separately.';
@@ -94,6 +111,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     !!scenario || typeof window === 'undefined' || window.innerWidth >= 1400 || window.innerHeight < 720);
   const [dockFocus,setDockFocus] = useState<'program'|'diagnostics'>('program');
   const [workspaceHelp,setWorkspaceHelp] = useState(false);
+  // These affect layout only; they never enter a saved PLC project.
+  const [panelSizes,setPanelSizes] = useState<UiPanelSizes>(initialPanelSizes);
+  useEffect(()=>{
+    if(scenario)return;
+    try{window.localStorage.setItem(UX2_LAYOUT_KEY,JSON.stringify(panelSizes));}
+    catch{/* restrictive storage environments keep in-memory panel sizing */}
+  },[panelSizes,scenario]);
   const [activeStage, setActiveStage] = useState<'build' | 'wire' | 'program' | 'test'>('build');
   const [localSave, setLocalSave] = useState<'pending' | 'saved' | 'failed'>('pending');
   const [storageReady, setStorageReady] = useState(false);
@@ -547,7 +571,12 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   return <>
     <AppHeader />
     <main id="main" className={`sandbox-page sandbox-ux p5-organized wrap wrap-wide${scenario ? '' : ' efo-ux2-shell'}`}
-      data-p5-workspace="organized" data-ux2-workbench={scenario ? undefined : 'pc-tablet'}>
+      data-p5-workspace="organized" data-ux2-workbench={scenario ? undefined : 'pc-tablet'}
+      style={scenario ? undefined : {
+        '--ux2-palette-size': `${panelSizes.library}px`,
+        '--ux2-inspector-size': `${panelSizes.inspector}px`,
+        '--ux2-dock-size': `${panelSizes.dock}px`,
+      } as CSSProperties}>
       <header className="sandbox-masthead">
         <div>
           <p className="sandbox-breadcrumb"><Link to="/">Skills Lab</Link><span>/</span> {scenario ? 'Scenario' : 'Simulator'} <span>/</span> {scenario ? scenario.def.title : 'Open workspace'}</p>
@@ -602,6 +631,21 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <button type="button" onClick={()=>{setWorkspaceView('logical');setActiveStage('wire');}}>Open terminal wiring</button>
           <button type="button" onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);}}>Open virtual instruments</button>
           <button type="button" onClick={()=>{setDockFocus('program');setDockExpanded(true);}}>Open PLC programming</button>
+          {!scenario&&<div className="ux2-panel-settings" role="group" aria-label="Resize workbench panels">
+            <label>Component library width <output>{panelSizes.library}px</output>
+              <input type="range" min="160" max="320" step="10" data-ux2-resize="library"
+                value={panelSizes.library} onChange={e=>setPanelSizes(v=>({...v,library:Number(e.target.value)}))}/>
+            </label>
+            <label>Inspector width <output>{panelSizes.inspector}px</output>
+              <input type="range" min="190" max="350" step="10" data-ux2-resize="inspector"
+                value={panelSizes.inspector} onChange={e=>setPanelSizes(v=>({...v,inspector:Number(e.target.value)}))}/>
+            </label>
+            <label>Engineering dock height <output>{panelSizes.dock}px</output>
+              <input type="range" min="125" max="390" step="5" data-ux2-resize="dock"
+                value={panelSizes.dock} onChange={e=>setPanelSizes(v=>({...v,dock:Number(e.target.value)}))}/>
+            </label>
+            <button type="button" onClick={()=>setPanelSizes(defaultPanelSizes)}>Reset panel sizes</button>
+          </div>}
         </div></details>
         <details><summary>Help</summary><div className="p5-menu-content">
           <button type="button" onClick={()=>setWorkspaceHelp(v=>!v)}>Toggle workspace instructions</button>
