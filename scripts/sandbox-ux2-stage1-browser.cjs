@@ -205,7 +205,31 @@ const viewports=[
       disabled:document.querySelector('.ux2-equipment-tile')?.disabled,
       count:document.querySelectorAll('[data-p5-logical-device]').length,
     }))));
+    await page.evaluate(()=>{
+      const events=[];
+      window.__ux2TapEvents=events;
+      for(const name of ['touchstart','touchend','pointerdown','pointerup','click']){
+        document.addEventListener(name,e=>{
+          if(events.length<20)events.push({
+            name,target:e.target?.tagName,
+            cls:e.target?.getAttribute?.('class'),
+            onTile:!!e.target?.closest?.('.ux2-equipment-tile'),
+          });
+        },true);
+      }
+    });
+    const hit=await page.$eval('.ux2-equipment-tile:not([disabled])',el=>{
+      el.scrollIntoView({block:'center'});
+      const r=el.getBoundingClientRect();
+      const node=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+      return {box:r.toJSON(),node:node?.tagName,
+        closestTile:node?.closest?.('.ux2-equipment-tile')===el,
+        draggable:el.draggable,maxTouch:navigator.maxTouchPoints,
+        coarse:matchMedia('(pointer: coarse)').matches};
+    });
+    console.log('UX2 TABLET HIT',JSON.stringify(hit));
     await page.tap('.ux2-equipment-tile:not([disabled])');
+    console.log('UX2 TABLET EVENTS',JSON.stringify(await page.evaluate(()=>window.__ux2TapEvents)));
     await page.waitForFunction(()=>document.querySelectorAll('[data-p5-logical-device]').length===1,
       {timeout:12000}).catch(async error=>{
         const debug=await page.evaluate(()=>({
