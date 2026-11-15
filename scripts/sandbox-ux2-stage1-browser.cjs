@@ -33,6 +33,7 @@ const viewports=[
       await page.setViewport({...viewport,deviceScaleFactor:1});
       await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:30000});
       await page.waitForSelector('[data-ux2-workbench="pc-tablet"]',{timeout:15000});
+      await page.waitForFunction(()=>document.documentElement.dataset.theme==='dark',{timeout:8000});
       const measurements=await page.evaluate(()=>{
         const outer=document.documentElement;
         const stage=document.querySelector('[data-p5-view-active]');
@@ -76,6 +77,23 @@ const viewports=[
     await page.setViewport({width:1366,height:768,deviceScaleFactor:1});
     await page.goto(base+'/sandbox',{waitUntil:'networkidle0'});
     await page.waitForSelector('.ux2-equipment-tile');
+    // Dark industrial is the default on /sandbox only. A user who explicitly
+    // selects light must retain that preference through a reload.
+    assert.equal(await page.$eval('html',el=>el.dataset.theme),'dark',
+      'Open engineering workspace defaults to approved dark theme');
+    await page.click('.theme-btn');
+    await page.waitForFunction(()=>document.documentElement.dataset.theme==='light');
+    assert.equal(await page.evaluate(()=>localStorage.getItem('skills-lab:theme')),'light',
+      'User light override is stored');
+    await page.reload({waitUntil:'networkidle0'});
+    await page.waitForSelector('.ux2-equipment-tile');
+    assert.equal(await page.$eval('html',el=>el.dataset.theme),'light',
+      'User light theme overrides the sandbox default after reload');
+    await page.click('.theme-btn');
+    await page.waitForFunction(()=>document.documentElement.dataset.theme==='dark');
+    assert.equal(await page.evaluate(()=>localStorage.getItem('skills-lab:theme')),'dark',
+      'User can restore dark theme');
+    console.log('UX2 THEME PASS: dark workbench default with persisted light/dark preference');
     const num=await page.$$eval('.ux2-equipment-tile',xs=>xs.length);
     assert.ok(num>=10,'Image-based device catalog has real registry entries');
     const plcFilter=await page.$('[data-p5-category="plc"]');
