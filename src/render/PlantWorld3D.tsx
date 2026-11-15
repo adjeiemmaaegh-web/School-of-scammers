@@ -9,6 +9,7 @@ import type {ThreeEvent} from '@react-three/fiber';
 import type {SceneRuntime} from '../plant/world/runner';
 import type {ProjectFile} from '../sim/signals';
 import {PLANT_EQUIPMENT} from '../plant/equipment';
+import {PlantMachineVisual} from './PlantMachineVisuals';
 import {plantPlacements} from '../sim/p3-plant-bridge';
 import {P7_SENSOR_KINDS} from './scene-authoring';
 import {opticalZoneOf,type OpticalZone} from '../plant/equipment/sensor-zone';
@@ -74,6 +75,25 @@ function Drawing({drawing,kind,progress=0}:{drawing:EquipmentDrawing;kind:string
        <boxGeometry args={[.12,.16,.13]}/>
        <meshStandardMaterial color="#d58e38" metalness={.32}/>
      </mesh>
+     {/* Bounded worker-registered conveyor drive and service frame. */}
+     {[-1,1].flatMap(side=>[-1,1].map(end=><group key={side+'-'+end}>
+       <mesh position={[end*(len/2-.055),-height*.51,side*(depth/2-.04)]} castShadow>
+         <boxGeometry args={[.035,Math.max(.07,height*.68),.035]}/>
+         <meshStandardMaterial color="#9eabb3" metalness={.72} roughness={.35}/>
+       </mesh>
+       <mesh position={[end*(len/2-.06),-height*.79,side*(depth/2-.04)]}>
+         <boxGeometry args={[.075,.016,.075]}/>
+         <meshStandardMaterial color="#394d59" metalness={.62}/>
+       </mesh>
+     </group>))}
+     <mesh position={[len*.33,-height*.46,depth*.30]} rotation={[0,0,Math.PI/2]} castShadow>
+       <cylinderGeometry args={[.055,.055,.13,14]}/>
+       <meshStandardMaterial color="#357c9e" metalness={.55} roughness={.39}/>
+     </mesh>
+     <mesh position={[len*.33,-height*.46,depth*.30+.075]}>
+       <boxGeometry args={[.12,.08,.045]}/>
+       <meshStandardMaterial color="#d4a349" metalness={.4}/>
+     </mesh>
    </> : kind==='shelf' ? <group name="p8-opaque-storage-rack">
      {/* The simplified rack is a solid optical obstacle; opaque back plane
        intentionally avoids promising empty-space ray transmission. */}
@@ -122,11 +142,18 @@ function Drawing({drawing,kind,progress=0}:{drawing:EquipmentDrawing;kind:string
        <boxGeometry args={[len*.78,.015,.027]}/>
        <meshStandardMaterial color="#b6c4cd" metalness={.45}/></mesh>)}
      </group>
-   </> : <mesh>
+   </> : (kind==='mixer'&&drawing.part==='agitator') ||
+          (kind==='proportional-valve'&&drawing.part==='valve') ||
+          (kind==='heater'&&drawing.part==='element') ||
+          (kind==='filler'&&drawing.part==='nozzle') ||
+          (kind==='capper'&&drawing.part==='capping head')
+     ? <PlantMachineVisual kind={kind} part={drawing.part}
+         size={[len,height,depth]} colour={drawing.colour} progress={progress}/>
+     : <mesh>
       {drawing.shape==='box'?<boxGeometry args={[len,height,depth]}/>:
        <cylinderGeometry args={[len/2,len/2,height,20]}/>}
       <meshStandardMaterial color={drawing.colour} metalness={.25} roughness={.6}/>
-   </mesh>}
+   </mesh>
  </group>;
 }
 /** This volume is projected from the *same* sensor-zone descriptor read
@@ -196,7 +223,8 @@ export function PlantWorld3D({project,scene,onPointerDownPart,onPointerMovePart,
         <Drawing kind={item.kind} key={drawing.part+'-'+index} drawing={drawing}
          progress={item.kind==='turntable'?(item.params.rotateCargo===1?
           ((state.phase??0)-(state.done?1:0)+state.progress+4)%4:
-          state.progress):0}/>)}
+          state.progress):item.kind==='proportional-valve'?
+            Math.max(0,Math.min(1,state.value/100)):0}/>)}
       {showZones&&optical&&<group
         position={[metres(item.originMm.x),0,metres(item.originMm.y)]}>
         {zone&&<OpticalSensingVolume zone={zone} on={active}/>}
