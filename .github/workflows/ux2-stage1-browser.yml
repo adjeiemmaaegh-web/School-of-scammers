@@ -7,6 +7,8 @@ on:
       - 'src/app/ux2-workbench.css'
       - 'src/ui/sandbox/EquipmentThumbnail.tsx'
       - 'scripts/sandbox-ux2-stage1-browser.cjs'
+      - 'src/app/ux2-command-layout.css'
+      - 'scripts/sandbox-ux2-stage2-browser.cjs'
       - 'scripts/sandbox-p7-3d-commissioning-browser.cjs'
       - 'scripts/sandbox-p12-multicase-browser.cjs'
       - '.github/workflows/ux2-stage1-browser.yml'
@@ -40,6 +42,8 @@ jobs:
           curl -fsS http://127.0.0.1:4173/ > /dev/null
       - name: Validate fixed-screen PC and tablet workbench with real worker
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux2-stage1-browser.cjs
+      - name: Verify compact command panels at five PC and tablet resolutions
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux2-stage2-browser.cjs
       - name: Regression - 3D factory PLC16 commissioning and floor raycasts
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-3d-commissioning-browser.cjs
       - name: Regression - P12 factory challenge launch from clipped scene panel
