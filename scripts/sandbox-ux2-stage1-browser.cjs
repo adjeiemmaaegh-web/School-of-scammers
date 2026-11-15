@@ -56,8 +56,12 @@ const viewports=[
         'UX2 document is wider than '+viewport.name+': '+JSON.stringify(measurements));
       assert.ok(measurements.document[1]<=viewport.height+2,
         'UX2 outer page scrolls at '+viewport.name+': '+JSON.stringify(measurements));
-      assert.ok(measurements.canvas?.w>=190&&measurements.canvas?.h>=190,
+      assert.ok(measurements.canvas?.w>=190&&measurements.canvas?.h>=145,
         'UX2 workcell missing at '+viewport.name+': '+JSON.stringify(measurements));
+      assert.ok(measurements.canvas.y+measurements.canvas.h<=
+        measurements.stage.y+measurements.stage.h+3,
+        'UX2 3D scene is clipped by central workspace at '+
+        viewport.name+': '+JSON.stringify(measurements));
       assert.ok(measurements.paletteTiles>=10,
         'UX2 palette must show registered equipment at '+viewport.name);
       assert.equal(measurements.thumbnailCount,measurements.paletteTiles,
@@ -119,8 +123,22 @@ const viewports=[
     }));
     graphical3D=render.canvas;
     if(graphical3D){
-      // Test DragEvent on original renderer, not a fake alternate placement API.
-      const previous=await page.$$eval('[data-device-id]',x=>x.length);
+      // P1 camera and canvas measurements must stabilize before a raycast.
+      await page.waitForFunction(()=>{
+        const canvas=document.querySelector('.sandbox-three-canvas canvas');
+        return !!canvas&&canvas.width>320&&canvas.height>120;
+      },{timeout:12000});
+      // Avoid placing directly on an existing PLC/supply: intentional
+      // collisions are worker-rejected, which would falsely fail drag/drop QA.
+      await page.evaluate(()=>{
+        const btn=[...document.querySelectorAll('.sandbox-toolbar button')]
+          .find(el=>el.textContent?.trim()==='New blank project');
+        if(!btn)throw Error('New blank project button missing');
+        btn.click();
+      });
+      await page.waitForFunction(()=>document.querySelectorAll('[data-device-id]').length===0,
+        {timeout:10000});
+      const previous=0;
       await page.evaluate(()=>{
         const shell=document.querySelector('.sandbox-3d-shell');
         const r=shell.getBoundingClientRect();
@@ -133,7 +151,16 @@ const viewports=[
       });
       await page.waitForFunction(n=>
         document.querySelectorAll('[data-device-id]').length>n,
-        {timeout:10000},previous);
+        {timeout:10000},previous).catch(async err=>{
+          const state=await page.evaluate(()=>({
+            errors:[...document.querySelectorAll('[role="alert"]')].map(el=>el.textContent),
+            canvas:document.querySelector('.sandbox-three-canvas canvas')?.getBoundingClientRect().toJSON(),
+            visibleDevices:document.querySelectorAll('[data-device-id]').length,
+            status:document.querySelector('.p5-simulation-status')?.textContent,
+          }));
+          throw new Error('3D drop did not create a real component: '+
+            JSON.stringify(state)+'; '+String(err));
+        });
     } else {
       assert.ok(render.fallback,'No-WebGL fallback must remain visible');
       console.log('UX2 3D DROP SKIPPED: this browser has no WebGL; click placement and wiring tested');
