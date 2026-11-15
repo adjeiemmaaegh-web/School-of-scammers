@@ -244,6 +244,14 @@
   .efo-ux2-shell .p5-physical-stage {
     height:100%;
     min-height:0;
+    /* Keep scene gallery and assessment controls inside the scene pane.
+       Otherwise their overflow was overpainted by the later live-status
+       panel, intercepting the assessment Run click. */
+    overflow:auto;
+    scrollbar-width:thin;
+    overscroll-behavior:contain;
+    position:relative;
+    isolation:isolate;
   }
   .efo-ux2-shell .sandbox-3d-shell {
     height:max(100px,calc(100% - 51px));
