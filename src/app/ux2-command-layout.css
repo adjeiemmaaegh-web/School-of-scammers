@@ -175,10 +175,10 @@
 }
 
 
-/* Portrait tablets: wrap canvas and panel tools into fully visible rows.
+/* Compact laptops and tablets: wrap canvas and panel tools into visible rows.
    Hiding off-edge Inspector/Dock buttons would defeat a no-scroll
    engineering workstation; moving them to a second compact line does not. */
-@media (min-width:768px) and (max-width:899px) and (min-height:720px) {
+@media (min-width:768px) and (max-width:1399px) and (min-height:720px) {
   .efo-ux2-shell .ux2-command-stack > .p5-view-tools {
     flex-wrap:wrap;
     overflow:visible;
