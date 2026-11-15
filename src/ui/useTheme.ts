@@ -10,6 +10,11 @@ function readStored(): Theme {
   } catch {
     /* ignore */
   }
+  // The open industrial engineering workbench defaults to its owner-approved
+  // dark interface. This is only a default: explicit user-selected light/dark
+  // preferences always take priority, and other routes retain system theme.
+  if (typeof window !== 'undefined' && window.location.pathname === '/sandbox')
+    return 'dark';
   return 'system';
 }
 
