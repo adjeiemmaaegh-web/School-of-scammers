@@ -51,6 +51,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await page.waitForSelector('[data-starters]');
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle0' });
+    // The canvas-first workspace starts with the engineering dock hidden.
+    // Restore its real PLC tabs and wiring list before assertions.
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await page.waitForSelector('[data-starters]');
 
     // 1. One click gives a complete, wired, programmed starter. No manual wiring or programming.
@@ -161,6 +164,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
     // 8. The edited plant survives a reload.
     await page.reload({ waitUntil: 'networkidle0' });
+    // The canvas-first workspace starts with the engineering dock hidden.
+    // Restore its real PLC tabs and wiring list before assertions.
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await waitCounts(10, 15);
 
     // 9. Phone width: the new controls cause no horizontal scroll.
