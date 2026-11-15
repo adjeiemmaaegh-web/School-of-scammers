@@ -78,8 +78,13 @@ const viewports=[
             const available=list.getBoundingClientRect();
             return [...list.querySelectorAll('.ux2-equipment-tile')].filter(el=>{
               const box=el.getBoundingClientRect();
-              return box.width>20&&box.height>50&&
-                box.top>=available.top-1&&box.bottom<=available.bottom+1;
+              const aside=document.querySelector('[data-p5-library]')?.getBoundingClientRect();
+              const layer=document.elementFromPoint(box.left+box.width/2,box.top+box.height/2);
+              return box.width>20&&box.height>50&&aside&&
+                box.left>=available.left-1&&box.right<=available.right+1&&
+                box.left>=aside.left-1&&box.right<=aside.right+1&&
+                box.top>=available.top-1&&box.bottom<=available.bottom+1&&
+                !!layer&&(el===layer||el.contains(layer));
             }).length;
           })(),
         };
@@ -99,8 +104,13 @@ const viewports=[
       assert.equal(measurements.thumbnailCount,measurements.paletteTiles,
         'Every visible equipment tile has an original SVG illustration');
       assert.ok(measurements.fullyVisibleTiles>=2,
-        'At least one illustrated equipment row must be entirely visible without scrolling the library at '+
+        'At least one complete illustrated equipment row must be visible AND directly hittable, with no horizontal or vertical sidebar clipping, at '+
         viewport.name+': '+JSON.stringify(measurements));
+      assert.ok(measurements.paletteDebug.first.x>=measurements.paletteDebug.container.x-1&&
+        measurements.paletteDebug.first.x+measurements.paletteDebug.first.w<=
+        measurements.paletteDebug.container.x+measurements.paletteDebug.container.w+1,
+        'First equipment tile must remain inside left palette, never underneath factory canvas at '+
+        viewport.name+': '+JSON.stringify(measurements.paletteDebug));
       assert.ok(measurements.dock?.h>=24,
         'Engineering dock controls must remain available (collapsed is OK): '+
         viewport.name+' '+JSON.stringify(measurements));
