@@ -277,6 +277,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   // they never obscure the physical machine being inspected.
   const compact=!selected&&project.components.length>2&&
     (project.components.length<=8||galleryScene);
+  const showDeviceTerminals = !galleryScene || selected;
   // P3 equipment uses the real worker-owned 3D shapes, not duplicated large
   // placeholder housings. Its outline is only a selection/drag affordance.
   return <group position={[x, y, z]} rotation={[0, -(c.yawDeg ?? 0) * Math.PI / 180, 0]}>
@@ -341,7 +342,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
       // model and mapping, but display pins contextually after selecting the
       // corresponding device. Hand-built P7 commissioning keeps its existing
       // always-visible terminal targets for precision wiring acceptance.
-      const showTerminal = !galleryScene || selected || selected;
+      const showTerminal = showDeviceTerminals || selected;
       const position: [number, number, number] = [t.side === 'left' ? -0.64 : 0.64, 0.35, (t.y - 65) / 120];
       return <group key={t.name} position={position}>
         <mesh onPointerDown={e => {
