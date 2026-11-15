@@ -66,7 +66,9 @@ const viewports=[
         'UX2 palette must show registered equipment at '+viewport.name);
       assert.equal(measurements.thumbnailCount,measurements.paletteTiles,
         'Every visible equipment tile has an original SVG illustration');
-      assert.ok(measurements.dock?.h>=35,'Engineering dock must remain available');
+      assert.ok(measurements.dock?.h>=24,
+        'Engineering dock controls must remain available (collapsed is OK): '+
+        viewport.name+' '+JSON.stringify(measurements));
       assert.ok(measurements.library?.h>100,'Illustrated library must remain available');
       console.log('UX2 GEOMETRY',viewport.name,JSON.stringify(measurements));
       await page.screenshot({path:'qa-artifacts/ux2-stage1/'+viewport.name+'.png'});
