@@ -408,6 +408,17 @@
   .efo-ux2-shell .sandbox-palette {
     gap:3px;
     padding:6px;
+    min-width:0;
+  }
+  /* At 768px tablet portrait, min-content widths from the long family
+     chips used to expand the palette to ~860px despite its 190px sidebar.
+     Heading, search and illustrated tiles were then painted over/under the
+     central 3D canvas, leaving the visible sidebar apparently empty. */
+  .efo-ux2-shell .sandbox-palette > * {
+    min-width:0;
+    max-width:100%;
+    width:100%;
+    box-sizing:border-box;
   }
   .efo-ux2-shell .sandbox-palette .sandbox-rail-heading {
     display:flex;
@@ -462,6 +473,10 @@
   .efo-ux2-shell .sandbox-library-foot {display:none}
   .efo-ux2-shell .sandbox-palette-list {
     flex:1 1 0;
+    min-width:0;
+    max-width:100%;
+    width:100%;
+    grid-template-columns:repeat(2,minmax(0,1fr));
     min-height:106px;
     align-content:start;
     overflow-y:auto;
