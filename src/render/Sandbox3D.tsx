@@ -345,7 +345,8 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
       const showTerminal = showDeviceTerminals || selected;
       const position: [number, number, number] = [t.side === 'left' ? -0.64 : 0.64, 0.35, (t.y - 65) / 120];
       return <group key={t.name} position={position}>
-        <mesh onPointerDown={e => {
+        {/* Hide WebGL pin geometry when its matching contextual HTML pin is hidden. */}
+        {showTerminal && <mesh onPointerDown={e => {
             e.stopPropagation();
             // Parent shell owns placement; clicking a terminal cannot emit a second place.
           }}
@@ -353,7 +354,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
           <sphereGeometry args={[0.105, 12, 8]} />
           <meshStandardMaterial color={selected ? COLORS.highlight : COLORS.light}
             emissive={selected ? COLORS.highlight : '#000000'} emissiveIntensity={0.35} />
-        </mesh>
+        </mesh>}
         <Html position={[t.side === 'left' ? -0.14 : 0.14, 0.09, 0]} center distanceFactor={12}>
           <button type="button" className={`sandbox-3d-terminal ${selected ? 'selected' : ''} ${showTerminal ? '' : 'ux3-hidden-terminal'}`}
             data-scene-terminal-id={fullId} disabled={!editable}
