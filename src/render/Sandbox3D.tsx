@@ -306,7 +306,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
         rod={c.kind === 'cylinder' ? rod : undefined} lamps={c.kind === 'stacklight' ? lamps : undefined} />
     </group>}
     <Html position={[0, plant ? .70 : 1.08, 0]} center
-      distanceFactor={compact ? 3.1 : 5.4}>
+      distanceFactor={compact ? 3.1 : 3.4}>
       <div className={`sandbox-3d-label ${compact ? 'ux3-compact-label' : 'ux3-selected-label'}`} data-3d-drag-handle={c.id}
         title={`${def.label} (${c.id}) · Select to see live state; drag to reposition while paused`}
         onPointerDown={event=>{
