@@ -275,6 +275,12 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   // Two-device projects used to show two enormous status cards over the real
   // geometry. Full names and live state remain available on selection/hover.
   const compact=!selected;
+  // Label chips are deliberately short; full equipment names and the stable
+  // unique ID remain in the tooltip and selected inspector. A long ID such as
+  // proportional-valve-2 would otherwise balloon with perspective distance.
+  const chipName=c.id.length>13
+    ? (c.id.match(/([^-]+-\\d+)$/)?.[1] ?? c.id.slice(0,9)+'…')
+    : c.id;
   const showDeviceTerminals = !galleryScene || selected;
   // P3 equipment uses the real worker-owned 3D shapes, not duplicated large
   // placeholder housings. Its outline is only a selection/drag affordance.
@@ -307,7 +313,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
           if((event.target as HTMLElement).closest('button'))return;
           onLabelPress(event,c.id);
         }}>
-        <strong>{compact ? c.id : def.label}</strong>
+        <strong>{compact ? chipName : def.label}</strong>
         <small>{c.kind === 'revmotor' ? (direction ?? 'stopped').toUpperCase() :
           c.kind === 'forwardcontactor' || c.kind === 'reversecontactor' ? (active ? 'CLOSED' : 'OPEN') :
           c.kind === 'motor' ? (active ? 'RUNNING' : 'STOPPED') :
