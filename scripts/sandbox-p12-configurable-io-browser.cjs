@@ -45,6 +45,9 @@ const ST = ['VAR_INPUT', '  Door : BOOL;', 'END_VAR', 'VAR_OUTPUT', '  Beacon : 
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('.sandbox-palette-item:not([disabled])');
+    await page.click('[data-p5-view="logical"]');
+    await page.click('[data-p5-dock-tab="diagnostics"]');
+    await page.waitForSelector('.sandbox-wire-list');
 
     // 1. Build from the library: supply, 16/16 PLC, a button and two lamps.
     for (const l of ['24V supply', 'Virtual PLC 16/16', 'START NO', '24V pilot lamp', '24V pilot lamp']) { await place(l); await sleep(80); }
