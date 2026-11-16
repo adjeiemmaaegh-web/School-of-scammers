@@ -278,7 +278,12 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   // Large, hand-authored commissioning projects retain a larger on-screen
   // handle for actual pointer dragging at the default inspection distance.
   // Worker-authored galleries and the two-machine case stay unobstructed.
-  const precisionCommissioning=!galleryScene&&project.components.length>8;
+  // A lone machine also needs a genuinely clickable label at the original
+  // unframed orbit distance; otherwise P6 direct 3D manipulation becomes
+  // inaccessible after the selection is cleared. Two-device plant examples
+  // still retain small labels (the screenshot-specific UX5 fix).
+  const precisionCommissioning=!galleryScene&&
+    (project.components.length===1||project.components.length>8);
   // Label chips are deliberately short; full equipment names and the stable
   // unique ID remain in the tooltip and selected inspector. A long ID such as
   // proportional-valve-2 would otherwise balloon with perspective distance.
