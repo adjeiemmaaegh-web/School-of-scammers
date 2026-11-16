@@ -9,6 +9,7 @@ on:
       - 'scripts/sandbox-ux2-stage1-browser.cjs'
       - 'src/app/ux2-command-layout.css'
       - 'src/app/ux4-canvas-focus.css'
+      - 'src/app/ux5-workspace-clarity.css'
       - 'scripts/sandbox-ux4-canvas-focus-browser.cjs'
       - 'scripts/sandbox-ux2-stage2-browser.cjs'
       - 'scripts/sandbox-p7-3d-commissioning-browser.cjs'
