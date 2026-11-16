@@ -46,8 +46,15 @@ const dir='qa-artifacts/ux5-workspace-clarity';
    await page.waitForFunction(()=>document.querySelectorAll('.sandbox-3d-label').length===2,
       {timeout:15000});
    await page.click('[data-3d-fit-scene]');
-   await page.waitForFunction(()=>document.querySelector('.sandbox-three-canvas canvas')?.width>400,
-      {timeout:10000});
+   // The initial 3D camera remains fixed while a learner places successive
+   // devices. Explicit Fit all is asynchronous through React/OrbitControls;
+   // measure AFTER the real camera has framed both small machines.
+   await page.waitForFunction(()=>{
+     const canvas=document.querySelector('.sandbox-three-canvas canvas');
+     const first=document.querySelector('.sandbox-3d-label')?.getBoundingClientRect();
+     return !!canvas&&canvas.width>400&&!!first&&first.width>=35&&first.height>=13;
+   },{timeout:12000});
+   await new Promise(resolve=>setTimeout(resolve,180));
    const evidence=await page.evaluate(()=>{
     const box=sel=>{
       const el=document.querySelector(sel);
