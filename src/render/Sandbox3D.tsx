@@ -427,7 +427,7 @@ type DeviceDrag = {
 /** This scene owns camera and pointer gestures, NEVER PLC or physics state.
  * A dragged machine is a temporary ghost until the worker acknowledges 'move'.
  */
-function Workbench({ project, snapshot, editable, grid, mode, fitRequest, placeKind, alignSensor,
+function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusRequest, focusSelectedId, placeKind, alignSensor,
   showZones, showSignals, hover, selectedDeviceIds, selectedTerminal, moveTarget,
   onTerminal, onOperate, onSelect, onPlaceAt, onPreview, onMove, onRotate, onCameraPose }: {
   project: ProjectFile; snapshot: RenderSnapshot; editable: boolean; grid: GridStep;
