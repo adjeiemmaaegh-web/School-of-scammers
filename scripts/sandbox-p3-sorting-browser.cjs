@@ -35,6 +35,10 @@ async function button(page,text) {
   try {
     await page.setViewport({width:1440,height:940,deviceScaleFactor:1});
     await page.goto(base+'/sandbox',{waitUntil:'networkidle0'});
+  // Canvas-first UX4: request real engineering dock before inspecting worker wires/PLC editor.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await page.waitForSelector('.sandbox-toolbar');
     await button(page,'Place 3D sorting layout');
     await page.waitForFunction(()=>document.querySelectorAll('.sandbox-device-list .sandbox-device').length===8);
