@@ -186,4 +186,8 @@ main.efo-workspace-focused .p5-floor-stage .floor-plan-panel {
   .efo-ux2-shell .efo-canvas-actions {right:7px;max-width:calc(100% - 14px)}
   .efo-ux2-shell .efo-canvas-actions button {font-size:11px;min-height:38px;padding:7px 8px}
   main.efo-workspace-focused .efo-canvas-actions {top:8px;right:8px}
+  /* Keep the 3D camera toolbar below the Restore/Run controls on portrait tablets. */
+  main.efo-workspace-focused .sandbox-3d-camera-controls {
+    top:58px;left:8px;max-width:calc(100% - 16px);
+  }
 }
