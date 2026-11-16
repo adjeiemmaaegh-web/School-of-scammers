@@ -1,0 +1,189 @@
+/*
+ * UX4: canvas-first engineering workspace.
+ *
+ * A reversible fullscreen-browser viewport, not browser Fullscreen API.
+ * Hides layout-only chrome; preserves the mounted worker, project, editor
+ * selection, panel expansion choices and saved project bytes.
+ */
+
+/* The canvas toggle is always discoverable in the work area, regardless of
+   which view (3D / logical / 2D plan) is selected. */
+.efo-ux2-shell .efo-canvas-actions {
+  position:absolute;
+  top:48px;
+  right:12px;
+  z-index:45;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  max-width:calc(100% - 24px);
+  pointer-events:none;
+}
+.efo-ux2-shell .efo-canvas-actions button {
+  pointer-events:auto;
+  min-height:36px;
+  border:1px solid #7390a6;
+  border-radius:7px;
+  padding:7px 11px;
+  font:700 12px/1.2 var(--body);
+  color:#f3f8fe;
+  background:#102435ee;
+  box-shadow:0 3px 12px #0007;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.efo-ux2-shell .efo-canvas-actions button:hover {
+  background:#1c4158;
+  border-color:#d0e8fa;
+}
+.efo-ux2-shell .efo-canvas-actions button:focus-visible {
+  outline:3px solid var(--accent);
+  outline-offset:3px;
+}
+.efo-ux2-shell .efo-canvas-actions button[aria-pressed="true"] {
+  border-color:var(--accent);
+}
+.efo-ux2-shell .efo-canvas-quick-run {
+  border-color:#5dc399;
+}
+
+/* Full-browser *content* area: browser tabs/OS chrome are unaffected.
+   Keep the same React/worker tree alive; do not remount the 3D scene. */
+body:has(main.efo-workspace-focused) {
+  overflow:hidden !important;
+}
+/* Remove background navigation from both sight and keyboard focus order while
+   the workbench covers the viewport. Restore it automatically on exit. */
+body:has(main.efo-workspace-focused) .app-header {
+  display:none !important;
+}
+main.efo-workspace-focused {
+  position:fixed !important;
+  inset:0 !important;
+  z-index:9999 !important;
+  display:flex !important;
+  flex-direction:column !important;
+  box-sizing:border-box !important;
+  margin:0 !important;
+  padding:0 !important;
+  width:100vw !important;
+  max-width:none !important;
+  height:100dvh !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+  background:var(--bg);
+}
+/* Hide only presentation chrome, without changing any React state controlling
+   the worker, simulation, selected device or remembered panel expansion. */
+main.efo-workspace-focused > :not(.p5-layout) {
+  display:none !important;
+}
+main.efo-workspace-focused > .p5-layout {
+  display:block !important;
+  flex:1 1 auto !important;
+  box-sizing:border-box !important;
+  width:100% !important;
+  max-width:none !important;
+  height:100% !important;
+  min-height:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  overflow:hidden !important;
+}
+main.efo-workspace-focused > .p5-layout > .sandbox-palette,
+main.efo-workspace-focused > .p5-layout > .p5-inspector-slot {
+  display:none !important;
+}
+main.efo-workspace-focused .sandbox-main {
+  position:relative;
+  box-sizing:border-box;
+  width:100% !important;
+  height:100% !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  overflow:hidden !important;
+}
+main.efo-workspace-focused .efo-canvas-actions {
+  top:12px;
+  right:14px;
+  z-index:60;
+}
+main.efo-workspace-focused .p5-logical-heading {
+  display:none !important;
+}
+
+/* The 3D scene itself should be the workspace, not a small box within it. */
+main.efo-workspace-focused .p5-layout[data-p5-view-active="physical"] .p5-physical-stage {
+  display:flex !important;
+  flex-direction:column !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+main.efo-workspace-focused .p5-physical-stage > :not(.sandbox-3d-shell):not(.sandbox-3d-loading) {
+  display:none !important;
+}
+main.efo-workspace-focused .p5-physical-stage > .sandbox-3d-shell {
+  flex:1 1 auto !important;
+  box-sizing:border-box !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  max-height:none !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+}
+main.efo-workspace-focused .p5-physical-stage > .sandbox-3d-loading {
+  flex:1 1 auto !important;
+  height:100% !important;
+}
+
+/* Logical view: use viewport-sized scrollable schematic. Wires and terminals
+   stay editable, but the duplicate keyboard patch panel does not consume space. */
+main.efo-workspace-focused .p5-layout[data-p5-view-active="logical"] .p5-logical-board {
+  height:100% !important;
+  min-height:0 !important;
+  box-sizing:border-box;
+  overflow:hidden !important;
+}
+main.efo-workspace-focused .p5-logical-board > .p5-logical-scroll {
+  height:100% !important;
+  max-height:none !important;
+  min-height:0 !important;
+  margin:0 !important;
+  border-radius:0;
+}
+main.efo-workspace-focused .p5-logical-board > .sandbox-help,
+main.efo-workspace-focused .p5-layout .p5-logical-stage {
+  display:none !important;
+}
+
+/* 2D plan: enlarge its containing surface, retaining its real SVG coordinate
+   system and internal pan/scroll rather than distorting edit coordinates. */
+main.efo-workspace-focused .p5-layout[data-p5-view-active="plan"] .p5-floor-stage {
+  height:100% !important;
+  min-height:0 !important;
+  width:100% !important;
+  overflow:auto !important;
+}
+main.efo-workspace-focused .p5-floor-stage .floor-plan-panel {
+  box-sizing:border-box;
+  min-height:100%;
+  margin:0;
+  border-radius:0;
+}
+
+/* Less mouse/touch reach required on tablets; do not let the floating control
+   cover the entire canvas. */
+@media (max-width:780px) {
+  .efo-ux2-shell .efo-canvas-actions {right:7px;max-width:calc(100% - 14px)}
+  .efo-ux2-shell .efo-canvas-actions button {font-size:11px;min-height:38px;padding:7px 8px}
+  main.efo-workspace-focused .efo-canvas-actions {top:8px;right:8px}
+}
