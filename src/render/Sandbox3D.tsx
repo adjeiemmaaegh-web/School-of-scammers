@@ -275,6 +275,10 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   // Two-device projects used to show two enormous status cards over the real
   // geometry. Full names and live state remain available on selection/hover.
   const compact=!selected;
+  // Large, hand-authored commissioning projects retain a larger on-screen
+  // handle for actual pointer dragging at the default inspection distance.
+  // Worker-authored galleries and the two-machine case stay unobstructed.
+  const precisionCommissioning=!galleryScene&&project.components.length>8;
   // Label chips are deliberately short; full equipment names and the stable
   // unique ID remain in the tooltip and selected inspector. A long ID such as
   // proportional-valve-2 would otherwise balloon with perspective distance.
@@ -306,7 +310,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
         rod={c.kind === 'cylinder' ? rod : undefined} lamps={c.kind === 'stacklight' ? lamps : undefined} />
     </group>}
     <Html position={[0, plant ? .70 : 1.08, 0]} center
-      distanceFactor={compact ? 3.1 : 3.4}>
+      distanceFactor={compact ? (precisionCommissioning ? 8.5 : 3.1) : 3.4}>
       <div className={`sandbox-3d-label ${compact ? 'ux3-compact-label' : 'ux3-selected-label'}`} data-3d-drag-handle={c.id}
         title={`${def.label} (${c.id}) · Select to see live state; drag to reposition while paused`}
         onPointerDown={event=>{
