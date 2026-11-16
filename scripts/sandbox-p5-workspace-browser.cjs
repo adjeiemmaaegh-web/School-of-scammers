@@ -23,7 +23,7 @@ const url=(process.env.PLC_BASE_URL||'http://127.0.0.1:4173')+'/sandbox';
       library:!!document.querySelector('[data-p5-library]'),
       inspector:!!document.querySelector('[data-p5-inspector]'),
       dock:!!document.querySelector('[data-p5-dock]'),
-      tools:[...document.querySelectorAll('[data-p5-view]')].map(el=>el.textContent.trim()),
+      tools:[...document.querySelectorAll('[data-p5-view]')].map(el=>el.getAttribute('aria-label')||el.textContent.trim()),
     }));
     assert.equal(initial.view,'physical');
     assert.equal(initial.library,true);
