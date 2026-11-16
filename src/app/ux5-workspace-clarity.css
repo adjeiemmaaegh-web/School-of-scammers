@@ -43,9 +43,11 @@
 }
 .efo-ux2-shell .sandbox-3d-label.ux3-compact-label {
   box-sizing:border-box;
-  min-width:38px;
-  min-height:24px;
+  min-width:32px;
+  min-height:0;
   max-width:92px;
+  padding:2px 5px;
+  line-height:1.1;
   justify-content:center;
 }
 .efo-ux2-shell .sandbox-3d-label.ux3-compact-label:focus-within,
