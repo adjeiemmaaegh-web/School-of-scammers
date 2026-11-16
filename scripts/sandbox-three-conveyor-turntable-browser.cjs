@@ -78,6 +78,10 @@ const makeProject = (wrong = false) => ({
       localStorage.setItem(key,JSON.stringify(data));
     },key,fixture);
     await page.reload({waitUntil:'networkidle0'});
+  // UX4 canvas-first: open actual engineering dock on demand for worker I/O assertions.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await page.waitForSelector('[data-p3-bodies]',{timeout:20000});
     await page.waitForSelector('.sandbox-p3-body-list');
     await page.waitForFunction(() =>
@@ -126,6 +130,10 @@ const makeProject = (wrong = false) => ({
     assert.equal(saved.components.find(c=>c.id==='north')?.yawDeg,90);
     assert.equal(saved.stSource,fixture.stSource);
     await page.reload({waitUntil:'networkidle0'});
+  // UX4 canvas-first: open actual engineering dock on demand for worker I/O assertions.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await page.waitForFunction(() =>
       document.querySelectorAll('.sandbox-wire-list > div').length===23,
       {timeout:15000});
@@ -134,6 +142,10 @@ const makeProject = (wrong = false) => ({
   try {
     await page.setViewport({width:1440,height:940,deviceScaleFactor:1});
     await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:30000});
+  // UX4 canvas-first: open actual engineering dock on demand for worker I/O assertions.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await runCase(false,'north');
     await runCase(true,'east');
     assert.deepEqual(pageErrors.filter(s=>!/favicon|WebGL|GPU stall|swiftshader/i.test(s)),[]);
