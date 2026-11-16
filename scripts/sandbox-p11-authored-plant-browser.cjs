@@ -84,6 +84,9 @@ const PLC_B = ['VAR_INPUT', '  Start : BOOL;', '  StopOK : BOOL;', '  TankHigh :
     await page.click('[data-cta="simulator"]');
     await page.waitForSelector('.sandbox-toolbar', { timeout: 15000 });
     await page.waitForSelector('.sandbox-palette-item:not([disabled])', { timeout: 15000 }); // editing is disabled until the saved project has hydrated
+    await page.click('[data-p5-view="logical"]');
+    await page.click('[data-p5-dock-tab="diagnostics"]');
+    await page.waitForSelector('.sandbox-wire-list');
     assert.deepEqual(await counts(), { d: 0, w: 0 }, 'An empty floor');
 
     // 1. Build: place every device from the library.
