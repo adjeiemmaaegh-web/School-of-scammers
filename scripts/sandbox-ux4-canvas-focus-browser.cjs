@@ -51,6 +51,8 @@ const sizes=[
       return !n||!n.getClientRects().length||getComputedStyle(n).display==='none';
     };
     const canvas=box('.sandbox-three-canvas canvas');
+    const cameraToolbar=box('.sandbox-3d-camera-controls');
+    const focusToolbar=box('.efo-canvas-actions');
     return {
       viewport:[innerWidth,innerHeight],
       main:box('main.efo-workspace-focused'),
@@ -58,7 +60,7 @@ const sizes=[
       sandboxMain:box('.sandbox-main'),
       physical:box('.p5-physical-stage'),
       shell:box('.sandbox-3d-shell'),
-      canvas,
+      canvas,cameraToolbar,focusToolbar,
       canvasRatio:canvas?canvas.w*canvas.h/(innerWidth*innerHeight):0,
       mastheadHidden:hidden('.sandbox-masthead'),
       navHeaderHidden:hidden('.app-header'),
@@ -72,6 +74,11 @@ const sizes=[
     };
    });
    console.log('UX4 CANVAS FOCUS',t.name,JSON.stringify(state));
+   if(state.cameraToolbar&&state.focusToolbar){
+     const a=state.cameraToolbar,b=state.focusToolbar;
+     const overlap=a.x<b.x+b.w && b.x<a.x+a.w && a.y<b.y+b.h && b.y<a.y+a.h;
+     assert.ok(!overlap,'Focused camera toolbar must not overlap Restore/Run controls at '+t.name+': '+JSON.stringify(state));
+   }
    assert.equal(state.focused,'true');
    assert.equal(state.restorePressed,'true');
    assert.ok(state.canvasRatio>=0.90,'3D canvas occupies <90% viewport at '+t.name+': '+JSON.stringify(state));
