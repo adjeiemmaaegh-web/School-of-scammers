@@ -41,6 +41,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('.sandbox-palette-item:not([disabled])');
+    await page.click('[data-p5-view="logical"]');
+    await page.click('[data-p5-dock-tab="diagnostics"]');
+    await page.waitForSelector('.sandbox-wire-list');
     for (const l of ['24V supply', 'START NO', '24V on-delay relay', '24V pilot lamp', '24V pilot lamp']) { await place(l); await sleep(70); }
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 5, { timeout: 8000 });
     const [PS, GO, T, LATE, EARLY] = ['supply-1', 'start-2', 'timerelay-3', 'lamp-4', 'lamp-5'];
