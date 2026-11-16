@@ -40,6 +40,8 @@ const pairs = [
     { timeout: 5000 }, running ? 'RUNNING' : 'STOPPED');
   try {
     await page.goto(baseUrl + '/sandbox', { waitUntil: 'networkidle0', timeout: 15000 });
+    // UX4 begins canvas-first. Reveal the real engineering dock on demand.
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await page.waitForSelector('.sandbox-3d-shell',{timeout:12000}).catch(async error=>{
       const snippet=await page.evaluate(async stack=>{
         const match=/\((https?:[^)]+\.js):(\d+):(\d+)\)/.exec(stack??'');
