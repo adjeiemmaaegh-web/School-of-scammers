@@ -279,7 +279,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   // unique ID remain in the tooltip and selected inspector. A long ID such as
   // proportional-valve-2 would otherwise balloon with perspective distance.
   const chipName=c.id.length>13
-    ? (c.id.match(/([^-]+-\\d+)$/)?.[1] ?? c.id.slice(0,9)+'…')
+    ? (c.id.match(/([^-]+-\d+)$/)?.[1] ?? c.id.slice(0,9)+'…')
     : c.id;
   const showDeviceTerminals = !galleryScene || selected;
   // P3 equipment uses the real worker-owned 3D shapes, not duplicated large
