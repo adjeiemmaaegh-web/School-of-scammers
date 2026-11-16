@@ -66,6 +66,7 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
    await page.click('[data-3d-fit-scene]');
    await page.waitForFunction(()=>document.querySelector('.sandbox-three-canvas canvas')?.width>300,
      {timeout:12000});
+   await page.mouse.move(1,1); // exclude transient hover expansion from passive-size evidence
    await sleep(500); // only for WebGL paint to settle, not simulation progression
    const evidence=await page.evaluate(kind=>{
      const raw=localStorage.getItem('efo-open-sandbox-project-v1');
@@ -92,6 +93,8 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
        terminals:[...document.querySelectorAll('.sandbox-3d-terminal')].map(el=>({
          width:Math.round(el.getBoundingClientRect().width),
          selected:el.classList.contains('selected'),
+          interactive:el.matches(':hover, :focus-visible'),
+          visible:getComputedStyle(el).visibility!=='hidden' && getComputedStyle(el).display!=='none',
        })),
      };
    },t.kind);
@@ -107,8 +110,8 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
      'Unselected labels must be compact, not obscure real 3D machines: '+
       JSON.stringify(evidence.labels));
    assert.ok(evidence.terminals.length>=2 &&
-     evidence.terminals.filter(p=>!p.selected).every(p=>p.width<=22),
-     'Unselected PLC terminals must be pin markers, not giant HTML buttons: '+
+     evidence.terminals.filter(p=>!p.selected && !p.interactive && p.visible).every(p=>p.width<=22),
+     'Passive visible PLC terminals must be pin markers, not giant HTML buttons: '+
        JSON.stringify(evidence.terminals.slice(0,20)));
    console.log('UX3 REAL SCENE',t.name,JSON.stringify({
      ...evidence,labels:evidence.labels.slice(0,15),
