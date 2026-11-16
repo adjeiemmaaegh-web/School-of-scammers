@@ -45,10 +45,16 @@
   box-sizing:border-box;
   min-width:32px;
   min-height:0;
-  max-width:92px;
-  padding:2px 5px;
+  max-width:72px;
+  padding:2px 4px;
   line-height:1.1;
   justify-content:center;
+}
+.efo-ux2-shell .sandbox-3d-label.ux3-compact-label strong {
+  max-width:64px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 .efo-ux2-shell .sandbox-3d-label.ux3-compact-label:focus-within,
 .efo-ux2-shell .sandbox-3d-label.ux3-selected-label:focus-within {
