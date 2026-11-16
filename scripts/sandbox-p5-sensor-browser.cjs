@@ -51,6 +51,13 @@ const connections = [
     await page.waitForSelector('.sandbox-toolbar');
     await clickText('Place 3D sorting layout');
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device-list .sandbox-device').length === 8);
+    // Canvas-first UX4 keeps Diagnostics collapsed until explicitly requested.
+    // Exercise wiring and sensor fault controls through the real user-visible panels.
+    await page.click('[data-p5-view="logical"]');
+    await page.waitForFunction(() => document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active') === 'logical');
+    await page.click('[data-p5-dock-tab="diagnostics"]');
+    await page.waitForSelector('.sandbox-wire-list');
+    await page.waitForSelector('[data-fault-inject]');
     for (const [from, to] of connections) {
       await page.click(`[data-terminal-id="${from}"]`);
       await page.waitForFunction(id => document.querySelector(`[data-terminal-id="${id}"]`)
