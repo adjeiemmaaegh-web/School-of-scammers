@@ -93,6 +93,15 @@ const ST = [
     const r=el.getBoundingClientRect();return {x:r.left,y:r.top,w:r.width,h:r.height};
    });
    const cx=box.x+(x+85)*box.w/1080,cy=box.y+(y+65)*box.h/580;
+   const target=await page.evaluate(({x,y})=>{
+     const el=document.elementFromPoint(x,y);
+     const root=document.querySelector('[data-floor-plan]');
+     return {tag:el?.tagName,classes:el?.getAttribute('class'),
+       floorBackground:el?.hasAttribute('data-floor-background')??false,
+       insidePlan:!!(root && el && root.contains(el)),point:[x,y]};
+   },{x:cx,y:cy});
+   console.log('P6 FLOOR CLICK',JSON.stringify({requested:[x,y],target}));
+   assert.ok(target.insidePlan,'Floor plan click target intercepted: '+JSON.stringify(target));
    await page.mouse.click(cx,cy);
  };
  const clickTerminal=async terminal=>{
