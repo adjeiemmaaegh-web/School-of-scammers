@@ -37,6 +37,7 @@ import './p5-workspace.css';
 import './ux2-workbench.css';
 import './ux2-command-layout.css';
 import './ux4-canvas-focus.css';
+import './ux5-workspace-clarity.css';
 
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
@@ -743,19 +744,22 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       <div className="p5-view-tools" role="toolbar" aria-label="Canvas views and active tools">
         <div className="p5-view-tabs" role="group" aria-label="Project view">
           <button type="button" data-p5-view="logical" aria-pressed={workspaceView==='logical'}
-            onClick={()=>setWorkspaceView('logical')}>Logical / Wiring</button>
+            aria-label="Logical / Wiring"
+            onClick={()=>setWorkspaceView('logical')}>Wiring</button>
           <button type="button" data-p5-view="physical" aria-pressed={workspaceView==='physical'}
-            onClick={()=>setWorkspaceView('physical')}>Physical / 3D Plant</button>
+            aria-label="Physical / 3D Plant"
+            onClick={()=>setWorkspaceView('physical')}>3D Plant</button>
           <button type="button" data-p5-view="plan" aria-pressed={workspaceView==='plan'}
-            onClick={()=>setWorkspaceView('plan')}>Floor Plan / 2D</button>
+            aria-label="Floor Plan / 2D"
+            onClick={()=>setWorkspaceView('plan')}>2D Plan</button>
         </div>
         <div className="p5-tool-actions" role="group" aria-label="Engineering tools">
           <button type="button" onClick={()=>{setMoveTarget(null);setSelectedTerminal(null);}}>Select</button>
-          <button type="button" disabled={!editable} onClick={()=>{setWorkspaceView('logical');setActiveStage('wire');}}>
-            Wire terminals</button>
+          <button type="button" disabled={!editable} onClick={()=>{setWorkspaceView('logical');setActiveStage('wire');}}
+            aria-label="Wire terminals">Wire</button>
           <button type="button" onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);
-            if (scenario) document.getElementById('sandbox-stage-test')?.scrollIntoView({block:'nearest'});}}>
-            Measure / diagnose</button>
+            if (scenario) document.getElementById('sandbox-stage-test')?.scrollIntoView({block:'nearest'});}}
+            aria-label="Measure / diagnose">Diagnose</button>
         </div>
         <div className="p5-panel-toggles" role="group" aria-label="Workspace panels">
           <button type="button" aria-pressed={libraryExpanded}
