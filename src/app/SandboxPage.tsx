@@ -36,6 +36,7 @@ import './sandbox.css';
 import './p5-workspace.css';
 import './ux2-workbench.css';
 import './ux2-command-layout.css';
+import './ux4-canvas-focus.css';
 
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
@@ -107,13 +108,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [libraryFamily,setLibraryFamily] = useState<DeviceFamily>('all');
   const [workspaceView,setWorkspaceView] = useState<'physical'|'logical'|'plan'>('physical');
   const [libraryExpanded,setLibraryExpanded] = useState(true);
-  // Keep the factory visible on narrower PC/tablet screens; Inspector remains one tap away.
-  const [inspectorExpanded,setInspectorExpanded] = useState(() =>
-    !!scenario || typeof window === 'undefined' || window.innerWidth >= 1100);
-  // UX2 gives 1280px-class laptops/tablets priority to the factory viewport.
-  // Full desktop and scenario flows retain their previous expanded defaults.
-  const [dockExpanded,setDockExpanded] = useState(() =>
-    !!scenario || typeof window === 'undefined' || window.innerWidth >= 1400 || window.innerHeight < 720);
+  // Layout state only; never changes the PLC program, wires or saved project.
+  const [canvasFocused,setCanvasFocused] = useState(false);
+  // Canvas-first on all PC/tablet widths. Scenario routes keep their prior panel defaults.
+  const [inspectorExpanded,setInspectorExpanded] = useState(!!scenario);
+  const [dockExpanded,setDockExpanded] = useState(!!scenario);
   const [dockFocus,setDockFocus] = useState<'program'|'diagnostics'>('program');
   const [workspaceHelp,setWorkspaceHelp] = useState(false);
   // These affect layout only; they never enter a saved PLC project.
@@ -556,6 +555,23 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     { id: 'program' as const, label: 'Program', hint: 'Edit Ladder logic', count: project?.program.rungs.length ?? 0 },
     { id: 'test' as const, label: 'Test', hint: 'Run and troubleshoot', count: snapshot?.tick ?? 0 },
   ];
+  // Alt+Enter maximizes the work surface; Escape restores the toolbox.
+  // This is a UI-only viewport change, never a simulator/worker command.
+  useEffect(()=>{
+    if (scenario) return;
+    const onFocusKey=(event:KeyboardEvent)=>{
+      const target=event.target as HTMLElement|null;
+      const typing=!!target&&(/^(input|textarea|select)$/i.test(target.tagName)||target.isContentEditable);
+      if (event.key==='Escape' && canvasFocused) {
+        event.preventDefault();setCanvasFocused(false);return;
+      }
+      if (event.altKey && event.key==='Enter' && !typing && !event.repeat) {
+        event.preventDefault();setCanvasFocused(v=>!v);
+      }
+    };
+    window.addEventListener('keydown',onFocusKey);
+    return ()=>window.removeEventListener('keydown',onFocusKey);
+  },[scenario,canvasFocused]);
   // Shortcuts affect only the active view, except explicit export.
   useEffect(()=>{
     const onShortcut=(event:KeyboardEvent)=>{
@@ -575,8 +591,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   });
   return <>
     <AppHeader />
-    <main id="main" className={`sandbox-page sandbox-ux p5-organized wrap wrap-wide${scenario ? '' : ' efo-ux2-shell'}`}
+    <main id="main" className={`sandbox-page sandbox-ux p5-organized wrap wrap-wide${scenario ? '' : ' efo-ux2-shell'}${canvasFocused ? ' efo-workspace-focused' : ''}`}
       data-p5-workspace="organized" data-ux2-workbench={scenario ? undefined : 'pc-tablet'}
+      data-efo-canvas-focused={canvasFocused ? 'true' : 'false'}
       style={scenario ? undefined : {
         '--ux2-palette-size': `${panelSizes.library}px`,
         '--ux2-inspector-size': `${panelSizes.inspector}px`,
@@ -798,6 +815,21 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <span>{componentKinds.length} registered kinds · no live equipment</span></div>
         </aside>}
         <div className="sandbox-main" id="sandbox-stage-build">
+          {!scenario && <div className="efo-canvas-actions" role="group" aria-label="Canvas display and simulation controls">
+            <button type="button" className="efo-canvas-focus-toggle"
+              data-efo-canvas-focus-toggle aria-pressed={canvasFocused}
+              aria-keyshortcuts="Alt+Enter"
+              title={canvasFocused ? 'Restore the component library, tools and inspector (Esc)' : 'Expand the working canvas across the browser window (Alt+Enter)'}
+              onClick={()=>setCanvasFocused(v=>!v)}>
+              {canvasFocused ? 'Restore tools · Esc' : '⛶ Maximize workspace'}
+            </button>
+            {canvasFocused && <button type="button" className="efo-canvas-quick-run"
+              data-efo-canvas-quick-run
+              aria-label={snapshot?.running ? 'Pause PLC simulation' : 'Run PLC simulation'}
+              onClick={()=>send([{k:snapshot?.running?'pause':'run'}])}>
+              {snapshot?.running ? 'Ⅱ Pause' : '▶ Run'}
+            </button>}
+          </div>}
           <div className="p5-logical-heading" aria-hidden={workspaceView!=='logical'}>
             <strong>Logical / Wiring workspace</strong>
             <span>Choose the first terminal, then a compatible second terminal. The worker validates each connection.</span>
