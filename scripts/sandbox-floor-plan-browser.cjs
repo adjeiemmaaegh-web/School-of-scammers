@@ -56,8 +56,29 @@ const ST = [
  const page = await browser.newPage(), errors=[];
  page.on('pageerror',e=>errors.push(String(e)));
  const saved=()=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'null'),storage);
- const count=(n)=>page.waitForFunction(num=>
-   document.querySelectorAll('[data-plan-device]').length===num,{timeout:15000},n);
+ const count=async(n)=>{
+    try {
+      await page.waitForFunction(num=>
+        document.querySelectorAll('[data-plan-device]').length===num,{timeout:15000},n);
+    } catch (error) {
+      const diagnostic=await page.evaluate(()=>{
+        const svg=document.querySelector('[data-floor-plan] svg');
+        const r=svg?.getBoundingClientRect();
+        let saved=null;
+        try {saved=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null')} catch {}
+        return {
+          visibleDevices:document.querySelectorAll('[data-plan-device]').length,
+          savedKinds:saved?.components?.map(c=>c.kind),
+          selectedTool:document.querySelector('[data-floor-tool]')?.value,
+          editable:!document.querySelector('[data-floor-tool]')?.disabled,
+          activeView:document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active'),
+          svg:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null,
+          alerts:[...document.querySelectorAll('[role="alert"]')].map(el=>el.textContent?.slice(0,160)),
+        };
+      });
+      throw new Error('P6 floor-plan placement expected '+n+' devices: '+JSON.stringify(diagnostic)+'; '+String(error));
+    }
+  };
  const clickText=async label=>{
   const found=await page.evaluate(value=>{
    const b=[...document.querySelectorAll('button')].find(el=>el.textContent.trim()===value);
