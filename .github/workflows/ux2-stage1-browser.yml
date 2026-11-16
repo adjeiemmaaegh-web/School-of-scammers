@@ -8,10 +8,19 @@ on:
       - 'src/ui/sandbox/EquipmentThumbnail.tsx'
       - 'scripts/sandbox-ux2-stage1-browser.cjs'
       - 'src/app/ux2-command-layout.css'
+      - 'src/app/ux4-canvas-focus.css'
+      - 'scripts/sandbox-ux4-canvas-focus-browser.cjs'
       - 'scripts/sandbox-ux2-stage2-browser.cjs'
       - 'scripts/sandbox-p7-3d-commissioning-browser.cjs'
       - 'scripts/sandbox-p12-multicase-browser.cjs'
       - 'scripts/sandbox-p5-workspace-browser.cjs'
+      - 'scripts/sandbox-floor-plan-browser.cjs'
+      - 'scripts/sandbox-p4-reversing-browser.cjs'
+      - 'scripts/sandbox-p5-faults-browser.cjs'
+      - 'scripts/sandbox-p5-sensor-browser.cjs'
+      - 'scripts/sandbox-p15-timer-relay-browser.cjs'
+      - 'scripts/sandbox-p11-authored-plant-browser.cjs'
+      - 'scripts/sandbox-p10-multiplant-browser.cjs'
       - 'scripts/sandbox-p8-edit-plant-browser.cjs'
       - '.github/workflows/ux2-stage1-browser.yml'
   workflow_dispatch:
@@ -46,6 +55,22 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux2-stage1-browser.cjs
       - name: Verify compact command panels at five PC and tablet resolutions
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux2-stage2-browser.cjs
+      - name: UX4 real-browser canvas focus at five viewports
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux4-canvas-focus-browser.cjs
+      - name: Regression - P6 interactive 2D floor-plan placement and worker wiring
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-floor-plan-browser.cjs
+      - name: Regression - P4 reversing motor real 21-wire and NC interlocks
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p4-reversing-browser.cjs
+      - name: Regression - P5 hidden-fault electrical diagnosis and repair
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-faults-browser.cjs
+      - name: Regression - P5 photoeye hidden fault, real PLC input and repair
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-sensor-browser.cjs
+      - name: Regression - P15 on-delay timer relay inspector and reload
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p15-timer-relay-browser.cjs
+      - name: Regression - P11 real authored 2-station plant and saved PLC restore
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p11-authored-plant-browser.cjs
+      - name: Regression - P10 two independent conveyor and tank PLC plants
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p10-multiplant-browser.cjs
       - name: Regression - 3D factory PLC16 commissioning and floor raycasts
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-3d-commissioning-browser.cjs
       - name: Regression - P12 factory challenge launch from clipped scene panel
@@ -62,6 +87,7 @@ jobs:
           path: |
             qa-artifacts/ux2-stage1/
             qa-artifacts/ux2-stage2/
+            qa-artifacts/ux4-canvas-focus/
           if-no-files-found: ignore
           retention-days: 7
       - name: Surface preview diagnostics when failed

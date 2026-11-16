@@ -41,6 +41,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('.sandbox-palette-item:not([disabled])');
+    await page.click('[data-p5-view="logical"]');
+    await page.click('[data-p5-dock-tab="diagnostics"]');
+    await page.waitForSelector('.sandbox-wire-list');
+    // UX4 starts with Inspector collapsed; open the actual UI before editing a relay dial.
+    await page.click('.p5-panel-toggles button:nth-child(2)');
+    await page.waitForSelector('[data-p5-inspector]');
     for (const l of ['24V supply', 'START NO', '24V on-delay relay', '24V pilot lamp', '24V pilot lamp']) { await place(l); await sleep(70); }
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 5, { timeout: 8000 });
     const [PS, GO, T, LATE, EARLY] = ['supply-1', 'start-2', 'timerelay-3', 'lamp-4', 'lamp-5'];
@@ -85,6 +91,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await sleep(500);
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 5, { timeout: 8000 });
+    // A fresh load intentionally collapses the Inspector again.
+    await page.click('.p5-panel-toggles button:nth-child(2)');
+    await page.waitForSelector('[data-p5-inspector]');
     await inspect(T);
     await page.waitForSelector('[data-param="delayMs"]');
     assert.equal(await page.$eval('[data-param="delayMs"]', e => e.value), '1000', 'delay survives reload');

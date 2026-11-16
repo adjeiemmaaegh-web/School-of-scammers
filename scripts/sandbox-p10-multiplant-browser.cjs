@@ -44,6 +44,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await page.goto(base + '/sandbox', { waitUntil: 'networkidle0', timeout: 20000 });
     await page.evaluate((k, v) => { localStorage.clear(); localStorage.setItem(k, JSON.stringify(v)); }, KEY, p);
     await page.reload({ waitUntil: 'networkidle0' });
+    // The canvas-first layout starts with its PLC programming dock closed.
+    // Inspect both programmed PLCs in the actual Program panel after each project load.
+    await page.click('[data-p5-dock-tab="program"]');
     await page.waitForSelector('[data-plc-tab="plc2"]', { timeout: 10000 });
   };
   const status = (id, want, timeout = 12000) => page.waitForFunction((dev, expected) =>

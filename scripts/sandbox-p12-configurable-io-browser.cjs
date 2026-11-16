@@ -45,6 +45,9 @@ const ST = ['VAR_INPUT', '  Door : BOOL;', 'END_VAR', 'VAR_OUTPUT', '  Beacon : 
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('.sandbox-palette-item:not([disabled])');
+    await page.click('[data-p5-view="logical"]');
+    await page.click('[data-p5-dock-tab="diagnostics"]');
+    await page.waitForSelector('.sandbox-wire-list');
 
     // 1. Build from the library: supply, 16/16 PLC, a button and two lamps.
     for (const l of ['24V supply', 'Virtual PLC 16/16', 'START NO', '24V pilot lamp', '24V pilot lamp']) { await place(l); await sleep(80); }
@@ -114,6 +117,9 @@ const ST = ['VAR_INPUT', '  Door : BOOL;', 'END_VAR', 'VAR_OUTPUT', '  Beacon : 
 
     // 8. Names (and the program) survive a reload.
     await page.reload({ waitUntil: 'networkidle0' });
+    // UX4 restores the canvas-first workspace with its programming dock collapsed.
+    // Open the real Program tab before reading persistent I/O mappings after reload.
+    await page.click('[data-p5-dock-tab="program"]');
     await page.waitForSelector(`[data-io-map="${PLC}"]`);
     assert.equal(await fieldValue('[data-io-input="I1.7"]'), 'Door');
     assert.equal(await fieldValue('[data-io-output="Q1.7"]'), 'Beacon');

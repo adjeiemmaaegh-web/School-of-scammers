@@ -56,8 +56,29 @@ const ST = [
  const page = await browser.newPage(), errors=[];
  page.on('pageerror',e=>errors.push(String(e)));
  const saved=()=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'null'),storage);
- const count=(n)=>page.waitForFunction(num=>
-   document.querySelectorAll('[data-plan-device]').length===num,{timeout:15000},n);
+ const count=async(n)=>{
+    try {
+      await page.waitForFunction(num=>
+        document.querySelectorAll('[data-plan-device]').length===num,{timeout:15000},n);
+    } catch (error) {
+      const diagnostic=await page.evaluate(()=>{
+        const svg=document.querySelector('[data-floor-plan] svg');
+        const r=svg?.getBoundingClientRect();
+        let saved=null;
+        try {saved=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null')} catch {}
+        return {
+          visibleDevices:document.querySelectorAll('[data-plan-device]').length,
+          savedKinds:saved?.components?.map(c=>c.kind),
+          selectedTool:document.querySelector('[data-floor-tool]')?.value,
+          editable:!document.querySelector('[data-floor-tool]')?.disabled,
+          activeView:document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active'),
+          svg:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null,
+          alerts:[...document.querySelectorAll('[role="alert"]')].map(el=>el.textContent?.slice(0,160)),
+        };
+      });
+      throw new Error('P6 floor-plan placement expected '+n+' devices: '+JSON.stringify(diagnostic)+'; '+String(error));
+    }
+  };
  const clickText=async label=>{
   const found=await page.evaluate(value=>{
    const b=[...document.querySelectorAll('button')].find(el=>el.textContent.trim()===value);
@@ -67,11 +88,20 @@ const ST = [
   assert.ok(found,'Expected enabled toolbar control: '+label);
  };
  const position=async(x,y)=>{
-   await page.$eval('[data-floor-plan] svg',el=>el.scrollIntoView({block:'center'}));
+   await page.$eval('[data-floor-plan] svg',el=>el.scrollIntoView({block:'start'}));
    const box=await page.$eval('[data-floor-plan] svg',el=>{
     const r=el.getBoundingClientRect();return {x:r.left,y:r.top,w:r.width,h:r.height};
    });
    const cx=box.x+(x+85)*box.w/1080,cy=box.y+(y+65)*box.h/580;
+   const target=await page.evaluate(({x,y})=>{
+     const el=document.elementFromPoint(x,y);
+     const root=document.querySelector('[data-floor-plan]');
+     return {tag:el?.tagName,classes:el?.getAttribute('class'),
+       floorBackground:el?.hasAttribute('data-floor-background')??false,
+       insidePlan:!!(root && el && root.contains(el)),point:[x,y]};
+   },{x:cx,y:cy});
+   console.log('P6 FLOOR CLICK',JSON.stringify({requested:[x,y],target}));
+   assert.ok(target.insidePlan,'Floor plan click target intercepted: '+JSON.stringify(target));
    await page.mouse.click(cx,cy);
  };
  const clickTerminal=async terminal=>{
@@ -84,6 +114,10 @@ const ST = [
   await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:30000});
   await page.evaluate(()=>localStorage.clear());
   await page.reload({waitUntil:'networkidle0'});
+  // UX4 canvas-first: open actual engineering dock on demand for worker I/O assertions.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
   await page.waitForSelector('[data-p5-view="plan"]',{timeout:15000});
   await page.click('[data-p5-view="plan"]');
   await page.waitForSelector('[data-floor-plan]');
@@ -175,6 +209,10 @@ const ST = [
   assert.equal(project.language,'st');
   assert.match(project.stSource||'',/Out2 := Rotate/);
   await page.reload({waitUntil:'networkidle0'});
+  // UX4 canvas-first: open actual engineering dock on demand for worker I/O assertions.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
   await page.click('[data-p5-view="plan"]');
   await count(10);
   assert.equal((await saved()).wires.length,23);

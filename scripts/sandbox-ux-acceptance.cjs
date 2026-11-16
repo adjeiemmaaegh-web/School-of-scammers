@@ -22,6 +22,12 @@ const base = process.env.PLC_BASE_URL || 'http://127.0.0.1:4173';
   try {
     await page.setViewport({ width: 1440, height: 940, deviceScaleFactor: 1 });
     await page.goto(base + '/sandbox', { waitUntil: 'networkidle0' });
+  // UX4 canvas-first: open actual engineering dock on demand for worker I/O assertions.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
+  // The Inspector is also on-demand; test authentic selected-device controls.
+  await page.click('.p5-panel-toggles button:nth-child(2)[aria-pressed="false"]');
     await page.waitForSelector('.sandbox-workflow');
     assert.equal(await page.$eval('.sandbox-workflow', el => el.querySelectorAll('button').length), 4,
       'Real Build, Wire, Program, Test navigation exists');

@@ -45,6 +45,10 @@ const state=(page,id,value)=>page.waitForFunction((id,value)=>
   try{
     await page.setViewport({width:1440,height:940,deviceScaleFactor:1});
     await page.goto(base+'/sandbox',{waitUntil:'networkidle0'});
+  // UX4 canvas-first: open actual engineering dock on demand for worker I/O assertions.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await page.waitForSelector('.sandbox-toolbar');
     await button(page,'Place protected DOL layout');
     await page.waitForFunction(()=>document.querySelectorAll('.sandbox-device-list .sandbox-device').length===10);

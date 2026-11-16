@@ -501,3 +501,162 @@
     display:none; /* device count is still available in the searchable list */
   }
 }
+
+
+/* UX3: genuine machine visibility. Previous screen-size assertions passed
+   while gigantic per-device HTML labels physically covered the WebGL scene.
+   Keep all drag handles and real terminal buttons in the DOM, but render
+   unselected devices as small readable tags and terminals as pin markers.
+   Selecting a device exposes its full equipment name, state and controls.
+   This is presentation only; the PLC worker and terminal mapping do not move. */
+.sandbox-3d-label.ux3-compact-label {
+  min-width:32px;
+  max-width:92px;
+  padding:3px 6px;
+  border-radius:5px;
+  background:#112a3ac7;
+  border:1px solid #597d94bb;
+  color:#dcecf3;
+  font:600 10px/1.15 var(--body);
+  gap:0;
+  box-shadow:none;
+  opacity:.88;
+}
+.sandbox-3d-label.ux3-compact-label strong {
+  max-width:82px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font:600 10px/1.15 var(--mono);
+}
+.sandbox-3d-label.ux3-compact-label small,
+.sandbox-3d-label.ux3-compact-label button {display:none}
+.sandbox-3d-label.ux3-compact-label:hover {
+  opacity:1;
+  border-color:#ffbb61;
+  background:#18384cf2;
+}
+.sandbox-3d-terminal {
+  min-width:12px;
+  width:12px;
+  height:12px;
+  min-height:12px;
+  padding:0;
+  font-size:0;
+  line-height:0;
+  border-radius:50%;
+  border:2px solid #bad0dc;
+  color:transparent;
+  background:#3b90aa;
+  box-shadow:0 1px 3px #0006;
+  overflow:hidden;
+  /* Physical Html perspective magnifies nearby terminals. Reducing the
+     unselected overlay screen footprint preserves pin identity and keeps
+     actual equipment visible. Focusing/hovering restores a readable label. */
+  transform:scale(.65);
+  transform-origin:50% 50%;
+}
+.sandbox-3d-terminal:hover,
+.sandbox-3d-terminal:focus-visible,
+.sandbox-3d-terminal.selected {
+  min-width:32px;
+  width:auto;
+  height:auto;
+  min-height:22px;
+  padding:2px 4px;
+  font:700 10px/1.2 var(--mono);
+  border-radius:4px;
+  color:#102c3b;
+  background:#e1f1f8;
+  overflow:visible;
+  position:relative;
+  z-index:20;
+  transform:scale(1);
+}
+.sandbox-3d-terminal.selected {
+  color:#241500;
+  background:#ffbd60;
+}
+.efo-ux2-shell .sandbox-3d-hud {
+  bottom:4px;
+  left:6px;
+  right:6px;
+  gap:6px;
+  font-size:10px;
+  line-height:1.2;
+}
+.efo-ux2-shell .sandbox-3d-hud span {
+  padding:3px 6px;
+  border-radius:4px;
+  background:#0b2333b8;
+}
+.efo-ux2-shell .sandbox-3d-hud [data-3d-camera-status] {display:none}
+.efo-ux2-shell .p7-3d-authoring {
+  bottom:27px;
+  max-height:75px;
+  gap:4px;
+  padding:4px 6px;
+  font-size:10px;
+  background:#0b2639dd;
+}
+.efo-ux2-shell .p7-3d-authoring select {
+  font-size:10px;
+  min-width:130px;
+  max-width:195px;
+  padding:4px;
+}
+.efo-ux2-shell .p7-3d-authoring button {padding:4px 6px}
+
+/* UX3: the desktop simulator is a working application, not a marketing page.
+   The 60px "Design. Wire. Program. Run." masthead stole vertical canvas
+   room in every actual screenshot. Keep project/mode/save state visible
+   in a slim workstation strip rather than delete the project identity. */
+@media (min-width:768px) and (min-height:720px) {
+  .efo-ux2-shell .sandbox-masthead {
+    height:30px;
+    min-height:30px;
+    max-height:30px;
+    padding:0 4px;
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    box-sizing:border-box;
+  }
+  .efo-ux2-shell .sandbox-masthead > div:first-child {display:none}
+  .efo-ux2-shell .sandbox-project-meta {
+    flex-direction:row;
+    align-items:center;
+    gap:10px;
+    height:28px;
+    max-height:28px;
+    padding:2px 10px;
+    min-width:0;
+    max-width:100%;
+    border-radius:5px;
+    box-sizing:border-box;
+  }
+  .efo-ux2-shell .sandbox-project-meta .sandbox-work-status {
+    margin:0;
+    white-space:nowrap;
+    font-size:9px;
+  }
+  .efo-ux2-shell .sandbox-project-meta strong {
+    font-size:11px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:350px;
+  }
+  .efo-ux2-shell .sandbox-project-meta small {
+    font-size:9px;
+    white-space:nowrap;
+  }
+}
+
+/* Contextual gallery wiring: no sea of terminal markers over the machine
+   until a real selected device requests them. The accessible logical wiring
+   canvas remains available even when no device is selected in 3D. */
+.sandbox-3d-terminal.ux3-hidden-terminal {
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+}

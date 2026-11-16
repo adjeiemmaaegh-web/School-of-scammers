@@ -122,3 +122,49 @@ export function frameEntireWorkcell(
  return {target:[cx,0,cz],position:[cx+distance*.65,
   1+distance*.95,cz+distance]};
 }
+
+
+/**
+ * A learner opening a small existing project should see the ACTUAL equipment,
+ * not mostly empty factory grid. Only the initial orbit pose changes; the
+ * camera never writes to or advances the PLC worker and never chases ongoing
+ * movements or subsequent user edits.
+ *
+ * Larger projects retain the original calibrated commissioning camera.
+ */
+/**
+ * FRAME THE ACTUAL PLANT, not unrelated PLC terminal boxes placed outside it.
+ * The learner keeps electrical devices in the project, but the 3D inspection
+ * camera favors physical stations. This is strictly VIEW geometry.
+ *
+ * With 42-degree perspective camera and a short 3D dock on laptops, the
+ * original frameEntireWorkcell distance left machines covering <20% of the
+ * scene while empty grid dominated. This closer pose uses only existing
+ * equipment footprints and is clamped for bounded low-spec rendering.
+ */
+export function frameIndustrialPlant(
+ project:Pick<ProjectFile,'components'|'params'>,
+):{target:[number,number,number];position:[number,number,number]}{
+ const physical=project.components.filter(c=>Boolean(PLANT_EQUIPMENT[c.kind]));
+ if(!physical.length)return frameEntireWorkcell(project);
+ let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+ for(const c of physical){
+   const f=footprintOf(c,project.params);
+   const x=(f.x-540)/100,z=(f.y-290)/100;
+   minX=Math.min(minX,x-f.width/200);maxX=Math.max(maxX,x+f.width/200);
+   minZ=Math.min(minZ,z-f.depth/200);maxZ=Math.max(maxZ,z+f.depth/200);
+ }
+ const cx=(minX+maxX)/2,cz=(minZ+maxZ)/2;
+ const span=Math.max(maxX-minX,(maxZ-minZ)*1.5,2.7);
+ const distance=Math.max(2.4,Math.min(7.2,span*.68));
+ return {target:[cx,.28,cz],position:[cx+distance*.72,
+   .8+distance*.62,cz+distance*.88]};
+}
+
+export function initialOrbitFraming(
+ project:Pick<ProjectFile,'components'|'params'>,
+):{target:[number,number,number];position:[number,number,number]}{
+ if(project.components.length===0 || project.components.length>8)
+  return {target:[0,0,0],position:[7,8.5,10]};
+ return frameIndustrialPlant(project);
+}

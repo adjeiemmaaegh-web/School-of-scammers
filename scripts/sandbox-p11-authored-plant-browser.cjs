@@ -84,6 +84,12 @@ const PLC_B = ['VAR_INPUT', '  Start : BOOL;', '  StopOK : BOOL;', '  TankHigh :
     await page.click('[data-cta="simulator"]');
     await page.waitForSelector('.sandbox-toolbar', { timeout: 15000 });
     await page.waitForSelector('.sandbox-palette-item:not([disabled])', { timeout: 15000 }); // editing is disabled until the saved project has hydrated
+    await page.click('[data-p5-view="logical"]');
+    await page.click('[data-p5-dock-tab="diagnostics"]');
+    await page.waitForSelector('.sandbox-wire-list');
+    // UX4 defaults to a collapsed right Inspector; open it through its user control.
+    await page.click('.p5-panel-toggles button:nth-child(2)');
+    await page.waitForSelector('[data-p5-inspector]');
     assert.deepEqual(await counts(), { d: 0, w: 0 }, 'An empty floor');
 
     // 1. Build: place every device from the library.
@@ -112,10 +118,15 @@ const PLC_B = ['VAR_INPUT', '  Start : BOOL;', '  StopOK : BOOL;', '  TankHigh :
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-wire-list > div').length === 32, { timeout: 15000 });
 
     // 3. Program each PLC in Structured Text, written by hand in the editor.
+    // The diagnostics panel is a separate dock tab and does not mount the editor.
+    await page.click('[data-p5-dock-tab="program"]');
+    await page.waitForSelector('[data-plc-tab]');
     await page.click(`[data-plc-tab="${ID.plc1}"]`); await clickText('Structured Text (ST)'); await typeProgram(PLC_A);
     await page.click(`[data-plc-tab="${ID.plc2}"]`); await clickText('Structured Text (ST)'); await typeProgram(PLC_B);
 
     // 4. Check before running, with the multimeter: the second station is powered through its breaker.
+    await page.click('[data-p5-dock-tab="diagnostics"]');
+    await page.waitForSelector('[data-meter-status]');
     await page.select('select[aria-label="Red meter probe"]', `${ID.plc2}.L+`);
     await page.select('select[aria-label="Black meter probe"]', `${ID.plc2}.M`);
     await page.waitForFunction(() => document.querySelector('[data-meter-status]')?.textContent.trim() === '24 V DC', { timeout: 6000 });
@@ -173,7 +184,12 @@ const PLC_B = ['VAR_INPUT', '  Start : BOOL;', '  StopOK : BOOL;', '  TankHigh :
     // 10. The whole plant is an ordinary saved project: reload and it is all still there.
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 17, { timeout: 10000 });
+    // A reload closes the dock again. Verify persisted actual links, then the saved PLC source.
+    await page.click('[data-p5-dock-tab="diagnostics"]');
+    await page.waitForSelector('.sandbox-wire-list');
     assert.deepEqual(await counts(), { d: 17, w: 32 });
+    await page.click('[data-p5-dock-tab="program"]');
+    await page.waitForSelector('[data-plc-tab]');
     await page.click(`[data-plc-tab="${ID.plc2}"]`);
     await page.waitForFunction(() => /Fill := Start AND StopOK AND NOT TankHigh/.test(document.querySelector('#sandbox-st-source')?.value ?? ''), { timeout: 6000 });
     await clickText('▶ Run');

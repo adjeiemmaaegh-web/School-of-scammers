@@ -48,8 +48,26 @@ async function wire(page,a,b) {
  await page.waitForFunction(id=>document.querySelector('[data-terminal-id="'+id+'"]')
   ?.classList.contains('selected'),{},a);
  await page.click('[data-terminal-id="'+b+'"]');
- await page.waitForFunction(n=>document.querySelectorAll('.sandbox-wire-list > div').length===n,
-   {timeout:12000},count+1);
+ try {
+  await page.waitForFunction(n=>document.querySelectorAll('.sandbox-wire-list > div').length===n,
+    {timeout:12000},count+1);
+ } catch(error) {
+  const snapshot=await page.evaluate(([first,second])=>{
+    const el=document.querySelector('[data-terminal-id="'+second+'"]');
+    const rect=el?.getBoundingClientRect();
+    const hit=rect?document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2):null;
+    let stored=null;
+    try { stored=JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null'); } catch {}
+    return {first,second,view:document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active'),
+      wires:document.querySelectorAll('.sandbox-wire-list > div').length,
+      projectWires:stored?.wires?.length, selected:[...document.querySelectorAll('.sandbox-terminal.selected')].map(e=>e.getAttribute('data-terminal-id')),
+      secondVisible:!!el?.getClientRects().length,secondDisabled:el?.disabled,
+      secondRect:rect?{x:rect.x,y:rect.y,w:rect.width,h:rect.height}:null,
+      targetTag:hit?.tagName,targetClasses:hit?.getAttribute('class'),
+      alerts:[...document.querySelectorAll('[role="alert"]')].map(e=>e.textContent?.slice(0,200))};
+  },[a,b]);
+  throw new Error('P4 physical wiring did not commit: '+JSON.stringify(snapshot)+'; '+String(error));
+ }
 }
 async function waitScans(page,count) {
  const from=await page.$eval('.sandbox-scan',el=>Number((el.textContent.match(/\d+/)||['0'])[0]));
@@ -81,6 +99,15 @@ async function direction(page,value) {
   await page.waitForSelector('.sandbox-toolbar');
   await clickText(page,'Place reversing DOL layout');
   await page.waitForFunction(()=>document.querySelectorAll('.sandbox-device-list .sandbox-device').length===10);
+  // UX4 starts in canvas-first 3D. Navigate to the actual Logical / Wiring workspace
+  // before patching physical terminals; do not send synthetic worker commands.
+  await page.click('[data-p5-view="logical"]');
+  await page.waitForFunction(()=>document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active')==='logical');
+  // UX4 intentionally collapses the engineering dock on project workbenches.
+  // Open its real Diagnostics tab before requiring the user-visible wire list.
+  await page.click('[data-p5-dock-tab="diagnostics"]');
+  await page.waitForSelector('.sandbox-wire-list');
+  await page.waitForFunction(()=>document.querySelector('.p5-dock-heading button[aria-expanded]')?.getAttribute('aria-expanded')==='true');
   for(const [a,b] of wires)await wire(page,a,b);
   await page.waitForFunction(()=>document.querySelectorAll('.sandbox-wire-list > div').length===21);
   await clickText(page,'Load forward/reverse example');

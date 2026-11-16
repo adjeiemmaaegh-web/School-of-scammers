@@ -21,7 +21,7 @@ import { footprintOf } from '../workspace/floor-plan';
 import { clampPlacement } from '../workspace/geometry';
 import type { GridStep } from '../workspace/types';
 import { WorkcellCameraRig } from './WorkcellCameraRig';
-import { frameEntireWorkcell,initialNavigationPose, type CameraPose, type WorkcellCameraMode } from './workcell-camera';
+import { frameIndustrialPlant,initialNavigationPose,initialOrbitFraming, type CameraPose, type WorkcellCameraMode } from './workcell-camera';
 import {
   assess3DPlacement, placementMessage, previewDimensions,
   type PlacementAssessment,
@@ -270,6 +270,14 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   const def = COMPONENTS[c.kind];
   const plant = Boolean(PLANT_EQUIPMENT[c.kind]);
   const footprint = plant ? footprintOf(c, project.params) : null;
+  const galleryScene=project.components.some(item=>item.id.startsWith('scene-'));
+  // Large, hand-built commissioning projects retain their original 3D drag
+  // labels: the legacy precision drag acceptance requires a real >=20px hit
+  // target. Original gallery scenes receive compact camera-scaled tags so
+  // they never obscure the physical machine being inspected.
+  const compact=!selected&&project.components.length>2&&
+    (project.components.length<=8||galleryScene);
+  const showDeviceTerminals = !galleryScene || selected;
   // P3 equipment uses the real worker-owned 3D shapes, not duplicated large
   // placeholder housings. Its outline is only a selection/drag affordance.
   return <group position={[x, y, z]} rotation={[0, -(c.yawDeg ?? 0) * Math.PI / 180, 0]}>
@@ -293,14 +301,15 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
         tankLevelMl={c.kind === 'tank' ? tankLevelMl : undefined}
         rod={c.kind === 'cylinder' ? rod : undefined} lamps={c.kind === 'stacklight' ? lamps : undefined} />
     </group>}
-    <Html position={[0, 1.22, 0]} center distanceFactor={11}>
-      <div className="sandbox-3d-label" data-3d-drag-handle={c.id}
+    <Html position={[0, compact ? (plant ? .66 : 1.08) : 1.22, 0]} center
+      distanceFactor={compact ? 3.1 : 11}>
+      <div className={`sandbox-3d-label ${compact ? 'ux3-compact-label' : 'ux3-selected-label'}`} data-3d-drag-handle={c.id}
         title="Select the machine; drag this 3D-anchored label to reposition it while paused"
         onPointerDown={event=>{
           if((event.target as HTMLElement).closest('button'))return;
           onLabelPress(event,c.id);
         }}>
-        <strong>{def.label}</strong>
+        <strong>{compact ? c.id : def.label}</strong>
         <small>{c.kind === 'revmotor' ? (direction ?? 'stopped').toUpperCase() :
           c.kind === 'forwardcontactor' || c.kind === 'reversecontactor' ? (active ? 'CLOSED' : 'OPEN') :
           c.kind === 'motor' ? (active ? 'RUNNING' : 'STOPPED') :
@@ -329,9 +338,15 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
     {def.terminals.map(t => {
       const fullId = `${c.id}.${t.name}`;
       const selected = selectedTerminal === fullId;
+      // Gallery scenes contain many live PLC pins: keep the true terminal
+      // model and mapping, but display pins contextually after selecting the
+      // corresponding device. Hand-built P7 commissioning keeps its existing
+      // always-visible terminal targets for precision wiring acceptance.
+      const showTerminal = showDeviceTerminals || selected;
       const position: [number, number, number] = [t.side === 'left' ? -0.64 : 0.64, 0.35, (t.y - 65) / 120];
       return <group key={t.name} position={position}>
-        <mesh onPointerDown={e => {
+        {/* Hide WebGL pin geometry when its matching contextual HTML pin is hidden. */}
+        {showTerminal && <mesh onPointerDown={e => {
             e.stopPropagation();
             // Parent shell owns placement; clicking a terminal cannot emit a second place.
           }}
@@ -339,10 +354,11 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
           <sphereGeometry args={[0.105, 12, 8]} />
           <meshStandardMaterial color={selected ? COLORS.highlight : COLORS.light}
             emissive={selected ? COLORS.highlight : '#000000'} emissiveIntensity={0.35} />
-        </mesh>
+        </mesh>}
         <Html position={[t.side === 'left' ? -0.14 : 0.14, 0.09, 0]} center distanceFactor={12}>
-          <button type="button" className={`sandbox-3d-terminal ${selected ? 'selected' : ''}`}
+          <button type="button" className={`sandbox-3d-terminal ${selected ? 'selected' : ''} ${showTerminal ? '' : 'ux3-hidden-terminal'}`}
             data-scene-terminal-id={fullId} disabled={!editable}
+            tabIndex={showTerminal ? 0 : -1} aria-hidden={!showTerminal}
             aria-label={`Connect ${fullId} in 3D`}
             onPointerDown={e => {
               e.stopPropagation();
@@ -430,16 +446,29 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, placeK
   onCameraPose:(pose:CameraPose)=>void;
 }) {
   const { camera, gl } = useThree();
-  const [interest,setInterest]=useState<[number,number,number]>([0,0,0]);
+  const [interest,setInterest]=useState<[number,number,number]>(()=>initialOrbitFraming(project).target);
   useEffect(()=>{
     if(!fitRequest||mode!=='orbit')return;
-    const framing=frameEntireWorkcell(project);
+    const framing=frameIndustrialPlant(project);
     setInterest(framing.target);
     camera.position.set(...framing.position);
     camera.lookAt(...framing.target);
-  // Explicit user-triggered fit only: subsequent PLC scans, equipment motion
-  // and rerenders must not unexpectedly move the learner's 3D camera.
+  // Explicit fit respects existing worker-authored plant placements, not
+  // unrelated PLC terminal boxes. No PLC or physics state is changed.
   },[fitRequest]);
+  const previousCount=useRef(project.components.length);
+  useEffect(()=>{
+    const prior=previousCount.current;
+    previousCount.current=project.components.length;
+    if(mode!=='orbit'||prior!==0||project.components.length<3)return;
+    // A gallery scene or bulk project load arrives in one worker snapshot.
+    // Auto-fit ONCE at that transition. Individual user device placement,
+    // later scans and drag edits cannot hijack the camera.
+    const framing=frameIndustrialPlant(project);
+    setInterest(framing.target);
+    camera.position.set(...framing.position);
+    camera.lookAt(...framing.target);
+  },[project.components,mode]);
   const [drag,setDrag]=useState<DeviceDrag|null>(null);
   const currentDrag=useRef<DeviceDrag|null>(null);
   const poseCallback=useRef(onCameraPose);
