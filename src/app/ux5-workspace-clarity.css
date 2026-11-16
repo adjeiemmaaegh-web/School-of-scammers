@@ -1,0 +1,251 @@
+/*
+ * UX5: clean, full-height engineering canvas.
+ *
+ * Presentation and navigation only. No PLC command, camera collision,
+ * electrical model, worker ownership or persisted project format changes.
+ * Scoped to the open sandbox. Scenario / assessment layouts retain their
+ * established, separately tested work-order controls.
+ */
+
+/* The source of the giant on-screen cards was the selected/idle two-device
+ * case. Keep a real HTML drag target, but stop scaling full titles and state
+ * text to occupy the plant. Inspector and tooltip carry complete descriptions. */
+.efo-ux2-shell .sandbox-3d-label.ux3-selected-label {
+  display:flex;
+  max-width:166px;
+  min-width:62px;
+  min-height:28px;
+  box-sizing:border-box;
+  padding:5px 7px;
+  gap:2px;
+  text-align:center;
+  white-space:normal;
+  font:600 11px/1.2 var(--body);
+  border-color:#f2b765;
+  background:#10283cde;
+}
+.efo-ux2-shell .sandbox-3d-label.ux3-selected-label strong {
+  max-width:150px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.efo-ux2-shell .sandbox-3d-label.ux3-selected-label small {
+  max-width:150px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font:600 9px/1.2 var(--mono);
+}
+.efo-ux2-shell .sandbox-3d-label.ux3-selected-label button {
+  min-height:24px;
+  padding:3px 7px;
+}
+.efo-ux2-shell .sandbox-3d-label.ux3-compact-label {
+  box-sizing:border-box;
+  min-width:38px;
+  min-height:24px;
+  max-width:92px;
+  justify-content:center;
+}
+.efo-ux2-shell .sandbox-3d-label.ux3-compact-label:focus-within,
+.efo-ux2-shell .sandbox-3d-label.ux3-selected-label:focus-within {
+  outline:2px solid #ffc66d;
+  outline-offset:2px;
+}
+
+/* Keep active camera actions discoverable and entirely inside the WebGL stage.
+ * The training-person proxy remains user opt-in and never alters the PLC. */
+.efo-ux2-shell .sandbox-3d-camera-controls {
+  top:9px;
+  left:9px;
+  right:auto;
+  z-index:12;
+  padding:3px;
+  gap:3px;
+  align-items:center;
+  max-width:calc(100% - 18px);
+  box-sizing:border-box;
+  background:#0a2336ed;
+}
+.efo-ux2-shell .sandbox-3d-camera-controls button {
+  min-height:28px;
+  padding:4px 7px;
+  font-size:10px;
+  white-space:nowrap;
+}
+.efo-ux2-shell .sandbox-3d-camera-controls .p7-3d-check {
+  margin:0;
+  padding:2px 5px;
+  font-size:10px;
+  white-space:nowrap;
+}
+.efo-ux2-shell .sandbox-3d-camera-controls [data-3d-focus-selected]:disabled {
+  opacity:.42;
+}
+.efo-ux2-shell .p7-3d-authoring {
+  top:auto;
+  right:8px;
+  bottom:29px;
+  left:auto;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  gap:4px;
+  padding:4px 6px;
+  max-width:min(740px,calc(100% - 16px));
+  max-height:83px;
+  box-sizing:border-box;
+  overflow:auto;
+  border-radius:6px;
+  background:#102c3cdb;
+}
+.efo-ux2-shell .p7-3d-authoring select {
+  min-width:120px;
+  max-width:178px;
+}
+.efo-ux2-shell .p7-3d-authoring label {
+  white-space:nowrap;
+}
+.efo-ux2-shell .sandbox-3d-hud {
+  right:8px;
+  bottom:4px;
+  justify-content:flex-start;
+  font-size:10px;
+}
+.efo-ux2-shell .sandbox-3d-hud > span:last-child {
+  max-width:48%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.efo-ux2-shell .sandbox-3d-shell {isolation:isolate}
+
+/* One horizontal palette category row instead of stacked, partially hidden
+ * chips. The list below gets the recovered space. Keyboard scroll works too. */
+.efo-ux2-shell .p5-device-families {
+  display:flex;
+  flex-wrap:nowrap;
+  flex:0 0 auto;
+  min-height:31px;
+  max-height:34px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  gap:4px;
+  align-items:center;
+  padding-bottom:2px;
+  scrollbar-width:thin;
+}
+.efo-ux2-shell .p5-device-families button {
+  flex:0 0 auto;
+  padding:4px 7px;
+  font-size:10px;
+}
+.efo-ux2-shell .sandbox-library-search input:focus-visible,
+.efo-ux2-shell .p5-device-families button:focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:1px;
+}
+
+/* On normal laptop/desktop workstations, the actual scene claims its own
+ * allocated pane. Supporting plant panels remain available by intentional
+ * scrolling, rather than displacing the model in the initial viewport. */
+@media (min-width:768px) and (min-height:720px) {
+  .efo-ux2-shell .p5-menu-bar {
+    padding:0 4px;
+    min-height:27px;
+  }
+  .efo-ux2-shell .p5-menu-bar summary {padding:5px 8px}
+  .efo-ux2-shell .ux2-command-stack {gap:2px}
+  .efo-ux2-shell .ux2-command-stack > .sandbox-assembly-library:not([open]) {
+    height:20px;
+    max-height:20px;
+    padding:0 7px;
+  }
+  .efo-ux2-shell .ux2-command-stack > .sandbox-assembly-library:not([open]) > summary {
+    line-height:19px;
+    font-size:10px;
+  }
+  .efo-ux2-shell .p5-layout {
+    min-height:0;
+    overflow:hidden;
+  }
+  .efo-ux2-shell .p5-physical-stage {
+    height:100%;
+    min-height:0;
+    overflow-y:auto;
+    overflow-x:hidden;
+    overscroll-behavior-y:contain;
+  }
+  .efo-ux2-shell .sandbox-scene-heading {
+    box-sizing:border-box;
+    height:30px;
+    min-height:30px;
+    margin:0;
+    padding:1px 4px 5px;
+  }
+  .efo-ux2-shell .sandbox-scene-heading h2 {
+    font-size:13px;
+    margin:0;
+  }
+  .efo-ux2-shell .sandbox-scene-heading .eyebrow {display:none}
+  /* Project/device totals are already visible in the fixed status strip. */
+  .efo-ux2-shell .sandbox-scene-heading .sandbox-scene-stat {display:none}
+  .efo-ux2-shell .sandbox-main .efo-canvas-actions {
+    top:1px;
+    right:6px;
+    z-index:20;
+  }
+  .efo-ux2-shell .sandbox-main .efo-canvas-actions button {
+    min-height:26px;
+    padding:4px 8px;
+    font-size:10px;
+  }
+  .efo-ux2-shell .p5-physical-stage > .sandbox-3d-shell {
+    box-sizing:border-box;
+    width:100%;
+    height:calc(100% - 30px) !important;
+    min-height:280px;
+    max-height:none !important;
+    margin:0;
+    border-radius:6px;
+  }
+  .efo-ux2-shell .p5-physical-stage > .sandbox-3d-loading {
+    min-height:280px;
+  }
+  /* 2D/logical workspaces still need their own independent editable scroll. */
+  .efo-ux2-shell .p5-layout[data-p5-view-active="logical"] .sandbox-main,
+  .efo-ux2-shell .p5-layout[data-p5-view-active="plan"] .sandbox-main {
+    overflow:auto;
+  }
+}
+@media (min-width:768px) and (max-width:1099px) and (min-height:720px) {
+  .efo-ux2-shell .sandbox-3d-camera-controls {
+    max-width:calc(100% - 16px);
+    flex-wrap:wrap;
+    gap:2px;
+  }
+  .efo-ux2-shell .sandbox-3d-camera-controls button {padding:3px 5px}
+  .efo-ux2-shell .p7-3d-authoring {
+    max-width:calc(100% - 16px);
+    max-height:98px;
+  }
+}
+/* UX4 immersive mode owns the full viewport. New normal-workbench chrome
+ * must not override its fixed, reversible, >=90% canvas guarantee. */
+main.efo-workspace-focused .p5-physical-stage > .sandbox-3d-shell {
+  height:100% !important;
+  min-height:0 !important;
+  max-height:none !important;
+}
+main.efo-workspace-focused .sandbox-main .efo-canvas-actions {
+  top:12px;
+  right:14px;
+}
+@media (max-width:780px) {
+  main.efo-workspace-focused .sandbox-3d-camera-controls {
+    top:58px;
+    left:8px;
+    max-width:calc(100% - 16px);
+  }
+}
