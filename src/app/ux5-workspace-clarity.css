@@ -12,8 +12,8 @@
  * text to occupy the plant. Inspector and tooltip carry complete descriptions. */
 .efo-ux2-shell .sandbox-3d-label.ux3-selected-label {
   display:flex;
-  max-width:166px;
-  min-width:62px;
+  max-width:112px;
+  min-width:60px;
   min-height:28px;
   box-sizing:border-box;
   padding:5px 7px;
@@ -25,13 +25,13 @@
   background:#10283cde;
 }
 .efo-ux2-shell .sandbox-3d-label.ux3-selected-label strong {
-  max-width:150px;
+  max-width:104px;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
 .efo-ux2-shell .sandbox-3d-label.ux3-selected-label small {
-  max-width:150px;
+  max-width:104px;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
