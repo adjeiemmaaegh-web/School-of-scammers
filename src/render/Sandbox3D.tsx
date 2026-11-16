@@ -271,12 +271,10 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   const plant = Boolean(PLANT_EQUIPMENT[c.kind]);
   const footprint = plant ? footprintOf(c, project.params) : null;
   const galleryScene=project.components.some(item=>item.id.startsWith('scene-'));
-  // Large, hand-built commissioning projects retain their original 3D drag
-  // labels: the legacy precision drag acceptance requires a real >=20px hit
-  // target. Original gallery scenes receive compact camera-scaled tags so
-  // they never obscure the physical machine being inspected.
-  const compact=!selected&&project.components.length>2&&
-    (project.components.length<=8||galleryScene);
+  // Every unselected machine has a compact, pointer-accessible ID chip.
+  // Two-device projects used to show two enormous status cards over the real
+  // geometry. Full names and live state remain available on selection/hover.
+  const compact=!selected;
   const showDeviceTerminals = !galleryScene || selected;
   // P3 equipment uses the real worker-owned 3D shapes, not duplicated large
   // placeholder housings. Its outline is only a selection/drag affordance.
@@ -301,10 +299,10 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
         tankLevelMl={c.kind === 'tank' ? tankLevelMl : undefined}
         rod={c.kind === 'cylinder' ? rod : undefined} lamps={c.kind === 'stacklight' ? lamps : undefined} />
     </group>}
-    <Html position={[0, compact ? (plant ? .66 : 1.08) : 1.22, 0]} center
-      distanceFactor={compact ? 3.1 : 11}>
+    <Html position={[0, plant ? .70 : 1.08, 0]} center
+      distanceFactor={compact ? 3.1 : 5.4}>
       <div className={`sandbox-3d-label ${compact ? 'ux3-compact-label' : 'ux3-selected-label'}`} data-3d-drag-handle={c.id}
-        title="Select the machine; drag this 3D-anchored label to reposition it while paused"
+        title={`${def.label} (${c.id}) · Select to see live state; drag to reposition while paused`}
         onPointerDown={event=>{
           if((event.target as HTMLElement).closest('button'))return;
           onLabelPress(event,c.id);
@@ -433,7 +431,7 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, placeK
   showZones, showSignals, hover, selectedDeviceIds, selectedTerminal, moveTarget,
   onTerminal, onOperate, onSelect, onPlaceAt, onPreview, onMove, onRotate, onCameraPose }: {
   project: ProjectFile; snapshot: RenderSnapshot; editable: boolean; grid: GridStep;
-  mode:WorkcellCameraMode;fitRequest:number;
+  mode:WorkcellCameraMode;fitRequest:number;focusRequest:number;focusSelectedId:string|null;
   placeKind:ComponentKind | ''; alignSensor:boolean;
   showZones:boolean; showSignals:boolean;
   hover:PlacementAssessment|null;
@@ -456,11 +454,20 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, placeK
   // Explicit fit respects existing worker-authored plant placements, not
   // unrelated PLC terminal boxes. No PLC or physics state is changed.
   },[fitRequest]);
+  useEffect(()=>{
+    if(!focusRequest||mode!=='orbit'||!focusSelectedId)return;
+    const selected=project.components.find(c=>c.id===focusSelectedId);
+    if(!selected)return;
+    const framing=frameIndustrialPlant({...project,components:[selected]});
+    setInterest(framing.target);
+    camera.position.set(...framing.position);
+    camera.lookAt(...framing.target);
+  },[focusRequest,mode]);
   const previousCount=useRef(project.components.length);
   useEffect(()=>{
     const prior=previousCount.current;
     previousCount.current=project.components.length;
-    if(mode!=='orbit'||prior!==0||project.components.length<3)return;
+    if(mode!=='orbit'||prior!==0||project.components.length===0)return;
     // A gallery scene or bulk project load arrives in one worker snapshot.
     // Auto-fit ONCE at that transition. Individual user device placement,
     // later scans and drag edits cannot hijack the camera.
@@ -696,6 +703,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
   const camera = useRef<Camera | null>(null);
   const [cameraMode,setCameraMode]=useState<WorkcellCameraMode>('orbit');
   const [fitRequest,setFitRequest]=useState(0);
+  const [focusRequest,setFocusRequest]=useState(0);
   const [cameraPose,setCameraPose]=useState<CameraPose|null>(null);
   const [operatorEnabled,setOperatorEnabled]=useState(false);
   const operatorLive=useRef(false),operatorSender=useRef(props.onTrainingOperator);
@@ -782,13 +790,18 @@ export function Sandbox3D(props: Sandbox3DProps) {
          setCameraMode(id);setCameraPose(null);
         }}>
         {label}</button>)}
+      <button type="button" data-3d-focus-selected
+        title="Frame the selected machine without changing project or PLC state"
+        disabled={!available||!props.selectedDeviceId} onClick={()=>{
+          setCameraMode('orbit');setFocusRequest(n=>n+1);
+        }}>Focus selected</button>
       <button type="button" data-3d-fit-scene
         disabled={!available} title="Frame all placed equipment in the real 3D camera"
         onClick={()=>{
          if(operatorEnabled){props.onTrainingOperator(false,null);setOperatorEnabled(false);}
          setCameraMode('orbit');setFitRequest(n=>n+1);
         }}>
-        Fit scene
+        Fit all
       </button>
       <label className="p7-3d-check" title="Explicit teaching-person proxy in the worker, never real-person tracking">
         <input type="checkbox" data-p8-training-operator
@@ -798,7 +811,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
            props.onTrainingOperator(event.target.checked,
              event.target.checked?(cameraPose??initialNavigationPose('first-person')):null);
           }}/>
-        Simulate operator in opted-in sensors
+        Operator in sensors
       </label>
     </div>
     <div className="p7-3d-authoring" role="group" aria-label="3D factory authoring" data-p7-3d-authoring>
@@ -812,21 +825,22 @@ export function Sandbox3D(props: Sandbox3DProps) {
       </label>
       <label className="p7-3d-check"><input type="checkbox" data-p7-align-sensor
         checked={alignSensor} onChange={event=>setAlignSensor(event.target.checked)}/>
-        Align sensing zone to carrier</label>
+        Auto-align</label>
       <label className="p7-3d-check"><input type="checkbox" data-p7-zones
         checked={showZones} onChange={event=>setShowZones(event.target.checked)}/>
-        Sensor regions</label>
+        Zones</label>
       <label className="p7-3d-check"><input type="checkbox" data-p7-live-signals
         checked={showSignals} onChange={event=>setShowSignals(event.target.checked)}/>
-        Selected I/O</label>
-      <button type="button" data-p7-wire onClick={props.onOpenWiring}>Wire PLC terminals</button>
+        I/O tags</label>
+      <button type="button" data-p7-wire onClick={props.onOpenWiring}>Wire</button>
     </div>
     {available ? <Canvas className="sandbox-three-canvas" dpr={[1, 1.5]}
       gl={{ antialias: true, powerPreference: 'low-power' }}
       camera={{ position: [7, 8.5, 10], fov: 42, near: 0.1, far: 120 }}
       onCreated={state => { camera.current = state.camera; state.camera.lookAt(0, 0, 0); }}>
       <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
-        grid={props.grid??5} mode={cameraMode} fitRequest={fitRequest} onMove={props.onMove}
+        grid={props.grid??5} mode={cameraMode} fitRequest={fitRequest}
+        focusRequest={focusRequest} focusSelectedId={props.selectedDeviceId} onMove={props.onMove}
         placeKind={placementKind} alignSensor={alignSensor} showZones={showZones}
         showSignals={showSignals} hover={hover} onPreview={onPreview}
         onRotate={props.onRotate}
