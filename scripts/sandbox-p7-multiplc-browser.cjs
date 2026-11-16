@@ -102,6 +102,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     // 1. Two complete panels: two supplies, two PLCs, two of each device, all wired by clicking terminals.
     await starter('[data-layout-two-panels]');
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 12, { timeout: 8000 });
+    await page.click('[data-p5-view="logical"]');
+    await page.click('[data-p5-dock-tab="diagnostics"]');
+    await page.waitForSelector('.sandbox-wire-list');
     for (const [a, b] of [...panel(1), ...panel(2)]) await wire(a, b);
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-wire-list > div').length === 22, { timeout: 8000 });
     await page.waitForSelector('[data-plc-tab="plc-2"]');
