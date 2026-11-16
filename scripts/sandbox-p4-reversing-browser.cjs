@@ -103,6 +103,11 @@ async function direction(page,value) {
   // before patching physical terminals; do not send synthetic worker commands.
   await page.click('[data-p5-view="logical"]');
   await page.waitForFunction(()=>document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active')==='logical');
+  // UX4 intentionally collapses the engineering dock on project workbenches.
+  // Open its real Diagnostics tab before requiring the user-visible wire list.
+  await page.click('[data-p5-dock-tab="diagnostics"]');
+  await page.waitForSelector('.sandbox-wire-list');
+  await page.waitForFunction(()=>document.querySelector('.p5-dock-heading button[aria-expanded]')?.getAttribute('aria-expanded')==='true');
   for(const [a,b] of wires)await wire(page,a,b);
   await page.waitForFunction(()=>document.querySelectorAll('.sandbox-wire-list > div').length===21);
   await clickText(page,'Load forward/reverse example');
