@@ -88,7 +88,7 @@ const ST = [
   assert.ok(found,'Expected enabled toolbar control: '+label);
  };
  const position=async(x,y)=>{
-   await page.$eval('[data-floor-plan] svg',el=>el.scrollIntoView({block:'center'}));
+   await page.$eval('[data-floor-plan] svg',el=>el.scrollIntoView({block:'start'}));
    const box=await page.$eval('[data-floor-plan] svg',el=>{
     const r=el.getBoundingClientRect();return {x:r.left,y:r.top,w:r.width,h:r.height};
    });
