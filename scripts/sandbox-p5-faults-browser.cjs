@@ -161,6 +161,9 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     await faultCount(1);
     await sleep(400); // let the project persist to browser storage
     await page.reload({ waitUntil: 'networkidle0' });
+    // Reload intentionally restores UX4's canvas-first collapsed dock. Open
+    // the live Diagnostics panel again before inspecting the persisted fault.
+    await page.click('[data-p5-dock-tab="diagnostics"]');
     await page.waitForSelector('[data-fault-item]', { timeout: 8000 });
     assert.equal(await page.$eval('[data-fault-item]', e => e.getAttribute('data-fault-state')), 'hidden');
     assert.equal(await faultLabel(), 'Hidden fault 1');
