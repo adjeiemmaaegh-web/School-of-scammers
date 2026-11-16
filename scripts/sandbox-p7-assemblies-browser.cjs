@@ -44,6 +44,10 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   await page.goto(base+'/sandbox',{waitUntil:'domcontentloaded',timeout:45000});
   await page.evaluate(()=>localStorage.clear());
   await page.reload({waitUntil:'domcontentloaded',timeout:45000});
+  // Canvas-first UX4: request real engineering dock before inspecting worker wires/PLC editor.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
   await page.waitForSelector('[data-p7-assembly-library]');
   await place('24V supply');await count(1);
   await place('24V pilot lamp');await count(2);
@@ -82,6 +86,10 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   const libraryBefore=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),ASSEMBLIES);
   assert.equal(libraryBefore[0].name,'Reusable inspection station');
   await page.reload({waitUntil:'domcontentloaded',timeout:45000});
+  // Canvas-first UX4: request real engineering dock before inspecting worker wires/PLC editor.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
   await count(2);
   await page.waitForSelector('[data-p7-assembly-library] summary',{timeout:15000});
   await page.click('[data-p7-assembly-library] summary');
@@ -109,6 +117,10 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   // Invalid local storage must be preserved, never silently overwritten.
   await page.evaluate(key=>localStorage.setItem(key,'{broken'),ASSEMBLIES);
   await page.reload({waitUntil:'domcontentloaded',timeout:45000});
+  // Canvas-first UX4: request real engineering dock before inspecting worker wires/PLC editor.
+  await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
+  if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
+    await page.click('.p5-dock-heading button[aria-expanded="false"]');
   await page.waitForSelector('[data-p7-assembly-library] summary',{timeout:15000});
   await page.click('[data-p7-assembly-library] summary');
   await page.waitForSelector('[data-assembly-reset]');
