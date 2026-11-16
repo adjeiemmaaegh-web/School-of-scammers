@@ -181,6 +181,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     // 6. Both PLCs and both programs are part of the project and survive a reload.
     await clickText('Pause'); await paused();
     await page.reload({ waitUntil: 'networkidle0' });
+    // Reload restores the UX4 collapsed dock; reopen programming for both PLCs.
+    await page.click('[data-p5-dock-tab="program"]');
     await page.waitForSelector('[data-plc-tab="plc-2"]');
     assert.equal(await page.$$eval('.sandbox-device', n => n.length), 12);
     await page.click('[data-plc-tab="plc-2"]');
