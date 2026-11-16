@@ -18,6 +18,7 @@ on:
       - 'scripts/sandbox-p4-reversing-browser.cjs'
       - 'scripts/sandbox-p5-faults-browser.cjs'
       - 'scripts/sandbox-p5-sensor-browser.cjs'
+      - 'scripts/sandbox-p15-timer-relay-browser.cjs'
       - 'scripts/sandbox-p8-edit-plant-browser.cjs'
       - '.github/workflows/ux2-stage1-browser.yml'
   workflow_dispatch:
@@ -62,6 +63,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-faults-browser.cjs
       - name: Regression - P5 photoeye hidden fault, real PLC input and repair
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p5-sensor-browser.cjs
+      - name: Regression - P15 on-delay timer relay inspector and reload
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p15-timer-relay-browser.cjs
       - name: Regression - 3D factory PLC16 commissioning and floor raycasts
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-3d-commissioning-browser.cjs
       - name: Regression - P12 factory challenge launch from clipped scene panel
