@@ -10,6 +10,9 @@ on:
       - 'src/render/Sandbox3D.tsx'
       - 'src/app/ux2-workbench.css'
       - 'scripts/sandbox-ux3-real-scenes-browser.cjs'
+      - 'src/app/SandboxPage.tsx'
+      - 'src/app/ux5-workspace-clarity.css'
+      - 'scripts/sandbox-ux5-workspace-clarity-browser.cjs'
       - '.github/workflows/ux3-real-workcell-visual.yml'
   workflow_dispatch:
 permissions:
@@ -41,6 +44,8 @@ jobs:
           curl -fsS http://127.0.0.1:4173/ > /dev/null
       - name: Actual WebGL process, bottle and sorting scenes
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux3-real-scenes-browser.cjs
+      - name: UX5 real two-machine workspace and compact contextual labels
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-ux5-workspace-clarity-browser.cjs
       - name: Preserve existing 3D placement, 23-wire commissioning and ST
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/sandbox-p7-3d-commissioning-browser.cjs
       - name: Upload ONLY real running application screenshots
@@ -48,7 +53,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ux3-real-worker-webgl-scenes
-          path: qa-artifacts/ux3-real-workcells/
+          path: |
+            qa-artifacts/ux3-real-workcells/
+            qa-artifacts/ux5-workspace-clarity/
           if-no-files-found: ignore
           retention-days: 10
       - name: Preview diagnostics on failure
