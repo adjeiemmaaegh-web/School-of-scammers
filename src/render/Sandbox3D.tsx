@@ -473,10 +473,11 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusR
   useEffect(()=>{
     const prior=previousCount.current;
     previousCount.current=project.components.length;
-    if(mode!=='orbit'||prior!==0||project.components.length===0)return;
-    // A gallery scene or bulk project load arrives in one worker snapshot.
-    // Auto-fit ONCE at that transition. Individual user device placement,
-    // later scans and drag edits cannot hijack the camera.
+    if(mode!=='orbit'||prior!==0||project.components.length<2)return;
+    // A gallery scene or multi-device project load arrives in one worker
+    // snapshot. Never auto-fit a single manually placed component: doing so
+    // changes the 3D ray under the mouse between successive placement clicks.
+    // Later scans, individual edits and drags must not hijack the camera.
     const framing=frameIndustrialPlant(project);
     setInterest(framing.target);
     camera.position.set(...framing.position);
