@@ -55,6 +55,13 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     await page.waitForSelector('.sandbox-toolbar');
     await clickText('Place starter layout');
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 6);
+    // UX4 opens canvas-first with its engineering dock collapsed. Use the actual
+    // Logical / Wiring view and expand Diagnostics to expose wires, faults and meter.
+    await page.click('[data-p5-view="logical"]');
+    await page.waitForFunction(() => document.querySelector('[data-p5-view-active]')?.getAttribute('data-p5-view-active') === 'logical');
+    await page.click('[data-p5-dock-tab="diagnostics"]');
+    await page.waitForSelector('.sandbox-wire-list');
+    await page.waitForSelector('[data-fault-inject]');
     for (const [a, b] of pairs) await wire(a, b);
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-wire-list > div').length === 11);
     await clickText('Load editable latch example');
