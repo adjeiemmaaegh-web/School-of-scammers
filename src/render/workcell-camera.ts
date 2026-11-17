@@ -168,3 +168,19 @@ export function initialOrbitFraming(
   return {target:[0,0,0],position:[7,8.5,10]};
  return frameIndustrialPlant(project);
 }
+
+export type ViewPreset = 'top' | 'front' | 'side';
+/**
+ * Orthogonal inspection views (roadmap R6.2) at the same distance from the framed target as the default view.
+ * `top` looks straight down (a tiny z offset avoids the up-vector singularity), `front` along -z, `side` along -x.
+ * View geometry only: no project, PLC or plant state is touched.
+ */
+export function presetCameraPosition(
+ framing:{target:[number,number,number];position:[number,number,number]},preset:ViewPreset,
+):[number,number,number]{
+ const [tx,ty,tz]=framing.target,[px,py,pz]=framing.position;
+ const d=Math.hypot(px-tx,py-ty,pz-tz);
+ if(preset==='top')return [tx,ty+d,tz+0.01];
+ if(preset==='front')return [tx,ty+d*.18,tz+d*.98];
+ return [tx+d*.98,ty+d*.18,tz];
+}
