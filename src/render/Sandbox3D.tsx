@@ -275,10 +275,12 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   // labels: the legacy precision drag acceptance requires a real >=20px hit
   // target. Original gallery scenes receive compact camera-scaled tags so
   // they never obscure the physical machine being inspected.
-  // Plant equipment must never obscure the machines with giant HTML cards,
-  // including two-device teaching scenes. Full name/state remain in the
-  // selected-device inspector and the hover title.
-  const compact=plant || (!selected&&project.components.length>2&&
+  // Multi-machine plants use compact anchored tags, including two-device
+  // teaching scenes. A lone device retains its large, >=20px direct-drag
+  // handle required for accessible single-machine commissioning.
+  // Full name/state remain in the Inspector and native hover title.
+  const compact=(plant&&project.components.length>=2) ||
+    (!selected&&project.components.length>2&&
     (project.components.length<=8||galleryScene));
   const showDeviceTerminals = !galleryScene || selected;
   // P3 equipment uses the real worker-owned 3D shapes, not duplicated large
