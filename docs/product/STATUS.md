@@ -51,6 +51,9 @@ Severity: S1 blocks release claims, S2 should fix before the stage that depends 
 | F-19 | S3 | Registry audit (R6.1), generated in `DEVICE_CATALOG.md`: 12 kinds have neither a plant model nor an injectable fault: `breaker diverter drainvalve estop lamp overload plc plc16 stacklight star-delta-drive supply tank three-phase-supply` (several have faults via other mechanisms such as breaker/overload trip; the catalogue lists only solver/plant fault hooks) | `docs/product/DEVICE_CATALOG.md` | R6.1 |
 | F-11 | S1 (gate) | Not verified anywhere: physical 8 GB/no-GPU Windows run, real Chrome/Edge/Firefox/Safari manual passes, controls-engineer review, instructor/student trials, licensing clearance | `RELEASE_READINESS_2026-11-15.md` | R11/R12 |
 
+
+CI on `engineering/r1-contextual-workbench` (dispatch run [44178832135](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44178832135)): `build-and-test` **success**, including the new R1, R2 and offline-update scripts. An earlier run on the same branch failed only because of a missing Node typing in a test (found by running `verify:full` in a CI-like clean install; fixed).
+
 ## 4. Task register
 
 | Task | State | Baseline SHA | PR / commit | Evidence | Owner-only blockers | Notes |
