@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { COURSE } from '../exercises/course';
 import { SCENARIO_META } from '../exercises/meta';
 import { loadProgress } from '../platform/persistence';
 import { AppHeader } from '../ui/AppHeader';
@@ -21,6 +22,20 @@ export function LearnPage() {
           <Link to="/trades" className="hub-card"><h2>Guided exercises</h2><p>A ranked 1&ndash;10 ladder of hands-on tasks, PLC first, with hints and instant feedback.</p><span className="go">Open the ladder →</span></Link>
           <Link to="/labs" className="hub-card"><h2>Engineering labs</h2><p>Focused bench tools for one topic at a time.</p><span className="go">Open the labs →</span></Link>
         </div>
+
+        <section aria-labelledby="learn-course" style={{ marginTop: 40 }} data-learn-course>
+          <h2 id="learn-course" className="sec-title">Suggested course path</h2>
+          <p className="sub">An order to learn things in. Stages marked <em>open practice</em> have no guided lesson yet: they send you to the simulator with a goal to build.</p>
+          <ol className="course-list">
+            {COURSE.map(c => (
+              <li key={c.id} data-course-stage={c.id} data-course-kind={c.kind}>
+                <Link to={c.to}><strong>{c.title}</strong></Link>
+                <span>{c.goal}</span>
+                <small>{c.kind === 'scenario' ? 'Guided scenario' : c.kind === 'lab' ? 'Focused lab' : 'Open practice'}{c.gap ? ` · ${c.gap}` : ''}</small>
+              </li>
+            ))}
+          </ol>
+        </section>
 
         <section aria-labelledby="learn-scenarios" style={{ marginTop: 40 }}>
           <h2 id="learn-scenarios" className="sec-title">Simulator scenarios</h2>

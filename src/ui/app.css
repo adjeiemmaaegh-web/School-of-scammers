@@ -358,3 +358,8 @@ body::before {
   max-width:min(620px,calc(100% - 24px));padding:8px 12px;border-radius:10px;
   background:var(--surface);color:var(--text);border:1px solid var(--accent);box-shadow:0 10px 36px #0009;font-size:12px;
 }
+
+/* Course path on the Learn page (R9.2) */
+.course-list {list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.course-list li {display:grid;gap:3px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.course-list small {color:var(--muted)}
