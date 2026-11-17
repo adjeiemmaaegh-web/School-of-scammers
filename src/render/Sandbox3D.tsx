@@ -808,7 +808,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
         Fit all
       </button>
       <button type="button" data-3d-fit-selected
-        disabled={!available||!props.selectedDeviceIds.length}
+        disabled={!available||!(props.selectedDeviceIds?.length)}
         title="Focus the 3D camera on selected machine(s)"
         onClick={()=>{
          if(operatorEnabled){props.onTrainingOperator(false,null);setOperatorEnabled(false);}
