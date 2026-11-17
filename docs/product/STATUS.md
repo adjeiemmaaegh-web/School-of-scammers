@@ -55,6 +55,8 @@ Severity: S1 blocks release claims, S2 should fix before the stage that depends 
 
 CI on `engineering/r1-contextual-workbench` (dispatch run [44178832135](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44178832135)): `build-and-test` **success**, including the new R1, R2 and offline-update scripts. An earlier run on the same branch failed only because of a missing Node typing in a test (found by running `verify:full` in a CI-like clean install; fixed).
 
+CI on `engineering/r5-r7-soak-and-package` (dispatch run [44191919385](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44191919385)): `build-and-test` **success with zero browser-script retries**; includes the R1, R2, offline-update scripts and the fixed F-01/F-02 scripts.
+
 ## 4. Task register
 
 | Task | State | Baseline SHA | PR / commit | Evidence | Owner-only blockers | Notes |
