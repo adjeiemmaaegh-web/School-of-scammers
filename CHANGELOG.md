@@ -9,6 +9,7 @@ Versioning policy: `package.json` version is the app/build version (0.x until th
 - R3: golden tick tests, device contract, equipment-state phase extracted from `tick()`.
 - R4: Structured Text function blocks (TON, TOF, TP, CTU, CTD, R_TRIG, F_TRIG) and `T#` literals; Ladder limit 32 rungs / 48 tags.
 - R6/R8/R9/R10: generated device catalogue, hidden-fault export redaction, commissioning report export, suggested course path, contributor guide.
+- R5.5: meter continuity mode.
 - R10.1: data-only scene package format (title, level, objectives, hints, project) with library import/export.
 - R7/R11: bounded soak and benchmark test (10 simulated minutes, maximal project).
 

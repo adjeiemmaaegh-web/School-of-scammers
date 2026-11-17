@@ -17,6 +17,7 @@ import {
 import { LEGACY_IO, defaultIo, ioOf, isConfigurableIo, validateIoMap } from './plc-io';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
+import { measureContinuity } from '../electrical/continuity';
 import { threePhaseWireError, threePhaseConnections } from '../electrical/three-phase-netlist';
 import { freshStarterPanel } from '../electrical/three-phase-types';
 import { stepWiredStarter } from '../electrical/wired-star-delta';
@@ -470,6 +471,12 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         commandEvents.push({tick:world.tick,kind:'mains',
           detail:'Virtual three-phase source '+cmd.id+(cmd.enabled?' energised':' isolated')});
       }
+    } else if (cmd.k === 'setMeterMode') {
+      if (cmd.mode !== 'voltage' && cmd.mode !== 'continuity') world = setError(world, 'Unknown meter mode');
+      else {
+        const { mode: _old, ...rest } = world.meter;
+        world = { ...world, meter: { ...rest, ...(cmd.mode === 'continuity' ? { mode: 'continuity' as const } : {}), volts: null, status: 'select' } };
+      }
     } else if (cmd.k === 'setMeterProbe') {
       if ((cmd.lead !== 'positive' && cmd.lead !== 'negative') ||
           (cmd.terminal !== null && (typeof cmd.terminal !== 'string' ||
@@ -920,8 +927,10 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
         wires: solverWires(w.project),
       });
       w = { ...w, voltages: pausedCircuit.voltage,
-        meter: measureDC24(pausedCircuit.voltage, pausedCircuit.diagnostics,
-          w.meter.positive, w.meter.negative, pausedCircuit.sameSupply) };
+        meter: w.meter.mode === 'continuity'
+          ? measureContinuity(buildCircuit(w), solverWires(w.project), w.meter.positive, w.meter.negative, false)
+          : measureDC24(pausedCircuit.voltage, pausedCircuit.diagnostics,
+            w.meter.positive, w.meter.negative, pausedCircuit.sameSupply) };
     }
     return { world: w, snapshot: renderSnapshot(w), events };
   }
@@ -1244,7 +1253,9 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     plantWorld: p3.runtime,
     pumpOn, drainOn, lampOn,
     voltages: circuit.voltage,
-    meter: measureDC24(circuit.voltage,circuit.diagnostics,w.meter.positive,w.meter.negative,circuit.sameSupply),
+    meter: w.meter.mode === 'continuity'
+      ? measureContinuity([], [], w.meter.positive, w.meter.negative, true)
+      : measureDC24(circuit.voltage,circuit.diagnostics,w.meter.positive,w.meter.negative,circuit.sameSupply),
     diagnostics: [...circuit.diagnostics,
       ...(w.project.components.some(c => c.kind === 'breaker' && w.tripped[c.id] === true) ? ['Branch breaker open: reset only after removing downstream short'] : []),
       ...(w.project.components.some(c => c.kind === 'overload' && w.tripped[c.id] === true) ? ['Motor overload auxiliary 95-96 open (manual test trip)'] : []),

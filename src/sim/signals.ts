@@ -213,6 +213,8 @@ export type Command =
   | { k:'loadPlantScene'; id:string }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
+  /** Meter mode: DC voltage (default) or continuity (circuit must be de-energised). */
+  | { k: 'setMeterMode'; mode: 'voltage' | 'continuity' }
   | { k: 'setThreePhasePower'; id: string; enabled: boolean }
   /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
   /** Rename the tags of a configurable (16/16) PLC. Refused if it would break that PLC's program. Paused only. */

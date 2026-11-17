@@ -5,7 +5,9 @@ export type MeterReading = {
   positive: string | null;
   negative: string | null;
   volts: number | null;
-  status: 'select' | 'measured' | 'floating' | 'short';
+  status: 'select' | 'measured' | 'floating' | 'short' | 'conductor' | 'through-load' | 'open' | 'energised';
+  /** Present only in continuity mode (R5.5); absent means the default DC voltage mode. */
+  mode?: 'continuity';
 };
 export const emptyMeter = (): MeterReading => ({
   positive: null, negative: null, volts: null, status: 'select',
