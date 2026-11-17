@@ -36,6 +36,7 @@ export function ProjectLibraryPanel({ lib, active, status, editable, onOpen, onN
   const [versionLabel, setVersionLabel] = useState('');
   const importRef = useRef<HTMLInputElement>(null);
   const restoreRef = useRef<HTMLInputElement>(null);
+  const packageRef = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
@@ -51,13 +52,16 @@ export function ProjectLibraryPanel({ lib, active, status, editable, onOpen, onN
   }, [onClose]);
 
   const run = async (fn: () => Promise<unknown>) => { try { await fn(); } catch (e) { onNotice(e instanceof Error ? e.message : 'Project library action failed'); } await refresh(); onChanged(); };
-  const importFile = (kind: 'project' | 'bundle') => async (ev: ChangeEvent<HTMLInputElement>) => {
+  const importFile = (kind: 'project' | 'bundle' | 'package') => async (ev: ChangeEvent<HTMLInputElement>) => {
     const file = ev.target.files?.[0]; ev.target.value = '';
     if (!file) return;
     await run(async () => {
       if (file.size > (kind === 'bundle' ? 12_000_000 : 1_100_000)) { onNotice('That file is too large to import.'); return; }
       const text = await file.text();
-      if (kind === 'project') {
+      if (kind === 'package') {
+        const r = await lib.importScenePackage(text);
+        onNotice(r.ok ? `Imported scene "${r.meta.title}" (${r.level}). Objectives: ${r.objectives.join(' · ') || 'none listed'}${r.hints.length ? ` · ${r.hints.length} hint(s) in the file` : ''}. Open it from the list.` : r.message);
+      } else if (kind === 'project') {
         const r = await lib.importProject(text);
         onNotice(r.ok ? `Imported "${r.meta.title}" into the library (not opened).` : r.message);
       } else {
@@ -89,6 +93,8 @@ export function ProjectLibraryPanel({ lib, active, status, editable, onOpen, onN
         <button type="button" className="btn ghost small" onClick={() => importRef.current?.click()}>Import project JSON</button>
         <button type="button" className="btn ghost small" data-library-backup onClick={() => run(async () => download('efo-projects-backup.json', await lib.exportBundle()))}>Back up all</button>
         <button type="button" className="btn ghost small" onClick={() => restoreRef.current?.click()}>Restore backup</button>
+        <button type="button" className="btn ghost small" data-library-import-package onClick={() => packageRef.current?.click()}>Import scene package</button>
+        <input ref={packageRef} type="file" accept=".json,application/json" hidden data-library-package-input onChange={importFile('package')} />
         <input ref={importRef} type="file" accept=".json,application/json" hidden onChange={importFile('project')} />
         <input ref={restoreRef} type="file" accept=".json,application/json" hidden onChange={importFile('bundle')} />
       </div>
@@ -110,6 +116,8 @@ export function ProjectLibraryPanel({ lib, active, status, editable, onOpen, onN
             <button type="button" className="btn ghost small" data-library-rename onClick={() => setRenaming({ id: m.id, title: m.title })}>Rename</button>
             <button type="button" className="btn ghost small" data-library-duplicate onClick={() => run(async () => { const r = await lib.duplicate(m.id); if (!r.ok) onNotice(r.message); })}>Duplicate</button>
             <button type="button" className="btn ghost small" onClick={() => run(async () => { const t = await lib.exportProject(m.id); if (t) download(`${safeName(m.title)}.efo-project.json`, t); })}>Export</button>
+            <button type="button" className="btn ghost small" data-library-export-package title="Data-only scene file with a title, level, objectives and hints"
+              onClick={() => run(async () => { const t = await lib.exportScenePackage(m.id, { description: `Scene exported from "${m.title}".`, level: 'beginner', objectives: ['Describe the goal of this scene here'], hints: [] }); if (t) download(`${safeName(m.title)}.efo-scene.json`, t); })}>Export scene</button>
             <button type="button" className="btn ghost small" disabled={active?.id === m.id} title={active?.id === m.id ? 'Open another project first.' : undefined}
               onClick={() => run(() => lib.setArchived(m.id, !m.archived))}>{m.archived ? 'Unarchive' : 'Archive'}</button>
             {confirmDelete === m.id
