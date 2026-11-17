@@ -275,8 +275,11 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   // labels: the legacy precision drag acceptance requires a real >=20px hit
   // target. Original gallery scenes receive compact camera-scaled tags so
   // they never obscure the physical machine being inspected.
-  const compact=!selected&&project.components.length>2&&
-    (project.components.length<=8||galleryScene);
+  // Plant equipment must never obscure the machines with giant HTML cards,
+  // including two-device teaching scenes. Full name/state remain in the
+  // selected-device inspector and the hover title.
+  const compact=plant || (!selected&&project.components.length>2&&
+    (project.components.length<=8||galleryScene));
   const showDeviceTerminals = !galleryScene || selected;
   // P3 equipment uses the real worker-owned 3D shapes, not duplicated large
   // placeholder housings. Its outline is only a selection/drag affordance.
@@ -304,7 +307,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
     <Html position={[0, compact ? (plant ? .66 : 1.08) : 1.22, 0]} center
       distanceFactor={compact ? 3.1 : 11}>
       <div className={`sandbox-3d-label ${compact ? 'ux3-compact-label' : 'ux3-selected-label'}`} data-3d-drag-handle={c.id}
-        title="Select the machine; drag this 3D-anchored label to reposition it while paused"
+        title={`${def.label} · ${c.id}. Select to inspect; drag to move while paused.`}
         onPointerDown={event=>{
           if((event.target as HTMLElement).closest('button'))return;
           onLabelPress(event,c.id);
@@ -456,11 +459,14 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, placeK
   // Explicit fit respects existing worker-authored plant placements, not
   // unrelated PLC terminal boxes. No PLC or physics state is changed.
   },[fitRequest]);
-  const previousCount=useRef(project.components.length);
+  // An already-loaded two-machine plant should frame on first mount too.
+  // Do not refit on subsequent individual placements or worker scan updates.
+  const previousCount=useRef(0);
   useEffect(()=>{
     const prior=previousCount.current;
     previousCount.current=project.components.length;
-    if(mode!=='orbit'||prior!==0||project.components.length<3)return;
+    if(mode!=='orbit'||prior!==0||
+      (project.components.length<3&&!project.components.some(c=>Boolean(PLANT_EQUIPMENT[c.kind]))))return;
     // A gallery scene or bulk project load arrives in one worker snapshot.
     // Auto-fit ONCE at that transition. Individual user device placement,
     // later scans and drag edits cannot hijack the camera.
