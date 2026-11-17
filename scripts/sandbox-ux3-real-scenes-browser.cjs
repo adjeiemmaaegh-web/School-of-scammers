@@ -76,6 +76,10 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
      const pane=document.querySelector('.p5-layout')?.getBoundingClientRect();
      return {
        projectKinds:project?.components?.map(c=>c.kind),
+       plantLabels:(project?.components||[]).filter(c=>['mixer','filler','belt-conveyor','valve','agitator'].includes(c.kind)).map(c=>({
+         id:c.id,
+         compact:!!document.querySelector('.sandbox-3d-label.ux3-compact-label[data-3d-drag-handle="'+CSS.escape(c.id)+'"]'),
+       })),
        realWorkerScene:project?.components?.some(c=>c.kind===kind),
        projectWires:project?.wires?.length,
        canvas:{w:rect?.width,h:rect?.height,x:rect?.x,y:rect?.y},
@@ -109,6 +113,9 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
      evidence.labels.filter(l=>l.compact).every(l=>l.width<=110&&l.height<=32),
      'Unselected labels must be compact, not obscure real 3D machines: '+
       JSON.stringify(evidence.labels));
+   assert.ok(evidence.plantLabels.every(label=>label.compact),
+     'Plant labels must stay compact even with one or two machines: '+
+      JSON.stringify(evidence.plantLabels));
    assert.ok(evidence.terminals.length>=2 &&
      evidence.terminals.filter(p=>!p.selected && !p.interactive && p.visible).every(p=>p.width<=22),
      'Passive visible PLC terminals must be pin markers, not giant HTML buttons: '+
