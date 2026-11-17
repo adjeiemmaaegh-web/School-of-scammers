@@ -1,0 +1,107 @@
+/*
+ * UX6 (roadmap R1): reclaim canvas height and make the active tool explicit. Geometry only: no command,
+ * data attribute, simulator or worker behaviour changes. Applies to the desktop/tablet workbench (>=768px).
+ *  - project/mode/save state shares the menu-bar row instead of owning its own band
+ *  - the reusable-assembly picker lives in the equipment library panel instead of its own band
+ *  - the 3D placement ribbon wraps at the bottom-left and never sits under the axis gizmo or off the canvas
+ */
+.ux6-tool-chip {
+  display:inline-flex;align-items:center;white-space:nowrap;
+  padding:3px 8px;border:1px solid var(--line);border-radius:12px;
+  font:600 10.5px var(--body);color:var(--muted);background:var(--surface-2);
+}
+.ux6-tool-chip[data-ux6-active-tool="run"] {color:#ffb84d;border-color:#ffb84d66}
+.p5-tool-actions button[aria-pressed="true"] {
+  border-color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent);
+}
+
+@media (min-width:768px) and (min-height:720px) {
+  main.efo-ux2-shell {position:relative}
+  .efo-ux2-shell .sandbox-masthead {
+    position:absolute;top:2px;right:9px;z-index:45;
+    padding:0;margin:0;width:auto;min-height:0;
+  }
+  .efo-ux2-shell .sandbox-masthead > div:first-child {display:none}
+  .efo-ux2-shell .sandbox-project-meta {
+    display:flex;flex-direction:row;align-items:center;gap:8px;
+    min-width:0;max-width:430px;padding:2px 9px;white-space:nowrap;
+  }
+  .efo-ux2-shell .sandbox-project-meta strong {
+    overflow:hidden;text-overflow:ellipsis;max-width:190px;
+  }
+  .efo-ux2-shell .p5-menu-bar {width:calc(100% - 450px);box-sizing:border-box}
+
+  .efo-ux2-shell .ux2-command-stack {
+    grid-template-areas:"workflow toolbar toolbar" "views views authoring";
+  }
+  .efo-ux2-shell .sandbox-palette > .sandbox-assembly-library {
+    flex:0 0 auto;margin:0;padding:0 7px;border-radius:6px;
+    height:auto;max-height:none;
+  }
+  .efo-ux2-shell .sandbox-palette > .sandbox-assembly-library > summary {
+    line-height:24px;font-size:11px;cursor:pointer;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  /* The editing strip wraps onto the second line of the view-tools row instead of scrolling sideways with clipped buttons. */
+  .efo-ux2-shell .ux2-command-stack > .workspace-editing-strip {
+    height:auto;max-height:none;overflow:visible;
+  }
+  .efo-ux2-shell .ux2-command-stack .workspace-authoring-bar {
+    flex-wrap:wrap;min-width:0;gap:3px 4px;
+  }
+  .efo-ux2-shell .sandbox-palette > .sandbox-assembly-library[open] {
+    position:static;width:auto;max-height:230px;overflow:auto;padding:3px 7px 6px;
+    box-shadow:none;
+  }
+
+  /* 3D overlays: wrap instead of overflowing, keep clear of the gizmo (bottom-right) and the Maximize button. */
+  .efo-ux2-shell .p7-3d-authoring {
+    left:8px;right:auto;bottom:30px;
+    width:auto;max-width:min(560px,calc(100% - 200px));
+    flex-wrap:wrap;overflow:visible;max-height:none;
+    padding:4px 7px;gap:3px 8px;
+  }
+  .efo-ux2-shell .sandbox-3d-hud {bottom:4px}
+  .efo-ux2-shell .p7-3d-preview {bottom:92px}
+  .efo-ux2-shell .sandbox-3d-camera-controls .p7-3d-check {
+    font-size:10px;white-space:normal;max-width:150px;line-height:1.15;
+  }
+}
+@media (min-width:768px) and (max-width:1099px) and (min-height:720px) {
+  .efo-ux2-shell .ux2-command-stack {
+    grid-template-areas:"workflow toolbar" "views views" "authoring authoring";
+  }
+  .efo-ux2-shell .sandbox-project-meta strong,
+  .efo-ux2-shell .sandbox-project-meta small {display:none}
+  .efo-ux2-shell .p5-menu-bar {width:calc(100% - 150px)}
+}
+/* >=1100px the view/tool/panel groups fit on one line; keep the taller wrapped row only for narrower widths. */
+@media (min-width:1100px) and (min-height:720px) {
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools {
+    min-height:34px;flex-wrap:wrap;align-content:center;
+  }
+}
+
+/* Project library dialog (R2) */
+.ux6-modal-backdrop {position:fixed;inset:0;z-index:200;background:#02080fb8;display:flex;align-items:center;justify-content:center;padding:16px}
+.ux6-modal {
+  width:min(760px,100%);max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box;
+  background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:10px;
+  padding:14px 16px;box-shadow:0 20px 60px #000a;
+}
+.ux6-modal-head {display:flex;align-items:center;gap:10px}
+.ux6-modal-head h2 {margin:0;font-size:17px;flex:1}
+.ux6-lib-status {font:600 11px var(--mono);color:var(--muted)}
+.ux6-lib-status[data-library-status="conflict"],.ux6-lib-status[data-library-status="failed"] {color:#ff8a65}
+.ux6-lib-tools,.ux6-lib-new {display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+.ux6-lib-tools input[type=search],.ux6-lib-new input[type=text] {flex:1 1 180px;min-width:0;padding:6px 8px}
+.ux6-lib-list {list-style:none;margin:6px 0;padding:0;display:grid;gap:5px}
+.ux6-lib-list li {display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:space-between;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2)}
+.ux6-lib-list li.is-active {border-color:var(--accent)}
+.ux6-lib-row-main {display:grid;gap:2px;min-width:0;flex:1 1 220px}
+.ux6-lib-row-main small {color:var(--muted);font-size:11px}
+.ux6-lib-row-actions {display:flex;flex-wrap:wrap;gap:4px}
+.ux6-lib-empty {color:var(--muted);justify-content:center !important}
+.ux6-lib-versions h3 {font-size:13px;margin:12px 0 2px}
+.ux6-lib-note {font-size:11px;color:var(--muted);margin:10px 0 0}
+.ux6-conflict {display:flex;flex-wrap:wrap;gap:6px;align-items:center}
