@@ -35,9 +35,15 @@ const STORAGE='efo-open-sandbox-project-v1';
   await click();await count(1);
   const first=(await saved()).components[0];
   assert.equal(first.kind,'roller-conveyor');
-  await click();
-  await page.waitForFunction(()=>document.querySelector('[role="alert"]')?.
-   textContent?.includes('Refused duplicate'),{timeout:10000});
+  // A click that lands before the 3D hover state has caught up with the first placement can be dropped; repeating the
+  // same duplicate click is harmless (the worker refuses it) so retry a few times instead of waiting once.
+  let refused=false;
+  for(let attempt=0;attempt<5&&!refused;attempt++){
+   await page.mouse.move(box.x+box.width*.5-3,box.y+box.height*.5);await click();
+   refused=await page.waitForFunction(()=>document.querySelector('[role="alert"]')?.
+    textContent?.includes('Refused duplicate'),{timeout:3000}).then(()=>true,()=>false);
+  }
+  assert.ok(refused,'The worker must refuse a duplicate carrier');
   assert.equal((await saved()).components.length,1,'Duplicate carrier must be refused in the worker');
   await page.select('[data-p7-place-kind]','geometry-photoeye');
   await click();
