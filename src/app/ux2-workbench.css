@@ -660,3 +660,78 @@
   visibility:hidden;
   pointer-events:none;
 }
+
+
+/* UX5: reclaim workspace height on engineering laptops without changing the
+   worker, interactive scene hierarchy, project data, or browser accessibility.
+   Keep auxiliary plant and selection panels scrollable rather than hiding
+   commands or moving them outside their owning route. */
+@media (min-width:768px) and (min-height:720px) {
+  .efo-ux2-shell .sandbox-masthead {padding-block:0;min-height:0}
+  .efo-ux2-shell .p5-menu-bar {padding-block:0}
+  .efo-ux2-shell .p5-menu-bar summary {padding-block:4px}
+  .efo-ux2-shell .sandbox-workflow {padding-block:0}
+  .efo-ux2-shell .sandbox-workflow button {padding-block:4px}
+  .efo-ux2-shell .sandbox-toolbar {padding-block:2px}
+  .efo-ux2-shell .workspace-editing-strip {max-height:36px}
+  .efo-ux2-shell .p5-view-tools {padding-block:2px}
+  .efo-ux2-shell .p5-view-tools button {padding-block:4px}
+  .efo-ux2-shell .sandbox-assembly-library:not([open]) {
+    padding-block:0;
+    max-height:24px;
+  }
+  .efo-ux2-shell .sandbox-assembly-library:not([open]) > summary {
+    line-height:21px;
+  }
+  /* Device/wire totals already appear in the always-on simulation status.
+     Do not reserve a redundant 51px title band above the live 3D canvas. */
+  .efo-ux2-shell .p5-physical-stage > .sandbox-scene-heading {
+    display:none;
+  }
+  .efo-ux2-shell .sandbox-3d-shell {
+    height:max(140px,calc(100% - 6px));
+    max-height:none;
+  }
+  .efo-ux2-shell .sandbox-palette {padding:6px}
+  .efo-ux2-shell .sandbox-palette-item.ux2-equipment-tile {
+    min-height:96px;
+    padding-block:5px;
+  }
+  .efo-ux2-shell .ux2-equipment-illustration {height:52px}
+  .efo-ux2-shell .p7-3d-authoring {
+    max-width:min(660px,calc(100% - 18px));
+    max-height:min(96px,42%);
+    bottom:7px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    flex-wrap:nowrap;
+  }
+  .efo-ux2-shell .sandbox-3d-hud {bottom:57px}
+  .efo-ux2-shell .p7-3d-preview {bottom:92px}
+}
+
+/* The physical target remains visible when a machine is selected.
+   Active plant equipment is compact even in single/two-device scenes;
+   the Inspector and native title give the complete label/state. */
+.efo-ux2-shell .sandbox-3d-label.ux3-compact-label {
+  max-width:98px;
+  pointer-events:auto;
+}
+.efo-ux2-shell .sandbox-3d-label.ux3-compact-label strong {
+  max-width:87px;
+  white-space:nowrap;
+}
+
+/* Keep all camera modes and fit commands keyboard-accessible while allowing
+   narrow viewports to scroll the camera toolbar instead of clipping its end. */
+.efo-ux2-shell .sandbox-3d-camera-controls {
+  max-width:calc(100% - 20px);
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+}
+.efo-ux2-shell .sandbox-3d-camera-controls button:focus-visible,
+.efo-ux2-shell .p7-3d-authoring button:focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
