@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { COMPONENTS } from '../../components/registry';
+import { modelLimitFor } from '../../components/model-limits';
 import { paramSpecsOf, paramValue, type ParamSpec } from '../../components/params';
 import type { PlacedComponent, ProjectFile, RenderSnapshot } from '../../sim/signals';
 import { perDeviceLive } from '../../sim/device-state';
@@ -146,6 +147,7 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
       <button type="button" className="sandbox-inspector-close" onClick={onClearSelection} aria-label="Clear equipment selection">×</button>
     </div>
     <p className="sandbox-help">{definition.help}</p>
+    <p className="sandbox-help" data-model-limit>{modelLimitFor(selectedDevice.kind)}</p>
     <div className="sandbox-inspector-properties">
       <span>Device ID</span><code>{selectedDevice.id}</code>
       <span>Live state</span><strong className={isLive ? 'is-live' : ''}>{state}</strong>
