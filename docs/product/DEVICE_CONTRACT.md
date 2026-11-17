@@ -37,4 +37,4 @@ Plant equipment is driven by 24 V loads solved by the circuit (`stepProjectPlant
 ## Known debt (tracked in STATUS.md)
 
 - Two systems for device behaviour (`electrical-defs` hand-coded blocks vs `plant/equipment`); adapters, not a rewrite, are the plan.
-- `tick()` is one 380-line function and `buildCircuit` still special-cases the original devices and the first classic PLC.
+- `tick()` is now a ~190-line sequencer over four extracted phases in `src/sim/phases/` (`controller-scan`, `actuators`, `equipment-state`, `fail-closed`), pinned by the golden digests; `orchestrator.ts` fell from 1,289 to 1,071 lines. `buildCircuit` still special-cases the original devices and the first classic PLC, and the legacy single-device mirrors remain (R3.4 not done).

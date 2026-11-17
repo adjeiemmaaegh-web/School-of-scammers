@@ -26,6 +26,9 @@ import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeCompon
 import { laneOf, lanesOf, vesselOf } from './stations';
 import { electricalDevices } from '../components/electrical-defs';
 import { stepEquipmentState } from './phases/equipment-state';
+import { stepActuators } from './phases/actuators';
+import { scanControllers } from './phases/controller-scan';
+import { deenergisedPlcs, quietLanes } from './phases/fail-closed';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { clearedAlarm } from '../plant/cylinder';
 import { analogWireError, sampleAnalogInputs } from './analog';
@@ -327,8 +330,6 @@ function syncLegacy(w: WorldState): WorldState {
 /** A cylinder latches its alarm until it is reset; repairing it (or clearing its fault) resets it. */
 const resetCylinderAlarm = (w: WorldState, id: string): WorldState =>
   w.cylinders[id] ? { ...w, cylinders: { ...w.cylinders, [id]: clearedAlarm(w.cylinders[id]) } } : w;
-const quietLanes = (lanes: Record<string, SortingPlant>): Record<string, SortingPlant> =>
-  Object.fromEntries(Object.entries(lanes).map(([id, lane]) => [id, { ...lane, photoeyeActive: false }]));
 /** Truth a photoeye reports: the lane (conveyor) it is positioned along. No lane, no detection. */
 const eyeActive = (w: WorldState, eye: PlacedComponent): boolean => {
   const lane = laneOf(w.project.components, eye);
@@ -339,9 +340,6 @@ const probeHigh = (w: WorldState, probe: PlacedComponent): boolean => {
   const vessel = vesselOf(w.project.components, probe);
   return !!vessel && w.vessels[vessel.id]?.highLevel === true;
 };
-/** Every additional PLC with its outputs off (fail-closed after a runtime fault). */
-const deenergisedPlcs = (plcs: Record<string, PlcRuntime>): Record<string, PlcRuntime> =>
-  Object.fromEntries(Object.entries(plcs).map(([id, rt]) => [id, { ...rt, coils: {} }]));
 const canEdit = (world: WorldState) => !world.running;
 /** Replace the fault list, omitting the key when empty so fault-free projects keep their v1 shape. */
 function withFaults(world: WorldState, faults: readonly FaultSpec[]): WorldState {
@@ -960,214 +958,14 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   const plc = plcComponents(w.project)[0];
   // "24 V" always means 24 V relative to the device's OWN reference, so isolated supplies cannot leak.
   const powered = !!plc && !shorted && circuit.reads24(terminal(plc.id, 'L+'), terminal(plc.id, 'M'));
-  // 3. Sample actual wired 24V input image, including powered mark photoeye.
-  // The photoeye's optical state was determined by the PRIOR plant scan.
-  const eyePowered = !shorted && w.project.components.some(c => c.kind === 'photoeye' && circuit.reads24(terminal(c.id, 'L+'), terminal(c.id, 'M')));
-  const probePowered = !shorted && w.project.components.some(c => c.kind === 'levelprobe' && circuit.reads24(terminal(c.id, 'L+'), terminal(c.id, 'M')));
-  const inputs = {
-    Start: powered && circuit.reads24(terminal(plc!.id, 'I0.0'), terminal(plc!.id, 'M')),
-    StopOK: powered && circuit.reads24(terminal(plc!.id, 'I0.1'), terminal(plc!.id, 'M')),
-    Photoeye: powered && eyePowered && circuit.reads24(terminal(plc!.id, 'I0.2'), terminal(plc!.id, 'M')),
-    TankHigh: powered && probePowered && circuit.reads24(terminal(plc!.id, 'I0.3'), terminal(plc!.id, 'M')),
-    ReverseRequest: powered && circuit.reads24(terminal(plc!.id, 'I0.4'), terminal(plc!.id, 'M')),
-  };
-  // 4. Execute the learner's exact document in the salvaged bounded LD or ST engine.
-  let ladderResult: LadderResult | null = null;
-  let stResult: STResult | null = null;
-  let fbdResult: FbdResult | null = null;
-  try {
-    // Only a classic first PLC runs through this original fixed-name path; every other PLC takes the generic path below.
-    if (powered && plc?.kind === 'plc') {
-      if(w.project.language==='fbd') {
-        fbdResult=executeFbd(compileFbd(programOf(w.project,plc.id).fbd,namesFor(w.project,plc.id)),
-          inputs,w.coils,w.fbdMemory,dtMs);
-      } else if (w.project.language === 'st') {
-        const compiled = w.stCompiled ?? compileSandboxST(w.project.stSource ?? '');
-        stResult = executeStructuredText(compiled, inputs, w.stMemory);
-        const run = Object.entries(stResult.outputs).find(([key]) => key.toLowerCase() === 'run')?.[1];
-        if (typeof run !== 'boolean') throw new TypeError('ST Run output must be BOOL');
-      } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs, w.ladderNumeric,
-        w.debugForces[plc.id] ?? {});
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'PLC runtime failed';
-    // Fail closed in the *simulated* plant. Do not publish stale energized outputs
-    // after an arithmetic fault (overflow, division by zero, invalid typed write).
-    const paused: WorldState = {
-      ...w, running: false, coils: { ...w.coils, Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
-      tagValues: { ...w.tagValues, Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
-      contactorOn: false, motorOn: false, conveyorOn: false, diverterOn: false,
-      pumpOn: false, drainOn: false, lampOn: false,
-      plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {},
-      forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
-      interlockConflict: false,
-      plant: { ...w.plant, photoeyeActive: false }, lanes: quietLanes(w.lanes), voltages: {},
-      diagnostics: [...w.diagnostics, 'PLC scan interrupted; simulated outputs deenergized'],
-      lastError: `PLC runtime error: ${message}`,
-    };
-    return { world: paused, snapshot: renderSnapshot(paused),
-      events: [{ tick: w.tick, kind: 'error', detail: message }] };
-  }
-  const stRun = stResult
-    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'run')?.[1]
-    : undefined;
-  const stSort = stResult
-    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'sort')?.[1]
-    : undefined;
-  const stFill = stResult
-    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'fill')?.[1]
-    : undefined;
-  const stDrain = stResult
-    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'drain')?.[1]
-    : undefined;
-  const stForward = stResult
-    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'forward')?.[1]
-    : undefined;
-  const stReverse = stResult
-    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'reverse')?.[1]
-    : undefined;
-  if ((stSort !== undefined && typeof stSort !== 'boolean') ||
-      (stFill !== undefined && typeof stFill !== 'boolean') ||
-      (stDrain !== undefined && typeof stDrain !== 'boolean') ||
-      (stForward !== undefined && typeof stForward !== 'boolean') ||
-      (stReverse !== undefined && typeof stReverse !== 'boolean')) {
-    const paused: WorldState = {
-      ...w, running: false, coils: { ...w.coils, Run: false, Sort: false },
-      tagValues: { ...w.tagValues, Run: false, Sort: false },
-      motorOn: false, conveyorOn: false, diverterOn: false, contactorOn: false,
-      pumpOn: false, drainOn: false, lampOn: false,
-      plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {},
-      forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
-      interlockConflict: false,
-      lastError: 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL',
-    };
-    return { world: paused, snapshot: renderSnapshot(paused),
-      events: [{ tick: w.tick, kind: 'error', detail: 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL' }] };
-  }
-  // Structured Text is case-insensitive; the physical Q0.0 binding is always canonical "Run".
-  const coils: Record<string, boolean> = stResult
-    ? { ...Object.fromEntries(Object.entries(stResult.outputs).filter(([, value]) => typeof value === 'boolean')),
-        Run: stRun === true, Sort: stSort === true, Fill: stFill === true, Drain: stDrain === true,
-        Forward: stForward === true, Reverse: stReverse === true }
-    : fbdResult?.outputs ?? ladderResult?.outputs ?? {};
-  const tagValues: Record<string, STValue> = {
-    ...inputs, ...(stResult?.signals ?? {}), ...(w.debugForces[plc?.id ?? '']??{}),
-    ...(ladderResult?.numericValues ?? {}), ...coils,
-    Run: coils.Run === true, Sort: coils.Sort === true,
-    Fill: coils.Fill === true, Drain: coils.Drain === true,
-    Forward: coils.Forward === true, Reverse: coils.Reverse === true, Unused: false,
-  };
-  // 4b. Every additional PLC samples ITS OWN wired terminals and scans ITS OWN program. They interact
-  // only through the 24V netlist (e.g. one PLC's output wired to another's input).
-  const nextPlcs: Record<string, PlcRuntime> = {};
-  const unpoweredExtras: string[] = [];
-  for (const extra of runtimePlcs(w.project)) {
-    const extraPowered = !shorted && circuit.reads24(terminal(extra.id, 'L+'), terminal(extra.id, 'M'));
-    const io = ioOf(w.project, extra);
-    // A sensor-named input only reads high if some powered sensor of that kind exists (guards a wire straight to P24).
-    const digitalInputs = Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => [tag, extraPowered &&
-      (tag === 'Photoeye' ? eyePowered : tag === 'TankHigh' ? probePowered : true) &&
-      circuit.reads24(terminal(extra.id, pin), terminal(extra.id, 'M'))]));
-    const cfg = programOf(w.project, extra.id);
-    try {
-      const openAnalogWires = new Set(faultsOf(w.project).filter(f => f.kind === 'wire-open').map(f => f.target));
-      const numeric = sampleAnalogInputs(w.project, w.vessels, extra.id, io, extraPowered, openAnalogWires,
-        w.plantWorld, id => circuit.reads24(terminal(id, 'L+'), terminal(id, 'M')));
-      // Physical numeric process inputs come from the preceding settled scan state.
-      const tagInputs = { ...digitalInputs, ...numeric.values };
-      nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)),
-        tagInputs, extraPowered, dtMs, numeric.points, w.debugForces[extra.id] ?? {});
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'PLC runtime failed';
-      const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
-      const paused: WorldState = {
-        ...w, running: false, coils: { ...w.coils, ...quiet }, tagValues: { ...w.tagValues, ...quiet },
-        plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {},
-        contactorOn: false, motorOn: false, conveyorOn: false, diverterOn: false,
-        pumpOn: false, drainOn: false, lampOn: false,
-        forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped', interlockConflict: false,
-        plant: { ...w.plant, photoeyeActive: false }, lanes: quietLanes(w.lanes), voltages: {},
-        diagnostics: [...w.diagnostics, 'PLC scan interrupted; simulated outputs deenergized'],
-        lastError: `PLC ${extra.id} runtime error: ${message}`,
-      };
-      return { world: paused, snapshot: renderSnapshot(paused), events: [{ tick: w.tick, kind: 'error', detail: `PLC ${extra.id}: ${message}` }] };
-    }
-    if (!extraPowered && extra.id !== plc?.id) unpoweredExtras.push(extra.id);
-  }
+  // 3-4. Sample the wired input image and scan every controller (see sim/phases/controller-scan.ts).
+  const scan = scanControllers(w, circuit, shorted, plc, powered, dtMs);
+  if (scan.halt) return { world: scan.halt.world, snapshot: renderSnapshot(scan.halt.world), events: scan.halt.events };
+  const { eyePowered, probePowered, inputs, ladderResult, stResult, fbdResult, coils, tagValues, nextPlcs, unpoweredExtras } = scan;
   // 5. Publish output image (Q0.0 follows coil Run, only when PLC is powered).
   // 6. Apply outputs to actuators via circuit on the NEXT tick; contactor coil is sampled here.
-  const contactor = w.project.components.find(c => c.kind === 'contactor');
-  const motor = w.project.components.find(c => c.kind === 'motor');
-  const conveyor = w.project.components.find(c => c.kind === 'conveyor');
-  const diverter = w.project.components.find(c => c.kind === 'diverter');
-  const pump = w.project.components.find(c => c.kind === 'pump');
-  const drain = w.project.components.find(c => c.kind === 'drainvalve');
-  const lamp = w.project.components.find(c => c.kind === 'lamp');
-  const forwardContactor = w.project.components.find(c => c.kind === 'forwardcontactor');
-  const reverseContactor = w.project.components.find(c => c.kind === 'reversecontactor');
-  const reversibleMotor = w.project.components.find(c => c.kind === 'revmotor');
-  // Coil currents come only from the resolved electrical graph, including
-  // the opposite contactor's physically wired NC auxiliary. The simplified
-  // mechanical interlock also inhibits both when simultaneous energized coils
-  // are detected (e.g. user bypasses both NC auxiliaries).
-  const forwardCoilOn = !!forwardContactor && circuit.energizedLoads.includes(forwardContactor.id);
-  const reverseCoilOn = !!reverseContactor && circuit.energizedLoads.includes(reverseContactor.id);
-  const interlockConflict = forwardCoilOn && reverseCoilOn;
-  const forwardContactorOn = forwardCoilOn && !interlockConflict;
-  const reverseContactorOn = reverseCoilOn && !interlockConflict;
-  const forwardMotorPowered = !!reversibleMotor &&
-    circuit.energizedLoads.includes(`${reversibleMotor.id}-F`);
-  const reverseMotorPowered = !!reversibleMotor &&
-    circuit.energizedLoads.includes(`${reversibleMotor.id}-R`);
-  const opposingDrives = forwardMotorPowered && reverseMotorPowered;
-  const motorDirection: 'stopped' | 'forward' | 'reverse' =
-    interlockConflict || opposingDrives ? 'stopped' :
-      forwardMotorPowered ? 'forward' : reverseMotorPowered ? 'reverse' : 'stopped';
-  // The simple modeled shaft follows only worker-owned scan time and observed
-  // 24V motor terminal energization. Reverse rotates in the negative direction.
-  const reverseMotorAngleRad = motorDirection === 'stopped' ? w.reverseMotorAngleRad :
-    (w.reverseMotorAngleRad + (motorDirection === 'forward' ? 1 : -1) * dtMs * 0.02 +
-      2 * Math.PI * 100) % (2 * Math.PI);
-  const contactorOn = !!contactor && circuit.energizedLoads.includes(contactor.id);
-  // 7. Advance P1 plant: ideal DC motor load, no fake animation or invented motion physics.
-  const motorOn = !!motor && circuit.energizedLoads.includes(motor.id);
-  // Idealized shaft indicator rotation comes from the authoritative simulation clock,
-  // not requestAnimationFrame or visual-only animation. Speed is illustrative, not calibrated.
-  const motorAngleRad = motorOn ? (w.motorAngleRad + dtMs * 0.02) % (2 * Math.PI) : w.motorAngleRad;
-  // P3 plant movement derives from the actual powered conveyor, never Run/3D animation.
-  const conveyorOn = !!conveyor && circuit.energizedLoads.includes(conveyor.id);
-  const diverterOn = !!diverter && circuit.energizedLoads.includes(diverter.id);
-  // Every conveyor is its own lane: the photoeye and diverter positioned along it, and its own parcel.
-  const nextLanes: Record<string, SortingPlant> = {};
-  for (const lane of lanesOf(w.project.components)) {
-    const belt = circuit.energizedLoads.includes(lane.conveyor.id);
-    const gate = lane.diverters.some(d => circuit.energizedLoads.includes(d.id));
-    const parts = [lane.conveyor, ...lane.eyes.slice(0, 1), ...lane.diverters.slice(0, 1)];
-    const change = stepPlant(w.lanes[lane.conveyor.id] ?? freshPlant(), parts, belt, gate, dtMs);
-    nextLanes[lane.conveyor.id] = change.plant;
-    for (const detail of change.events) events.push({ tick: w.tick + 1, kind: 'plant', detail });
-  }
-  const pumpOn = !!pump && circuit.energizedLoads.includes(pump.id);
-  const drainOn = !!drain && circuit.energizedLoads.includes(drain.id);
-  const lampOn = !!lamp && circuit.energizedLoads.includes(lamp.id);
-  // Every contactor, motor and lamp has its own energised state (the legacy booleans mirror the first).
-  const deviceOn: Record<string, boolean> = {};
-  const motorAngles: Record<string, number> = {};
-  for (const c of w.project.components) {
-    if (!['contactor', 'motor', 'lamp', 'conveyor', 'diverter', 'pump', 'drainvalve', 'relay', 'stacklight'].includes(c.kind)) continue;
-    const on = circuit.energizedLoads.includes(c.id);
-    deviceOn[c.id] = on;
-    // A stack light has three lamps, each its own load: record every lamp by `<id>-R`, `-Y` and `-G`.
-    if (c.kind === 'stacklight') for (const lamp of ['R', 'Y', 'G']) deviceOn[`${c.id}-${lamp}`] = circuit.energizedLoads.includes(`${c.id}-${lamp}`);
-    if (c.kind === 'motor') {
-      const prev = w.motorAngles[c.id] ?? (c.id === motor?.id ? w.motorAngleRad : 0);
-      motorAngles[c.id] = on ? (prev + dtMs * 0.02) % (2 * Math.PI) : prev;
-      if (c.id !== motor?.id && on !== (w.deviceOn[c.id] === true))
-        events.push({ tick: w.tick + 1, kind: 'motor', detail: `Motor ${c.id} ${on ? 'running' : 'stopped'}` });
-    } else if (c.kind === 'contactor' && c.id !== contactor?.id && on !== (w.deviceOn[c.id] === true)) {
-      events.push({ tick: w.tick + 1, kind: 'contactor', detail: `Contactor ${c.id} ${on ? 'energised' : 'released'}` });
-    }
-  }
+  // Actuator image: legacy single-device flags plus per-instance state (see sim/phases/actuators.ts).
+  const { contactor, motor, conveyor, diverter, pump, drain, lamp, forwardContactor, reverseContactor, reversibleMotor, forwardCoilOn, reverseCoilOn, interlockConflict, forwardContactorOn, reverseContactorOn, forwardMotorPowered, reverseMotorPowered, opposingDrives, motorDirection, reverseMotorAngleRad, contactorOn, motorOn, motorAngleRad, conveyorOn, diverterOn, nextLanes, pumpOn, drainOn, lampOn, deviceOn, motorAngles } = stepActuators(w, circuit.energizedLoads, dtMs, events);
   // On-delay relays, pneumatic cylinders and tank vessels advance from the solved circuit (see sim/phases/equipment-state.ts).
   const { nextTimers, nextCylinders, nextVessels } = stepEquipmentState(w, circuit.energizedLoads, dtMs, deviceOn, events);
   // The authoritative P3 world advances exactly five 10 ms substeps AFTER PLC
