@@ -91,8 +91,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await sleep(500);
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 5, { timeout: 8000 });
-    // A fresh load intentionally collapses the Inspector again.
-    await page.click('.p5-panel-toggles button:nth-child(2)');
+    // Panel visibility is a persisted view preference (R1): open the Inspector only if the reload did not restore it.
+    if (await page.$eval('.p5-panel-toggles button:nth-child(2)', e => e.getAttribute('aria-pressed') !== 'true')) await page.click('.p5-panel-toggles button:nth-child(2)');
     await page.waitForSelector('[data-p5-inspector]');
     await inspect(T);
     await page.waitForSelector('[data-param="delayMs"]');

@@ -6,8 +6,10 @@ const VERSION=/*__VERSION__*/;
 const CACHE='plc-skills-lab-shell-'+VERSION;
 const PREFIX='plc-skills-lab-shell-';
 self.addEventListener('install',event=>{
- event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(PRECACHE)).then(()=>self.skipWaiting()));
+ // No skipWaiting here: an open tab keeps the assets it started with until the user chooses to update (R2.6).
+ event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(PRECACHE)));
 });
+self.addEventListener('message',event=>{if(event.data==='SKIP_WAITING')self.skipWaiting();});
 self.addEventListener('activate',event=>{
  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(PREFIX)&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()));
 });

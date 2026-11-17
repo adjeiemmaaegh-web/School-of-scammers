@@ -78,10 +78,17 @@ export function useProjectLibrary(options: Options) {
           const opened = await library.open(id);
           if (opened.status === 'ok') {
             setActiveBoth({ id, title: opened.meta.title, revision: opened.meta.revision });
+            // Loading a project must not create a revision: only a real difference from the stored copy is committed.
+            lastJson.current = JSON.stringify(opened.project);
             // The working copy is gone (cleared storage, new device profile): restore from the durable library.
-            if (!opts.current.hadWorkingCopy()) {
+            // Only into an untouched blank page: if the user already started editing while the library opened,
+            // their work wins and the library project stays available in the dialog.
+            const here = opts.current.project;
+            const untouched = !here || (here.components.length === 0 && here.wires.length === 0);
+            const restoring = opened.project as ProjectFile;
+            if (!opts.current.hadWorkingCopy() && untouched && (restoring.components.length > 0 || restoring.wires.length > 0)) {
               awaitingLoad.current = JSON.stringify(opened.project);
-              opts.current.loadIntoWorker(opened.project as ProjectFile);
+              opts.current.loadIntoWorker(restoring);
               opts.current.onNotice(`Restored "${opened.meta.title}" from the project library.`);
             }
           } else if (opened.status === 'damaged') {

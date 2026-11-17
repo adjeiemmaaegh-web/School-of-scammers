@@ -53,7 +53,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await page.reload({ waitUntil: 'networkidle0' });
     // The canvas-first workspace starts with the engineering dock hidden.
     // Restore its real PLC tabs and wiring list before assertions.
-    await page.click('.p5-dock-heading button[aria-expanded="false"]');
+    // Panel visibility persists across a reload (R1), so expand the dock only if it came back collapsed.
+    if (await page.$('.p5-dock-heading button[aria-expanded="false"]')) await page.click('.p5-dock-heading button[aria-expanded="false"]');
     await page.waitForSelector('[data-starters]');
 
     // 1. One click gives a complete, wired, programmed starter. No manual wiring or programming.
@@ -166,7 +167,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await page.reload({ waitUntil: 'networkidle0' });
     // The canvas-first workspace starts with the engineering dock hidden.
     // Restore its real PLC tabs and wiring list before assertions.
-    await page.click('.p5-dock-heading button[aria-expanded="false"]');
+    if (await page.$('.p5-dock-heading button[aria-expanded="false"]')) await page.click('.p5-dock-heading button[aria-expanded="false"]'); // the dock state persists across reloads (R1)
     await waitCounts(10, 15);
 
     // 9. Phone width: the new controls cause no horizontal scroll.
