@@ -1,4 +1,4 @@
-/** Single official P3 equipment registry; 23 original, bounded teaching models. */
+/** Single official P3 equipment registry; 26 original, bounded teaching models. */
 import type {EquipmentDef} from '../world/equipment';
 import {spec} from '../world/equipment';
 import {STATIC_SOLID_KINDS} from '../world/solid-geometry';

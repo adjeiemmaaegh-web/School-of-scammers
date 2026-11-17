@@ -2,6 +2,8 @@
 
 **Open, browser-based industrial automation sandbox** — build a system from components, wire it, edit real Ladder logic, then Run, Step and troubleshoot. Inspired by the workflow of Cisco Packet Tracer/GNS3, PLC programming engineering tools, and Factory I/O; this is an original educational simulator, not a vendor clone.
 
+> **Current status and plan:** [docs/product/STATUS.md](docs/product/STATUS.md) (evidence, inventory, findings) and the single forward plan [docs/product/MASTER_ROADMAP.md](docs/product/MASTER_ROADMAP.md).
+>
 > **Deployed software baseline — 15 November 2026:** [PR #70](https://github.com/adjeiemmaaegh-web/School-of-scammers/pull/70)
 > integrated the P1–P25 work and QA hardening into `main` at commit
 > `4e4d5538b30ea562e0bf249eecf6abab173c97cc`. Vercel reported

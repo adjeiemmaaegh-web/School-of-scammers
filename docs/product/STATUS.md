@@ -1,0 +1,58 @@
+# Status register — EFO Skill Lab / PLC Skills Lab
+
+**Governing plan:** [`MASTER_ROADMAP.md`](MASTER_ROADMAP.md) (R0–R12). This page records what is *verified now*; the roadmap says what to do next. Task states: `NOT_STARTED`, `IMPLEMENTED_UNVERIFIED`, `CI_VERIFIED`, `OWNER_ACCEPTED`, `BLOCKED`, `DEFERRED`.
+
+## 1. Baseline (R0.1, R0.3) — measured 2026-11-17 in a fresh checkout
+
+| Item | Value |
+|---|---|
+| Source of truth | `origin/main` = `284ba4783225f64b88c1c1d3e5bb1cc314511e55` (identical to the roadmap's baseline; nothing newer) |
+| Toolchain | Node v22.23.4, npm 10.9.9, `npm ci` clean (8 s), lockfile unchanged |
+| `tsc --noEmit` | pass |
+| Vitest | **171 files, 1,414 tests pass** (52 s) |
+| `npm run build`, `verify:engineering:offline`, `verify:full` | pass (offline build: shell/asset paths verified) |
+| Bundle budgets | pass. entry 104.3 KB gzip (limit 120), sandbox route 538.9 KB (limit 575 KiB), total JS 807.9 KB (limit 850 KiB) |
+| Exact-head GitHub checks on `284ba478` | `build-and-test` success ([run](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44074086327)), `windows-edge` success ([run](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44074086392)). Vercel status: **failure, "Deployment rate limited — retry in 24 hours"** (platform limit, not a code failure; production redeploy of this commit is therefore unconfirmed) |
+| Local browser matrix, **no retries**, 66 CI scripts | **63 pass, 3 fail** (see F-01, F-02, F-03). Run in a container with Puppeteer 24.31.0, Chromium, software WebGL; not a physical device |
+
+## 2. Inventory (R0.2) — counted from executable code
+
+- Component kinds in `src/components/registry.ts`: **54**. Plant equipment definitions (`src/plant/equipment`): **26**, all of which are also registry kinds. The other **28** kinds (supplies, PLCs, buttons, contactors, motors, relay, timer relay, cylinder, stack light, breakers, three-phase and star-delta, and so on) have electrical behaviour only and no plant definition. This is the two-system split noted in F-04.
+- Scenes (`src/plant/scenes/catalogue.ts`): **21**. Classic sandbox scenarios (`src/exercises/catalogue.ts`): **4**. These are separate concepts (templates vs graded scenarios) and must not be counted together.
+- Routes (`src/app/App.tsx`): `/`, `/sandbox`, `/trades`, `/trade/:id`, `/exercise/:id`, `/scenario/:id`, `/learn`, `/assess`, `/employer`, `/take`, eight `/labs/*` legacy labs, and nine redirects from old paths.
+- Files: `src` 285 (30.7 k lines, many very long), `tests` 179, `scripts` 90 (66 run in CI), `docs` 147, `.github` 5.
+- Largest sources: `sim/orchestrator.ts` 1,289 lines, `app/SandboxPage.tsx` 1,252, `render/Sandbox3D.tsx` 895, `ui/sandbox/SceneMatrixPanel.tsx` 786.
+- Not done: a per-file ownership matrix and a line-by-line read of every module. R0.2 is therefore only partly complete (counts and registries verified; ownership matrix `NOT_STARTED`).
+
+## 3. Findings register (R0.7)
+
+Severity: S1 blocks release claims, S2 should fix before the stage that depends on it, S3 hygiene.
+
+| ID | Sev | Finding | Evidence | Stage |
+|---|---|---|---|---|
+| F-01 | S2 | `sandbox-3d-workcell-browser.cjs` fails locally in most runs (1 of 4 passed): the camera-status wait after holding `w` times out at 12 s | `scripts/sandbox-3d-workcell-browser.cjs:51` | R1/R11.4 |
+| F-02 | S3 | `sandbox-p7-clearance-browser.cjs` intermittent (failed 1 of 5): "Refused duplicate" alert wait | `scripts/sandbox-p7-clearance-browser.cjs:39` | R11.4 |
+| F-03 | S3 | `browser-acceptance.cjs` fails deterministically in this container ("node not clickable" while clicking the PLCopen LD export on the legacy `/labs/engineering` page) but passes in CI | `scripts/browser-acceptance.cjs:54`, `src/components/LadderEditor.tsx:74` | R11.2 |
+| F-04 | S2 | Two device systems coexist: 28 registry kinds with electrical-only behaviour vs 26 `plant/equipment` definitions; first-PLC legacy path and mirrors remain in `tick()` | registry vs `plantKinds` (section 2); `sim/orchestrator.ts` | R3 |
+| F-05 | S2 | CI retries masked flakiness: `run-browser-step.cjs` makes a flaky script pass with a warning. The no-retry matrix above shows three scripts that would fail | `scripts/run-browser-step.cjs`, section 1 | R11.4 |
+| F-06 | S1 | Project save is a single `localStorage` key plus one recovery record, 1 MB cap, and its own comment states it cannot prevent simultaneous multi-tab overwrites | `src/platform/sandbox-project-storage.ts:9,22,59,67` | R2 |
+| F-07 | S3 | Documentation drift: plant registry header said 23 models (26 exist; fixed in this PR); `AUDIT_SIMULATOR_FIRST.md` said no FBD editor (superseded note added); README sections are historical snapshots | `src/plant/equipment/index.ts:1`, `docs/product/AUDIT_SIMULATOR_FIRST.md:15` | R0.6 |
+| F-08 | S3 | Worker compares whole project JSON on every dispatch (`JSON.stringify` of before/after); cost unmeasured | `src/sim/worker.ts:13` | R3.6 (profile first) |
+| F-09 | S1 | Vercel deployment of `284ba478` rate-limited; production may not be on the latest commit | commit status, section 1 | owner |
+| F-10 | S3 | 16 early per-increment reports sat at `docs/` top level (moved to `docs/archive/early-reports`; licensing/dependency evidence kept) | `docs/` | R0.6 |
+| F-11 | S1 (gate) | Not verified anywhere: physical 8 GB/no-GPU Windows run, real Chrome/Edge/Firefox/Safari manual passes, controls-engineer review, instructor/student trials, licensing clearance | `RELEASE_READINESS_2026-11-15.md` | R11/R12 |
+
+## 4. Task register
+
+| Task | State | Baseline SHA | PR / commit | Evidence | Owner-only blockers | Notes |
+|---|---|---|---|---|---|---|
+| R0.1 baseline SHA, toolchain, tests | CI_VERIFIED | 284ba478 | this branch | section 1 | none | |
+| R0.2 inventory | IMPLEMENTED_UNVERIFIED | 284ba478 | this branch | section 2 (counts only) | none | ownership matrix and full read still open |
+| R0.3 full test/build/browser matrix | IMPLEMENTED_UNVERIFIED | 284ba478 | this branch | 1,414 unit tests; 63/66 browser scripts local, exact-head CI green | none | Windows Edge via CI only; Firefox/WebKit via CI only |
+| R0.4 screenshot matrix | NOT_STARTED | — | — | — | owner review | needed before R1 |
+| R0.5 compare #79, #80, #81, old PRs | IMPLEMENTED_UNVERIFIED | 284ba478 | — | #80 merged; #79 open draft; #81 open; #28–#69 superseded by #70 | none | #79 not diffed in detail yet |
+| R0.6 docs reconciliation | IMPLEMENTED_UNVERIFIED | 284ba478 | this branch | roadmap + this page added, README/CLAUDE pointers, early reports archived, three drift items fixed | none | PRD/ARCHITECTURE/handover tense not yet rewritten |
+| R0.7 findings register | IMPLEMENTED_UNVERIFIED | 284ba478 | this branch | section 3 | none | covers what was measured, not a line-by-line audit |
+| R1 contextual workbench (issue #81) | NOT_STARTED | — | — | — | UX sign-off | next after R0 review |
+| R2 project library and recovery | NOT_STARTED | — | — | — | real-browser storage acceptance | |
+| R3–R12 | NOT_STARTED | — | — | — | per roadmap | |
