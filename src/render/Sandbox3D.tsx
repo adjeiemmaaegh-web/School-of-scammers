@@ -432,11 +432,11 @@ type DeviceDrag = {
 /** This scene owns camera and pointer gestures, NEVER PLC or physics state.
  * A dragged machine is a temporary ghost until the worker acknowledges 'move'.
  */
-function Workbench({ project, snapshot, editable, grid, mode, fitRequest, placeKind, alignSensor,
+function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusSelectedRequest, placeKind, alignSensor,
   showZones, showSignals, hover, selectedDeviceIds, selectedTerminal, moveTarget,
   onTerminal, onOperate, onSelect, onPlaceAt, onPreview, onMove, onRotate, onCameraPose }: {
   project: ProjectFile; snapshot: RenderSnapshot; editable: boolean; grid: GridStep;
-  mode:WorkcellCameraMode;fitRequest:number;
+  mode:WorkcellCameraMode;fitRequest:number;focusSelectedRequest:number;
   placeKind:ComponentKind | ''; alignSensor:boolean;
   showZones:boolean; showSignals:boolean;
   hover:PlacementAssessment|null;
@@ -459,6 +459,16 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, placeK
   // Explicit fit respects existing worker-authored plant placements, not
   // unrelated PLC terminal boxes. No PLC or physics state is changed.
   },[fitRequest]);
+  useEffect(()=>{
+    if(!focusSelectedRequest||mode!=='orbit')return;
+    const chosen=project.components.filter(c=>selectedDeviceIds.includes(c.id));
+    if(!chosen.length)return;
+    const framing=frameIndustrialPlant({...project,components:chosen});
+    setInterest(framing.target);
+    camera.position.set(...framing.position);
+    camera.lookAt(...framing.target);
+  // Selection is explicit; later PLC scans and position updates never refit.
+  },[focusSelectedRequest]);
   // An already-loaded two-machine plant should frame on first mount too.
   // Do not refit on subsequent individual placements or worker scan updates.
   const previousCount=useRef(0);
@@ -702,6 +712,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
   const camera = useRef<Camera | null>(null);
   const [cameraMode,setCameraMode]=useState<WorkcellCameraMode>('orbit');
   const [fitRequest,setFitRequest]=useState(0);
+  const [focusSelectedRequest,setFocusSelectedRequest]=useState(0);
   const [cameraPose,setCameraPose]=useState<CameraPose|null>(null);
   const [operatorEnabled,setOperatorEnabled]=useState(false);
   const operatorLive=useRef(false),operatorSender=useRef(props.onTrainingOperator);
@@ -794,8 +805,15 @@ export function Sandbox3D(props: Sandbox3DProps) {
          if(operatorEnabled){props.onTrainingOperator(false,null);setOperatorEnabled(false);}
          setCameraMode('orbit');setFitRequest(n=>n+1);
         }}>
-        Fit scene
+        Fit all
       </button>
+      <button type="button" data-3d-fit-selected
+        disabled={!available||!props.selectedDeviceIds.length}
+        title="Focus the 3D camera on selected machine(s)"
+        onClick={()=>{
+         if(operatorEnabled){props.onTrainingOperator(false,null);setOperatorEnabled(false);}
+         setCameraMode('orbit');setFocusSelectedRequest(n=>n+1);
+        }}>Focus selected</button>
       <label className="p7-3d-check" title="Explicit teaching-person proxy in the worker, never real-person tracking">
         <input type="checkbox" data-p8-training-operator
           disabled={!available||cameraMode!=='first-person'} checked={operatorEnabled}
@@ -832,7 +850,8 @@ export function Sandbox3D(props: Sandbox3DProps) {
       camera={{ position: [7, 8.5, 10], fov: 42, near: 0.1, far: 120 }}
       onCreated={state => { camera.current = state.camera; state.camera.lookAt(0, 0, 0); }}>
       <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
-        grid={props.grid??5} mode={cameraMode} fitRequest={fitRequest} onMove={props.onMove}
+        grid={props.grid??5} mode={cameraMode} fitRequest={fitRequest}
+        focusSelectedRequest={focusSelectedRequest} onMove={props.onMove}
         placeKind={placementKind} alignSensor={alignSensor} showZones={showZones}
         showSignals={showSignals} hover={hover} onPreview={onPreview}
         onRotate={props.onRotate}
