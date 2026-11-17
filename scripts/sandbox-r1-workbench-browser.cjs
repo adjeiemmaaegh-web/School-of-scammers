@@ -97,6 +97,20 @@ const SIZES = [[1440, 940, 0.66], [1366, 768, 0.60], [1280, 720, 0.58], [1024, 7
     await page.waitForSelector('.p5-panel-toggles');
     assert.equal((await pressed()).Library, 'true');
     console.log('Preferences: persisted, corrupt values recovered');
+    // Commissioning report (R8.4): the menu item produces an escaped local HTML file from the worker's own state.
+    await place(page, ['24V supply', '24V pilot lamp']);
+    await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length >= 2);
+    await page.evaluate(() => {
+      window.__reportBlob = null;
+      const original = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = blob => { if (blob.type === 'text/html') blob.text().then(t => { window.__reportBlob = t; }); return original(blob); };
+      const d = [...document.querySelectorAll('.p5-menu-bar details')].find(x => x.querySelector('summary').textContent === 'Project'); d.open = true;
+      document.querySelector('[data-export-report]').click();
+    });
+    await page.waitForFunction(() => !!window.__reportBlob, { timeout: 8000 });
+    const report = await page.evaluate(() => window.__reportBlob);
+    assert.match(report, /commissioning snapshot/); assert.match(report, /Content-Security-Policy/); assert.match(report, /lamp/);
+    console.log('Report: commissioning HTML generated from the live snapshot');
     assert.deepEqual(errors.filter(e => !/favicon|WebGL|GPU stall|swiftshader/i.test(e)), [], 'No page errors');
     console.log('R1 workbench browser E2E PASS');
   } finally { await browser.close(); }

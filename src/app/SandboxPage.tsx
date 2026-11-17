@@ -9,6 +9,7 @@ import { AssemblyLibrary } from '../ui/sandbox/AssemblyLibrary';
 import { ProjectLibraryPanel } from '../ui/sandbox/ProjectLibraryPanel';
 import { useProjectLibrary } from './useProjectLibrary';
 import { redactHiddenFaults } from '../sim/redact';
+import { commissioningReportHtml } from '../diagnostics/commissioning-report';
 import { EquipmentThumbnail } from '../ui/sandbox/EquipmentThumbnail';
 import { makeFragment } from '../workspace/clipboard';
 import { recordChange, emptyHistory, undoHistory, redoHistory } from '../workspace/history';
@@ -448,6 +449,16 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     link.href = url; link.download = 'efo-sandbox-project.json'; link.click();
     URL.revokeObjectURL(url);
   };
+  const exportReport = () => {
+    if (!project || !snapshot) return;
+    try {
+      const html = commissioningReportHtml({ title: library.active?.title ?? 'Sandbox project', project, snapshot, events, generatedAt: new Date().toISOString() });
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+      const link = document.createElement('a');
+      link.href = url; link.download = 'efo-commissioning-report.html'; link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { setClientError(e instanceof Error ? e.message : 'Could not build the report'); }
+  };
   const importProject = async (ev: ChangeEvent<HTMLInputElement>) => {
     const file = ev.target.files?.[0]; if (!file) return;
     try {
@@ -677,6 +688,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           {!scenario && <button type="button" disabled={!library.lib||!library.active}
             onClick={()=>{void library.saveVersion(`Version ${new Date().toLocaleTimeString()}`).then(ok=>setClientError(ok?null:'Could not save a version.'));}}>Save a version of this project</button>}
           <button type="button" disabled={!project} onClick={exportProject}>Download project JSON</button>
+          <button type="button" data-export-report disabled={!project||!snapshot} onClick={exportReport}>Export commissioning report (HTML)</button>
           <span>Projects stay in this browser unless exported.</span>
         </div></details>
         <details><summary>Edit</summary><div className="p5-menu-content">
