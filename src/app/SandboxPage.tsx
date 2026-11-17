@@ -8,6 +8,7 @@ import { WorkspaceSelectionPanel } from '../ui/sandbox/WorkspaceSelectionPanel';
 import { AssemblyLibrary } from '../ui/sandbox/AssemblyLibrary';
 import { ProjectLibraryPanel } from '../ui/sandbox/ProjectLibraryPanel';
 import { useProjectLibrary } from './useProjectLibrary';
+import { redactHiddenFaults } from '../sim/redact';
 import { EquipmentThumbnail } from '../ui/sandbox/EquipmentThumbnail';
 import { makeFragment } from '../workspace/clipboard';
 import { recordChange, emptyHistory, undoHistory, redoHistory } from '../workspace/history';
@@ -440,7 +441,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     COMPONENTS[c.kind].terminals.map(t => `${c.id}.${t.name}`)) ?? [];
   const exportProject = () => {
     if (!project) return;
-    const file = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+    // Graded scenarios never write hidden faults into a downloadable file (they would reveal the answer).
+    const file = new Blob([JSON.stringify(scenario ? redactHiddenFaults(project) : project, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(file);
     const link = document.createElement('a');
     link.href = url; link.download = 'efo-sandbox-project.json'; link.click();
