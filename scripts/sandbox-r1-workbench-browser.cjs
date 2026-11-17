@@ -97,6 +97,14 @@ const SIZES = [[1440, 940, 0.66], [1366, 768, 0.60], [1280, 720, 0.58], [1024, 7
     await page.waitForSelector('.p5-panel-toggles');
     assert.equal((await pressed()).Library, 'true');
     console.log('Preferences: persisted, corrupt values recovered');
+    // Diagnostics overview (R8.1): worker-derived rails/controllers/alarms and jump links in the Measurements tab.
+    await page.evaluate(() => document.querySelector('[data-p5-dock-tab="diagnostics"]').click());
+    await page.waitForSelector('[data-diagnostics-overview]', { timeout: 8000 });
+    assert.ok(await page.$('[data-diag-rail]'), 'power rail listed');
+    assert.match(await page.$eval('[data-diag-scan]', e => e.textContent), /Scan \d+/);
+    await page.evaluate(() => document.querySelector('[data-diag-jump="diag-meter"]').click());
+    assert.ok(await page.$('#diag-meter'), 'jump target exists');
+    console.log('Diagnostics: overview with rails, controllers, alarms and jump links');
     // Commissioning report (R8.4): the menu item produces an escaped local HTML file from the worker's own state.
     await place(page, ['24V supply', '24V pilot lamp']);
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length >= 2);

@@ -7,6 +7,7 @@ import { WorkspaceAuthoringBar } from '../ui/sandbox/WorkspaceAuthoringBar';
 import { WorkspaceSelectionPanel } from '../ui/sandbox/WorkspaceSelectionPanel';
 import { AssemblyLibrary } from '../ui/sandbox/AssemblyLibrary';
 import { ProjectLibraryPanel } from '../ui/sandbox/ProjectLibraryPanel';
+import { DiagnosticsOverview } from '../ui/sandbox/DiagnosticsOverview';
 import { useProjectLibrary } from './useProjectLibrary';
 import { redactHiddenFaults } from '../sim/redact';
 import { commissioningReportHtml } from '../diagnostics/commissioning-report';
@@ -1270,6 +1271,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           {activePlcId && activePlcView?.kind === 'plc16' && <IoMappingPanel plcId={activePlcId} view={activePlcView} editable={editable} send={send} />}
         </div>
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
+          {project && snapshot && <DiagnosticsOverview project={project} snapshot={snapshot} />}
+          <span id="diag-monitor" />
           {snapshot && <LiveMonitor snapshot={snapshot} project={project}
             onBreakpoint={scan => send([{ k: 'breakAtScan', scan }])}
             onTagBreakpoint={breakpoint => send([{ k: 'breakOnTag', breakpoint }])}
@@ -1282,12 +1285,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             {project?.components.some(c => c.kind === 'tank') && <p>{tankWireGuide}</p>}
             {project?.components.some(c => c.kind === 'overload') && <p>{protectedDOLGuide}</p>}
             {project?.components.some(c => c.kind === 'revmotor') && <p>{reverseWireGuide}</p>}</details>}
+          <span id="diag-wiring" />
           <h3>Wires ({project?.wires.length ?? 0})</h3>
           <div className="sandbox-wire-list">{project?.wires.map(w =>
             <div key={w.id}><code>{w.from} → {w.to}</code>
               <button disabled={!editable} aria-label={`Remove wire ${w.id}`} onClick={() => send([{ k: 'unwire', id: w.id }])}>×</button></div>)}</div>
           {selectedTerminal && <button className="btn ghost small" onClick={() => setSelectedTerminal(null)}>Cancel wire from {selectedTerminal}</button>}
-          <section className="sandbox-meter" aria-label="Virtual DC multimeter">
+          <section id="diag-meter" className="sandbox-meter" aria-label="Virtual DC multimeter">
             <span className="eyebrow">P4 · virtual instrument</span>
             <h3>Two-probe DC multimeter</h3>
             <p className="sandbox-help">Select two real terminals to read their differential
@@ -1322,12 +1326,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                 'Select both probes'}
             </output>
           </section>
+          <span id="diag-faults" />
           {project && snapshot && <TroubleshootingPanel project={project} snapshot={snapshot}
             editable={editable} send={send} instructor={!scenario} />}
           <h3>Voltage probes (V)</h3>
           <div className="sandbox-volts">{Object.entries(snapshot?.voltages ?? {}).filter(([name]) =>
             name.includes('I0.') || name.includes('Q0.') || name.endsWith('A1')).map(([name, value]) =>
               <div key={name}><code>{name}</code><strong>{value === null ? 'floating' : value ?? '—'}</strong></div>)}</div>
+          <span id="diag-events" />
           <h3>Simulation events</h3>
           {snapshot?.diagnostics.map((d, i) => <p className="sandbox-diagnostic" key={i}>{d}</p>)}
           <div className="sandbox-event-list">{events.length ? events.map((e, i) => <p key={i}>{e}</p>) :
