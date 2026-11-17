@@ -10,7 +10,9 @@ function dispatch(commands: WorkerRequest['commands'] = [], requestId?: number, 
   const before = world.project;
   const result = tick(world, commands);
   world = result.world;
-  const documentChanged = JSON.stringify(before) !== JSON.stringify(world.project);
+  // tick() keeps the same project object when nothing was edited (tests/r3-project-identity.test.ts), so the full-project
+  // JSON compare only runs when the object actually changed, not on every 50 ms scan.
+  const documentChanged = before !== world.project && JSON.stringify(before) !== JSON.stringify(world.project);
   const reply: WorkerResponse = { kind: 'snapshot', snapshot: result.snapshot, events: result.events,
     ...(requestId === undefined ? {} : { requestId }),
     ...(requestIds?.length ? { requestIds } : {}),

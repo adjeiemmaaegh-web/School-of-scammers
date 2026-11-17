@@ -3,8 +3,9 @@ import { validateLadder, type LadderDocument, type NumericOperand } from '../eng
 import { compileStructuredText, type STProgram } from '../engineering/structured-text';
 import { LEGACY_NAMES, type IoNames } from '../sim/plc-io';
 
-export const MAX_SANDBOX_RUNGS = 8;
-export const MAX_SANDBOX_SYMBOLS = 16;
+/** Teaching-subset program size: large enough for a multi-machine cell, still bounded for scan cost and validation. */
+export const MAX_SANDBOX_RUNGS = 32;
+export const MAX_SANDBOX_SYMBOLS = 48;
 export const SANDBOX_INPUTS = ['Start', 'StopOK', 'Photoeye', 'TankHigh', 'ReverseRequest'] as const;
 export const DEFAULT_ST_SOURCE = [
   'VAR_INPUT',

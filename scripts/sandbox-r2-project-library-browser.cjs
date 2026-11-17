@@ -59,16 +59,30 @@ const GL = ['--no-sandbox', '--disable-setuid-sandbox', '--enable-webgl', '--use
     console.log('B. second project created, switching restores each project exactly');
 
     /* C. wipe the working copy and reload: restored from the durable library */
-    await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('efo-open-sandbox-project') || k === 'efo-active-project-v1') localStorage.removeItem(k); });
+    // Partial loss: the working copy is gone but the pointer to the active library project survives.
+    await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('efo-open-sandbox-project')) localStorage.removeItem(k); });
     await go(page);
     await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length >= 1, { timeout: 15000 });
     const restored = await deviceCount(page);
     assert.ok(restored === 3 || restored === 1, `restored a real project (${restored} devices)`);
     console.log(`C. working copy wiped: ${restored} devices restored from the library`);
+    // Total loss of local storage (pointer too) is a fresh start: nothing is restored or overwritten; the library still holds the projects.
+    const libraryCount = async () => { await openDialog(page); const n = (await titles(page)).length; await closeDialog(page); return n; };
+    const countBefore = await libraryCount();
+    await page.evaluate(() => localStorage.clear());
+    await go(page); await libReady(page);
+    assert.equal(await deviceCount(page), 0, 'a fresh start is blank');
+    await sleep(1800);
+    assert.equal(await libraryCount(), countBefore, 'nothing is created or changed until the user edits');
+    await place(page, ['24V supply']);
+    await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 1);
+    await savedRev(page, 1);
+    assert.equal(await libraryCount(), countBefore + 1, 'the first edit creates a NEW project instead of overwriting an old one');
+    console.log('C2. total local-storage loss is a fresh start; existing library projects are untouched');
     // make "My project" active again for the next steps
     await openDialog(page);
-    if (await page.$eval('[data-library-item][data-library-active="true"] strong', e => !e.textContent.includes('My project'))) {
-      await page.evaluate(() => [...document.querySelectorAll('[data-library-item]')].find(li => li.textContent.includes('My project')).querySelector('[data-library-open]').click());
+    if (await page.$eval('[data-library-item][data-library-active="true"] strong', e => e.textContent.replace(/ · open$/, '') !== 'My project')) {
+      await page.evaluate(() => [...document.querySelectorAll('[data-library-item]')].find(li => li.querySelector('strong').textContent.replace(/ · open$/, '') === 'My project').querySelector('[data-library-open]').click());
       await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length === 3, { timeout: 10000 });
     } else await closeDialog(page);
     await savedRev(page, 3).catch(() => undefined);

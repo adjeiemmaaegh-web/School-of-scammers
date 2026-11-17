@@ -72,7 +72,7 @@ export function useProjectLibrary(options: Options) {
         let id = readActiveId();
         if (migrated.status === 'migrated' && !id) id = migrated.id;
         if (id && (await library.open(id)).status === 'missing') id = null;
-        if (!id) id = (await library.list())[0]?.id ?? null;
+        // No pointer means a fresh start in this browser profile: never adopt (and later overwrite) an existing library project.
         if (cancelled) return;
         if (id) {
           const opened = await library.open(id);
@@ -150,6 +150,8 @@ export function useProjectLibrary(options: Options) {
       awaitingLoad.current = null; lastJson.current = json; setStatus('saved'); return;
     }
     if (json === lastJson.current) return;
+    // A pristine blank page with no library project yet is not worth a library entry; the first real edit creates it.
+    if (!activeRef.current && options.project.components.length === 0 && options.project.wires.length === 0) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => { void commit(); }, COMMIT_DELAY_MS);
     return () => { if (timer.current) clearTimeout(timer.current); };
