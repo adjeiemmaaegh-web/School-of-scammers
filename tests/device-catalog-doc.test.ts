@@ -3,11 +3,14 @@ import committed from '../docs/product/DEVICE_CATALOG.md?raw';
 import { deviceCatalogMarkdown } from '../src/components/catalog-doc';
 import { COMPONENTS } from '../src/components/registry';
 
+// No Node typings in the tests tsconfig (CI installs none): reach the environment through globalThis.
+const nodeProcess = (globalThis as unknown as { process?: { env?: Record<string, string | undefined>; getBuiltinModule?: (id: string) => { writeFileSync: (p: string, d: string) => void } } }).process;
+
 describe('device catalogue document (R6.1 / R10.3)', () => {
   it('is regenerated from the registries and is not stale', () => {
     const fresh = deviceCatalogMarkdown();
-    if (process.env.UPDATE_DEVICE_CATALOG) {
-      const fs = (process as unknown as { getBuiltinModule: (id: string) => { writeFileSync: (p: string, d: string) => void } }).getBuiltinModule('node:fs');
+    if (nodeProcess?.env?.UPDATE_DEVICE_CATALOG) {
+      const fs = nodeProcess.getBuiltinModule!('node:fs');
       fs.writeFileSync('docs/product/DEVICE_CATALOG.md', fresh);
       return;
     }

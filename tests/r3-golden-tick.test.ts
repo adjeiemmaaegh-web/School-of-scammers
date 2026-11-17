@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { createWorld, renderSnapshot, tick } from '../src/sim/orchestrator';
 import type { Command, WorldState } from '../src/sim/signals';
 
+// The tests tsconfig has no Node typings (CI installs none), so read the environment through globalThis.
+const nodeProcess = (globalThis as unknown as { process?: { env?: Record<string, string | undefined>; stderr?: { write: (s: string) => void } } }).process;
 const fnv = (text: string): string => {
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
@@ -102,7 +104,7 @@ describe('R3.1 golden tick digests', () => {
     it(`${name} is byte-stable and replays identically`, () => {
       const first = run(scenario), second = run(scenario);
       expect(second).toEqual(first); // determinism: same script, same snapshots
-      if (process.env.GOLDEN_PRINT) process.stderr.write(`GOLDEN ${name} ${JSON.stringify(first)}\n`);
+      if (nodeProcess?.env?.GOLDEN_PRINT) nodeProcess.stderr?.write(`GOLDEN ${name} ${JSON.stringify(first)}\n`);
       else expect(first).toEqual(GOLDEN[name]);
     });
   }

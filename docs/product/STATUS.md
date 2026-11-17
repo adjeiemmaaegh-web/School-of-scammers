@@ -13,6 +13,7 @@
 | `npm run build`, `verify:engineering:offline`, `verify:full` | pass (offline build: shell/asset paths verified) |
 | Bundle budgets | pass. entry 104.3 KB gzip (limit 120), sandbox route 538.9 KB (limit 575 KiB), total JS 807.9 KB (limit 850 KiB) |
 | Exact-head GitHub checks on `284ba478` | `build-and-test` success ([run](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44074086327)), `windows-edge` success ([run](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44074086392)). Vercel status: **failure, "Deployment rate limited — retry in 24 hours"** (platform limit, not a code failure; production redeploy of this commit is therefore unconfirmed) |
+| Gate hygiene | Run `npm run verify:full` right after `npm ci`, **before** installing Puppeteer: Puppeteer's transitive `@types/node` hides missing Node typings that CI (which installs it later) then rejects (found in R3: `process` in a test) |
 | Local browser matrix, **no retries**, 66 CI scripts | **63 pass, 3 fail** (see F-01, F-02, F-03). Run in a container with Puppeteer 24.31.0, Chromium, software WebGL; not a physical device |
 
 ## 2. Inventory (R0.2) — counted from executable code
