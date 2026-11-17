@@ -100,7 +100,15 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   await page.$eval('.sandbox-three-canvas',el=>el.scrollIntoView({block:'center'}));
   const label=await page.$(`[data-3d-drag-handle="${id}"]`);
   assert.ok(label,'The selected P3 machine has a 3D-anchored direct manipulation handle');
-  const box=await label.boundingBox();assert.ok(box&&box.width>20&&box.height>20);
+  const box=await label.boundingBox();
+  const handleDebug=await page.$eval(`[data-3d-drag-handle="${id}"]`,el=>({
+    className:el.className,rect:[el.getBoundingClientRect().width,el.getBoundingClientRect().height],
+    display:getComputedStyle(el).display,visibility:getComputedStyle(el).visibility,
+    projectCount:JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1')||'null')?.components?.length,
+    viewport:[innerWidth,innerHeight],parent:el.parentElement?.getBoundingClientRect().toJSON(),
+  }));
+  assert.ok(box&&box.width>20&&box.height>20,
+    '3D commissioning drag handle must remain at least 20px on both axes: '+JSON.stringify({box,handleDebug}));
   const cx=box.x+box.width/2,cy=box.y+box.height/2;
   const before=(await saved()).components[0];
   // Real pointer drag of the label fixed above the 3D machine: coordinates
