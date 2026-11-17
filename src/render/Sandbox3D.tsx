@@ -478,7 +478,8 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusS
     const prior=previousCount.current;
     previousCount.current=project.components.length;
     if(mode!=='orbit'||prior!==0||
-      (project.components.length<3&&!project.components.some(c=>Boolean(PLANT_EQUIPMENT[c.kind]))))return;
+      (project.components.length<3 && !(project.components.length===2 &&
+        project.components.some(c=>Boolean(PLANT_EQUIPMENT[c.kind])))))return;
     // A gallery scene or bulk project load arrives in one worker snapshot.
     // Auto-fit ONCE at that transition. Individual user device placement,
     // later scans and drag edits cannot hijack the camera.
