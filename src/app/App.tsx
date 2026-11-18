@@ -11,6 +11,7 @@ import { LEGACY_LABS } from './labs-index';
 import { EmployerPage } from './EmployerPage';
 import { CandidatePage } from './CandidatePage';
 import { AppHeader } from '../ui/AppHeader';
+import { UpdateBanner } from '../ui/UpdateBanner';
 const SandboxPage = React.lazy(() => import('./SandboxPage').then(m => ({ default: m.SandboxPage })));
 
 /* Legacy engine lab surfaces — kept reachable under /labs/* so the salvaged
@@ -83,6 +84,7 @@ export function App() {
         const main = document.getElementById('main');
         if (main) { main.setAttribute('tabindex', '-1'); main.focus(); }
       }}>Skip to main content</a>
+      <UpdateBanner />
       <Routes>
         <Route path="/" element={<FrontDoor />} />
         <Route path="/sandbox" element={<Suspense fallback={<main id="main" className="wrap wrap-wide page">

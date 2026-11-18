@@ -6,6 +6,10 @@ import { LogicalWiringCanvas } from '../ui/sandbox/LogicalWiringCanvas';
 import { WorkspaceAuthoringBar } from '../ui/sandbox/WorkspaceAuthoringBar';
 import { WorkspaceSelectionPanel } from '../ui/sandbox/WorkspaceSelectionPanel';
 import { AssemblyLibrary } from '../ui/sandbox/AssemblyLibrary';
+import { ProjectLibraryPanel } from '../ui/sandbox/ProjectLibraryPanel';
+import { useProjectLibrary } from './useProjectLibrary';
+import { redactHiddenFaults } from '../sim/redact';
+import { commissioningReportHtml } from '../diagnostics/commissioning-report';
 import { EquipmentThumbnail } from '../ui/sandbox/EquipmentThumbnail';
 import { makeFragment } from '../workspace/clipboard';
 import { recordChange, emptyHistory, undoHistory, redoHistory } from '../workspace/history';
@@ -37,12 +41,26 @@ import './p5-workspace.css';
 import './ux2-workbench.css';
 import './ux2-command-layout.css';
 import './ux4-canvas-focus.css';
+import './ux6-workbench.css';
 
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
 const UX2_LAYOUT_KEY = 'efo-ux2-layout-v1';
 type UiPanelSizes = {library:number;inspector:number;dock:number};
 const defaultPanelSizes:UiPanelSizes = {library:228,inspector:238,dock:205};
+type UiPanelVisible = {library:boolean;inspector:boolean;dock:boolean};
+const defaultPanelVisible:UiPanelVisible = {library:true,inspector:false,dock:false};
+/** Panel visibility is a view preference stored beside the panel sizes, never in the project. Bad values fall back to defaults. */
+const initialPanelVisible = ():UiPanelVisible => {
+  if(typeof window==='undefined')return defaultPanelVisible;
+  try {
+    const stored=JSON.parse(window.localStorage.getItem(UX2_LAYOUT_KEY)??'null') as {visible?:Partial<UiPanelVisible>}|null;
+    const v=stored&&typeof stored==='object'?stored.visible:undefined;
+    if(!v||typeof v!=='object')return defaultPanelVisible;
+    const flag=(x:unknown,d:boolean)=>typeof x==='boolean'?x:d;
+    return {library:flag(v.library,true),inspector:flag(v.inspector,false),dock:flag(v.dock,false)};
+  }catch{return defaultPanelVisible;}
+};
 const panelSize = (value:unknown,fallback:number,min:number,max:number) =>
   typeof value==='number'&&Number.isFinite(value) ? Math.min(max,Math.max(min,value)) : fallback;
 const initialPanelSizes = ():UiPanelSizes => {
@@ -107,27 +125,30 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   // View/panel preferences do not belong to PLC or electrical project state.
   const [libraryFamily,setLibraryFamily] = useState<DeviceFamily>('all');
   const [workspaceView,setWorkspaceView] = useState<'physical'|'logical'|'plan'>('physical');
-  const [libraryExpanded,setLibraryExpanded] = useState(true);
+  const [initialVisible] = useState<UiPanelVisible>(()=>scenario?defaultPanelVisible:initialPanelVisible());
+  const [libraryExpanded,setLibraryExpanded] = useState(initialVisible.library);
   // Layout state only; never changes the PLC program, wires or saved project.
   const [canvasFocused,setCanvasFocused] = useState(false);
   // Canvas-first on all PC/tablet widths. Scenario routes keep their prior panel defaults.
-  const [inspectorExpanded,setInspectorExpanded] = useState(!!scenario);
-  const [dockExpanded,setDockExpanded] = useState(!!scenario);
+  const [inspectorExpanded,setInspectorExpanded] = useState(!!scenario||initialVisible.inspector);
+  const [dockExpanded,setDockExpanded] = useState(!!scenario||initialVisible.dock);
   const [dockFocus,setDockFocus] = useState<'program'|'diagnostics'>('program');
   const [workspaceHelp,setWorkspaceHelp] = useState(false);
   // These affect layout only; they never enter a saved PLC project.
   const [panelSizes,setPanelSizes] = useState<UiPanelSizes>(initialPanelSizes);
   useEffect(()=>{
     if(scenario)return;
-    try{window.localStorage.setItem(UX2_LAYOUT_KEY,JSON.stringify(panelSizes));}
+    try{window.localStorage.setItem(UX2_LAYOUT_KEY,JSON.stringify({...panelSizes,visible:{library:libraryExpanded,inspector:inspectorExpanded,dock:dockExpanded}}));}
     catch{/* restrictive storage environments keep in-memory panel sizing */}
-  },[panelSizes,scenario]);
+  },[panelSizes,scenario,libraryExpanded,inspectorExpanded,dockExpanded]);
   const [activeStage, setActiveStage] = useState<'build' | 'wire' | 'program' | 'test'>('build');
   const [localSave, setLocalSave] = useState<'pending' | 'saved' | 'failed'>('pending');
   const [storageReady, setStorageReady] = useState(false);
   const storageRawRef = useRef<string|null>(null);
   const storageBlockedRef = useRef(false);
   const bootstrapLoadPendingRef = useRef(false);
+  const hadWorkingCopyRef = useRef(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [events, setEvents] = useState<string[]>([]);
   const [clientError, setClientError] = useState<string | null>(null);
   const worker = useRef<Worker | null>(null);
@@ -205,6 +226,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     try {
       const stored = readSandboxProject(localStorage, storageKey, validateProject);
       storageRawRef.current = stored.observedRaw;
+      hadWorkingCopyRef.current = stored.project !== null;
       storageBlockedRef.current = !stored.saveAllowed;
       if (stored.warning) {
         setClientError(stored.warning);
@@ -267,6 +289,16 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     try { localStorage.setItem(attemptKey, JSON.stringify({ startedAt: startedAt.current, evidence, result })); }
     catch { /* the attempt just will not survive a reload */ }
   }, [scenario, project, evidence, result, attemptKey]);
+  const library = useProjectLibrary({
+    enabled: !scenario, project, storageReady,
+    hadWorkingCopy: () => hadWorkingCopyRef.current,
+    legacyRaw: () => { try { return localStorage.getItem(STORAGE_KEY); } catch { return null; } },
+    loadIntoWorker: next => {
+      setSelectedTerminal(null); setMoveTarget(null); setSelectedDeviceId(null); setEvents([]);
+      send([{ k: 'loadProject', project: next }], 'ignore');
+    },
+    onNotice: setClientError,
+  });
   const submitScenario = (rubric: RubricResult) => {
     if (!scenario || resultRef.current || !project) return;
     const finishedAt = Date.now();
@@ -410,11 +442,22 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     COMPONENTS[c.kind].terminals.map(t => `${c.id}.${t.name}`)) ?? [];
   const exportProject = () => {
     if (!project) return;
-    const file = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+    // Graded scenarios never write hidden faults into a downloadable file (they would reveal the answer).
+    const file = new Blob([JSON.stringify(scenario ? redactHiddenFaults(project) : project, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(file);
     const link = document.createElement('a');
     link.href = url; link.download = 'efo-sandbox-project.json'; link.click();
     URL.revokeObjectURL(url);
+  };
+  const exportReport = () => {
+    if (!project || !snapshot) return;
+    try {
+      const html = commissioningReportHtml({ title: library.active?.title ?? 'Sandbox project', project, snapshot, events, generatedAt: new Date().toISOString() });
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+      const link = document.createElement('a');
+      link.href = url; link.download = 'efo-commissioning-report.html'; link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { setClientError(e instanceof Error ? e.message : 'Could not build the report'); }
   };
   const importProject = async (ev: ChangeEvent<HTMLInputElement>) => {
     const file = ev.target.files?.[0]; if (!file) return;
@@ -579,6 +622,12 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       const typing=!!target&&(/^(input|textarea|select)$/i.test(target.tagName)||target.isContentEditable);
       if(event.key==='Escape'){setSelectedTerminal(null);setMoveTarget(null);return;}
       if(typing||event.repeat)return;
+      if(!event.ctrlKey&&!event.metaKey&&!event.altKey&&!scenario){
+        const k=event.key.toLowerCase();
+        if(k==='v'){setMoveTarget(null);setSelectedTerminal(null);setActiveStage('build');return;}
+        if(k==='t'&&editable){setWorkspaceView('logical');setActiveStage('wire');return;}
+        if(k==='i'){setDockFocus('diagnostics');setDockExpanded(true);setActiveStage('test');return;}
+      }
       if(event.altKey&&['1','2','3'].includes(event.key)){
         event.preventDefault();setWorkspaceView(event.key==='1'?'logical':event.key==='2'?'physical':'plan');
       }
@@ -589,6 +638,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     window.addEventListener('keydown',onShortcut);
     return ()=>window.removeEventListener('keydown',onShortcut);
   });
+  // The active tool is derived from real state (never a separate flag that could drift from what a click will do).
+  const activeTool: 'run' | 'move' | 'wire' | 'measure' | 'select' =
+    snapshot?.running ? 'run' : moveTarget ? 'move' :
+    (selectedTerminal || (workspaceView === 'logical' && activeStage === 'wire')) ? 'wire' :
+    (dockExpanded && dockFocus === 'diagnostics' && activeStage === 'test') ? 'measure' : 'select';
+  const toolLabel = { run: 'Running (editing locked)', move: 'Move', wire: 'Wire terminals', measure: 'Measure', select: 'Select' }[activeTool];
+  const lockedHint = 'Editing is locked while the simulation runs. Press Pause to edit.';
   return <>
     <AppHeader />
     <main id="main" className={`sandbox-page sandbox-ux p5-organized wrap wrap-wide${scenario ? '' : ' efo-ux2-shell'}${canvasFocused ? ' efo-workspace-focused' : ''}`}
@@ -610,13 +666,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <span className={`sandbox-work-status ${snapshot?.running ? 'is-running' : ''}`}>
             <i aria-hidden="true" />{snapshot?.running ? 'SIMULATION RUNNING' : 'EDIT MODE'}
           </span>
-          <strong>{scenario ? scenario.def.title : plcList.length > 1 ? `Untitled multi-panel project (${plcList.length} PLCs)` : project?.components.some(c => c.kind === 'revmotor') ? 'Untitled forward/reverse motor panel' :
+          <strong>{scenario ? scenario.def.title : library.active ? library.active.title : plcList.length > 1 ? `Untitled multi-panel project (${plcList.length} PLCs)` : project?.components.some(c => c.kind === 'revmotor') ? 'Untitled forward/reverse motor panel' :
             project?.components.some(c => c.kind === 'breaker') ? 'Untitled protected 24V DOL panel' :
             project?.components.some(c => c.kind === 'tank') ? 'Untitled tank process project' :
             project?.components.some(c => c.kind === 'conveyor') ?
             'Untitled conveyor sorting project' : 'Untitled automation project'}</strong>
-          <small>{localSave === 'saved' ? 'Saved in this browser' :
-            localSave === 'failed' ? 'Not saved — export your JSON' : 'Loading local project'}</small>
+          <small data-library-summary={library.status}>{localSave === 'saved' ? 'Saved in this browser' :
+            localSave === 'failed' ? 'Not saved — export your JSON' : 'Loading local project'}{!scenario && library.active ? ` · Library v${library.active.revision}${library.status === 'saving' ? ' (saving)' : ''}` : ''}</small>
         </div>
       </header>
       <nav className="p5-menu-bar" aria-label="Engineering workspace menus" data-p5-menu>
@@ -626,7 +682,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             setWorkspaceView('physical');send([{k:'clear'}]);
           }}>New empty project</button>}
           {!scenario && <button type="button" onClick={()=>fileInput.current?.click()}>Open local JSON project</button>}
+          {!scenario && <button type="button" data-open-project-library disabled={!library.lib}
+            title={library.lib ? undefined : 'The project library is starting or unavailable in this browser.'}
+            onClick={()=>setLibraryOpen(true)}>Project library…</button>}
+          {!scenario && <button type="button" disabled={!library.lib||!library.active}
+            onClick={()=>{void library.saveVersion(`Version ${new Date().toLocaleTimeString()}`).then(ok=>setClientError(ok?null:'Could not save a version.'));}}>Save a version of this project</button>}
           <button type="button" disabled={!project} onClick={exportProject}>Download project JSON</button>
+          <button type="button" data-export-report disabled={!project||!snapshot} onClick={exportReport}>Export commissioning report (HTML)</button>
           <span>Projects stay in this browser unless exported.</span>
         </div></details>
         <details><summary>Edit</summary><div className="p5-menu-content">
@@ -737,9 +799,6 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onPaste={pasteSelection} onDuplicate={duplicateSelection} onRemove={deleteSelection}
           onRotate={rotateSelection} onNudge={moveSelection}/>
       </div>}
-      {!scenario && <AssemblyLibrary project={project} selectedIds={selectedDeviceIds}
-        editable={editable} grid={grid}
-        onInsert={(fragment,at)=>edit({kind:'paste',fragment,at,grid})}/>}
       <div className="p5-view-tools" role="toolbar" aria-label="Canvas views and active tools">
         <div className="p5-view-tabs" role="group" aria-label="Project view">
           <button type="button" data-p5-view="logical" aria-pressed={workspaceView==='logical'}
@@ -750,12 +809,17 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             onClick={()=>setWorkspaceView('plan')}>Floor Plan / 2D</button>
         </div>
         <div className="p5-tool-actions" role="group" aria-label="Engineering tools">
-          <button type="button" onClick={()=>{setMoveTarget(null);setSelectedTerminal(null);}}>Select</button>
-          <button type="button" disabled={!editable} onClick={()=>{setWorkspaceView('logical');setActiveStage('wire');}}>
+          <button type="button" data-ux6-tool="select" aria-pressed={activeTool==='select'} aria-keyshortcuts="V" title="Select (V)"
+            onClick={()=>{setMoveTarget(null);setSelectedTerminal(null);setActiveStage('build');}}>Select</button>
+          <button type="button" data-ux6-tool="wire" aria-pressed={activeTool==='wire'} aria-keyshortcuts="T"
+            title={editable?'Wire terminals (T)':lockedHint} disabled={!editable} onClick={()=>{setWorkspaceView('logical');setActiveStage('wire');}}>
             Wire terminals</button>
-          <button type="button" onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);
+          <button type="button" data-ux6-tool="measure" aria-pressed={activeTool==='measure'} aria-keyshortcuts="I" title="Measure / diagnose (I)"
+            onClick={()=>{setDockFocus('diagnostics');setDockExpanded(true);setActiveStage('test');
             if (scenario) document.getElementById('sandbox-stage-test')?.scrollIntoView({block:'nearest'});}}>
             Measure / diagnose</button>
+          <span className="ux6-tool-chip" data-ux6-active-tool={activeTool} role="status" aria-live="polite"
+            title={activeTool==='run'?lockedHint:'Shortcuts: V select, T wire, I measure, Esc cancel'}>Tool: {toolLabel}</span>
         </div>
         <div className="p5-panel-toggles" role="group" aria-label="Workspace panels">
           <button type="button" aria-pressed={libraryExpanded}
@@ -767,6 +831,17 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         </div>
       </div>
       </div>{/* UX2 command stack; legacy/scenario uses display:contents */}
+      {!scenario && library.status === 'conflict' && <div role="alert" className="sandbox-alert ux6-conflict" data-library-conflict>
+        {library.message} <button type="button" className="btn ghost small" onClick={()=>void library.resolveConflict('reload')}>Load the other tab's version</button>
+        <button type="button" className="btn ghost small" onClick={()=>void library.resolveConflict('copy')}>Keep mine as a new project</button>
+        <button type="button" className="btn ghost small" onClick={()=>void library.resolveConflict('overwrite')}>Overwrite with mine</button>
+      </div>}
+      {!scenario && (library.status === 'unavailable' || library.status === 'failed') && library.message &&
+        <div role="status" className="sandbox-alert ux6-lib-banner" data-library-unavailable>{library.message}</div>}
+      {!scenario && libraryOpen && library.lib && <ProjectLibraryPanel lib={library.lib} active={library.active} status={library.status}
+        editable={editable} onOpen={library.openProject} onNew={library.newProject} onChanged={()=>void library.refreshActive()}
+        onSaveVersion={library.saveVersion} onRestoreVersion={library.restoreVersion}
+        onClose={()=>setLibraryOpen(false)} onNotice={setClientError} />}
       {(clientError || snapshot?.lastError) && <div role="alert" className="sandbox-alert">{clientError || snapshot?.lastError}</div>}
       {scenario && <ScenarioPanel session={scenario} project={project} evidence={evidence} result={result}
         onSubmit={submitScenario} onRestart={restartScenario} />}
@@ -788,6 +863,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>
           <p className="sandbox-library-help">Drag an available device onto the 3D floor or 2D plan,
             or click to place it. The registry determines what really works. Pause to edit.</p>
+          {!scenario && <AssemblyLibrary project={project} selectedIds={selectedDeviceIds}
+            editable={editable} grid={grid}
+            onInsert={(fragment,at)=>edit({kind:'paste',fragment,at,grid})}/>}
           <div className="sandbox-palette-list">
             {visibleKinds.map(kind => <button key={kind} draggable={editable && !primaryTouch}
               onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}

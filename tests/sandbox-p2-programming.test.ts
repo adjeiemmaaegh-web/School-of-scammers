@@ -152,8 +152,11 @@ describe('P2 real worker programming modes and scan-state contract', () => {
     const invalid = { ...delayProgram,
       rungs: [{ ...delayProgram.rungs[0], elements: [contact('UnknownBool')] }, ...delayProgram.rungs.slice(1)] };
     expect(validateSandboxProgram(invalid).join(' ')).toMatch(/unknown contact/);
-    const many = { ...delayProgram, rungs: Array.from({ length: 9 },
+    const many = { ...delayProgram, rungs: Array.from({ length: 33 },
       (_, i) => ({ id: `r${i}`, elements: [contact('Start')], coil: `Aux${i}` })) };
-    expect(validateSandboxProgram(many).join(' ')).toMatch(/at most 8/);
+    expect(validateSandboxProgram(many).join(' ')).toMatch(/at most 32/);
+    const exactly = { ...delayProgram, symbols: Object.fromEntries(Array.from({ length: 32 }, (_, i) => [`Aux${i}`, { description: `aux ${i}` }])),
+      rungs: Array.from({ length: 32 }, (_, i) => ({ id: `r${i}`, elements: [contact('Start')], coil: `Aux${i}` })) };
+    expect(validateSandboxProgram(exactly)).toEqual([]);
   });
 });
