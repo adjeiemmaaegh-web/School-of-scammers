@@ -4,7 +4,7 @@
 import {COMPONENTS} from '../../components/registry';
 import type {PlacedComponent,Wire} from '../../sim/signals';
 export type LogicalPort={name:string;side:'left'|'right';x:number;y:number};
-export type LogicalLink={id:string;from:string;to:string;path:string};
+export type LogicalLink={id:string;from:string;to:string;path:string;/** Where a net label sits (the bend's midpoint). */labelAt:{x:number;y:number}};
 export const LOGICAL_NODE_WIDTH=170;
 export const LOGICAL_WORLD_WIDTH=1080;
 export const LOGICAL_WORLD_HEIGHT=580;
@@ -37,7 +37,8 @@ export function logicalWirePaths(components:readonly PlacedComponent[],
     if(!a||!b)continue; // The authoritative project validator owns invalid wire errors.
     const midpoint=Math.round((a.x+b.x)/2);
     links.push({id:wire.id,from:wire.from,to:wire.to,
-      path:`M ${a.x} ${a.y} L ${midpoint} ${a.y} L ${midpoint} ${b.y} L ${b.x} ${b.y}`});
+      path:`M ${a.x} ${a.y} L ${midpoint} ${a.y} L ${midpoint} ${b.y} L ${b.x} ${b.y}`,
+      labelAt:{x:midpoint,y:Math.round((a.y+b.y)/2)}});
   }
   return links;
 }

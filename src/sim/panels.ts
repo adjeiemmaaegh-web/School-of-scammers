@@ -4,6 +4,7 @@
  */
 import type { LadderDocument } from '../engineering/ladder';
 import { isPlcKind } from '../components/registry';
+import { pruneWireStyles } from '../components/wire-style';
 import { MAX_PLCS, extraPlcs, plcComponents, primaryPlcId, programOf, withProgramOf } from './plcs';
 import type { PlacedComponent, ProjectFile, Wire, XY } from './signals';
 
@@ -28,6 +29,7 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     components: project.components.filter(c => c.id !== id),
     wires: project.wires.filter(w => !goneWires.has(w.id)),
   };
+  next = pruneWireStyles(next);
   if (project.faults) {
     const faults = project.faults.filter(f => f.target !== id && !(f.kind === 'wire-open' && goneWires.has(f.target)));
     const { faults: _old, ...rest } = next;

@@ -112,6 +112,8 @@ export type ProjectFile = {
   /** Device settings that differ from the default (a timer relay's delay), by component id then setting key. */
   params?: Record<string, Record<string, number>>;
   plantFaults?: Record<string,string>;
+  /** Presentation only: colour and net label per wire id. Never read by the solver. */
+  wireStyles?: Record<string, { color?: 'red' | 'blue' | 'black' | 'green' | 'yellow' | 'orange' | 'white' | 'brown'; label?: string }>;
 };
 export type WorldState = {
   project: ProjectFile;
@@ -201,6 +203,8 @@ export type Command =
   | { k: 'repair'; target: string }
   /** Delete a device and everything that depended on it (its wires, faults, PLC program). Paused only. */
   | { k: 'remove'; id: string }
+  /** Colour and/or net label of one wire (null clears). Presentation only; paused only. */
+  | { k: 'setWireStyle'; id: string; color?: string | null; label?: string | null }
   /** Set a device setting (e.g. an on-delay relay's delay). Validated against its spec. Paused only. */
   | { k: 'setParam'; id: string; key: string; value: number }
   /** Drop in a ready-made, pre-wired start/stop starter panel at a free spot (or `at`). Paused only. */

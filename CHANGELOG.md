@@ -14,6 +14,7 @@ Versioning policy: `package.json` version is the app/build version (0.x until th
 - R8.1: diagnostics overview.
 - R5.5: meter continuity mode.
 - R10.1: data-only scene package format (title, level, objectives, hints, project) with library import/export.
+- R5.1 (part): wire colour and net label (presentation only, saved in the project as optional `wireStyles`, validated on load, pruned with the wire).
 - R7/R11: bounded soak and benchmark test (10 simulated minutes, maximal project).
 
 ## 0.1.0 (merged to `main` as of PR #26 and PR #70)

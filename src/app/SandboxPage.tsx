@@ -9,6 +9,7 @@ import { AssemblyLibrary } from '../ui/sandbox/AssemblyLibrary';
 import { DiagnosticsOverview } from '../ui/sandbox/DiagnosticsOverview';
 import { useProjectLibrary } from './useProjectLibrary';
 import { redactHiddenFaults } from '../sim/redact';
+import { WIRE_COLORS } from '../components/wire-style';
 import { EquipmentThumbnail } from '../ui/sandbox/EquipmentThumbnail';
 import { makeFragment } from '../workspace/clipboard';
 import { recordChange, emptyHistory, undoHistory, redoHistory } from '../workspace/history';
@@ -175,7 +176,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     const id=requestId.current++;
     const editKinds = new Set(['place','move','wire','unwire','remove','addPanel','configureIo',
       'setParam','loadProgram','loadST','activateLanguage','clear','loadProject',
-      'editWorkspace','injectFault','injectSeededFault','clearFault','revealFault','repair','loadPlantScene']);
+      'editWorkspace','setWireStyle','injectFault','injectSeededFault','clearFault','revealFault','repair','loadPlantScene']);
     if(commands.some(c=>editKinds.has(c.k))){
       historyRequests.current.set(id,historyMode);
       setHistoryPending(true);
@@ -1300,6 +1301,15 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <h3>Wires ({project?.wires.length ?? 0})</h3>
           <div className="sandbox-wire-list">{project?.wires.map(w =>
             <div key={w.id}><code>{w.from} → {w.to}</code>
+              <select className="ux6-wire-color" aria-label={`Colour of wire ${w.id}`} data-wire-color-select={w.id} disabled={!editable}
+                value={project?.wireStyles?.[w.id]?.color ?? ''} onChange={e => send([{ k: 'setWireStyle', id: w.id, color: e.target.value || null }])}>
+                <option value="">Colour…</option>
+                {Object.entries(WIRE_COLORS).map(([key, c]) => <option key={key} value={key}>{c.label}</option>)}
+              </select>
+              <input className="ux6-wire-label" aria-label={`Net label of wire ${w.id}`} data-wire-label-input={w.id} disabled={!editable} maxLength={24} placeholder="Label"
+                defaultValue={project?.wireStyles?.[w.id]?.label ?? ''} key={`${w.id}:${project?.wireStyles?.[w.id]?.label ?? ''}`}
+                onBlur={e => { const v = e.target.value.trim(); if (v !== (project?.wireStyles?.[w.id]?.label ?? '')) send([{ k: 'setWireStyle', id: w.id, label: v || null }]); }}
+                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
               <button disabled={!editable} aria-label={`Remove wire ${w.id}`} onClick={() => send([{ k: 'unwire', id: w.id }])}>×</button></div>)}</div>
           {selectedTerminal && <button className="btn ghost small" onClick={() => setSelectedTerminal(null)}>Cancel wire from {selectedTerminal}</button>}
           <section id="diag-meter" className="sandbox-meter" aria-label="Virtual DC multimeter">
