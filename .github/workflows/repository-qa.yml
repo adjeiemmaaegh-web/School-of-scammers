@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   source-and-security:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +41,7 @@ jobs:
             qa-artifacts/qa-advisory-summary.json
           if-no-files-found: warn
   native-coverage:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
