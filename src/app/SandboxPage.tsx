@@ -1293,6 +1293,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             <p className="sandbox-help">Select two real terminals to read their differential
               potential from the 24V solver. Floating nodes and direct supply shorts
               report an unavailable reading. This is not calibrated test equipment.</p>
+            <label className="sandbox-meter-mode">Meter mode
+              <select aria-label="Meter mode" data-meter-mode value={snapshot?.meter.mode ?? 'voltage'}
+                onChange={e=>send([{k:'setMeterMode',mode:e.target.value as 'voltage'|'continuity'}])}>
+                <option value="voltage">DC voltage</option>
+                <option value="continuity">Continuity (circuit must be paused)</option>
+              </select>
+            </label>
             <div className="sandbox-meter-leads">
               {(['positive','negative'] as const).map(lead=><label key={lead}>
                 {lead === 'positive' ? 'Red (+) probe' : 'Black (−) probe'}
@@ -1305,7 +1312,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               </label>)}
             </div>
             <output className="sandbox-meter-reading" aria-live="polite" data-meter-status={snapshot?.meter.status}>
-              {snapshot?.meter.status === 'measured' ? `${snapshot.meter.volts} V DC` :
+              {snapshot?.meter.status === 'conductor' ? 'Continuity: closed conductive path' :
+                snapshot?.meter.status === 'through-load' ? 'Continuity only through a load (coil or lamp): not a clean conductor' :
+                snapshot?.meter.status === 'open' ? 'Open circuit: no path' :
+                snapshot?.meter.status === 'energised' ? 'Pause the simulation: never test continuity on a live circuit' :
+                snapshot?.meter.status === 'measured' ? `${snapshot.meter.volts} V DC` :
                 snapshot?.meter.status === 'short' ? 'Supply short · measurement unavailable' :
                 snapshot?.meter.status === 'floating' ? 'Floating or unconnected terminal' :
                 'Select both probes'}

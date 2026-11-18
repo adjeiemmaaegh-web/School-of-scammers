@@ -45,14 +45,16 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   await page.waitForFunction(()=>document.querySelector('[data-3d-camera-status]')?.textContent.includes('Camera '));
   const flyBefore=await cameraPosition();
   assert.equal(await page.$eval('.sandbox-three-canvas canvas',canvas=>{canvas.focus();return document.activeElement===canvas;}),true,'Keyboard must focus the active 3D canvas');
+  // Hold the key until the camera actually moves: under a slow software renderer one frame can outlast a fixed 750 ms
+  // hold, so the key would be released before any frame saw it pressed.
   await page.keyboard.down('w');
-  await sleep(750);
-  await page.keyboard.up('w');
-  await page.waitForFunction(before=>{
-   const text=document.querySelector('[data-3d-camera-status]')?.textContent||'';
-   const m=/Camera ([-.0-9]+), ([-.0-9]+), ([-.0-9]+) m/.exec(text);
-   return m&&Math.abs(Number(m[1])-before[0])+Math.abs(Number(m[3])-before[2])>.02;
-  },{timeout:12000},flyBefore);
+  try{
+   await page.waitForFunction(before=>{
+    const text=document.querySelector('[data-3d-camera-status]')?.textContent||'';
+    const m=/Camera ([-.0-9]+), ([-.0-9]+), ([-.0-9]+) m/.exec(text);
+    return m&&Math.abs(Number(m[1])-before[0])+Math.abs(Number(m[3])-before[2])>.02;
+   },{timeout:12000},flyBefore);
+  }finally{await page.keyboard.up('w');}
   const flyAfter=await cameraPosition();
   assert.notDeepEqual(flyAfter,flyBefore,'Fly must move the actual Three.js camera');
   await page.click('[data-3d-camera-mode="first-person"]');

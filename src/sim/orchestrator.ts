@@ -9,7 +9,7 @@ import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from 
 import { fbdReadings, instructionBreakpointHit, ladderReadings, validateInstructionBreakpoint } from '../program/instruction-breakpoint';
 import { applyLocalForce } from '../program/local-force';
 import { feedPlant, freshPlant, stepPlant } from '../plant/sorting-conveyor';
-import { freshTank, stepTank } from '../plant/tank-process';
+import { freshTank } from '../plant/tank-process';
 import {
   MAX_PLCS, blankProgram, defaultProgramFor, extraPlcs, freshPlcRuntime, legacyPrimaryId, namesFor, plcComponents, plcView,
   primaryPlcId, programOf, runtimePlcs, scanPlc, withProgramOf,
@@ -17,15 +17,17 @@ import {
 import { LEGACY_IO, defaultIo, ioOf, isConfigurableIo, validateIoMap } from './plc-io';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
+import { measureContinuity } from '../electrical/continuity';
 import { threePhaseWireError, threePhaseConnections } from '../electrical/three-phase-netlist';
 import { freshStarterPanel } from '../electrical/three-phase-types';
 import { stepWiredStarter } from '../electrical/wired-star-delta';
 import { readPhaseMeter } from '../electrical/phase-instruments';
 import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
-import { laneOf, lanesOf, vesselOf, vesselsOf } from './stations';
+import { laneOf, lanesOf, vesselOf } from './stations';
 import { electricalDevices } from '../components/electrical-defs';
+import { stepEquipmentState } from './phases/equipment-state';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
-import { clearedAlarm, engineFault, freshCylinder, stepCylinder } from '../plant/cylinder';
+import { clearedAlarm } from '../plant/cylinder';
 import { analogWireError, sampleAnalogInputs } from './analog';
 import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
 import {firstNewCarrierSuperposition,carrierSuperpositionError} from '../workspace/carrier-clearance';
@@ -468,6 +470,12 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         world={...world,threePhasePower:{...world.threePhasePower,[cmd.id]:cmd.enabled}};
         commandEvents.push({tick:world.tick,kind:'mains',
           detail:'Virtual three-phase source '+cmd.id+(cmd.enabled?' energised':' isolated')});
+      }
+    } else if (cmd.k === 'setMeterMode') {
+      if (cmd.mode !== 'voltage' && cmd.mode !== 'continuity') world = setError(world, 'Unknown meter mode');
+      else {
+        const { mode: _old, ...rest } = world.meter;
+        world = { ...world, meter: { ...rest, ...(cmd.mode === 'continuity' ? { mode: 'continuity' as const } : {}), volts: null, status: 'select' } };
       }
     } else if (cmd.k === 'setMeterProbe') {
       if ((cmd.lead !== 'positive' && cmd.lead !== 'negative') ||
@@ -919,8 +927,10 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
         wires: solverWires(w.project),
       });
       w = { ...w, voltages: pausedCircuit.voltage,
-        meter: measureDC24(pausedCircuit.voltage, pausedCircuit.diagnostics,
-          w.meter.positive, w.meter.negative, pausedCircuit.sameSupply) };
+        meter: w.meter.mode === 'continuity'
+          ? measureContinuity(buildCircuit(w), solverWires(w.project), w.meter.positive, w.meter.negative, false)
+          : measureDC24(pausedCircuit.voltage, pausedCircuit.diagnostics,
+            w.meter.positive, w.meter.negative, pausedCircuit.sameSupply) };
     }
     return { world: w, snapshot: renderSnapshot(w), events };
   }
@@ -1158,36 +1168,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       events.push({ tick: w.tick + 1, kind: 'contactor', detail: `Contactor ${c.id} ${on ? 'energised' : 'released'}` });
     }
   }
-  // Every on-delay relay times its own coil: elapsed grows while the coil is energised and resets the moment it drops.
-  // `deviceOn` for these means "contacts transferred", which the circuit reads on the next scan (the usual one-scan delay).
-  const nextTimers: Record<string, number> = {};
-  for (const c of w.project.components.filter(x => x.kind === 'timerelay')) {
-    const delayMs = paramValue(w.project.params, c.id, paramSpecsOf('timerelay')[0]);
-    const coil = circuit.energizedLoads.includes(c.id);
-    const elapsed = coil ? Math.min((w.timers[c.id] ?? 0) + dtMs, delayMs) : 0;
-    nextTimers[c.id] = elapsed;
-    const done = elapsed >= delayMs;
-    deviceOn[c.id] = done;
-    if (done !== (w.deviceOn[c.id] === true))
-      events.push({ tick: w.tick + 1, kind: 'relay', detail: `${c.id}: ${done ? 'delay elapsed, contacts transferred' : 'released'}` });
-  }
-  // Every tank is its own vessel: the pumps, drain valves and level switches mounted beside it.
-  // Every pneumatic cylinder moves from its two solenoid coils, as solved from the wiring.
-  const nextCylinders: Record<string, CylinderState> = {};
-  for (const c of w.project.components.filter(x => x.kind === 'cylinder')) {
-    const fault = engineFault(faultsOf(w.project).find(f => f.target === c.id && f.kind.startsWith('cylinder-'))?.kind);
-    const step = stepCylinder(w.cylinders[c.id] ?? freshCylinder(), circuit.energizedLoads.includes(`${c.id}-E`), circuit.energizedLoads.includes(`${c.id}-R`), dtMs, fault);
-    nextCylinders[c.id] = step.state;
-    for (const detail of step.events) events.push({ tick: w.tick + 1, kind: 'cylinder', detail: `${c.id}: ${detail}` });
-  }
-  const nextVessels: Record<string, TankProcess> = {};
-  for (const vessel of vesselsOf(w.project.components)) {
-    const live = (parts: PlacedComponent[]) => parts.some(p => circuit.energizedLoads.includes(p.id));
-    const parts = [vessel.tank, ...vessel.pumps.slice(0, 1), ...vessel.valves.slice(0, 1), ...vessel.probes.slice(0, 1)];
-    const change = stepTank(w.vessels[vessel.tank.id] ?? freshTank(), parts, live(vessel.pumps), live(vessel.valves), dtMs);
-    nextVessels[vessel.tank.id] = change.tank;
-    for (const detail of change.events) events.push({ tick: w.tick + 1, kind: 'tank', detail });
-  }
+  // On-delay relays, pneumatic cylinders and tank vessels advance from the solved circuit (see sim/phases/equipment-state.ts).
+  const { nextTimers, nextCylinders, nextVessels } = stepEquipmentState(w, circuit.energizedLoads, dtMs, deviceOn, events);
   // The authoritative P3 world advances exactly five 10 ms substeps AFTER PLC
   // outputs and the electrical actuator image settle. Geometry sensors feed the
   // following PLC scan, never the current scan's input image.
@@ -1271,7 +1253,9 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     plantWorld: p3.runtime,
     pumpOn, drainOn, lampOn,
     voltages: circuit.voltage,
-    meter: measureDC24(circuit.voltage,circuit.diagnostics,w.meter.positive,w.meter.negative,circuit.sameSupply),
+    meter: w.meter.mode === 'continuity'
+      ? measureContinuity([], [], w.meter.positive, w.meter.negative, true)
+      : measureDC24(circuit.voltage,circuit.diagnostics,w.meter.positive,w.meter.negative,circuit.sameSupply),
     diagnostics: [...circuit.diagnostics,
       ...(w.project.components.some(c => c.kind === 'breaker' && w.tripped[c.id] === true) ? ['Branch breaker open: reset only after removing downstream short'] : []),
       ...(w.project.components.some(c => c.kind === 'overload' && w.tripped[c.id] === true) ? ['Motor overload auxiliary 95-96 open (manual test trip)'] : []),

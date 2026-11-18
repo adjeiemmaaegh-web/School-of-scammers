@@ -7,6 +7,8 @@
  * multi-tab saves safe; the in-memory store here is for tests and as a volatile fallback. Nothing in this module
  * is an authentication or tamper-protection mechanism: stored projects are user data, never trusted input.
  */
+import { buildScenePackage, parseScenePackage } from './scene-package';
+
 export const LIBRARY_SCHEMA = 1;
 export const MAX_PROJECTS = 50;
 export const MAX_SNAPSHOTS = 10;
@@ -186,6 +188,19 @@ export function createLibrary(deps: LibraryDeps) {
         return this.create(cleanTitle(parsed.title, 'Imported project'), parsed.project);
       }
       return this.create('Imported project', parsed);
+    },
+
+    /** Imports a scene package (data-only file with objectives) as a new project; the objectives are returned for display. */
+    async importScenePackage(raw: string): Promise<{ ok: true; meta: ProjectMeta; objectives: string[]; hints: string[]; level: string } | { ok: false; message: string }> {
+      const parsed = parseScenePackage(raw, validate);
+      if (!parsed.ok) return parsed;
+      const made = await this.create(parsed.pkg.title, parsed.pkg.project);
+      return made.ok ? { ok: true, meta: made.meta, objectives: parsed.pkg.objectives, hints: parsed.pkg.hints, level: parsed.pkg.level } : made;
+    },
+
+    async exportScenePackage(id: string, details: { description: string; level: 'beginner' | 'intermediate' | 'advanced'; objectives: string[]; hints: string[] }): Promise<string | undefined> {
+      const rec = await store.get(id);
+      return rec ? buildScenePackage({ title: rec.title, project: rec.project, ...details }, validate) : undefined;
     },
 
     async exportBundle(): Promise<string> {

@@ -25,7 +25,7 @@ const GL = ['--no-sandbox', '--disable-setuid-sandbox', '--enable-webgl', '--use
   const summary = page => page.$eval('[data-library-summary]', e => e.textContent);
   const libReady = page => page.waitForFunction(() => !document.querySelector('[data-open-project-library]')?.disabled && !!document.querySelector('[data-open-project-library]'), { timeout: 15000 });
   const openMenu = async page => { await page.evaluate(() => { const d = [...document.querySelectorAll('.p5-menu-bar details')].find(x => x.querySelector('summary').textContent === 'Project'); d.open = true; }); };
-  const openDialog = async page => { await openMenu(page); await page.evaluate(() => document.querySelector('[data-open-project-library]').click()); await page.waitForSelector('[data-project-library]'); };
+  const openDialog = async page => { await openMenu(page); await page.evaluate(() => document.querySelector('[data-open-project-library]').click()); await page.waitForSelector('[data-project-library]'); await page.waitForSelector('[data-library-item]', { timeout: 10000 }); };
   const closeDialog = async page => { await page.evaluate(() => document.querySelector('[data-library-close]').click()); await page.waitForFunction(() => !document.querySelector('[data-project-library]')); };
   const savedRev = (page, n) => page.waitForFunction(v => (document.querySelector('[data-library-summary]')?.textContent ?? '').includes(`Library v${v}`) && document.querySelector('[data-library-summary]').getAttribute('data-library-summary') === 'saved', { timeout: 20000 }, n);
   const titles = page => page.$$eval('[data-library-item] strong', n => n.map(e => e.textContent.replace(/ · open$/, '')));
@@ -157,6 +157,21 @@ const GL = ['--no-sandbox', '--disable-setuid-sandbox', '--enable-webgl', '--use
     }
     assert.equal(await deviceCount(page), 4, 'the open project is untouched by a failed open');
     console.log('G. damaged library record refused with a message, open project untouched');
+
+    /* G2. scene package import (data only) */
+    await openDialog(page);
+    const pkg = JSON.stringify({ kind: 'efo-scene-package', formatVersion: 1, title: 'Imported lamp scene', description: 'd', level: 'beginner', objectives: ['Wire the lamp'], hints: ['Use P24'],
+      project: { formatVersion: 1, components: [{ id: 'lamp-1', kind: 'lamp', x: 20, y: 20, pressed: false }], wires: [], program: { id: 'sandbox-program', version: '1', rungs: [{ id: 'r1', elements: [{ type: 'contact', tag: 'Start' }], coil: 'Run' }] } } });
+    const input = await page.$('[data-library-package-input]');
+    await page.evaluate(text => { const el = document.querySelector('[data-library-package-input]'); const dt = new DataTransfer(); dt.items.add(new File([text], 'x.efo-scene.json', { type: 'application/json' })); el.files = dt.files; el.dispatchEvent(new Event('change', { bubbles: true })); }, pkg);
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-library-item] strong')].some(e => e.textContent.includes('Imported lamp scene')), { timeout: 8000 });
+    assert.ok(await page.evaluate(() => /Objectives: Wire the lamp/.test(document.querySelector('.sandbox-alert')?.textContent ?? '')), 'objectives are shown after import');
+    const evil = JSON.stringify({ kind: 'efo-scene-package', formatVersion: 1, title: 'x', description: 'd', level: 'beginner', objectives: [], hints: [], script: 'alert(1)', project: {} });
+    await page.evaluate(text => { const el = document.querySelector('[data-library-package-input]'); const dt = new DataTransfer(); dt.items.add(new File([text], 'evil.json', { type: 'application/json' })); el.files = dt.files; el.dispatchEvent(new Event('change', { bubbles: true })); }, evil);
+    await page.waitForFunction(() => /data only/i.test(document.querySelector('.sandbox-alert')?.textContent ?? ''), { timeout: 8000 });
+    void input;
+    await closeDialog(page);
+    console.log('G2. scene package imported as data only; a package with a script field is refused');
     await page.close();
 
     /* H. IndexedDB unavailable: say so, keep working copy autosave */
