@@ -139,3 +139,9 @@
 .ux6-lib-details h3 {font-size:13px;margin:0}
 .ux6-lib-details label {display:grid;gap:2px;font-size:11px;color:var(--muted)}
 .ux6-lib-details textarea,.ux6-lib-details select {font-size:12px;padding:4px 6px;box-sizing:border-box;width:100%}
+
+/* Wire colour and net label (R5.1) */
+.sandbox-wire-list > div {flex-wrap:wrap}
+.ux6-wire-color {font-size:11px;padding:2px 4px;max-width:120px}
+.ux6-wire-label {font-size:11px;padding:2px 4px;width:90px;box-sizing:border-box}
+.p5-wire-label {font:600 10px var(--mono);fill:var(--text);paint-order:stroke;stroke:var(--surface);stroke-width:3px}

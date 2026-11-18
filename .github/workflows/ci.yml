@@ -42,6 +42,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/offline-update-browser.cjs
       - name: R9 guided lessons - unwired starter, honest failure, UI build passes the outcome check, wrong build rejected, downloadable starters
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r9-lessons-browser.cjs
+      - name: Browser - wire colour and net label (R5.1)
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r5-wire-style-browser.cjs
       - name: R1 contextual workbench - canvas share, no clipped controls at five sizes, explicit tools, shortcuts, preference recovery
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r1-workbench-browser.cjs
       - name: Open sandbox P1 - place, wire, program, run and test failures
@@ -183,7 +185,12 @@ jobs:
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.64.1
           ok=0
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4; do
+            # Hosted runners run apt in the background on first boot; wait (bounded) for its dpkg lock instead of failing on it.
+            for _ in $(seq 1 24); do
+              sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1 || break
+              sleep 10
+            done
             if timeout 240 npx playwright install --with-deps firefox webkit; then ok=1; break; fi
             echo "playwright install attempt $attempt failed or timed out"; sleep 10
           done

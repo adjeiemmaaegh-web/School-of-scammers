@@ -6,7 +6,7 @@ The master roadmap's R5 and R7 describe behaviour that the P1–P25 factory work
 
 | Roadmap item | Evidence in the repo | Gap |
 |---|---|---|
-| R5.1 schematic-style wiring | Logical/Wiring canvas (`LogicalWiringCanvas`), accessible terminal list; `scripts/sandbox-p4-panel-browser.cjs` | Net labels, wire colours and routed wires are **not** built (needs a schema field for wire style) |
+| R5.1 schematic-style wiring | Logical/Wiring canvas (`LogicalWiringCanvas`), accessible terminal list; `scripts/sandbox-p4-panel-browser.cjs` | Net labels, wire colours (done on the logical canvas, see STATUS) and routed wires are **not** built (needs a schema field for wire style) |
 | R5.2 24 V devices, protection, reversing, E-stop | `tests/sandbox-p4-electrical.test.ts`, `tests/sandbox-p4-panel.test.ts`, `tests/sandbox-p4-reversing.test.ts`, `scripts/sandbox-p4-panel-browser.cjs`, `scripts/sandbox-p4-reversing-browser.cjs` | None known; idealised models |
 | R5.3 panel templates, empty route kept | `tests/edit-plant.test.ts` (addPanel), Starters menu, `scripts/sandbox-p8-edit-plant-browser.cjs` | Hiding solutions in graded exercises is covered by `tests/lessons.test.ts` (starters hold parts only) |
 | R5.4 digital vs analog channels, domain warnings | `tests/analog-plc.test.ts`, `tests/analog-p2-integration.test.ts`, `src/sim/analog.ts` (`analogWireError`), `scripts/sandbox-analog-browser.cjs` | Units/range shown only for plant analog channels |

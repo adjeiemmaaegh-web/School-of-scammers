@@ -30,6 +30,7 @@ import { stepActuators } from './phases/actuators';
 import { scanControllers } from './phases/controller-scan';
 import { deenergisedPlcs, quietLanes } from './phases/fail-closed';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
+import { pruneWireStyles, validateWireStyles, withWireStyle, type WireColor } from '../components/wire-style';
 import { clearedAlarm } from '../plant/cylinder';
 import { analogWireError, sampleAnalogInputs } from './analog';
 import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
@@ -232,6 +233,7 @@ export function validateProject(raw: unknown): ProjectFile {
   const plcPrograms = validatePlcPrograms(p.plcPrograms, components, plcIo);
   const params = validateParams(p.params, components);
   const plantFaults = validatePlantFaults(p.plantFaults, { components });
+  const wireStyles = validateWireStyles(p.wireStyles, wires);
   return {
     formatVersion: 1, components, wires, program: p.program,
     ...(p.language !== undefined ? { language: p.language } : {}),
@@ -243,6 +245,7 @@ export function validateProject(raw: unknown): ProjectFile {
     ...(plcIo ? { plcIo } : {}),
     ...(params ? { params } : {}),
     ...(plantFaults ? { plantFaults } : {}),
+    ...(wireStyles ? { wireStyles } : {}),
   };
 }
 /** Device settings: each key must be a setting its device kind defines, with an allowed value that differs from the default. */
@@ -541,6 +544,10 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         commandEvents.push({ tick: world.tick, kind: 'repair', detail: repairDetail(cmd.target) });
       }
     }
+    else if (cmd.k === 'setWireStyle') {
+      try { world = { ...world, project: withWireStyle(world.project, cmd.id, { color: cmd.color as WireColor | null | undefined, label: cmd.label }), lastError: null }; }
+      catch (e) { world = setError(world, e instanceof Error ? e.message : 'Invalid wire style'); }
+    }
     else if (cmd.k === 'setParam') {
       const part = world.project.components.find(c => c.id === cmd.id);
       const spec = part ? paramSpecsOf(part.kind).find(s => s.key === cmd.key) : undefined;
@@ -674,7 +681,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         world = setError(world, 'Invalid or duplicate terminal connection');
       else world = { ...world, project: { ...world.project, wires: [...world.project.wires, { id: cmd.id, from: cmd.from, to: cmd.to }] } };
     } else if (cmd.k === 'unwire') {
-      world = { ...world, project: { ...world.project, wires: world.project.wires.filter(w => w.id !== cmd.id) } };
+      world = { ...world, project: pruneWireStyles({ ...world.project, wires: world.project.wires.filter(w => w.id !== cmd.id) }) };
       // Removing a broken conductor is a legitimate repair, and a dangling fault would make the
       // exported project fail validation.
       world = withFaults(world, faultsOf(world.project).filter(f => !(f.kind === 'wire-open' && f.target === cmd.id)));

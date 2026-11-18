@@ -5,6 +5,7 @@
 import {COMPONENTS} from '../../components/registry';
 import type {ProjectFile,RenderSnapshot} from '../../sim/signals';
 import {perDeviceLive} from '../../sim/device-state';
+import {WIRE_COLORS} from '../../components/wire-style';
 import {LOGICAL_WORLD_HEIGHT,LOGICAL_WORLD_WIDTH,logicalWirePaths,nodeHeightOf,portsOf} from './logical-wiring';
 type Props={
   project:ProjectFile|null;snapshot:RenderSnapshot|null;editable:boolean;
@@ -22,9 +23,16 @@ export function LogicalWiringCanvas({project,snapshot,editable,selectedTerminal,
       <div className="p5-logical-canvas" style={{height}}>
         <svg className="p5-logical-wires" viewBox={`0 0 ${LOGICAL_WORLD_WIDTH} ${height}`}
           width={LOGICAL_WORLD_WIDTH} height={height} aria-label="Project wire routes">
-          {wires.map(w=><path data-p5-wire={w.id} key={w.id} d={w.path}>
-            <title>{w.from} to {w.to}</title>
-          </path>)}
+          {wires.map(w=>{
+            const style=project?.wireStyles?.[w.id];
+            return <g key={w.id}>
+              <path data-p5-wire={w.id} d={w.path} data-wire-color={style?.color}
+                style={style?.color?{stroke:WIRE_COLORS[style.color].css,strokeWidth:3}:undefined}>
+                <title>{w.from} to {w.to}{style?.label?` (${style.label})`:''}</title>
+              </path>
+              {style?.label&&<text data-wire-label={w.id} x={w.labelAt.x+4} y={w.labelAt.y-4} className="p5-wire-label">{style.label}</text>}
+            </g>;
+          })}
         </svg>
         {parts.map(c=>{
           const def=COMPONENTS[c.kind];
