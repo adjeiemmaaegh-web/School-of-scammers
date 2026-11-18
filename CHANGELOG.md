@@ -6,9 +6,11 @@ Versioning policy: `package.json` version is the app/build version (0.x until th
 - R0: master roadmap, status register, baseline evidence, early reports archived.
 - R1: canvas-first workbench consolidation, explicit tool chip and V/T/I shortcuts, persisted panel visibility.
 - R2: offline project library (IndexedDB), version history, backup/import, tab-conflict handling; service worker waits for a reload prompt.
-- R3: golden tick tests, device contract, equipment-state phase extracted from `tick()`.
+- R3: golden tick tests, device contract, four tick phases extracted (`src/sim/phases/`).
 - R4: Structured Text function blocks (TON, TOF, TP, CTU, CTD, R_TRIG, F_TRIG) and `T#` literals; Ladder limit 32 rungs / 48 tags.
 - R6/R8/R9/R10: generated device catalogue, hidden-fault export redaction, commissioning report export, suggested course path, contributor guide.
+- R6.2 (part): Top/Front/Side camera presets.
+- R8.1: diagnostics overview.
 - R5.5: meter continuity mode.
 - R10.1: data-only scene package format (title, level, objectives, hints, project) with library import/export.
 - R7/R11: bounded soak and benchmark test (10 simulated minutes, maximal project).

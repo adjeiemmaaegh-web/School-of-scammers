@@ -21,7 +21,7 @@ import { footprintOf } from '../workspace/floor-plan';
 import { clampPlacement } from '../workspace/geometry';
 import type { GridStep } from '../workspace/types';
 import { WorkcellCameraRig } from './WorkcellCameraRig';
-import { frameIndustrialPlant,initialNavigationPose,initialOrbitFraming, type CameraPose, type WorkcellCameraMode } from './workcell-camera';
+import { frameIndustrialPlant,initialNavigationPose,initialOrbitFraming,presetCameraPosition, type CameraPose, type ViewPreset, type WorkcellCameraMode } from './workcell-camera';
 import {
   assess3DPlacement, placementMessage, previewDimensions,
   type PlacementAssessment,
@@ -434,11 +434,11 @@ type DeviceDrag = {
 /** This scene owns camera and pointer gestures, NEVER PLC or physics state.
  * A dragged machine is a temporary ghost until the worker acknowledges 'move'.
  */
-function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusSelectedRequest, placeKind, alignSensor,
+function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusSelectedRequest, viewPreset, placeKind, alignSensor,
   showZones, showSignals, hover, selectedDeviceIds, selectedTerminal, moveTarget,
   onTerminal, onOperate, onSelect, onPlaceAt, onPreview, onMove, onRotate, onCameraPose }: {
   project: ProjectFile; snapshot: RenderSnapshot; editable: boolean; grid: GridStep;
-  mode:WorkcellCameraMode;fitRequest:number;focusSelectedRequest:number;
+  mode:WorkcellCameraMode;fitRequest:number;focusSelectedRequest:number;viewPreset:{name:ViewPreset;n:number};
   placeKind:ComponentKind | ''; alignSensor:boolean;
   showZones:boolean; showSignals:boolean;
   hover:PlacementAssessment|null;
@@ -471,6 +471,15 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusS
     camera.lookAt(...framing.target);
   // Selection is explicit; later PLC scans and position updates never refit.
   },[focusSelectedRequest]);
+  useEffect(()=>{
+    if(!viewPreset.n||mode!=='orbit')return;
+    // Selected machines if any, otherwise the whole plant, viewed along an axis. Camera only.
+    const chosen=project.components.filter(c=>selectedDeviceIds.includes(c.id));
+    const framing=frameIndustrialPlant(chosen.length?{...project,components:chosen}:project);
+    setInterest(framing.target);
+    camera.position.set(...presetCameraPosition(framing,viewPreset.name));
+    camera.lookAt(...framing.target);
+  },[viewPreset.n]);
   // An already-loaded two-machine plant should frame on first mount too.
   // Do not refit on subsequent individual placements or worker scan updates.
   const previousCount=useRef(0);
@@ -716,6 +725,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
   const [cameraMode,setCameraMode]=useState<WorkcellCameraMode>('orbit');
   const [fitRequest,setFitRequest]=useState(0);
   const [focusSelectedRequest,setFocusSelectedRequest]=useState(0);
+  const [viewPreset,setViewPreset]=useState<{name:ViewPreset;n:number}>({name:'top',n:0});
   const [cameraPose,setCameraPose]=useState<CameraPose|null>(null);
   const [operatorEnabled,setOperatorEnabled]=useState(false);
   const operatorLive=useRef(false),operatorSender=useRef(props.onTrainingOperator);
@@ -810,6 +820,12 @@ export function Sandbox3D(props: Sandbox3DProps) {
         }}>
         Fit all
       </button>
+      {(['top','front','side'] as const).map(name=><button key={name} type="button" data-3d-view-preset={name}
+        disabled={!available} title={`${name[0].toUpperCase()+name.slice(1)} view of the selection or the whole plant (camera only)`}
+        onClick={()=>{
+         if(operatorEnabled){props.onTrainingOperator(false,null);setOperatorEnabled(false);}
+         setCameraMode('orbit');setViewPreset(v=>({name,n:v.n+1}));
+        }}>{name[0].toUpperCase()+name.slice(1)}</button>)}
       <button type="button" data-3d-fit-selected
         disabled={!available||!(props.selectedDeviceIds?.length)}
         title="Focus the 3D camera on selected machine(s)"
@@ -854,7 +870,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
       onCreated={state => { camera.current = state.camera; state.camera.lookAt(0, 0, 0); }}>
       <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
         grid={props.grid??5} mode={cameraMode} fitRequest={fitRequest}
-        focusSelectedRequest={focusSelectedRequest} onMove={props.onMove}
+        focusSelectedRequest={focusSelectedRequest} viewPreset={viewPreset} onMove={props.onMove}
         placeKind={placementKind} alignSensor={alignSensor} showZones={showZones}
         showSignals={showSignals} hover={hover} onPreview={onPreview}
         onRotate={props.onRotate}

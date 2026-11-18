@@ -105,3 +105,14 @@
 .ux6-lib-versions h3 {font-size:13px;margin:12px 0 2px}
 .ux6-lib-note {font-size:11px;color:var(--muted);margin:10px 0 0}
 .ux6-conflict {display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+
+/* Diagnostics overview (R8.1) */
+.ux6-diag-overview {border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:10px;background:var(--surface-2)}
+.ux6-diag-chips {display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.ux6-diag-chips span {font:600 10.5px var(--body);padding:2px 8px;border-radius:10px;border:1px solid var(--line);color:var(--muted)}
+.ux6-diag-chips span.is-bad {color:#ff8a65;border-color:#ff8a6577}
+.ux6-diag-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 14px}
+.ux6-diag-grid h4 {margin:2px 0;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.ux6-diag-grid ul {margin:0;padding-left:15px;font-size:12px}
+.ux6-diag-grid p {margin:0;font-size:12px}
+.ux6-diag-jumps {display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
