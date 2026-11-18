@@ -116,3 +116,12 @@
 .ux6-diag-grid ul {margin:0;padding-left:15px;font-size:12px}
 .ux6-diag-grid p {margin:0;font-size:12px}
 .ux6-diag-jumps {display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+
+/* Guided lessons panel (R9) */
+.ux6-lesson {border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:10px}
+.ux6-lesson h4 {margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.ux6-lesson ul {margin:4px 0;padding-left:16px;font-size:12px}
+.ux6-lesson p {margin:4px 0;font-size:12px}
+.ux6-lesson-actions {display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.ux6-lesson-result {border-top:1px solid var(--line);padding-top:6px;font-size:12px}
+.ux6-lesson-result li[data-lesson-check-result="fail"] {color:#ff8a65}

@@ -8,6 +8,7 @@ import { WorkspaceSelectionPanel } from '../ui/sandbox/WorkspaceSelectionPanel';
 import { AssemblyLibrary } from '../ui/sandbox/AssemblyLibrary';
 import { ProjectLibraryPanel } from '../ui/sandbox/ProjectLibraryPanel';
 import { DiagnosticsOverview } from '../ui/sandbox/DiagnosticsOverview';
+import { LessonPanel } from '../ui/sandbox/LessonPanel';
 import { useProjectLibrary } from './useProjectLibrary';
 import { redactHiddenFaults } from '../sim/redact';
 import { commissioningReportHtml } from '../diagnostics/commissioning-report';
@@ -1272,6 +1273,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         </div>
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
           {project && snapshot && <DiagnosticsOverview project={project} snapshot={snapshot} />}
+          {!scenario && project && <LessonPanel project={project} editable={editable} canStart={!!library.lib} onStart={library.createFrom} />}
           <span id="diag-monitor" />
           {snapshot && <LiveMonitor snapshot={snapshot} project={project}
             onBreakpoint={scan => send([{ k: 'breakAtScan', scan }])}

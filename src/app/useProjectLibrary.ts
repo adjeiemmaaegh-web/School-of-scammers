@@ -187,6 +187,15 @@ export function useProjectLibrary(options: Options) {
     return openProject(made.meta.id);
   }, [lib, commit, openProject]);
 
+  /** Creates a new library project from a ready-made project (a lesson starter) and opens it. */
+  const createFrom = useCallback(async (title: string, project: ProjectFile): Promise<boolean> => {
+    if (!lib) return false;
+    await commit();
+    const made = await lib.create(title, project);
+    if (!made.ok) { opts.current.onNotice(made.message); return false; }
+    return openProject(made.meta.id);
+  }, [lib, commit, openProject]);
+
   const resolveConflict = useCallback(async (choice: 'reload' | 'copy' | 'overwrite') => {
     if (!lib || !activeRef.current) return;
     const project = opts.current.project;
@@ -233,6 +242,6 @@ export function useProjectLibrary(options: Options) {
     else if (opened.status === 'missing') { activeRef.current = null; setActive(null); }
   }, [lib]);
 
-  return { lib, status, message, active, openProject, newProject, resolveConflict, refreshActive, restoreVersion, commitNow: commit,
+  return { lib, status, message, active, openProject, newProject, createFrom, resolveConflict, refreshActive, restoreVersion, commitNow: commit,
     saveVersion: async (label: string) => { if (!lib || !activeRef.current) return false; await commit(); const r = await lib.snapshot(activeRef.current.id, label); return r.ok; } };
 }

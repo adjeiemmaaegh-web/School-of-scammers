@@ -40,6 +40,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r2-project-library-browser.cjs
       - name: Offline update protocol - a newer build waits, the page offers a reload, the project survives
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/offline-update-browser.cjs
+      - name: R9 guided lessons - unwired starter, honest failure, UI build passes the outcome check, wrong build rejected, downloadable starters
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r9-lessons-browser.cjs
       - name: R1 contextual workbench - canvas share, no clipped controls at five sizes, explicit tools, shortcuts, preference recovery
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r1-workbench-browser.cjs
       - name: Open sandbox P1 - place, wire, program, run and test failures
