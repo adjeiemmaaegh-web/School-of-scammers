@@ -50,12 +50,15 @@ Severity: S1 blocks release claims, S2 should fix before the stage that depends 
 | F-17 | S2 | Persisted panel visibility (R1) changed reload behaviour: two older E2E scripts assumed a collapsed dock/inspector after reload and were updated to be state-aware | `sandbox-p8-edit-plant-browser.cjs`, `sandbox-p15-timer-relay-browser.cjs` | R1 |
 | F-18 | S2 | `npm audit` (2026-11-17): 5 high advisories, all in the dev toolchain (`picomatch` ReDoS GHSA-fc5q-39xc-vjpf reached through `tinyglobby`/`fdir`, surfaced under `vite` and `vitest`). Not part of the shipped browser bundle. npm's suggested "fixes" are downgrades (vite 6.2.7, vitest 3.1.4), so they were not applied; re-check when a patched `picomatch` lands. Disclose in the release SBOM notes | `npm audit --json` | R11.1 |
 | F-19 | S3 | Registry audit (R6.1), generated in `DEVICE_CATALOG.md`: 12 kinds have neither a plant model nor an injectable fault: `breaker diverter drainvalve estop lamp overload plc plc16 stacklight star-delta-drive supply tank three-phase-supply` (several have faults via other mechanisms such as breaker/overload trip; the catalogue lists only solver/plant fault hooks) | `docs/product/DEVICE_CATALOG.md` | R6.1 |
+| F-20 | S2 (fixed) | On 2026-11-18 `ubuntu-latest` moved to Ubuntu 26.04 and Playwright's `--with-deps firefox webkit` install stalled until the 40-minute job timeout (two cancelled runs), although every browser script had already passed. Linux workflows are now pinned to `ubuntu-24.04`; the install step is also time-bounded with retries. Re-evaluate the pin when Playwright supports 26.04. Windows still uses `windows-latest` | `.github/workflows/*.yml` | R11.3 |
 | F-11 | S1 (gate) | Not verified anywhere: physical 8 GB/no-GPU Windows run, real Chrome/Edge/Firefox/Safari manual passes, controls-engineer review, instructor/student trials, licensing clearance | `RELEASE_READINESS_2026-11-15.md` | R11/R12 |
 
 
 CI on `engineering/r1-contextual-workbench` (dispatch run [44178832135](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44178832135)): `build-and-test` **success**, including the new R1, R2 and offline-update scripts. An earlier run on the same branch failed only because of a missing Node typing in a test (found by running `verify:full` in a CI-like clean install; fixed).
 
 CI on `engineering/r5-r7-soak-and-package` (dispatch run [44191919385](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44191919385)): `build-and-test` **success with zero browser-script retries**; includes the R1, R2, offline-update scripts and the fixed F-01/F-02 scripts.
+
+CI on `engineering/r3-tick-phases` (dispatch run [44209626296](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44209626296), runners pinned to ubuntu-24.04): `build-and-test` **success**.
 
 ## 4. Task register
 
