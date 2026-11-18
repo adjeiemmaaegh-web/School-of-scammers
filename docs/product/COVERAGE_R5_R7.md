@@ -27,4 +27,4 @@ The master roadmap's R5 and R7 describe behaviour that the P1–P25 factory work
 
 ## Honest summary
 
-R5 and R7 are not "not started": most bullets are covered by earlier slices. The real, still-open gaps are: wire colours/net labels (schema change), current/trend instruments, a PID instruction, pressure/air supply, and generalised classification sorting. They are listed in `STATUS.md`.
+R5 and R7 are not "not started": most bullets are covered by earlier slices. Closed since: wire colours/net labels (logical canvas only) and a teaching PID function block in Structured Text. The real, still-open gaps are: current/trend instruments, pressure/air supply, and generalised classification sorting. They are listed in `STATUS.md`.
