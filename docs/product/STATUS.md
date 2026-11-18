@@ -61,6 +61,8 @@ CI on `engineering/r5-r7-soak-and-package` (dispatch run [44191919385](https://g
 
 CI on `engineering/r3-tick-phases` (dispatch run [44209626296](https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44209626296), runners pinned to ubuntu-24.04): `build-and-test` **success**.
 
+Local browser matrix on `engineering/r5-r12-batch`: **68 of 70 pass without retries** (archive `docs/qa/r12/browser-matrix-2026-11-18.txt`); the two failures are the local-only `browser-acceptance.cjs` (F-03) and one camera-framing race in `sandbox-3d-workcell-browser.cjs` that was hardened afterwards (0 failures in 6 reruns).
+
 ## 4. Task register
 
 | Task | State | Baseline SHA | PR / commit | Evidence | Owner-only blockers | Notes |

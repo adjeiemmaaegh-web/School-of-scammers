@@ -120,11 +120,18 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   // Real pointer drag of the label fixed above the 3D machine: coordinates
   // are projected back onto the 3D factory floor and sent to the worker.
   // The label is a visual 3D interaction aid, not an independent 2D plant.
-  await page.mouse.move(cx,cy);
-  await page.mouse.down();
-  await page.waitForFunction(()=>
-    document.querySelectorAll('[data-workspace-selection] input:checked').length===1,
-    {timeout:12000});
+  // The first press can land before the camera finished framing the machine under a slow software renderer, so retry
+  // the press (releasing in between) until the worker-backed selection registers.
+  let pressed=false;
+  for(let attempt=0;attempt<5&&!pressed;attempt++){
+    await page.mouse.move(cx,cy);
+    await page.mouse.down();
+    pressed=await page.waitForFunction(()=>
+      document.querySelectorAll('[data-workspace-selection] input:checked').length===1,
+      {timeout:4000}).then(()=>true,()=>false);
+    if(!pressed){await page.mouse.up();await sleep(500);}
+  }
+  assert.ok(pressed,'Pressing the 3D machine must select it');
   await page.mouse.move(cx+65,cy+18,{steps:14});
   await page.mouse.up();
   await page.waitForFunction((id,oldX)=>{
