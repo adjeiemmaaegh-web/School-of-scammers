@@ -1,4 +1,5 @@
 import type { GridStep } from '../../workspace/types';
+import { ALIGN_MODES, type AlignMode } from '../../workspace/align';
 import { GRID_STEPS } from '../../workspace/geometry';
 import './workspace-authoring.css';
 
@@ -11,6 +12,7 @@ type Props = {
   onCopy: () => void; onPaste: () => void; onDuplicate: () => void;
   onRemove: () => void; onRotate: (turns: -1 | 1) => void;
   onNudge: (dx: number, dy: number) => void;
+  onAlign?: (mode: AlignMode) => void;
 };
 
 /** The toolbar only dispatches edits; the worker validates and owns project mutations. */
@@ -36,6 +38,14 @@ export function WorkspaceAuthoringBar(props: Props) {
       onClick={() => props.onRotate(1)} title="Rotate supported equipment right by 90° (orientation-locked machines stay fixed)">↷ 90°</button>
     <button type="button" className="btn ghost small" data-delete-selection disabled={!selected}
       onClick={props.onRemove} title="Delete selected devices, dependent wires and faults">Delete</button>
+    {props.onAlign && <label className="workspace-grid-label">Align
+      <select aria-label="Align or distribute the selection" data-align value="" disabled={!props.editable || props.selectedCount < 2}
+        title={props.selectedCount < 2 ? 'Select two or more devices' : 'Aligns device origins; distribute needs three'}
+        onChange={e => { if (e.target.value) props.onAlign!(e.target.value as AlignMode); }}>
+        <option value="">Align…</option>
+        {ALIGN_MODES.map(m => <option key={m} value={m} disabled={m.startsWith('distribute') && props.selectedCount < 3}>{m.replace('-', ' ')}</option>)}
+      </select>
+    </label>}
     <label className="workspace-grid-label">Snap
       <select aria-label="Workspace snap grid size" value={props.grid}
         onChange={e => props.onGrid(Number(e.target.value) as GridStep)}>

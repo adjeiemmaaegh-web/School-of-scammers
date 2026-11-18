@@ -803,6 +803,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           canUndo={!historyPending&&history.undo.length>0} canRedo={!historyPending&&history.redo.length>0} canPaste={!!clipboard}
           grid={grid} onGrid={setGrid} onUndo={undo} onRedo={redo} onCopy={copySelection}
           onPaste={pasteSelection} onDuplicate={duplicateSelection} onRemove={deleteSelection}
+          onAlign={mode=>edit({kind:'align',ids:selectedDeviceIds,mode})}
           onRotate={rotateSelection} onNudge={moveSelection}/>
       </div>}
       <div className="p5-view-tools" role="toolbar" aria-label="Canvas views and active tools">

@@ -10,6 +10,7 @@ import type { PlacedComponent, ProjectFile, Wire, XY } from '../sim/signals';
 import { assertSelection } from './selection';
 import { makeFragment } from './clipboard';
 import { boundedGroupDelta, clampPlacement, MAX_POSITION, turn } from './geometry';
+import { alignedPositions } from './align';
 import type { WorkspaceEdit, WorkspaceFragment } from './types';
 
 const NONREPEATABLE = new Set(['reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor']);
@@ -118,6 +119,11 @@ export function editWorkspace(project: ProjectFile, edit: WorkspaceEdit): Projec
       if (edit.quarterTurns !== -1 && edit.quarterTurns !== 1) throw new RangeError('Invalid rotation');
       return { ...project, components: project.components.map(c => ids.has(c.id) ?
         { ...c, yawDeg: turn(c.yawDeg, edit.quarterTurns) } : c) };
+    }
+    case 'align': {
+      const targets = alignedPositions(parts, edit.mode);
+      if (parts.every(c => targets.get(c.id)!.x === c.x && targets.get(c.id)!.y === c.y)) return project;
+      return { ...project, components: project.components.map(c => ids.has(c.id) ? { ...c, ...targets.get(c.id)! } : c) };
     }
     case 'duplicate': {
       const anchor = { x: Math.min(...parts.map(c => c.x)) + edit.offset.x,

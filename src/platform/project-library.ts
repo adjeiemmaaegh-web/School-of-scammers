@@ -236,7 +236,7 @@ export function createLibrary(deps: LibraryDeps) {
      */
     async migrateLegacy(rawText: string | null): Promise<{ status: 'migrated'; id: string } | { status: 'none' | 'already' } | { status: 'unreadable'; message: string }> {
       if (await store.getMeta('legacyMigrated')) return { status: 'already' };
-      if (rawText === null || rawText === '') { await store.setMeta('legacyMigrated', 'none'); return { status: 'none' }; }
+      if (typeof rawText !== 'string' || rawText === '') { await store.setMeta('legacyMigrated', 'none'); return { status: 'none' }; }
       if (rawText.length > MAX_PROJECT_TEXT) return { status: 'unreadable', message: 'The saved project is larger than the 1 MB limit; it was left untouched.' };
       let parsed: unknown;
       try { parsed = JSON.parse(rawText); } catch { return { status: 'unreadable', message: 'The saved project is not valid JSON; it was left untouched.' }; }
