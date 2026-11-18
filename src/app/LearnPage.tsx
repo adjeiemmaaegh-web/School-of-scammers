@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { COURSE } from '../exercises/course';
+import { LESSON_META } from '../exercises/lessons-meta';
 import { SCENARIO_META } from '../exercises/meta';
 import { loadProgress } from '../platform/persistence';
 import { AppHeader } from '../ui/AppHeader';
@@ -35,6 +36,20 @@ export function LearnPage() {
               </li>
             ))}
           </ol>
+        </section>
+
+        <section aria-labelledby="learn-lessons" style={{ marginTop: 40 }} data-learn-lessons>
+          <h2 id="learn-lessons" className="sec-title">Guided simulator lessons</h2>
+          <p className="sub">Each lesson starts with unwired parts. In the simulator open <strong>Measurements &middot; faults &middot; events</strong>, choose the lesson, press <em>Start this lesson</em>, build it, then <em>Check my work</em>: the check runs your project through the real simulator, so any working build passes. Or download the starter and import it from <em>Project library &rarr; Import scene package</em>.</p>
+          <div className="hub-cards">
+            {LESSON_META.map(l => (
+              <article key={l.id} className="hub-card" data-learn-lesson={l.id}>
+                <h3>{l.title}</h3>
+                <p>{l.summary}</p>
+                <span className="go"><a href={`/lessons/${l.id}.efo-scene.json`} download>Download starter</a> · {l.level} · <Link to="/sandbox">Open simulator →</Link></span>
+              </article>
+            ))}
+          </div>
         </section>
 
         <section aria-labelledby="learn-scenarios" style={{ marginTop: 40 }}>

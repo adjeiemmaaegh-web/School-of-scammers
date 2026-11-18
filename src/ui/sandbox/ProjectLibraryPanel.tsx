@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import type { ProjectLibrary, ProjectMeta, Snapshot } from '../../platform/project-library';
 import type { ActiveProject, LibraryStatus } from '../../app/useProjectLibrary';
+import { exportableDetails, loadDetails, saveDetails, type SceneDetails } from '../../platform/scene-details';
 
 type Props = {
   lib: ProjectLibrary;
@@ -34,6 +35,7 @@ export function ProjectLibraryPanel({ lib, active, status, editable, onOpen, onN
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [versions, setVersions] = useState<Omit<Snapshot, 'project'>[]>([]);
   const [versionLabel, setVersionLabel] = useState('');
+  const [details, setDetails] = useState<SceneDetails>(() => (active ? loadDetails(active.id) : { description: '', level: 'beginner', objectives: '', hints: '' }));
   const importRef = useRef<HTMLInputElement>(null);
   const restoreRef = useRef<HTMLInputElement>(null);
   const packageRef = useRef<HTMLInputElement>(null);
@@ -117,7 +119,7 @@ export function ProjectLibraryPanel({ lib, active, status, editable, onOpen, onN
             <button type="button" className="btn ghost small" data-library-duplicate onClick={() => run(async () => { const r = await lib.duplicate(m.id); if (!r.ok) onNotice(r.message); })}>Duplicate</button>
             <button type="button" className="btn ghost small" onClick={() => run(async () => { const t = await lib.exportProject(m.id); if (t) download(`${safeName(m.title)}.efo-project.json`, t); })}>Export</button>
             <button type="button" className="btn ghost small" data-library-export-package title="Data-only scene file with a title, level, objectives and hints"
-              onClick={() => run(async () => { const t = await lib.exportScenePackage(m.id, { description: `Scene exported from "${m.title}".`, level: 'beginner', objectives: ['Describe the goal of this scene here'], hints: [] }); if (t) download(`${safeName(m.title)}.efo-scene.json`, t); })}>Export scene</button>
+              onClick={() => run(async () => { const t = await lib.exportScenePackage(m.id, exportableDetails(active?.id === m.id ? details : loadDetails(m.id), m.title)); if (t) download(`${safeName(m.title)}.efo-scene.json`, t); })}>Export scene</button>
             <button type="button" className="btn ghost small" disabled={active?.id === m.id} title={active?.id === m.id ? 'Open another project first.' : undefined}
               onClick={() => run(() => lib.setArchived(m.id, !m.archived))}>{m.archived ? 'Unarchive' : 'Archive'}</button>
             {confirmDelete === m.id
@@ -145,6 +147,18 @@ export function ProjectLibraryPanel({ lib, active, status, editable, onOpen, onN
             </div>
           </li>)}
         </ul>
+      </section>}
+      {active && <section className="ux6-lib-details" aria-label="Scene details for export" data-scene-details>
+        <h3>Scene details (used by “Export scene”)</h3>
+        <label>Description<textarea data-scene-description rows={2} maxLength={600} value={details.description}
+          onChange={e => { const d = { ...details, description: e.target.value }; setDetails(d); saveDetails(active.id, d); }} /></label>
+        <label>Level<select data-scene-level value={details.level} onChange={e => { const d = { ...details, level: e.target.value as SceneDetails['level'] }; setDetails(d); saveDetails(active.id, d); }}>
+          <option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label>
+        <label>Objectives (one per line, up to 12)<textarea data-scene-objectives rows={3} value={details.objectives}
+          onChange={e => { const d = { ...details, objectives: e.target.value }; setDetails(d); saveDetails(active.id, d); }} /></label>
+        <label>Hints (one per line, up to 12)<textarea data-scene-hints rows={2} value={details.hints}
+          onChange={e => { const d = { ...details, hints: e.target.value }; setDetails(d); saveDetails(active.id, d); }} /></label>
+        <small>The exported file contains only this text plus the project: no scripts, no links followed. Do not put answers in the starter if it will be used for assessment.</small>
       </section>}
       <p className="ux6-lib-note">Projects are stored in this browser only (IndexedDB). Clearing site data deletes them: use Back up all to keep a file copy. Export/import never leaves your device.</p>
     </div>

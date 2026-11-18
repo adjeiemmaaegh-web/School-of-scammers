@@ -12,7 +12,9 @@ const clip = (value: unknown, n: number): string => { const s = String(value ?? 
 const table = (head: string[], rows: string[][]): string =>
   `<table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 
-export type ReportInput = { title: string; project: ProjectFile; snapshot: RenderSnapshot; events: readonly string[]; generatedAt: string };
+export type ReportInput = { title: string; project: ProjectFile; snapshot: RenderSnapshot; events: readonly string[]; generatedAt: string;
+  /** Optional acceptance checklist (R8.4), already evaluated; included as a table. */
+  checklist?: readonly { title: string; status: string; detail: string }[] };
 
 export function commissioningReportHtml(input: ReportInput): string {
   const { project, snapshot } = input;
@@ -37,6 +39,7 @@ export function commissioningReportHtml(input: ReportInput): string {
     '<h2>Faults</h2>',
     visibleFaults.length ? table(['Kind', 'Target'], visibleFaults.map(f => [f.kind, f.target])) : '<p>No revealed faults.</p>',
     hiddenCount ? `<p class="note">${esc(hiddenCount)} hidden fault(s) are not listed: diagnose them with the instruments.</p>` : '',
+    ...(input.checklist?.length ? ['<h2>Acceptance checklist</h2>', table(['Item', 'Status', 'Detail / note'], input.checklist.slice(0, 20).map(i => [i.title, i.status, clip(i.detail, 300)]))] : []),
     '<h2>Recent events</h2>', input.events.length ? `<ul>${input.events.slice(-24).map(e => `<li>${esc(clip(e, 300))}</li>`).join('')}</ul>` : '<p>None.</p>',
   ].join('\n');
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>${esc(clip(input.title, 80))} commissioning snapshot</title><style>body{font:14px system-ui,sans-serif;margin:24px;max-width:960px}table{border-collapse:collapse;width:100%;margin:6px 0 18px}th,td{border:1px solid #bbb;padding:3px 6px;text-align:left;font-size:12px}.note{color:#555}</style></head><body>\n${body}\n</body></html>`;

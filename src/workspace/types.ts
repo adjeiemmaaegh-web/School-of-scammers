@@ -1,3 +1,4 @@
+import type { AlignMode } from './align';
 /** P1 source-only workspace edit contracts. Pure data, no React/DOM/worker coupling. */
 import type { XY, PlacedComponent, Wire, PlcProgram, ProjectFile } from '../sim/signals';
 
@@ -20,6 +21,7 @@ export type WorkspaceEdit =
   | { kind: 'translate'; ids: string[]; delta: XY; grid: GridStep }
   | { kind: 'rotate'; ids: string[]; quarterTurns: -1 | 1 }
   | { kind: 'duplicate'; ids: string[]; offset: XY; grid: GridStep }
+  | { kind: 'align'; ids: string[]; mode: AlignMode }
   | { kind: 'delete'; ids: string[] }
   | { kind: 'paste'; fragment: WorkspaceFragment; at: XY; grid: GridStep };
 

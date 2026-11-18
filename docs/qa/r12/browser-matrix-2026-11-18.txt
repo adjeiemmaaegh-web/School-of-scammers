@@ -1,0 +1,76 @@
+# Local browser matrix, no retries (R12.5 archive)
+Commit under test: 7b28384 (+ one script hardening after this run)
+Environment: container, Puppeteer 24.31.0, Chromium, software WebGL. NOT a physical device.
+Format: exit-code seconds script :: last output line
+Result: 68 pass, 2 fail (browser-acceptance.cjs fails only in this container, passes in CI; sandbox-3d-workcell-browser.cjs failed once on a camera-framing race, since hardened and 0 failures in 6 reruns)
+
+0 9s scripts/accessibility-acceptance.cjs :: ACCESSIBILITY ACCEPTANCE PASS: 21 routes, zero detected serious/critical WCAG violations; skip navigation func
+1 2s scripts/browser-acceptance.cjs ::     at async run (/home/user/school-of-scammers/scripts/browser-acceptance.cjs:54:3)
+0 4s scripts/cpu-fallback-acceptance.cjs :: LOW-SPEC CPU-ONLY FALLBACK PASS: 4x CPU throttling, optional WebGL disabled, editing and scan remain usable
+0 1s scripts/offline-acceptance.cjs :: OFFLINE ACCEPTANCE PASS: pre-cached lazy labs and direct deep links
+0 9s scripts/offline-update-browser.cjs :: Offline update browser E2E PASS
+0 3s scripts/qa-candidate-employer-browser.cjs :: QA EMPLOYER PASS: verified shape review, invalid rubric rejected before React rendering
+0 2s scripts/qa-cross-trade-browser.cjs :: QA ALL TRADES PASS: 20 genuine ranked PLC/CCTV exercise pages interactive
+0 3s scripts/qa-csp-runtime-browser.cjs :: QA CSP RUNTIME PASS: actual browser enforced inline-script block, 5 deployment headers, lazy sandbox/Worker re
+0 10s scripts/qa-share-code-browser.cjs :: QA CROSS-PAGE PASS: no uncaught crash on prototype routes or malformed share codes
+1 19s scripts/sandbox-3d-workcell-browser.cjs ::     at /home/user/school-of-scammers/scripts/sandbox-3d-workcell-browser.cjs:125:14
+0 8s scripts/sandbox-analog-browser.cjs :: ANALOG PLC BROWSER PASS: physical tank signal, ST control, 24V pump, persistence
+0 13s scripts/sandbox-browser-acceptance.cjs :: PASS: sandbox P1 WebGL 3D + placement → wiring → editable latch → run → stop → wrong logic → broke
+0 18s scripts/sandbox-floor-plan-browser.cjs :: P6 WORKCELL BUILDER PASS: blank floor -> precise 2D placement -> 3D yaw -> drag -> 23 wires -> handwritten ST 
+0 7s scripts/sandbox-p1-workspace-browser.cjs :: P1 SOURCE ACCEPTANCE PASS: select/duplicate/undo/redo/rotate/copy/paste/save
+0 7s scripts/sandbox-p10-commissioning-browser.cjs :: P10 COMMISSIONING BROWSER PASS: unwired preflight, worker time, genuine 24V/IO, no false program/movement cred
+0 17s scripts/sandbox-p10-multiplant-browser.cjs :: Per-instance plant E2E PASS
+0 32s scripts/sandbox-p11-authored-plant-browser.cjs :: Authored-from-empty multi-device plant E2E PASS
+0 10s scripts/sandbox-p11-chronological-assessment-browser.cjs :: P11 ORDERED WORKER ASSESSMENT PASS: original scene -> true PLC16 ST/Q -> rotary busy -> indexed; no false pers
+0 18s scripts/sandbox-p12-configurable-io-browser.cjs :: Configurable I/O browser E2E PASS
+0 9s scripts/sandbox-p12-multicase-browser.cjs :: P12 REAL MULTI-CASE BROWSER PASS: four independent PLC/physics cases, deliberate wrong logic rejected, no fixt
+0 9s scripts/sandbox-p13-expanded-matrix-browser.cjs :: P13 EXTENDED MATRIX BROWSER PASS: real gate passes, constant ON rejected; newly supported P14 bottle remains u
+0 19s scripts/sandbox-p13-relay-cylinder-browser.cjs :: Relay and cylinder browser E2E PASS
+0 27s scripts/sandbox-p14-cylinder-faults-browser.cjs :: Cylinder faults and stack light browser E2E PASS
+0 11s scripts/sandbox-p14-physical-bottle-browser.cjs :: P14 PHYSICAL BOTTLE BROWSER PASS: real PLC feeder cylinder, moving belt, measured fill, interlocked cap, fault
+0 22s scripts/sandbox-p15-autonomous-factory-browser.cjs :: P15 AUTONOMOUS FACTORY BROWSER PASS: all three physical processes, registered faults, wrong code and non-persi
+0 9s scripts/sandbox-p15-autonomous-robot-browser.cjs :: P15 AUTONOMOUS ROBOT SORT PASS: real PLC sensor-feedback, two physical material routes, second-body robot faul
+0 9s scripts/sandbox-p15-multiproduct-browser.cjs :: P15 MULTI-PRODUCT BROWSER PASS: three original PLC-controlled bottles, stable physical IDs, measured fill, cap
+0 16s scripts/sandbox-p15-timer-relay-browser.cjs :: On-delay relay browser E2E PASS
+0 34s scripts/sandbox-p16-resilience-browser.cjs :: P16 RESILIENCE BROWSER PASS: original PLC browser-to-worker tests, audited negative controls, source edit inva
+0 32s scripts/sandbox-p17-material-lots-browser.cjs :: P17 MATERIAL LOTS BROWSER PASS: original PLC browser-to-worker tests, original body-quality traces, source edi
+0 9s scripts/sandbox-p18-conveyor-jam-browser.cjs :: P18 CONVEYOR JAM BROWSER PASS: original 24V PLC, moving real bottle belt fault, post-repair maintenance acknow
+0 41s scripts/sandbox-p19-power-restart-browser.cjs :: P19 POWER RESTART SOURCE-NEGATIVE BROWSER PASS: missing Q0.5 source fails and saved project never gains test f
+0 7s scripts/sandbox-p2-browser-acceptance.cjs :: P2 SANDBOX E2E PASS: wired TON, LD/ST, scan and edge breakpoints, scan history and CTD/CTU editing
+0 7s scripts/sandbox-p2-fbd-browser.cjs :: P2 FBD SOURCE ACCEPTANCE PASS: real FBD edit, wire-level motor latch, stop, persistence
+0 5s scripts/sandbox-p2-numeric-browser.cjs :: P2 NUMERIC BROWSER PASS: editable INT/ADD/COMPARE directly governs wired 3D motor
+0 10s scripts/sandbox-p20-physical-obstruction-browser.cjs :: P20 ORIGINAL GATE SOURCE-NEGATIVE BROWSER PASS: wrong PLC cannot borrow a previous physical pass and no grader
+0 9s scripts/sandbox-p21-real-queue-browser.cjs :: P21 REAL BODY QUEUE SOURCE-NEGATIVE BROWSER PASS: missing powered reset fails and stored project retains no as
+0 10s scripts/sandbox-p22-real-zone-browser.cjs :: P22 SOURCE-NEGATIVE BROWSER PASS: a program using only accumulationTrip rather than physical zoneFull feeds b3
+0 10s scripts/sandbox-p23-two-belt-handoff-browser.cjs :: P23 NEGATIVE PASS: PLC ignoring actual receiver I0.7 feeds b3 too early and fails
+0 9s scripts/sandbox-p24-physical-outfeed-hold-browser.cjs :: P24 NEGATIVE PASS: PLC dropping outstop on receiver-full without 200ms original contact fails
+0 12s scripts/sandbox-p25-stuck-outfeed-retry-browser.cjs :: P25 NEGATIVE PASS: PLC lacking physical I1.2 timeout never latches real 24V alarm and fails
+0 7s scripts/sandbox-p3-plant-browser.cjs :: P3 SOURCE BROWSER PASS: actual PLC→feeder→body→photoeye, save/reopen ready
+0 13s scripts/sandbox-p3-sorting-browser.cjs :: P3 3D SORTING PASS: placed/wired photoeye and diverter, marked reject, plain pass, deliberately wrong code cha
+0 12s scripts/sandbox-p3-tank-browser.cjs :: P3 TANK BROWSER PASS: user-built 11-wire 3D tank, real high switch, drain cycle and wrong PLC program
+0 10s scripts/sandbox-p4-panel-browser.cjs :: P4 PANEL BROWSER PASS: 16-wire real DOL, meter, overload, latching training E-stop, short reset refusal and re
+0 15s scripts/sandbox-p4-reversing-browser.cjs :: P4 REVERSING BROWSER PASS: 21 wires, real forward/stop/reverse, simultaneous inhibit, E-stop and broken NC lin
+0 10s scripts/sandbox-p4-star-delta-browser.cjs :: P4 SOURCE BROWSER PASS: two domains, PLC/ST, STAR/DELTA, stop, isolate and save
+0 19s scripts/sandbox-p5-faults-browser.cjs :: P5 FAULTS BROWSER PASS: hidden fault → silent symptom → alarm (symptom only) → meter diagnosis → healt
+0 21s scripts/sandbox-p5-sensor-browser.cjs :: P5 SENSOR BROWSER PASS: hidden stuck-ON photoeye injected while running → lamp lit with no part → plain pa
+0 8s scripts/sandbox-p5-workspace-browser.cjs :: P5-UX BROWSER PASS: view state, catalog, dock, panels, keyboard and narrow controls
+0 24s scripts/sandbox-p6-scenario-browser.cjs :: P6 scenario browser E2E PASS
+0 33s scripts/sandbox-p7-3d-commissioning-browser.cjs :: P7 3D FACTORY COMMISSIONING PASS: blank perspective 3D floor -> 10 placed devices -> 3D rotate/drag -> 23 real
+0 7s scripts/sandbox-p7-assemblies-browser.cjs :: P7 REUSABLE ASSEMBLY PASS: real machines and wire -> local shelf -> restart -> worker paste -> delete; no clou
+0 7s scripts/sandbox-p7-clearance-browser.cjs :: P7 WORKER CLEARANCE PASS: duplicate carrier refused, intentional mounted sensor and adjacent conveyor allowed,
+0 17s scripts/sandbox-p7-multiplc-browser.cjs :: P7 multi-PLC browser E2E PASS
+0 13s scripts/sandbox-p8-assembly-rotation-browser.cjs :: P8 ROTATED REUSABLE ASSEMBLY PASS: real machines and wire -> local shelf -> restart -> worker paste -> delete;
+0 7s scripts/sandbox-p8-composed-assembly-browser.cjs :: P8 COMPOSED ASSEMBLY BROWSER PASS: two saved independent wired cells -> composite -> real worker paste
+0 14s scripts/sandbox-p8-edit-plant-browser.cjs :: P8 edit-plant browser E2E PASS
+0 11s scripts/sandbox-p8-jam-browser.cjs :: P8 FIXED SOLID BROWSER PASS: worker-driven conveyor jam vs legacy free material flow
+0 10s scripts/sandbox-p8-optical-browser.cjs :: P8 WORKER OCCLUSION BROWSER PASS: true PLC/ST/feeder/body, rotated rack blocks opt-in sensor but not legacy mo
+0 7s scripts/sandbox-p8-training-operator-browser.cjs :: P8 OPERATOR BROWSER PASS: explicit worker actor -> powered optical PLC chain -> disabled, no project persisten
+0 13s scripts/sandbox-p9-21-scenes-browser.cjs :: P9 21 SCENES BROWSER PASS: filter/search, unsolved worker scene, destructive confirmation, yaw/elevation and r
+0 7s scripts/sandbox-project-storage-browser.cjs :: SANDBOX TAB PASS: cross-tab change pauses stale tab autosave
+0 28s scripts/sandbox-r1-workbench-browser.cjs :: R1 workbench browser E2E PASS
+0 48s scripts/sandbox-r2-project-library-browser.cjs :: R2 project library browser E2E PASS
+0 8s scripts/sandbox-r9-lessons-browser.cjs :: R9 lessons browser E2E PASS
+0 32s scripts/sandbox-three-conveyor-turntable-browser.cjs :: THREE-CONVEYOR TURNTABLE E2E PASS: worker body north vs east, two sensors, ST, wiring, persistence
+0 7s scripts/sandbox-ux-acceptance.cjs :: SANDBOX UX PASS: search, stage shortcuts, inspector, terminal selection, local persistence and 390px mobile
+0 22s scripts/sandbox-ux2-stage1-browser.cjs :: 3D drop: executed
+0 10s scripts/simulator-first-browser.cjs :: Simulator-first product structure E2E PASS

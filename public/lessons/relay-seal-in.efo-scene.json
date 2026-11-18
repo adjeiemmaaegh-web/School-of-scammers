@@ -1,0 +1,76 @@
+{
+  "kind": "efo-scene-package",
+  "formatVersion": 1,
+  "title": "Hard-wired start/stop with a relay (no PLC)",
+  "description": "Build the classic seal-in: START latches a relay through its own contact, STOP (normally closed) releases it, and a lamp shows the state.",
+  "level": "beginner",
+  "objectives": [
+    "START then release keeps the lamp on (the relay seals itself in)",
+    "STOP drops it out and it stays off when STOP is released",
+    "No PLC and no program anywhere"
+  ],
+  "hints": [
+    "Put START in parallel with a NO contact of the relay, then STOP in series with both",
+    "The relay coil is A1/A2; its NO contacts are 13-14 and 23-24",
+    "Feed the lamp from the second contact so the coil and the lamp circuits stay separate"
+  ],
+  "project": {
+    "formatVersion": 1,
+    "components": [
+      {
+        "id": "ps",
+        "kind": "supply",
+        "x": 20,
+        "y": 20,
+        "pressed": false
+      },
+      {
+        "id": "start",
+        "kind": "start",
+        "x": 220,
+        "y": 20,
+        "pressed": false
+      },
+      {
+        "id": "stop",
+        "kind": "stop",
+        "x": 420,
+        "y": 20,
+        "pressed": false
+      },
+      {
+        "id": "k",
+        "kind": "relay",
+        "x": 620,
+        "y": 20,
+        "pressed": false
+      },
+      {
+        "id": "lamp",
+        "kind": "lamp",
+        "x": 820,
+        "y": 20,
+        "pressed": false
+      }
+    ],
+    "wires": [],
+    "program": {
+      "id": "sandbox-program",
+      "version": "1.0",
+      "rungs": [
+        {
+          "id": "rung-1",
+          "elements": [
+            {
+              "type": "contact",
+              "tag": "Start"
+            }
+          ],
+          "coil": "Run"
+        }
+      ]
+    },
+    "language": "ladder",
+    "stSource": "VAR_INPUT\n  Start : BOOL;\n  StopOK : BOOL;\nEND_VAR\nVAR_OUTPUT\n  Run : BOOL;\nEND_VAR\nRun := StopOK AND (Start OR Run);"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "kind": "efo-scene-package",
+  "formatVersion": 1,
+  "title": "A one-second delay in Structured Text",
+  "description": "Wire a 16/16 PLC, a pushbutton and a lamp, then use a TON timer in Structured Text so the lamp lights one second after the button is pressed and drops out when it is released.",
+  "level": "intermediate",
+  "objectives": [
+    "Wire the button to an input and the lamp to an output of the PLC",
+    "Name the tags in the I/O panel and write the program",
+    "The lamp is still off at 0.5 s, on after 1.5 s, off again after release"
+  ],
+  "hints": [
+    "Declare the timer in VAR: tm : TON;",
+    "Call it every scan: tm(IN := Go, PT := T#1s); then Lamp := tm.Q;",
+    "Remember the PLC needs its own 24 V on L+ and M"
+  ],
+  "project": {
+    "formatVersion": 1,
+    "components": [
+      {
+        "id": "ps",
+        "kind": "supply",
+        "x": 20,
+        "y": 20,
+        "pressed": false
+      },
+      {
+        "id": "p",
+        "kind": "plc16",
+        "x": 220,
+        "y": 20,
+        "pressed": false
+      },
+      {
+        "id": "go",
+        "kind": "start",
+        "x": 520,
+        "y": 20,
+        "pressed": false
+      },
+      {
+        "id": "lamp",
+        "kind": "lamp",
+        "x": 720,
+        "y": 20,
+        "pressed": false
+      }
+    ],
+    "wires": [],
+    "program": {
+      "id": "sandbox-program",
+      "version": "1.0",
+      "rungs": [
+        {
+          "id": "rung-1",
+          "elements": [
+            {
+              "type": "contact",
+              "tag": "In0"
+            }
+          ],
+          "coil": "Out0"
+        }
+      ]
+    },
+    "language": "ladder",
+    "stSource": "VAR_INPUT\n  In0 : BOOL;\nEND_VAR\nVAR_OUTPUT\n  Out0 : BOOL;\nEND_VAR\nOut0 := In0;"
+  }
+}

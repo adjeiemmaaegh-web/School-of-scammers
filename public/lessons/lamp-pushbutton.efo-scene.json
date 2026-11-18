@@ -1,0 +1,61 @@
+{
+  "kind": "efo-scene-package",
+  "formatVersion": 1,
+  "title": "A lamp on a pushbutton",
+  "description": "Wire a 24 V supply, a START pushbutton and a lamp so the lamp lights only while the button is held.",
+  "level": "beginner",
+  "objectives": [
+    "Connect the supply to the button and the button to the lamp",
+    "Return the lamp to the supply common",
+    "The lamp is off at rest, on while pressed, off again when released"
+  ],
+  "hints": [
+    "A lamp is a load: current needs a path from P24 through it to M0",
+    "Use the multimeter across the lamp terminals to see where voltage is missing"
+  ],
+  "project": {
+    "formatVersion": 1,
+    "components": [
+      {
+        "id": "ps",
+        "kind": "supply",
+        "x": 20,
+        "y": 20,
+        "pressed": false
+      },
+      {
+        "id": "go",
+        "kind": "start",
+        "x": 260,
+        "y": 20,
+        "pressed": false
+      },
+      {
+        "id": "lamp",
+        "kind": "lamp",
+        "x": 500,
+        "y": 20,
+        "pressed": false
+      }
+    ],
+    "wires": [],
+    "program": {
+      "id": "sandbox-program",
+      "version": "1.0",
+      "rungs": [
+        {
+          "id": "rung-1",
+          "elements": [
+            {
+              "type": "contact",
+              "tag": "Start"
+            }
+          ],
+          "coil": "Run"
+        }
+      ]
+    },
+    "language": "ladder",
+    "stSource": "VAR_INPUT\n  Start : BOOL;\n  StopOK : BOOL;\nEND_VAR\nVAR_OUTPUT\n  Run : BOOL;\nEND_VAR\nRun := StopOK AND (Start OR Run);"
+  }
+}
