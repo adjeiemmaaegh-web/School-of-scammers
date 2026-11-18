@@ -9,6 +9,7 @@ Versioning policy: `package.json` version is the app/build version (0.x until th
 - R3: golden tick tests, device contract, four tick phases extracted (`src/sim/phases/`).
 - R4: Structured Text function blocks (TON, TOF, TP, CTU, CTD, R_TRIG, F_TRIG) and `T#` literals; Ladder limit 32 rungs / 48 tags.
 - R6/R8/R9/R10: generated device catalogue, hidden-fault export redaction, commissioning report export, suggested course path, contributor guide.
+- R9.3-R9.5: guided lessons with a generic outcome grader. R8.4: acceptance checklist. R10.2: scene authoring details. R6.2: alignment/distribution. R11.1: hostile-input fuzz.
 - R6.2 (part): Top/Front/Side camera presets.
 - R8.1: diagnostics overview.
 - R5.5: meter continuity mode.

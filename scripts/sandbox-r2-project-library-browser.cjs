@@ -172,6 +172,24 @@ const GL = ['--no-sandbox', '--disable-setuid-sandbox', '--enable-webgl', '--use
     void input;
     await closeDialog(page);
     console.log('G2. scene package imported as data only; a package with a script field is refused');
+    // R10.2 authoring: details typed in the dialog end up in the exported scene package, which re-imports cleanly.
+    await openDialog(page);
+    await page.waitForSelector('[data-scene-details]');
+    await page.type('[data-scene-objectives]', 'Light the lamp\nStop it safely');
+    await page.type('[data-scene-hints]', 'Check the common');
+    await page.select('[data-scene-level]', 'intermediate');
+    await page.evaluate(() => {
+      window.__exported = null;
+      const original = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = blob => { if (blob.type === 'application/json') blob.text().then(t => { window.__exported = t; }); return original(blob); };
+      document.querySelector('[data-library-item][data-library-active="true"] [data-library-export-package]').click();
+    });
+    await page.waitForFunction(() => !!window.__exported, { timeout: 8000 });
+    const exported = JSON.parse(await page.evaluate(() => window.__exported));
+    assert.equal(exported.kind, 'efo-scene-package'); assert.deepEqual(exported.objectives, ['Light the lamp', 'Stop it safely']);
+    assert.deepEqual(exported.hints, ['Check the common']); assert.equal(exported.level, 'intermediate');
+    assert.ok(!('script' in exported));
+    console.log('G3. authored objectives, hints and level exported in a data-only package');
     await page.close();
 
     /* H. IndexedDB unavailable: say so, keep working copy autosave */

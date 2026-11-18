@@ -134,3 +134,8 @@
 .ux6-fat li[data-fat-status="fail"] {color:#ff8a65}
 .ux6-fat-mark {width:14px;text-align:center}
 .ux6-fat-note {display:block;width:100%;margin-top:2px;padding:3px 6px;font-size:11px;box-sizing:border-box}
+
+.ux6-lib-details {margin-top:10px;display:grid;gap:6px}
+.ux6-lib-details h3 {font-size:13px;margin:0}
+.ux6-lib-details label {display:grid;gap:2px;font-size:11px;color:var(--muted)}
+.ux6-lib-details textarea,.ux6-lib-details select {font-size:12px;padding:4px 6px;box-sizing:border-box;width:100%}
