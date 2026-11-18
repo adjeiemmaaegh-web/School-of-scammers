@@ -6,14 +6,9 @@ import { LogicalWiringCanvas } from '../ui/sandbox/LogicalWiringCanvas';
 import { WorkspaceAuthoringBar } from '../ui/sandbox/WorkspaceAuthoringBar';
 import { WorkspaceSelectionPanel } from '../ui/sandbox/WorkspaceSelectionPanel';
 import { AssemblyLibrary } from '../ui/sandbox/AssemblyLibrary';
-import { ProjectLibraryPanel } from '../ui/sandbox/ProjectLibraryPanel';
 import { DiagnosticsOverview } from '../ui/sandbox/DiagnosticsOverview';
-import { LessonPanel } from '../ui/sandbox/LessonPanel';
-import { FatChecklist } from '../ui/sandbox/FatChecklist';
 import { useProjectLibrary } from './useProjectLibrary';
 import { redactHiddenFaults } from '../sim/redact';
-import { commissioningReportHtml } from '../diagnostics/commissioning-report';
-import { evaluateFat, normaliseManual } from '../diagnostics/fat-checklist';
 import { EquipmentThumbnail } from '../ui/sandbox/EquipmentThumbnail';
 import { makeFragment } from '../workspace/clipboard';
 import { recordChange, emptyHistory, undoHistory, redoHistory } from '../workspace/history';
@@ -47,6 +42,10 @@ import './ux2-command-layout.css';
 import './ux4-canvas-focus.css';
 import './ux6-workbench.css';
 
+// Loaded on demand so opening the simulator does not download the project dialog, lessons, checklist or report builder.
+const ProjectLibraryPanel = lazy(() => import('../ui/sandbox/ProjectLibraryPanel').then(m => ({ default: m.ProjectLibraryPanel })));
+const LessonPanel = lazy(() => import('../ui/sandbox/LessonPanel').then(m => ({ default: m.LessonPanel })));
+const FatChecklist = lazy(() => import('../ui/sandbox/FatChecklist').then(m => ({ default: m.FatChecklist })));
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
 const UX2_LAYOUT_KEY = 'efo-ux2-layout-v1';
@@ -453,9 +452,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     link.href = url; link.download = 'efo-sandbox-project.json'; link.click();
     URL.revokeObjectURL(url);
   };
-  const exportReport = () => {
+  const exportReport = async () => {
     if (!project || !snapshot) return;
     try {
+      const [{ commissioningReportHtml }, { evaluateFat, normaliseManual }] = await Promise.all([
+        import('../diagnostics/commissioning-report'), import('../diagnostics/fat-checklist')]);
       let manual = {}; try { manual = JSON.parse(localStorage.getItem(`efo-fat-v1:${library.active?.id ?? 'working-copy'}`) ?? 'null') ?? {}; } catch { /* no saved notes */ }
       const checklist = evaluateFat(project, snapshot, normaliseManual(manual));
       const html = commissioningReportHtml({ title: library.active?.title ?? 'Sandbox project', project, snapshot, events, generatedAt: new Date().toISOString(), checklist });
@@ -845,10 +846,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       </div>}
       {!scenario && (library.status === 'unavailable' || library.status === 'failed') && library.message &&
         <div role="status" className="sandbox-alert ux6-lib-banner" data-library-unavailable>{library.message}</div>}
-      {!scenario && libraryOpen && library.lib && <ProjectLibraryPanel lib={library.lib} active={library.active} status={library.status}
+      {!scenario && libraryOpen && library.lib && <Suspense fallback={<div role="status" className="sandbox-help">Loading the project library…</div>}><ProjectLibraryPanel lib={library.lib} active={library.active} status={library.status}
         editable={editable} onOpen={library.openProject} onNew={library.newProject} onChanged={()=>void library.refreshActive()}
         onSaveVersion={library.saveVersion} onRestoreVersion={library.restoreVersion}
-        onClose={()=>setLibraryOpen(false)} onNotice={setClientError} />}
+        onClose={()=>setLibraryOpen(false)} onNotice={setClientError} /></Suspense>}
       {(clientError || snapshot?.lastError) && <div role="alert" className="sandbox-alert">{clientError || snapshot?.lastError}</div>}
       {scenario && <ScenarioPanel session={scenario} project={project} evidence={evidence} result={result}
         onSubmit={submitScenario} onRestart={restartScenario} />}
@@ -1278,8 +1279,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         </div>
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
           {project && snapshot && <DiagnosticsOverview project={project} snapshot={snapshot} />}
-          {!scenario && project && snapshot && <FatChecklist project={project} snapshot={snapshot} projectKey={library.active?.id ?? 'working-copy'} />}
-          {!scenario && project && <LessonPanel project={project} editable={editable} canStart={!!library.lib} onStart={library.createFrom} />}
+          <Suspense fallback={null}>
+            {!scenario && project && snapshot && <FatChecklist project={project} snapshot={snapshot} projectKey={library.active?.id ?? 'working-copy'} />}
+            {!scenario && project && <LessonPanel project={project} editable={editable} canStart={!!library.lib} onStart={library.createFrom} />}
+          </Suspense>
           <span id="diag-monitor" />
           {snapshot && <LiveMonitor snapshot={snapshot} project={project}
             onBreakpoint={scan => send([{ k: 'breakAtScan', scan }])}
