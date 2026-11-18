@@ -9,9 +9,11 @@ import { AssemblyLibrary } from '../ui/sandbox/AssemblyLibrary';
 import { ProjectLibraryPanel } from '../ui/sandbox/ProjectLibraryPanel';
 import { DiagnosticsOverview } from '../ui/sandbox/DiagnosticsOverview';
 import { LessonPanel } from '../ui/sandbox/LessonPanel';
+import { FatChecklist } from '../ui/sandbox/FatChecklist';
 import { useProjectLibrary } from './useProjectLibrary';
 import { redactHiddenFaults } from '../sim/redact';
 import { commissioningReportHtml } from '../diagnostics/commissioning-report';
+import { evaluateFat, normaliseManual } from '../diagnostics/fat-checklist';
 import { EquipmentThumbnail } from '../ui/sandbox/EquipmentThumbnail';
 import { makeFragment } from '../workspace/clipboard';
 import { recordChange, emptyHistory, undoHistory, redoHistory } from '../workspace/history';
@@ -454,7 +456,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const exportReport = () => {
     if (!project || !snapshot) return;
     try {
-      const html = commissioningReportHtml({ title: library.active?.title ?? 'Sandbox project', project, snapshot, events, generatedAt: new Date().toISOString() });
+      let manual = {}; try { manual = JSON.parse(localStorage.getItem(`efo-fat-v1:${library.active?.id ?? 'working-copy'}`) ?? 'null') ?? {}; } catch { /* no saved notes */ }
+      const checklist = evaluateFat(project, snapshot, normaliseManual(manual));
+      const html = commissioningReportHtml({ title: library.active?.title ?? 'Sandbox project', project, snapshot, events, generatedAt: new Date().toISOString(), checklist });
       const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
       const link = document.createElement('a');
       link.href = url; link.download = 'efo-commissioning-report.html'; link.click();
@@ -1273,6 +1277,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         </div>
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
           {project && snapshot && <DiagnosticsOverview project={project} snapshot={snapshot} />}
+          {!scenario && project && snapshot && <FatChecklist project={project} snapshot={snapshot} projectKey={library.active?.id ?? 'working-copy'} />}
           {!scenario && project && <LessonPanel project={project} editable={editable} canStart={!!library.lib} onStart={library.createFrom} />}
           <span id="diag-monitor" />
           {snapshot && <LiveMonitor snapshot={snapshot} project={project}

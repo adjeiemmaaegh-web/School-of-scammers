@@ -125,3 +125,12 @@
 .ux6-lesson-actions {display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .ux6-lesson-result {border-top:1px solid var(--line);padding-top:6px;font-size:12px}
 .ux6-lesson-result li[data-lesson-check-result="fail"] {color:#ff8a65}
+
+/* Acceptance checklist (R8.4) */
+.ux6-fat {border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:10px}
+.ux6-fat h4 {margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.ux6-fat ul {list-style:none;margin:4px 0;padding:0;display:grid;gap:4px;font-size:12px}
+.ux6-fat li {display:flex;gap:6px;align-items:flex-start}
+.ux6-fat li[data-fat-status="fail"] {color:#ff8a65}
+.ux6-fat-mark {width:14px;text-align:center}
+.ux6-fat-note {display:block;width:100%;margin-top:2px;padding:3px 6px;font-size:11px;box-sizing:border-box}

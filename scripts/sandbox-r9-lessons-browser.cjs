@@ -53,6 +53,18 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     assert.match(await page.$eval('[data-lesson-result]', e => e.textContent), /should be OFF/);
     console.log('Wrong build rejected with the failing expectation named');
 
+    // Acceptance checklist (R8.4): automatic items from the snapshot, manual observations persist across a reload.
+    await page.waitForSelector('[data-fat-checklist]');
+    assert.equal(await page.$eval('[data-fat-item="all-wired"]', e => e.getAttribute('data-fat-status')), 'pass');
+    await page.evaluate(() => document.querySelector('[data-fat-manual="trial-run"]').click());
+    await page.waitForFunction(() => document.querySelector('[data-fat-item="trial-run"]').getAttribute('data-fat-status') === 'pass');
+    await sleep(300);
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.evaluate(() => document.querySelector('[data-p5-dock-tab="diagnostics"]')?.click());
+    await page.waitForSelector('[data-fat-checklist]');
+    await page.waitForFunction(() => document.querySelector('[data-fat-item="trial-run"]')?.getAttribute('data-fat-status') === 'pass', { timeout: 10000 });
+    console.log('Checklist: automatic items from the snapshot, manual observation persisted across reload');
+
     // Learn page: lessons listed with downloadable starters that exist.
     await page.goto(base + '/learn', { waitUntil: 'networkidle0' });
     await page.waitForSelector('[data-learn-lessons]');
