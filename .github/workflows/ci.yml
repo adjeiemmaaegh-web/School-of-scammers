@@ -181,17 +181,17 @@ jobs:
       - name: Install Firefox and Linux WebKit for browser acceptance
         # The apt/CDN download occasionally hangs for the whole job timeout (seen twice on 2026-11-18): bound each attempt
         # and retry, so an infrastructure stall costs minutes instead of 40 and still fails loudly if it never succeeds.
-        timeout-minutes: 15
+        timeout-minutes: 35
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.64.1
           ok=0
-          for attempt in 1 2 3 4; do
+          for attempt in 1 2 3; do
             # Hosted runners run apt in the background on first boot; wait (bounded) for its dpkg lock instead of failing on it.
-            for _ in $(seq 1 24); do
+            for _ in $(seq 1 60); do
               sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1 || break
               sleep 10
             done
-            if timeout 240 npx playwright install --with-deps firefox webkit; then ok=1; break; fi
+            if timeout 480 npx playwright install --with-deps firefox webkit; then ok=1; break; fi
             echo "playwright install attempt $attempt failed or timed out"; sleep 10
           done
           test "$ok" = 1
