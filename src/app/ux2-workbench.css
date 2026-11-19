@@ -847,6 +847,16 @@
    Keep the natural page scrolling at short heights while giving the library
    an explicit bounded, sticky, internally scrollable area. */
 @media (min-width:768px) and (max-height:719px) {
+  /* The legacy authoring strip sticks at ~152px on 920px+ screens, even
+     below UX2's 720px height breakpoint. While page-scrolling to the library,
+     that strip overlays its tab row and intercepts clicks as Undo. Let the
+     authoring strip scroll naturally at short heights instead. */
+  .sandbox-ux.efo-ux2-shell .workspace-editing-strip {
+    position:static;
+    top:auto;
+    z-index:auto;
+    box-shadow:none;
+  }
   .efo-ux2-shell .sandbox-palette {
     height:clamp(360px,calc(100dvh - 110px),620px);
     max-height:none;
