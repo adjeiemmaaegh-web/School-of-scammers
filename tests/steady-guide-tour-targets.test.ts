@@ -5,7 +5,7 @@ describe('Steady Guide target allowlist',()=>{
   expect(GUIDE_TARGETS.length).toBe(8);
   expect(new Set(GUIDE_TARGETS.map(t=>t.id)).size).toBe(8);
   for(const t of GUIDE_TARGETS){
-   expect(t.selector.startsWith('.'||'[')).toBe(true);
+   expect(t.selector.startsWith('.')||t.selector.startsWith('[')).toBe(true);
    expect(t.selector).not.toMatch(/:has\(|:contains\(/);
    expect(t.title.length).toBeGreaterThan(3);
    expect(t.description.length).toBeGreaterThan(12);

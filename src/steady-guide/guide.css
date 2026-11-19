@@ -114,3 +114,11 @@
 .sg-hero {padding:18px}
 }
 @media (prefers-reduced-motion:reduce) {.sg-page * {scroll-behavior:auto!important;transition-duration:0s!important}}
+
+/* Screenshot reading key keeps explanations available on small screens and for assistive technology. */
+.sg-image-key {margin:0 13px 13px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+.sg-image-key summary {font-weight:750;font-size:13px;cursor:pointer}
+.sg-image-key ol {padding-left:19px;margin:11px 0;display:grid;gap:7px}
+.sg-image-key li {font-size:12.5px;color:var(--muted);line-height:1.5}
+.sg-image-key strong {color:var(--ink)}
+.sg-image-key>a {font-size:12.5px;color:var(--accent-text);font-weight:700}
