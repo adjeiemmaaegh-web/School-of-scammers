@@ -118,6 +118,58 @@ const viewports=[
       console.log('UX2 GEOMETRY',viewport.name,JSON.stringify(measurements));
       await page.screenshot({path:'qa-artifacts/ux2-stage1/'+viewport.name+'.png'});
     }
+    // UX8: the registered equipment grid must be scrollable even after opening
+    // the full assembly editor. Exercise real wheel input, not only CSS flags.
+    for(const vp of [{width:1366,height:768},{width:1280,height:720},
+                     {width:1024,height:768},{width:1920,height:1080}]) {
+      await page.setViewport({...vp,deviceScaleFactor:1});
+      await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:30000});
+      await page.waitForSelector('[data-library-tab-trigger="components"]');
+      const dimensions=await page.evaluate(()=>{
+        const list=document.querySelector('.sandbox-palette-list');
+        const rect=list.getBoundingClientRect();
+        return {x:rect.x+rect.width/2,y:rect.y+rect.height/2,
+          listHeight:list.clientHeight,listContent:list.scrollHeight,
+          count:list.querySelectorAll('.sandbox-palette-item').length,
+          active:document.querySelector('[data-library-tab-trigger="components"]').getAttribute('aria-selected'),
+          listOverflow:getComputedStyle(list).overflowY};
+      });
+      assert.ok(dimensions.count>=54,'UX8 equipment registry missing '+JSON.stringify(vp));
+      assert.equal(dimensions.active,'true');
+      assert.equal(dimensions.listOverflow,'auto');
+      assert.ok(dimensions.listHeight>=120,
+        'UX8 device viewport must not collapse: '+JSON.stringify({vp,dimensions}));
+      assert.ok(dimensions.listContent>dimensions.listHeight);
+      await page.mouse.move(dimensions.x,dimensions.y);
+      await page.mouse.wheel({deltaY:260});
+      await page.waitForFunction(()=>document.querySelector('.sandbox-palette-list').scrollTop>0);
+      const prior=await page.$eval('.sandbox-palette-list',el=>el.scrollTop);
+      assert.ok(prior>0,'UX8 mouse wheel must move the equipment list');
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollTop),0,
+        'UX8 wheel must not scroll the outer page');
+      await page.click('[data-library-tab-trigger="assemblies"]');
+      await page.$eval('[data-p7-assembly-library]',el=>{el.open=true;});
+      const assembly=await page.evaluate(()=>{
+        const panel=document.querySelector('[data-library-assemblies]');
+        const components=document.querySelector('[data-library-components]');
+        return {selected:document.querySelector('[data-library-tab-trigger="assemblies"]').getAttribute('aria-selected'),
+          shown:!panel.hidden,componentsHidden:components.hidden,
+          height:panel.getBoundingClientRect().height,
+          expanded:panel.querySelector('details').open};
+      });
+      assert.equal(assembly.selected,'true');
+      assert.ok(assembly.shown&&assembly.componentsHidden&&assembly.expanded);
+      assert.ok(assembly.height>=120,
+        'UX8 Assemblies must have its own usable viewport: '+JSON.stringify({vp,assembly}));
+      await page.click('[data-library-tab-trigger="components"]');
+      await page.waitForFunction(previous=>document.querySelector('.sandbox-palette-list').scrollTop>=previous-3,
+        {timeout:3000},prior);
+      assert.equal(await page.evaluate(()=>document.querySelector('[data-library-components]').hidden),false);
+      assert.equal(await page.evaluate(()=>document.querySelector('[data-library-assemblies]').hidden),true);
+      assert.ok(await page.$eval('.sandbox-palette-list',el=>el.clientHeight)>=120,
+        'UX8 expanded-but-hidden Assemblies must not shrink the equipment list');
+      console.log('UX8 LIBRARY TABS PASS',JSON.stringify(vp));
+    }
     await page.setViewport({width:1366,height:768,deviceScaleFactor:1});
     await page.goto(base+'/sandbox',{waitUntil:'networkidle0'});
     await page.waitForSelector('.ux2-equipment-tile');
