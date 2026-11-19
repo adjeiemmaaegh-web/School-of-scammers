@@ -820,12 +820,17 @@ export function Sandbox3D(props: Sandbox3DProps) {
         }}>
         Fit all
       </button>
+      <details className="sandbox-3d-presets" data-3d-presets>
+        <summary title="Orthogonal camera views (camera only)">Views</summary>
+        <div className="sandbox-3d-presets-pop">
       {(['top','front','side'] as const).map(name=><button key={name} type="button" data-3d-view-preset={name}
         disabled={!available} title={`${name[0].toUpperCase()+name.slice(1)} view of the selection or the whole plant (camera only)`}
         onClick={()=>{
          if(operatorEnabled){props.onTrainingOperator(false,null);setOperatorEnabled(false);}
          setCameraMode('orbit');setViewPreset(v=>({name,n:v.n+1}));
         }}>{name[0].toUpperCase()+name.slice(1)}</button>)}
+        </div>
+      </details>
       <button type="button" data-3d-fit-selected
         disabled={!available||!(props.selectedDeviceIds?.length)}
         title="Focus the 3D camera on selected machine(s)"

@@ -38,6 +38,7 @@ import './ux2-workbench.css';
 import './ux2-command-layout.css';
 import './ux4-canvas-focus.css';
 import './ux6-workbench.css';
+import './ux7-reference-layout.css';
 
 // Loaded on demand so opening the simulator does not download the project dialog, lessons, checklist or report builder.
 const ProjectLibraryPanel = lazy(() => import('../ui/sandbox/ProjectLibraryPanel').then(m => ({ default: m.ProjectLibraryPanel })));
@@ -47,7 +48,9 @@ const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ def
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
 const UX2_LAYOUT_KEY = 'efo-ux2-layout-v1';
 type UiPanelSizes = {library:number;inspector:number;dock:number};
-const defaultPanelSizes:UiPanelSizes = {library:228,inspector:238,dock:205};
+// Wide desktop windows get the roomier three-column library of the reference layout (ux7-reference-layout.css).
+const WIDE_WINDOW = typeof window !== 'undefined' && window.innerWidth >= 1500;
+const defaultPanelSizes:UiPanelSizes = {library:WIDE_WINDOW?330:228,inspector:238,dock:205};
 type UiPanelVisible = {library:boolean;inspector:boolean;dock:boolean};
 const defaultPanelVisible:UiPanelVisible = {library:true,inspector:false,dock:false};
 /** Panel visibility is a view preference stored beside the panel sizes, never in the project. Bad values fall back to defaults. */
@@ -69,7 +72,7 @@ const initialPanelSizes = ():UiPanelSizes => {
     const stored=JSON.parse(window.localStorage.getItem(UX2_LAYOUT_KEY)??'null') as Partial<UiPanelSizes>|null;
     if(!stored||typeof stored!=='object')return defaultPanelSizes;
     return {
-      library:panelSize(stored.library,228,160,320),
+      library:panelSize(stored.library,defaultPanelSizes.library,160,360),
       inspector:panelSize(stored.inspector,238,190,350),
       dock:panelSize(stored.dock,205,125,390),
     };
@@ -721,7 +724,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <button type="button" onClick={()=>{setDockFocus('program');setDockExpanded(true);}}>Open PLC programming</button>
           {!scenario&&<div className="ux2-panel-settings" role="group" aria-label="Resize workbench panels">
             <label>Component library width <output>{panelSizes.library}px</output>
-              <input type="range" min="160" max="320" step="10" data-ux2-resize="library"
+              <input type="range" min="160" max="360" step="10" data-ux2-resize="library"
                 value={panelSizes.library} onChange={e=>setPanelSizes(v=>({...v,library:Number(e.target.value)}))}/>
             </label>
             <label>Inspector width <output>{panelSizes.inspector}px</output>
@@ -805,6 +808,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onRotate={rotateSelection} onNudge={moveSelection}/>
       </div>}
       <div className="p5-view-tools" role="toolbar" aria-label="Canvas views and active tools">
+        <div className="p5-view-row">
         <div className="p5-view-tabs" role="group" aria-label="Project view">
           <button type="button" data-p5-view="logical" aria-pressed={workspaceView==='logical'}
             onClick={()=>setWorkspaceView('logical')}>Logical / Wiring</button>
@@ -825,6 +829,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             Measure / diagnose</button>
           <span className="ux6-tool-chip" data-ux6-active-tool={activeTool} role="status" aria-live="polite"
             title={activeTool==='run'?lockedHint:'Shortcuts: V select, T wire, I measure, Esc cancel'}>Tool: {toolLabel}</span>
+        </div>
         </div>
         <div className="p5-panel-toggles" role="group" aria-label="Workspace panels">
           <button type="button" aria-pressed={libraryExpanded}

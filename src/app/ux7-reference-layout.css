@@ -1,0 +1,91 @@
+/*
+ * UX7: reference workbench layout for wide desktop windows (>= 1500 x 800). Geometry only: every control, command and
+ * data attribute is unchanged. Smaller windows keep the compact layouts that the responsive browser tests cover.
+ *  - full-width header
+ *  - row 3 holds the Library/Inspector/Dock toggles (left) and one compact selection toolbar (right)
+ *  - secondary tools (Align, nudge arrows, camera Views) live in small menus so each row stays on one line
+ *  - wider component library with a three-column equipment grid
+ */
+.app-header:has(+ main.efo-ux2-shell) .app-header-inner { max-width:none; padding-inline:24px; }
+
+.p5-view-row { display:contents; }
+.workspace-more, .sandbox-3d-presets { position:relative; }
+.workspace-more > summary, .sandbox-3d-presets > summary {
+  list-style:none; cursor:pointer; user-select:none; white-space:nowrap;
+  border:1px solid var(--line); border-radius:6px; background:var(--surface-2); color:var(--ink);
+  font:600 11px var(--body); padding:4px 8px;
+}
+.workspace-more > summary::-webkit-details-marker, .sandbox-3d-presets > summary::-webkit-details-marker { display:none; }
+.workspace-more > summary::after, .sandbox-3d-presets > summary::after { content:" \25BE"; }
+.workspace-more[open] > summary, .sandbox-3d-presets[open] > summary { border-color:var(--accent); }
+.workspace-more-pop, .sandbox-3d-presets-pop {
+  position:absolute; z-index:30; top:calc(100% + 4px); right:0; min-width:150px;
+  display:flex; flex-direction:column; align-items:stretch; gap:6px; padding:8px;
+  background:var(--surface); border:1px solid var(--line); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+.sandbox-3d-presets-pop { left:0; right:auto; flex-direction:row; min-width:0; }
+.workspace-more-pop .workspace-nudges { display:flex; gap:4px; }
+.workspace-more-pop .workspace-nudges button { flex:1; }
+.workspace-more-pop .workspace-grid-label { display:flex; flex-direction:column; gap:3px; }
+
+@media (min-width:1500px) and (min-height:800px) {
+    .efo-ux2-shell .ux2-command-stack {
+    grid-template-areas:
+      "workflow toolbar toolbar"
+      "views views views"
+      "toggles authoring authoring"
+      "assembly assembly assembly";
+  }
+  /* The view/tool row and the panel toggles become separate grid rows (the wrapper only provided the shared chrome). */
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools { display:contents; }
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools > .p5-view-row {
+    grid-area:views; display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px;
+    padding:3px 8px; min-height:31px; box-sizing:border-box;
+    background:var(--surface-2); border:1px solid var(--line); border-radius:6px;
+  }
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools .p5-view-tabs,
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools .p5-tool-actions { display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools > .p5-panel-toggles {
+    grid-area:toggles; margin:0; align-self:center; justify-self:start; display:flex; gap:4px;
+  }
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools button {
+    font-size:11.5px; padding:5px 9px; white-space:nowrap;
+    border:1px solid transparent; border-radius:6px; background:transparent; color:var(--ink); cursor:pointer;
+  }
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools button[aria-pressed="true"] {
+    background:var(--surface); border-color:var(--accent); box-shadow:inset 0 -2px var(--accent);
+  }
+  .efo-ux2-shell .ux2-command-stack > .p5-view-tools > .p5-panel-toggles button { border-color:var(--line); }
+
+  .efo-ux2-shell .ux2-command-stack > .workspace-editing-strip {
+    grid-area:authoring; justify-self:end; width:auto; max-width:100%;
+    height:auto; max-height:none; overflow:visible; border:0; background:transparent; padding:0;
+  }
+  .efo-ux2-shell .ux2-command-stack .workspace-authoring-bar {
+    flex-wrap:nowrap; min-width:0; gap:4px; justify-content:flex-end;
+  }
+  .efo-ux2-shell .workspace-authoring-bar .workspace-grid-label { display:flex; align-items:center; gap:4px; }
+
+  /* Component library: compact heading, one filter row, three-column equipment grid. */
+  .efo-ux2-shell .sandbox-palette { padding:10px; }
+  .efo-ux2-shell .sandbox-palette .sandbox-rail-heading { align-items:center; text-align:center; margin-bottom:8px; }
+  .efo-ux2-shell .sandbox-palette .sandbox-rail-heading .eyebrow { display:none; }
+  .efo-ux2-shell .sandbox-palette .sandbox-rail-heading h2 { font-size:16px; margin:0; }
+  .efo-ux2-shell .sandbox-library-search span,
+  .efo-ux2-shell .sandbox-library-help {
+    position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;
+  }
+  .efo-ux2-shell .sandbox-library-search { margin-bottom:8px; }
+  .efo-ux2-shell .p5-device-families { flex-wrap:wrap; gap:5px; margin-bottom:8px; }
+  .efo-ux2-shell .p5-device-families button { white-space:nowrap; }
+  .efo-ux2-shell .p5-organized .sandbox-palette-list,
+  .efo-ux2-shell .sandbox-palette .sandbox-palette-list { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+  .efo-ux2-shell .sandbox-palette .ux2-equipment-tile {
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start; text-align:center;
+    gap:3px; min-height:98px; padding:6px 4px; position:relative;
+  }
+  .efo-ux2-shell .sandbox-palette .ux2-equipment-tile small { display:none; }
+  .efo-ux2-shell .sandbox-palette .ux2-equipment-tile .ux2-add-device { position:absolute; top:3px; right:5px; }
+  .efo-ux2-shell .sandbox-palette .ux2-equipment-name { text-align:center; }
+  .efo-ux2-shell .sandbox-palette .ux2-equipment-name strong { font-size:11px; line-height:1.2; }
+}
