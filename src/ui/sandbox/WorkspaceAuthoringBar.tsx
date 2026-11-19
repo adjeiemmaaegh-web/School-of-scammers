@@ -38,6 +38,15 @@ export function WorkspaceAuthoringBar(props: Props) {
       onClick={() => props.onRotate(1)} title="Rotate supported equipment right by 90° (orientation-locked machines stay fixed)">↷ 90°</button>
     <button type="button" className="btn ghost small" data-delete-selection disabled={!selected}
       onClick={props.onRemove} title="Delete selected devices, dependent wires and faults">Delete</button>
+    <label className="workspace-grid-label">Snap
+      <select aria-label="Workspace snap grid size" value={props.grid}
+        onChange={e => props.onGrid(Number(e.target.value) as GridStep)}>
+        {GRID_STEPS.map(step => <option key={step} value={step}>{step} unit{step > 1 ? 's' : ''}</option>)}
+      </select>
+    </label>
+    <details className="workspace-more" data-workspace-more>
+      <summary title="Align, distribute and nudge the selection">Move</summary>
+      <div className="workspace-more-pop">
     {props.onAlign && <label className="workspace-grid-label">Align
       <select aria-label="Align or distribute the selection" data-align value="" disabled={!props.editable || props.selectedCount < 2}
         title={props.selectedCount < 2 ? 'Select two or more devices' : 'Aligns device origins; distribute needs three'}
@@ -46,17 +55,13 @@ export function WorkspaceAuthoringBar(props: Props) {
         {ALIGN_MODES.map(m => <option key={m} value={m} disabled={m.startsWith('distribute') && props.selectedCount < 3}>{m.replace('-', ' ')}</option>)}
       </select>
     </label>}
-    <label className="workspace-grid-label">Snap
-      <select aria-label="Workspace snap grid size" value={props.grid}
-        onChange={e => props.onGrid(Number(e.target.value) as GridStep)}>
-        {GRID_STEPS.map(step => <option key={step} value={step}>{step} unit{step > 1 ? 's' : ''}</option>)}
-      </select>
-    </label>
     <div className="workspace-nudges" role="group" aria-label="Move selected equipment one grid step">
       <button type="button" disabled={!selected} onClick={() => props.onNudge(-props.grid, 0)} aria-label="Move selection left">←</button>
       <button type="button" disabled={!selected} onClick={() => props.onNudge(0, -props.grid)} aria-label="Move selection up">↑</button>
       <button type="button" disabled={!selected} onClick={() => props.onNudge(0, props.grid)} aria-label="Move selection down">↓</button>
       <button type="button" disabled={!selected} onClick={() => props.onNudge(props.grid, 0)} aria-label="Move selection right">→</button>
     </div>
+      </div>
+    </details>
   </div>;
 }
