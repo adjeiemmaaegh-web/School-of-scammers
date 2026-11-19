@@ -237,6 +237,9 @@ const viewports=[
           pointerEvents:getComputedStyle(tab).pointerEvents};
       });
       console.log('UX9 TAB HIT',JSON.stringify({vp,pointerDebug}));
+      assert.ok(pointerDebug.hitTab,
+        'UX9 tab must receive real pointer events, not an overlaid sticky toolbar: '+
+        JSON.stringify({vp,pointerDebug}));
       await page.mouse.click(tabPoint.x,tabPoint.y);
       const switchDebug=await page.evaluate(()=>{
         const el=document.querySelector('[data-library-assemblies]');
