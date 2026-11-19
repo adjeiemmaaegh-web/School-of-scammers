@@ -32,7 +32,7 @@ const base=process.env.PLC_BASE_URL||'http://127.0.0.1:4173';
   await go('/guide/builds/first-lamp');
   assert.equal(await page.$eval('[data-steady-build]',x=>x.getAttribute('data-steady-build')),'first-lamp');
   assert.equal(await page.$eval('[data-steady-build-parts] .sg-card',a=>a.length),3);
-    await go('/guide/scenes');
+  await go('/guide/scenes');
   assert.equal(await page.$$eval('[data-steady-scene-index] .sg-card',a=>a.length),21);
   await go('/guide/scenes/sorting-line');
   assert.match(await page.$eval('[data-steady-scene-detail] h2',x=>x.textContent),/Photoeye/i);

@@ -26,3 +26,9 @@ All user-facing screenshots must show **genuine app UI**, never invented or AI-g
 Existing files now available in public as `/steady-guide/media/r1-*.png` (5 PNGs, about 1.03 MB total). Original GitHub blob references and source metadata are in `public/steady-guide/media/manifest.json`. These screenshots are accurately identified as **R1** evidence and may become stale after later UI changes.
 
 Review viewports: 1440×940, 1366×768, 1280×720, 1024×768, 768×1024 and 390×844. Verify no screenshot contains any private project or assessment secret.
+
+## CI capture evidence and distinction (2026-11-19)
+
+An **eight-image genuine Chromium set** from draft PR #89 commit `f280fc5e` was captured on 2026-11-19 at 12:36 UTC and visually reviewed. It contains actual Home, Steady Guide, empty workbench, Logical view, Floor Plan, 768×1024 tablet, 390×844 Guide and Learn & Practice. These are **review evidence**, not final approved in-app training illustrations. The browser action also now scripts **14 capture states** on the feature branch, adding a filtered photoeye library, program dock (no PLC), diagnostics on empty project, Inspector without a selected device, and local project-library dialog. The richer SG-08/09/12 subject acceptance is **not yet met** by empty-state images. Captured state and training adequacy are different checks; final screenshots require a genuinely populated virtual project.
+
+Source CI artifact: https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44524998472/artifacts/14532642115 . This artifact is temporary; separately reviewed binary assets are still not committed to `/public` beyond the existing five authentic R1 workbench PNGs.
