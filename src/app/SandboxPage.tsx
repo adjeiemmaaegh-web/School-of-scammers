@@ -124,6 +124,13 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [libraryQuery, setLibraryQuery] = useState('');
   // Library-only UI state: never persisted into a PLC project or worker commands.
   const [libraryTab,setLibraryTab] = useState<'components'|'assemblies'>('components');
+  const componentListRef=useRef<HTMLDivElement|null>(null);
+  const componentScrollRef=useRef(0);
+  useEffect(()=>{
+    if(libraryTab==='components'&&componentListRef.current){
+      componentListRef.current.scrollTop=componentScrollRef.current;
+    }
+  },[libraryTab]);
   const [grid,setGrid] = useState<GridStep>(5);
   const [clipboard,setClipboard] = useState<WorkspaceFragment|null>(null);
   const pasteIndex=useRef(0);
@@ -905,7 +912,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>
           <p className="sandbox-library-help">Drag an available device onto the 3D floor or 2D plan,
             or click to place it. The registry determines what really works. Pause to edit.</p>
-          <div className="sandbox-palette-list">
+          <div className="sandbox-palette-list" ref={componentListRef}
+            onScroll={event=>{componentScrollRef.current=event.currentTarget.scrollTop;}}>
             {visibleKinds.map(kind => <button key={kind} draggable={editable && !primaryTouch}
               onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}
               onClick={() => place(kind)} disabled={!editable}
