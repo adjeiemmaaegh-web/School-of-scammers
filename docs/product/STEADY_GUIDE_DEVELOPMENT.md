@@ -12,8 +12,8 @@
 - Searchable atlas for all 21 original scenes using lightweight, source-checked titles/descriptions and real scene metadata; no reference solution/answer injection.
 - Existing lesson/scenario/course links reused; no duplicate grader or hidden-fault hints.
 - Local progress via dedicated, bounded `efo-steady-guide-progress-v1` key; no project, IndexedDB or assessment mutations performed by the guide.
-- Five genuine 2026-11-17/18 R1 workbench PNG screenshots (the original repository QA blobs) copied to first-party public assets; with visible source and viewport labels. **Not yet owner-approved and not recaptured at this new commit.**
-- Source-parity tests, progress parser tests and a browser smoke for navigation, screenshot load, device/scene coverage, safe project keys and mobile layout.
+- Eight screenshot-state captures are scripted as CI review artifacts (not automatically published). Five genuine 2026-11-17/18 R1 workbench PNG screenshots (the original repository QA blobs) copied to first-party public assets; with visible source and viewport labels. **Not yet owner-approved and not recaptured at this new commit.**
+- Source-parity tests, progress parser tests, authoritative first-lamp worker tests, and browser smoke for navigation, contextual drawer/Escape, screenshot load, device/scene coverage, safe project keys and mobile layout.
 
 ## Must complete before feature release
 

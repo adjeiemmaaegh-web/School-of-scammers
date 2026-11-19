@@ -37,7 +37,17 @@ const base=process.env.PLC_BASE_URL||'http://127.0.0.1:4173';
   assert.ok(links.some(x=>x.includes('language-tools')),'PID search must find the programming guide');
   const after=await page.evaluate(()=>Object.entries(localStorage).filter(([k])=>k.includes('sandbox')||k.includes('scenario')||k.includes('project')).sort());
   assert.deepEqual(after,before,'Reading and completing Steady Guide must not mutate projects or assessment storage');
-  await page.setViewport({width:390,height:844});
+  // The in-workbench contextual drawer opens only on explicit request and closes with Escape.
+  await page.setViewport({width:1366,height:768});
+  await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:45000});
+  await page.waitForSelector('[data-steady-open-help]',{timeout:15000});
+  await page.click('.p5-menu-bar details:last-of-type > summary');
+  await page.click('[data-steady-open-help]');
+  await page.waitForSelector('[data-steady-drawer]',{timeout:12000});
+  assert.match(await page.$eval('[data-steady-drawer] h2',x=>x.textContent),/Need a hand/i);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(()=>!document.querySelector('[data-steady-drawer]'),{timeout:8000});
+    await page.setViewport({width:390,height:844});
   await go('/guide');
   const sizes=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
   assert.ok(sizes.scroll<=sizes.client+2,'No horizontal overflow on 390px: '+JSON.stringify(sizes));
