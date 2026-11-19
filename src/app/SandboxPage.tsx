@@ -736,6 +736,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>}
         </div></details>
         <details><summary>Help</summary><div className="p5-menu-content">
+          <Link to="/guide/workspace" data-steady-context="workspace">Steady Guide: find your way around</Link>
+          <Link to="/guide/equipment" data-steady-context="equipment">Steady Guide: explain equipment</Link>
+          <Link to="/guide/topic/wire-safely" data-steady-context="wiring">Steady Guide: wiring and instruments</Link>
+          <Link to="/guide/topic/plc-basics" data-steady-context="plc">Steady Guide: PLC programming</Link>
+          <Link to="/guide/topic/diagnose" data-steady-context="diagnostics">Steady Guide: troubleshooting</Link>
           <button type="button" onClick={()=>setWorkspaceHelp(v=>!v)}>Toggle workspace instructions</button>
           <span>Alt+1 logical · Alt+2 3D · Alt+3 plan · Ctrl+S export · Esc cancel</span>
           <span>Educational model only: no real PLC firmware, certified electrical protection, safety-rated E-stop, or field hardware equivalence.</span>

@@ -23,6 +23,7 @@ export function FrontDoor() {
             <p className="lede">{BRAND.shortPitch} Think Cisco Packet Tracer, for industrial automation.</p>
             <div className="cta-row">
               <Link className="btn primary" to="/sandbox" data-cta="simulator">Open the simulator →</Link>
+              <Link className="btn ghost" to="/guide" data-cta="steady-guide">New here? Steady Guide</Link>
               <Link className="btn ghost" to="/learn">Learn &amp; practice</Link>
             </div>
             <div className="tagstrip">

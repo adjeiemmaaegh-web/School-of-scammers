@@ -26,9 +26,10 @@ export function AppHeader({ right }: { right?: React.ReactNode }) {
           <BrandMark />
           <span>{BRAND.name}</span>
         </Link>
-        {/* The product has one primary experience (the simulator) and two secondary sections. */}
+        {/* The simulator remains primary. Steady Guide is optional help; training and assessments remain separate. */}
         <nav className="primary-nav" aria-label="Primary">
           <NavLink to="/sandbox" className={({ isActive }) => `pn-link pn-sim${isActive ? ' is-active' : ''}`}>Simulator</NavLink>
+          <NavLink to="/guide" className={({ isActive }) => `pn-link pn-guide${isActive ? ' is-active' : ''}`}>Steady Guide</NavLink>
           <NavLink to="/learn" className={({ isActive }) => `pn-link${isActive ? ' is-active' : ''}`}>Learn &amp; Practice</NavLink>
           <NavLink to="/assess" className={({ isActive }) => `pn-link pn-secondary${isActive ? ' is-active' : ''}`}>Assessments</NavLink>
         </nav>
