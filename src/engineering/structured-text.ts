@@ -4,10 +4,10 @@ export type STValue=number|boolean;
 export type STSignals=Readonly<Record<string,STValue>>;
 export type STType='BOOL'|'INT'|'DINT'|'REAL'|'LREAL';
 /** Standard function blocks supported as instances: timers, counters and edge detectors (see docs/product/PLC_SUBSET.md). */
-export type FbType='TON'|'TOF'|'TP'|'CTU'|'CTD'|'R_TRIG'|'F_TRIG';
+export type FbType='TON'|'TOF'|'TP'|'CTU'|'CTD'|'R_TRIG'|'F_TRIG'|'PID';
 /** The engine's fixed scan period; timer function blocks advance by this each scan (the simulator scan is 50 ms). */
 export const ST_SCAN_MS=50;
-const FB_SPEC:Readonly<Record<FbType,{inputs:readonly string[];outputs:readonly {name:string;type:STType}[];hidden:readonly string[]}>>={
+const FB_SPEC:Readonly<Record<FbType,{inputs:readonly string[];outputs:readonly {name:string;type:STType}[];hidden:readonly string[];hiddenReal?:readonly string[]}>>={
  TON:{inputs:['IN','PT'],outputs:[{name:'Q',type:'BOOL'},{name:'ET',type:'DINT'}],hidden:[]},
  TOF:{inputs:['IN','PT'],outputs:[{name:'Q',type:'BOOL'},{name:'ET',type:'DINT'}],hidden:[]},
  TP:{inputs:['IN','PT'],outputs:[{name:'Q',type:'BOOL'},{name:'ET',type:'DINT'}],hidden:['RUN','PIN']},
@@ -15,6 +15,8 @@ const FB_SPEC:Readonly<Record<FbType,{inputs:readonly string[];outputs:readonly 
  CTD:{inputs:['CD','LD','PV'],outputs:[{name:'Q',type:'BOOL'},{name:'CV',type:'INT'}],hidden:['PCD']},
  R_TRIG:{inputs:['CLK'],outputs:[{name:'Q',type:'BOOL'}],hidden:['PCLK']},
  F_TRIG:{inputs:['CLK'],outputs:[{name:'Q',type:'BOOL'}],hidden:['PCLK']},
+ /** Teaching PID: positional form with output clamp and conditional-integration anti-windup; KI/KD are per second. Not a tuned industrial controller. */
+ PID:{inputs:['PV','SP','KP','KI','KD','OUT_MIN','OUT_MAX'],outputs:[{name:'OUT',type:'REAL'}],hidden:['PRIMED'],hiddenReal:['INTEG','PERR']},
 };
 const isFbType=(name:string):name is FbType=>Object.prototype.hasOwnProperty.call(FB_SPEC,name);
 /** Storage name of an instance member; plain identifiers so it round-trips through the scan memory (collisions are rejected as duplicates). */
@@ -30,7 +32,7 @@ const identifier=/^[A-Za-z][A-Za-z0-9_]*$/;
 const number=/^(?:\d+(?:\.\d+)?|\.\d+)$/;
 const BUILTINS = new Set(['ABS','MIN','MAX','LIMIT']);
 const precedence:Readonly<Record<string,number>>={OR:1,XOR:2,AND:3,'=':4,'<>':4,'<':4,'<=':4,'>':4,'>=':4,'+':5,'-':5,'*':6,'/':6,MOD:6};
-const RESERVED=new Set(['TON','TOF','TP','CTU','CTD','R_TRIG','F_TRIG','IF','THEN','ELSIF','ELSE','END_IF','AND','OR','XOR','NOT','TRUE','FALSE','MOD','VAR','VAR_INPUT','VAR_OUTPUT','END_VAR','BOOL','INT','DINT','REAL','LREAL','CASE','OF','END_CASE','FOR','TO','BY','DO','END_FOR','WHILE','END_WHILE']);
+const RESERVED=new Set(['TON','TOF','TP','CTU','CTD','R_TRIG','F_TRIG','PID','IF','THEN','ELSIF','ELSE','END_IF','AND','OR','XOR','NOT','TRUE','FALSE','MOD','VAR','VAR_INPUT','VAR_OUTPUT','END_VAR','BOOL','INT','DINT','REAL','LREAL','CASE','OF','END_CASE','FOR','TO','BY','DO','END_FOR','WHILE','END_WHILE']);
 function tokenize(source:string):Token[]{
  if(typeof source!=='string'||source.length>12000)throw new RangeError('Structured Text must be at most 12,000 characters');
  const tokens:Token[]=[];
@@ -116,6 +118,7 @@ export function compileStructuredText(source:string):STProgram{
     // The synthetic storage variables reserve their names so a user variable can never alias an instance's state.
     for(const o of FB_SPEC[typeName].outputs){const n=fbKey(key,o.name);namedDeclarations.add(n);declarations.push({name:n,type:o.type,scope:'local',initial:o.type==='BOOL'?false:0});}
     for(const h of FB_SPEC[typeName].hidden){const n=fbKey(key,h);namedDeclarations.add(n);declarations.push({name:n,type:'BOOL',scope:'local',initial:false});}
+    for(const h of FB_SPEC[typeName].hiddenReal??[]){const n=fbKey(key,h);namedDeclarations.add(n);declarations.push({name:n,type:'REAL',scope:'local',initial:0});}
     count++;continue;
    }
    if(!['BOOL','INT','DINT','REAL','LREAL'].includes(typeName))fail(`Unsupported variable type ${peek()}`);
@@ -242,6 +245,10 @@ function stepFunctionBlock(call:Extract<Statement,{kind:'fb'}>,values:Record<str
   const v=call.args[name]?numeric(evaluate(call.args[name],values)):0;
   if(!Number.isFinite(v))throw new RangeError(`${call.type}.${name} must be finite`);return Math.trunc(v);
  };
+ const real=(name:string,fallback:number)=>{
+  const v=call.args[name]?numeric(evaluate(call.args[name],values)):fallback;
+  if(!Number.isFinite(v))throw new RangeError(`${call.type}.${name} must be finite`);return v;
+ };
  const clampMs=(n:number)=>Math.max(0,Math.min(2147483647,n));
  switch(call.type){
   case 'TON':{const input=flag('IN'),pt=clampMs(int('PT'));
@@ -263,6 +270,14 @@ function stepFunctionBlock(call:Extract<Statement,{kind:'fb'}>,values:Record<str
   case 'CTD':{const down=flag('CD'),load=flag('LD'),pv=int('PV');let cv=Number(get('CV'));
    if(load)cv=Math.max(-32768,Math.min(32767,pv));else if(down&&get('PCD')!==true)cv=Math.max(cv-1,-32768);
    set('CV',cv);set('Q',cv<=0);set('PCD',down);break;}
+  case 'PID':{
+   const dt=ST_SCAN_MS/1000,pv=real('PV',0),sp=real('SP',0),kp=real('KP',0),ki=real('KI',0),kd=real('KD',0),lo=real('OUT_MIN',0),hi=real('OUT_MAX',100);
+   if(lo>hi)throw new RangeError('PID.OUT_MIN must not exceed OUT_MAX');
+   const e=sp-pv,primed=get('PRIMED')===true,integ=Number(get('INTEG')),perr=Number(get('PERR'));
+   const trial=integ+ki*e*dt,d=primed?kd*(e-perr)/dt:0;
+   let out=kp*e+trial+d,next=trial;
+   if(out>hi){out=hi;if(e>0)next=integ;}else if(out<lo){out=lo;if(e<0)next=integ;}
+   set('OUT',out);set('INTEG',next);set('PERR',e);set('PRIMED',true);break;}
   case 'R_TRIG':{const clk=flag('CLK');set('Q',clk&&get('PCLK')!==true);set('PCLK',clk);break;}
   case 'F_TRIG':{const clk=flag('CLK');set('Q',!clk&&get('PCLK')===true);set('PCLK',clk);break;}
  }
