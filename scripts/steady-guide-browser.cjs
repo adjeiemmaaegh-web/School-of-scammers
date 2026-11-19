@@ -1,0 +1,47 @@
+/** Browser smoke for Steady Guide. Read-only navigation must not alter a user's project keys. */
+const assert=require('node:assert/strict');
+const puppeteer=require('puppeteer');
+const base=process.env.PLC_BASE_URL||'http://127.0.0.1:4173';
+(async()=>{
+ const browser=await puppeteer.launch({headless:true,args:['--no-sandbox','--disable-setuid-sandbox','--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ const page=await browser.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(String(e)));
+ const go=async path=>{await page.goto(base+path,{waitUntil:'networkidle0',timeout:45000});await page.waitForSelector('[data-steady-guide]',{timeout:15000});};
+ try{
+  await page.setViewport({width:1366,height:768});
+  await go('/guide');
+  assert.match(await page.$eval('h1',x=>x.textContent),/Learn the application/i);
+  const nav=await page.$$eval('.primary-nav a',a=>a.map(x=>x.textContent.trim()));
+  assert.deepEqual(nav,['Simulator','Steady Guide','Learn & Practice','Assessments']);
+  const img=await page.$('[data-steady-screenshot] img');
+  assert.ok(img,'A genuine source screenshot is visible on the guide home');
+  await page.waitForFunction(()=>{const i=document.querySelector('[data-steady-screenshot] img');return i&&i.complete&&i.naturalWidth>0;},{timeout:12000});
+  const before=await page.evaluate(()=>Object.entries(localStorage).filter(([k])=>k.includes('sandbox')||k.includes('scenario')||k.includes('project')).sort());
+  await go('/guide/topic/first-lamp');
+  assert.equal(await page.$eval('[data-steady-topic]',x=>x.getAttribute('data-steady-topic')),'first-lamp');
+  assert.ok((await page.$$eval('.sg-steps>li',a=>a.length))>=5);
+  await page.click('.sg-actions button');
+  assert.equal(await page.$eval('.sg-actions button',x=>x.getAttribute('aria-pressed')),'true');
+  await go('/guide/equipment');
+  assert.equal(await page.$$eval('[data-steady-equipment-index] .sg-card',a=>a.length),54);
+  await go('/guide/equipment/photoeye');
+  assert.match(await page.$eval('[data-steady-equipment-detail] h2',x=>x.textContent),/photoeye/i);
+  assert.ok((await page.$$eval('.sg-terminal',a=>a.map(x=>x.textContent))).some(x=>x.includes('OUT')));
+  await go('/guide/scenes');
+  assert.equal(await page.$$eval('[data-steady-scene-index] .sg-card',a=>a.length),21);
+  await go('/guide/scenes/sorting-line');
+  assert.match(await page.$eval('[data-steady-scene-detail] h2',x=>x.textContent),/Photoeye/i);
+  await go('/guide');
+  await page.type('#sg-guide-search','PID');
+  const links=await page.$$eval('.sg-search-results a',a=>a.map(x=>x.getAttribute('href')));
+  assert.ok(links.some(x=>x.includes('language-tools')),'PID search must find the programming guide');
+  const after=await page.evaluate(()=>Object.entries(localStorage).filter(([k])=>k.includes('sandbox')||k.includes('scenario')||k.includes('project')).sort());
+  assert.deepEqual(after,before,'Reading and completing Steady Guide must not mutate projects or assessment storage');
+  await page.setViewport({width:390,height:844});
+  await go('/guide');
+  const sizes=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
+  assert.ok(sizes.scroll<=sizes.client+2,'No horizontal overflow on 390px: '+JSON.stringify(sizes));
+  assert.deepEqual(errors,[]);
+  console.log('STEADY GUIDE BROWSER PASS: 54 devices, 21 scenes, real screenshot, topic completion, search, read-only keys and 390px');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});
