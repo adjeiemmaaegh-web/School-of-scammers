@@ -5,13 +5,15 @@ import './guide-drawer.css';
 type Props={onClose:()=>void;activeView:'physical'|'logical'|'plan';activeTool:string;selectedKind?:string};
 export function GuideDrawer({onClose,activeView,activeTool,selectedKind}:Props){
  const root=useRef<HTMLElement|null>(null),previous=useRef<HTMLElement|null>(null);
+ // Snapshot updates can rerender the host every scan; do not reset the drawer's focus on every new callback identity.
+ const closeRef=useRef(onClose);closeRef.current=onClose;
  useEffect(()=>{
   previous.current=document.activeElement instanceof HTMLElement?document.activeElement:null;
   root.current?.focus();
-  const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();onClose();}};
+  const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();closeRef.current();}};
   document.addEventListener('keydown',key);
   return ()=>{document.removeEventListener('keydown',key);previous.current?.focus();};
- },[onClose]);
+ },[]);
  const viewText={
   physical:'Physical 3D shows the factory, camera and placement controls. Device placement is not the same as electrical connection.',
   logical:'Logical view shows named terminals and electrical wires. Use this to understand exactly why a component receives power or signals.',

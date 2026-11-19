@@ -1,7 +1,7 @@
 # Steady Guide — Engineering development checkpoint
 
 **Branch:** `feature/steady-guide` (created from `main` at `4eb3cd1a355ba708287a2ce1ddb9376b58abd70a`).
-**Product plan:** [STEADY_GUIDE_ARCHITECTURE_2026-11-19.md](../../STEADY_GUIDE_ARCHITECTURE_2026-11-19.md) exists in the owner handoff, not yet committed to the repository.
+**Product plan:** the owner-approved architecture file STEADY_GUIDE_ARCHITECTURE_2026-11-19.md was delivered in the project conversation; it is not committed to the repository.
 **Status:** Development branch only. Unmerged, no production release authorization.
 
 ## Implemented on this branch
