@@ -1,0 +1,33 @@
+{
+  "source": "docs/qa/r1",
+  "sourcePr": 83,
+  "sourceCommit": "af4e816a5ee7684f9a08945d1285726ee7255076",
+  "reviewStatus": "Owner screenshot signoff pending",
+  "images": [
+    {
+      "path": "public/steady-guide/media/r1-1440x940.png",
+      "blobSha": "1285a67c865d901b5ac3d4c74105786af8b882a6",
+      "authenticScreenshot": true
+    },
+    {
+      "path": "public/steady-guide/media/r1-1366x768.png",
+      "blobSha": "83bc4eb11e6aa07d78b59ced3fa8371d3c66a024",
+      "authenticScreenshot": true
+    },
+    {
+      "path": "public/steady-guide/media/r1-1280x720.png",
+      "blobSha": "406bcd9f63d8e5c49b7bfe3a27424f9e65fc5c45",
+      "authenticScreenshot": true
+    },
+    {
+      "path": "public/steady-guide/media/r1-1024x768.png",
+      "blobSha": "c123813a9168c797ae6d7d267b10d0d55ce9f466",
+      "authenticScreenshot": true
+    },
+    {
+      "path": "public/steady-guide/media/r1-768x1024.png",
+      "blobSha": "f973c797daecbd694988e97c9ed60a2250fcaaf4",
+      "authenticScreenshot": true
+    }
+  ]
+}
