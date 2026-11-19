@@ -221,8 +221,18 @@ const viewports=[
       assert.ok(Math.abs(wheel.document-data.scrollY)<=2,
         'UX9 mouse wheel scroll must stay inside the library: '+JSON.stringify({vp,data,wheel}));
       await page.click('[data-library-tab-trigger="assemblies"]');
+      // React tab state is async; require the new panel to render before
+      // measuring, especially at the 1024px narrow legacy breakpoint.
+      await page.waitForFunction(()=>{
+        const el=document.querySelector('[data-library-assemblies]');
+        return !!el&&!el.hidden&&el.clientHeight>=160;
+      },{timeout:10000});
       await page.$eval('[data-p7-assembly-library]',el=>{el.open=true;});
-      assert.ok(await page.$eval('[data-library-assemblies]',el=>!el.hidden&&el.clientHeight>=160));
+      const assemblies=await page.$eval('[data-library-assemblies]',el=>({
+        visible:!el.hidden,height:el.clientHeight,scrollHeight:el.scrollHeight,
+      }));
+      assert.ok(assemblies.visible&&assemblies.height>=160,
+        'UX9 Assemblies tab collapsed: '+JSON.stringify({vp,assemblies}));
       await page.click('[data-library-tab-trigger="components"]');
       await page.waitForFunction(previous=>document.querySelector('.sandbox-palette-list').scrollTop>=previous-3,
         {timeout:3000},wheel.list);
