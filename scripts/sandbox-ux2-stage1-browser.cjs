@@ -221,6 +221,15 @@ const viewports=[
       assert.ok(Math.abs(wheel.document-data.scrollY)<=2,
         'UX9 mouse wheel scroll must stay inside the library: '+JSON.stringify({vp,data,wheel}));
       await page.click('[data-library-tab-trigger="assemblies"]');
+      const switchDebug=await page.evaluate(()=>{
+        const el=document.querySelector('[data-library-assemblies]');
+        const aside=document.querySelector('.sandbox-palette');
+        return {selected:document.querySelector('[data-library-tab-trigger="assemblies"]')
+          ?.getAttribute('aria-selected'),hidden:el.hidden,height:el.clientHeight,
+          display:getComputedStyle(el).display,asideHeight:aside.clientHeight,
+          win:[innerWidth,innerHeight],documentScrollY:scrollY};
+      });
+      console.log('UX9 ASSEMBLY SWITCH',JSON.stringify({vp,switchDebug}));
       // React tab state is async; require the new panel to render before
       // measuring, especially at the 1024px narrow legacy breakpoint.
       await page.waitForFunction(()=>{
