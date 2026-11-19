@@ -72,6 +72,7 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   assert.ok(selected);
   await page.waitForFunction(()=>
    document.querySelectorAll('[data-workspace-selection] input:checked').length===2);
+  await page.click('[data-library-tab-trigger="assemblies"]');
   await page.waitForSelector('[data-p7-assembly-library] summary',{timeout:15000});
   await page.click('[data-p7-assembly-library] summary');
   await page.waitForSelector('[data-assembly-name]',{visible:true});
@@ -91,6 +92,7 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
     await page.click('.p5-dock-heading button[aria-expanded="false"]');
   await count(2);
+  await page.click('[data-library-tab-trigger="assemblies"]');
   await page.waitForSelector('[data-p7-assembly-library] summary',{timeout:15000});
   await page.click('[data-p7-assembly-library] summary');
   await page.waitForSelector('[data-assembly-select]');
@@ -121,6 +123,7 @@ const ASSEMBLIES='plc-sandbox-local-assemblies-v1';
   await page.waitForSelector('.p5-dock-heading button',{timeout:20000});
   if(await page.$('.p5-dock-heading button[aria-expanded="false"]'))
     await page.click('.p5-dock-heading button[aria-expanded="false"]');
+  await page.click('[data-library-tab-trigger="assemblies"]');
   await page.waitForSelector('[data-p7-assembly-library] summary',{timeout:15000});
   await page.click('[data-p7-assembly-library] summary');
   await page.waitForSelector('[data-assembly-reset]');

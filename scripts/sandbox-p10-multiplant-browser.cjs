@@ -33,6 +33,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   page.on('pageerror', e => errors.push(String(e)));
   await page.setViewport({ width: 1440, height: 940, deviceScaleFactor: 1 });
   const clickText = async (text, scope = 'document') => {
+    // Wait for the async worker/project bootstrap before interacting. A fixed
+    // 150 ms sleep made this legitimate UI control sporadically appear disabled.
+    await page.waitForFunction((label,sel)=>{
+      const root=sel==='document'?document:document.querySelector(sel);
+      return !!root&&[...root.querySelectorAll('button')]
+        .some(el=>el.textContent.trim()===label&&!el.disabled);
+    },{timeout:15000},text,scope);
     const ok = await page.evaluate((label, sel) => {
       const root = sel === 'document' ? document : document.querySelector(sel);
       const b = [...root.querySelectorAll('button')].find(el => el.textContent.trim() === label);
