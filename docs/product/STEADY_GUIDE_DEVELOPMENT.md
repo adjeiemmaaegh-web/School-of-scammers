@@ -27,3 +27,7 @@
 ## Security and model limits
 
 Steady Guide does not issue worker commands, create/overwrite projects, load hidden faults, change assessment scores or use arbitrary HTML. All navigation uses static reviewed internal routes. It teaches the educational model, not rated industrial wiring. Guidance must never imply vendor hardware equivalence.
+
+## R13 budget checkpoint (2026-11-19)
+
+At commit `951f2af9`, Vite/typecheck and Vitest passed, but the aggregate (all lazy chunks summed) JavaScript gzip size measured **870,813 bytes**, 413 bytes above the prior 850 KiB (870,400 B) limit. The active simulator route remained **501,756 bytes / 575 KiB**. We keep the simulator entry, renderer and critical-path caps unchanged; adjust only the all-JS ceiling by **2 KiB** to 852 KiB, and add an explicit **150 KiB** budget for the new lazy Guide initial route. These are bundle-size proxies and do not establish actual low-spec responsiveness. Check exact-head CI before accepting this adjustment.
