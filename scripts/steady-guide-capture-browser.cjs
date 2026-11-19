@@ -61,7 +61,7 @@ const dir='qa-artifacts/steady-guide-captures';
 
   const data={generatedAt:new Date().toISOString(),note:'Captured for human QA only. Do not import without source and visual review.',captures};
   fs.writeFileSync(dir+'/manifest.json',JSON.stringify(data,null,2));
-  assert.equal(captures.length,13);
+  assert.equal(captures.length,14);
   console.log('STEADY GUIDE REAL SCREENSHOT CAPTURE PASS: '+captures.length+' states');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
