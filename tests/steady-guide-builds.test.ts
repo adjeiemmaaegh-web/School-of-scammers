@@ -5,7 +5,7 @@ import {getGuideTopic} from '../src/steady-guide/guide-data';
 describe('Steady Guide task-based equipment selection',()=>{
  it('only refers to real registered equipment, scenes and internal practice routes',()=>{
   const known=new Set(GUIDE_EQUIPMENT_KINDS);
-  const scenes=new Set(GUIDE_SCENES.map(s=>s.id));
+  const scenes=new Set<string>(GUIDE_SCENES.map(s=>s.id));
   expect(GUIDE_BUILDS.length).toBeGreaterThanOrEqual(5);
   expect(new Set(GUIDE_BUILDS.map(p=>p.id)).size).toBe(GUIDE_BUILDS.length);
   for(const p of GUIDE_BUILDS){
