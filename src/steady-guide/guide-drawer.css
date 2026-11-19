@@ -17,3 +17,14 @@
 .sg-drawer footer button {background:var(--accent);color:var(--accent-ink);font-weight:700;border:0;padding:9px 12px;border-radius:8px;cursor:pointer}
 .sg-drawer footer a {font-size:12px;color:var(--accent-text);font-weight:700}
 @media (max-width:700px) {.sg-drawer {top:auto;bottom:7px;left:7px;right:7px;width:auto;max-height:min(65dvh,600px);padding:14px}}
+
+/* Eight read-only tour targets: highlighting cannot alter project state. */
+.sg-drawer-intro {margin:6px 0!important}
+.sg-tour-targets {display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.sg-tour-targets button {text-align:left;display:flex;align-items:center;gap:7px;min-width:0;min-height:38px;border:1px solid var(--line);border-radius:8px;padding:7px 8px;background:var(--surface-2);color:var(--ink);font-size:12px;cursor:pointer}
+.sg-tour-targets button:hover,.sg-tour-targets button[aria-pressed=true] {border-color:var(--accent)}
+.sg-tour-targets button[aria-pressed=true] {font-weight:800}
+.sg-tour-targets button span {width:18px;height:18px;flex:0 0 18px;border-radius:50%;display:grid;place-items:center;background:var(--surface);font:700 10px var(--mono);color:var(--accent-text)}
+.sg-drawer .sg-tour-status {padding:9px 11px;border-radius:9px;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);font-size:12px}
+body [data-steady-spotlight] {outline:3px solid var(--accent)!important;outline-offset:4px!important;box-shadow:0 0 0 7px color-mix(in srgb,var(--accent) 17%,transparent)!important}
+@media (max-width:460px){.sg-tour-targets {grid-template-columns:1fr 1fr}}
