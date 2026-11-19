@@ -170,6 +170,65 @@ const viewports=[
         'UX8 expanded-but-hidden Assemblies must not shrink the equipment list');
       console.log('UX8 LIBRARY TABS PASS',JSON.stringify(vp));
     }
+    // UX9: The earlier QA only tested heights >=720 CSS px. At short laptop
+    // viewport heights the fallback layout collapsed the active Components
+    // panel to ZERO despite displaying the 54-count heading and selected tab.
+    for(const vp of [{width:1366,height:700},{width:1366,height:650},
+                     {width:1366,height:600},{width:1024,height:700},
+                     {width:1536,height:710}]) {
+      await page.setViewport({...vp,deviceScaleFactor:1});
+      await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:30000});
+      await page.waitForSelector('[data-library-tab-trigger="components"]');
+      // Short viewports intentionally retain outer document scrolling.
+      // Scroll the document to the real library before testing wheel input.
+      await page.evaluate(()=>{
+        const r=document.querySelector('.sandbox-palette').getBoundingClientRect();
+        scrollTo(0,Math.max(0,scrollY+r.top-100));
+      });
+      const data=await page.evaluate(()=>{
+        const get=selector=>{
+          const e=document.querySelector(selector);
+          const r=e.getBoundingClientRect();
+          return {height:e.clientHeight,top:r.top,bottom:r.bottom,width:r.width,
+            scrollHeight:e.scrollHeight,display:getComputedStyle(e).display};
+        };
+        const list=get('.sandbox-palette-list');
+        const first=get('.sandbox-palette-item');
+        return {side:get('.sandbox-palette'),panel:get('#sandbox-components-panel'),
+          search:get('.sandbox-library-search'),list,first,
+          buttons:document.querySelectorAll('.sandbox-palette-item').length,
+          selected:document.querySelector('[data-library-tab-trigger="components"]').getAttribute('aria-selected'),
+          scrollY,scrollWidth:document.documentElement.scrollWidth};
+      });
+      assert.equal(data.selected,'true');
+      assert.equal(data.buttons,54,'UX9 must preserve all registered equipment');
+      assert.ok(data.panel.height>=220&&data.search.height>=25&&data.list.height>=160,
+        'UX9 short viewport collapsed Components: '+JSON.stringify({vp,data}));
+      assert.ok(data.first.top>=data.list.top&&data.first.bottom<=data.list.bottom+2,
+        'UX9 first equipment card must be visible: '+JSON.stringify({vp,data}));
+      assert.ok(data.list.top>=0&&data.list.bottom<=vp.height+2,
+        'UX9 equipment list must be in reach after scrolling page: '+JSON.stringify({vp,data}));
+      assert.ok(data.scrollWidth<=vp.width+2,'UX9 horizontal page overflow');
+      await page.mouse.move(data.side.width/2+
+        (await page.$eval('.sandbox-palette',el=>el.getBoundingClientRect().left)),
+        data.list.top+Math.min(60,data.list.height/2));
+      await page.mouse.wheel({deltaY:260});
+      await page.waitForFunction(()=>document.querySelector('.sandbox-palette-list').scrollTop>0);
+      const wheel=await page.evaluate(()=>({
+        list:document.querySelector('.sandbox-palette-list').scrollTop,
+        document:scrollY,
+      }));
+      assert.ok(Math.abs(wheel.document-data.scrollY)<=2,
+        'UX9 mouse wheel scroll must stay inside the library: '+JSON.stringify({vp,data,wheel}));
+      await page.click('[data-library-tab-trigger="assemblies"]');
+      await page.$eval('[data-p7-assembly-library]',el=>{el.open=true;});
+      assert.ok(await page.$eval('[data-library-assemblies]',el=>!el.hidden&&el.clientHeight>=160));
+      await page.click('[data-library-tab-trigger="components"]');
+      await page.waitForFunction(previous=>document.querySelector('.sandbox-palette-list').scrollTop>=previous-3,
+        {timeout:3000},wheel.list);
+      assert.ok(await page.$eval('.sandbox-palette-list',el=>el.clientHeight)>=160);
+      console.log('UX9 SHORT VIEWPORT COMPONENTS PASS',JSON.stringify(vp));
+    }
     await page.setViewport({width:1366,height:768,deviceScaleFactor:1});
     await page.goto(base+'/sandbox',{waitUntil:'networkidle0'});
     await page.waitForSelector('.ux2-equipment-tile');
