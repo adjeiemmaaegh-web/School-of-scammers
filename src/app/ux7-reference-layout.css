@@ -76,7 +76,7 @@
     position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;
   }
   .efo-ux2-shell .sandbox-library-search { margin-bottom:8px; }
-  .efo-ux2-shell .p5-device-families { flex-wrap:wrap; gap:5px; margin-bottom:8px; }
+  .efo-ux2-shell .p5-device-families { flex-wrap:wrap; gap:5px; margin-bottom:8px; align-items:center; }
   .efo-ux2-shell .p5-device-families button { white-space:nowrap; }
   .efo-ux2-shell .p5-organized .sandbox-palette-list,
   .efo-ux2-shell .sandbox-palette .sandbox-palette-list { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
@@ -89,3 +89,9 @@
   .efo-ux2-shell .sandbox-palette .ux2-equipment-name { text-align:center; }
   .efo-ux2-shell .sandbox-palette .ux2-equipment-name strong { font-size:11px; line-height:1.2; }
 }
+
+.p5-family-more {
+  font:600 11px var(--body); color:var(--ink); background:var(--surface-2); border:1px solid var(--line);
+  border-radius:6px; padding:4px 6px; max-width:100%;
+}
+.p5-family-more[data-active="true"] { border-color:var(--accent); box-shadow:inset 0 -2px var(--accent); }

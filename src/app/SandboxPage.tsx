@@ -866,10 +866,18 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               placeholder="Search motors, PLCs…" aria-label="Search component library" />
           </label>
           <div className="p5-device-families" role="group" aria-label="Industrial device families">
-            {DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).map(f=>
+            {DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).slice(0,2).map(f=>
               <button key={f.id} type="button" data-p5-category={f.id}
                 aria-pressed={libraryFamily===f.id} onClick={()=>setLibraryFamily(f.id)}>
                 {f.label}</button>)}
+            {DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).length>2 &&
+              <select className="p5-family-more" data-p5-category-more aria-label="More device categories"
+                data-active={DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).slice(2).some(f=>f.id===libraryFamily)?'true':'false'}
+                value={DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).slice(2).some(f=>f.id===libraryFamily)?libraryFamily:''}
+                onChange={e=>{if(e.target.value)setLibraryFamily(e.target.value as DeviceFamily);}}>
+                <option value="">More categories</option>
+                {DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).slice(2).map(f=><option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>}
           </div>
           <p className="sandbox-library-help">Drag an available device onto the 3D floor or 2D plan,
             or click to place it. The registry determines what really works. Pause to edit.</p>
