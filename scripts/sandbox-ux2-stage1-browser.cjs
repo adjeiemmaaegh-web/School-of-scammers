@@ -227,6 +227,16 @@ const viewports=[
         const r=el.getBoundingClientRect();
         return {x:r.left+r.width/2,y:r.top+r.height/2};
       });
+      const pointerDebug=await page.evaluate(()=>{
+        const tab=document.querySelector('[data-library-tab-trigger="assemblies"]');
+        const r=tab.getBoundingClientRect();
+        const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+        return {coords:[r.left+r.width/2,r.top+r.height/2],bounds:[r.left,r.top,r.width,r.height],
+          hit:hit?.outerHTML.slice(0,320),hitTab:hit===tab||tab.contains(hit),
+          hitParent:hit?.parentElement?.outerHTML.slice(0,260),scrollY,
+          pointerEvents:getComputedStyle(tab).pointerEvents};
+      });
+      console.log('UX9 TAB HIT',JSON.stringify({vp,pointerDebug}));
       await page.mouse.click(tabPoint.x,tabPoint.y);
       const switchDebug=await page.evaluate(()=>{
         const el=document.querySelector('[data-library-assemblies]');
