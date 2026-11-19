@@ -122,6 +122,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const setSelectedDeviceId = (id: string | null) => setSelectedDeviceIds(id ? [id] : []);
   const [selectedPlcId, setSelectedPlcId] = useState<string | null>(null);
   const [libraryQuery, setLibraryQuery] = useState('');
+  // Library-only UI state: never persisted into a PLC project or worker commands.
+  const [libraryTab,setLibraryTab] = useState<'components'|'assemblies'>('components');
   const [grid,setGrid] = useState<GridStep>(5);
   const [clipboard,setClipboard] = useState<WorkspaceFragment|null>(null);
   const pasteIndex=useRef(0);
@@ -860,6 +862,28 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         {libraryExpanded&&<aside className="sandbox-palette panel" aria-label="Component library" data-p5-library>
           <div className="sandbox-rail-heading"><span className="eyebrow">Device library</span><h2>Components</h2>
             <small>{visibleKinds.length} types available</small></div>
+          {!scenario && <div className="sandbox-library-tabs" role="tablist" aria-label="Component library sections"
+            onKeyDown={event=>{
+              let next:'components'|'assemblies'|null=null;
+              if(event.key==='ArrowRight'||event.key==='ArrowLeft')next=libraryTab==='components'?'assemblies':'components';
+              if(event.key==='Home')next='components';
+              if(event.key==='End')next='assemblies';
+              if(next){
+                event.preventDefault();
+                setLibraryTab(next);
+                document.getElementById(next==='components'?'sandbox-components-tab':'sandbox-assemblies-tab')?.focus();
+              }
+            }}>
+            <button type="button" role="tab" id="sandbox-components-tab" data-library-tab-trigger="components"
+              aria-controls="sandbox-components-panel" aria-selected={libraryTab==='components'}
+              tabIndex={libraryTab==='components'?0:-1} onClick={()=>setLibraryTab('components')}>Components</button>
+            <button type="button" role="tab" id="sandbox-assemblies-tab" data-library-tab-trigger="assemblies"
+              aria-controls="sandbox-assemblies-panel" aria-selected={libraryTab==='assemblies'}
+              tabIndex={libraryTab==='assemblies'?0:-1} onClick={()=>setLibraryTab('assemblies')}>Assemblies</button>
+          </div>}
+          <div className="sandbox-library-components" id="sandbox-components-panel" data-library-components
+            role={!scenario?'tabpanel':undefined} aria-labelledby={!scenario?'sandbox-components-tab':undefined}
+            hidden={!scenario&&libraryTab!=='components'}>
           <label className="sandbox-library-search">
             <span>Find equipment</span>
             <input type="search" value={libraryQuery} onChange={e => setLibraryQuery(e.target.value)}
@@ -881,9 +905,6 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>
           <p className="sandbox-library-help">Drag an available device onto the 3D floor or 2D plan,
             or click to place it. The registry determines what really works. Pause to edit.</p>
-          {!scenario && <AssemblyLibrary project={project} selectedIds={selectedDeviceIds}
-            editable={editable} grid={grid}
-            onInsert={(fragment,at)=>edit({kind:'paste',fragment,at,grid})}/>}
           <div className="sandbox-palette-list">
             {visibleKinds.map(kind => <button key={kind} draggable={editable && !primaryTouch}
               onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}
@@ -909,6 +930,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>
           <div className="sandbox-library-foot"><strong>Educational models</strong>
             <span>{componentKinds.length} registered kinds · no live equipment</span></div>
+          </div>
+          {!scenario && <div className="sandbox-library-assemblies" id="sandbox-assemblies-panel"
+            data-library-assemblies role="tabpanel" aria-labelledby="sandbox-assemblies-tab"
+            hidden={libraryTab!=='assemblies'}>
+            <AssemblyLibrary project={project} selectedIds={selectedDeviceIds}
+              editable={editable} grid={grid}
+              onInsert={(fragment,at)=>edit({kind:'paste',fragment,at,grid})}/>
+          </div>}
         </aside>}
         <div className="sandbox-main" id="sandbox-stage-build">
           {!scenario && <div className="efo-canvas-actions" role="group" aria-label="Canvas display and simulation controls">
