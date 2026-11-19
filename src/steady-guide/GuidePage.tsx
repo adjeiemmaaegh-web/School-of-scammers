@@ -12,10 +12,12 @@ import './guide.css';
 
 const Equipment=lazy(()=>import('./GuideEquipment').then(m=>({default:m.GuideEquipment})));
 const Scenes=lazy(()=>import('./GuideScenes').then(m=>({default:m.GuideScenes})));
+const Builds=lazy(()=>import('./GuideBuilds').then(m=>({default:m.GuideBuilds})));
 const GUIDE_LINKS=[
  {label:'Overview',to:'/guide'},
  {label:'Start here',to:'/guide/start'},
  {label:'Your learning paths',to:'/guide/paths'},
+ {label:'What should I build?',to:'/guide/builds'},
  {label:'Workbench navigation',to:'/guide/workspace'},
  {label:'Tools & wiring',to:'/guide/tools'},
  {label:'Equipment encyclopedia',to:'/guide/equipment'},
@@ -71,7 +73,7 @@ function GuideHome({completed,lastTopic}:{completed:readonly string[];lastTopic:
   </div>
   <div className="sg-choice-grid">
    <Link to={guideTopicRoute('welcome')}><strong>I'm completely new</strong><span>Understand the app, then build your first lamp.</span></Link>
-   <Link to="/guide/tools"><strong>I want to build something</strong><span>Find the right tools, terminals and equipment.</span></Link>
+   <Link to="/guide/builds"><strong>I want to build something</strong><span>Choose a goal and get the right equipment list.</span></Link>
    <Link to="/guide/help"><strong>Something isn't working</strong><span>Learn how to investigate a dark lamp or stopped machine.</span></Link>
   </div>
   <section><h3>Your starting route</h3><p>Welcome → My first lamp → Save & recover → PLC basics. Opening a guide does not clear or modify your simulator project.</p>
@@ -87,6 +89,7 @@ function GuidePaths(){
   <p>Steady Guide explains navigation and equipment. The existing Learn & Practice lessons provide interactive projects and assess the actual simulator behaviour.</p>
   <div className="sg-card-grid">
    <Link className="sg-card" to={guideTopicRoute('welcome')}><small>Beginner · first</small><h3>1. Find your feet</h3><p>Understand the interface, build a lamp, then save a project.</p><span>Start orientation</span></Link>
+   <Link className="sg-card" to="/guide/builds"><small>Choose a goal</small><h3>0. What should I build?</h3><p>Match your first task to equipment and a real exercise.</p><span>Explore projects</span></Link>
    <Link className="sg-card" to={guideTopicRoute('wire-safely')}><small>Wiring · first</small><h3>2. Power and measure</h3><p>Learn terminal naming, I/O mapping and the virtual meter.</p><span>Learn wiring</span></Link>
    <Link className="sg-card" to={guideTopicRoute('plc-basics')}><small>PLC · basic</small><h3>3. Program a controller</h3><p>Choose Ladder, ST or FBD and observe scan outputs.</p><span>PLC basics</span></Link>
    <Link className="sg-card" to={guideTopicRoute('factory-scenes')}><small>Factory · next</small><h3>4. Build a workcell</h3><p>Start from an original scene; connect real plant feedback.</p><span>Browse the factory</span></Link>
@@ -148,9 +151,10 @@ export function GuidePage(){
      {area==='topic'&&(topic?<GuideTopicArticle topic={topic} completed={progress.completed.includes(topic.id)} onComplete={done}/>:<section><h2>Topic not found</h2><Link to="/guide">Return to the Guide</Link></section>)}
      {area==='paths'&&<GuidePaths/>}
      {area==='glossary'&&<GuideGlossary/>}
+     {area==='builds'&&<Suspense fallback={<p role="status">Loading practical build plans…</p>}><Builds id={detail}/></Suspense>}
      {area==='equipment'&&<Suspense fallback={<p role="status">Loading real equipment reference…</p>}><Equipment kind={detail}/></Suspense>}
      {area==='scenes'&&<Suspense fallback={<p role="status">Loading original factory scene atlas…</p>}><Scenes id={detail}/></Suspense>}
-     {!['','start','workspace','tools','plc','projects','help','topic','paths','glossary','equipment','scenes'].includes(area)&&<section><h2>Section not found</h2><Link to="/guide">Return to the Guide</Link></section>}
+     {!['','start','workspace','tools','plc','projects','help','topic','paths','glossary','equipment','scenes','builds'].includes(area)&&<section><h2>Section not found</h2><Link to="/guide">Return to the Guide</Link></section>}
      <footer className="sg-footer"><Link to="/sandbox">Open the simulator</Link><Link to="/learn">Learn & Practice</Link><span>This is a simplified educational simulator, not certified industrial equipment.</span></footer>
     </div>
    </div>
