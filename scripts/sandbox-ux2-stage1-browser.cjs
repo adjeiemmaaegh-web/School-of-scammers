@@ -220,7 +220,14 @@ const viewports=[
       }));
       assert.ok(Math.abs(wheel.document-data.scrollY)<=2,
         'UX9 mouse wheel scroll must stay inside the library: '+JSON.stringify({vp,data,wheel}));
-      await page.click('[data-library-tab-trigger="assemblies"]');
+      // Puppeteer page.click scrolls a sticky sidebar tab into view and can
+      // displace it mid-hit in the 1024px fallback layout. Click the actual
+      // currently visible tab center to test the user's mouse interaction.
+      const tabPoint=await page.$eval('[data-library-tab-trigger="assemblies"]',el=>{
+        const r=el.getBoundingClientRect();
+        return {x:r.left+r.width/2,y:r.top+r.height/2};
+      });
+      await page.mouse.click(tabPoint.x,tabPoint.y);
       const switchDebug=await page.evaluate(()=>{
         const el=document.querySelector('[data-library-assemblies]');
         const aside=document.querySelector('.sandbox-palette');
@@ -242,7 +249,11 @@ const viewports=[
       }));
       assert.ok(assemblies.visible&&assemblies.height>=160,
         'UX9 Assemblies tab collapsed: '+JSON.stringify({vp,assemblies}));
-      await page.click('[data-library-tab-trigger="components"]');
+      const componentsPoint=await page.$eval('[data-library-tab-trigger="components"]',el=>{
+        const r=el.getBoundingClientRect();
+        return {x:r.left+r.width/2,y:r.top+r.height/2};
+      });
+      await page.mouse.click(componentsPoint.x,componentsPoint.y);
       await page.waitForFunction(previous=>document.querySelector('.sandbox-palette-list').scrollTop>=previous-3,
         {timeout:3000},wheel.list);
       assert.ok(await page.$eval('.sandbox-palette-list',el=>el.clientHeight)>=160);
