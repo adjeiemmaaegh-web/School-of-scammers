@@ -1,8 +1,9 @@
 /**
- * Tick phase (R3.3): sample the wired input image and run every controller. The first classic PLC takes the original
- * fixed-name Ladder/ST/FBD path; every other PLC samples ITS OWN terminals and scans ITS OWN program through
- * `scanPlc`. Extracted verbatim from `tick()`; a runtime fault returns `halt`, which the caller turns into the same
- * fail-closed paused world as before. Behaviour is pinned by `tests/r3-golden-tick.test.ts` and the scenario suites.
+ * Tick phase (R3.3/R3.4): sample the wired input image and run every controller.
+ * The first classic PLC and each additional/PLC16 controller execute through the SAME
+ * `scanPlc` interpreter. The first classic PLC retains historical fixed-name
+ * WorldState mirrors and trace outputs for existing v1 projects. Independent PLCs
+ * sample their own terminals, program and state. All faults stop the virtual model.
  */
 import type { LadderResult } from '../../engineering/ladder';
 import type { FbdResult } from '../../engineering/fbd';
