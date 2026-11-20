@@ -3,7 +3,7 @@
 **Date:** 2026-11-20  
 **Branch:** `engineering/stage2-simulation-architecture-20261120`  
 **Parent development branch:** `engineering/stage1-workspace-completion-20261120`  
-**Status:** `IMPLEMENTED_UNVERIFIED` for the scoped increment; **the full R3 roadmap has outstanding work**.
+**Status:** `DEVELOPMENT_IN_PROGRESS` — the initial increment and additional R3.2/R3.4/R3.5/R3.7 source work are committed; the full R3 scope is **not complete**.
 
 ## Scope and intent
 
@@ -34,11 +34,20 @@ The engine already had four pure phases (`controller-scan`, `actuators`, `equipm
 - Verified that the orchestrator imports the extracted phase and no longer contains the old inline phase loop.
 - **No TypeScript compilation, Vitest, full build, CI, browser simulation or real hardware checks were run in this increment.** Their status is unverified, not passed.
 
+## Continued Stage 2 source development (same PR #94)
+
+6. **Per-device isolation (R3.4):** `src/sim/device-state.ts` now uses historical first-instance live flags only for the device that actually owns each legacy mirror. A second motor, PLC, conveyor, lamp, contactor, pump, valve or breaker no longer borrows the first device's state if its own snapshot entry is absent. The special classic-first-PLC legacy path remains, intentionally, for v1 compatibility.
+7. **Canonical integration seam (R3.2):** `src/sim/device-contract.ts` joins the existing visual/terminal, parameter and physical-plant definitions by device kind without building another independent registry. New equipment can read the existing integrated signal definitions and fault capability list.
+8. **Real typed telemetry in the inspector (R3.5):** `src/sim/device-channels.ts` now supports a selected-device scope and unit metadata taken from the registered physical model, not from heuristics; `WorkbenchInspector.tsx` exposes the snapshot's digital, numeric and disconnected channels with source labels. The list scrolls independently on tablets and desktop. A missing signal stays missing; numeric channels are not treated as 24 V power.
+9. **Bounded replay API (R3.7):** `src/sim/replay.ts` offers deterministic command/scan scripting and named snapshot checkpoints, with frame, command and scan limits. It reuses the one authoritative `tick()` implementation, and full serialized snapshots/events can be compared across two independent runs. No wall clock or second simulator was introduced.
+
+**Limitations:** This continuation was performed through live GitHub source commits rather than a complete local checkout. No compile, test suite, browser acceptance, hardware work, merge or deployment is claimed. Replay comparison is an implemented utility, not independently established determinism for every scenario.
+
 ## Next engineering and acceptance work
 
 - Run `npm ci`, `npm run typecheck`, `npm test`, golden tick tests and browser/worker smoke tests on the exact PR head in a connected checkout.
 - Verify no regressions in paused/running queue handling, large legacy project loads, multiple PLCs, isolated supplies, all star/delta cases, seeded faults and save/reload.
-- R3.4 legacy singleton removal and generalised first-controller assumptions, R3.5 device channel unit/provenance integration beyond this read-only adapter, and R3.7 comprehensive deterministic replay/mutation coverage remain open.
+- R3.4 remaining internal first-controller/singleton assumptions, R3.5 full channel timing/range/power-reference and fault-observability metadata, and R3.7 comprehensive scenario coverage remain open. The first-instance UI fallback and inspector integration described above are done.
 - R2 browser-level crash/quota/migration/offline-update acceptance and owner-device testing remain open.
 - PR review and owner approval precede any merge; deployment and hardware connections are out of scope.
 
