@@ -91,6 +91,11 @@ export function namesFor(project: ProjectFile, plcId: string | undefined): IoNam
 
 /** Project with one PLC's program changed. The first PLC writes the legacy fields. */
 export function withProgramOf(project: ProjectFile, plcId: string | undefined, patch: Partial<PlcProgram>): ProjectFile {
+  // A program target is a concrete placed controller, not an arbitrary string:
+  // otherwise a stale selection creates an orphan entry that can later attach
+  // unexpected code to a newly placed device with the same identifier.
+  if (plcId !== undefined && !plcComponents(project).some(c => c.id === plcId))
+    throw new RangeError('Unknown PLC program target: ' + plcId);
   if (plcId === undefined || plcId === primaryPlcId(project)) return {
     ...project,
     ...(patch.program !== undefined ? { program: patch.program } : {}),
