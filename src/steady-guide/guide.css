@@ -138,9 +138,6 @@
 .sg-lamp-checklist {margin:20px 0;padding:17px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
 .sg-lamp-checklist h3 {margin:0 0 8px;font-size:18px}
 .sg-lamp-checklist>p {font-size:13px;line-height:1.65;color:var(--muted)}
-.sg-lamp-checklist ol {margin:14px 0;padding:0;list-style:none;display:grid;gap:8px}
-.sg-lamp-checklist li {display:flex;align-items:flex-start;gap:12px;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2)}
-.sg-lamp-checklist li>span {width:26px;height:26px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--surface);font:700 12px var(--mono);color:var(--ink)}
-.sg-lamp-checklist li>div {display:flex;flex-wrap:wrap;align-items:center;gap:8px;line-height:1.5;font-size:13px;min-width:0}
-.sg-lamp-checklist li strong {overflow-wrap:anywhere}
-.sg-lamp-checklist li>div>span {color:var(--accent-text);font-weight:800}
+.sg-lamp-checklist ol {margin:14px 0;padding-left:30px;display:grid;gap:8px}
+.sg-lamp-checklist li {padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);line-height:1.7;font-size:13px;overflow-wrap:anywhere}
+.sg-lamp-checklist li>span {margin-inline:8px;color:var(--accent-text);font-weight:800}

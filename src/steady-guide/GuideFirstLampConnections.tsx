@@ -1,20 +1,19 @@
-import { FIRST_LAMP_WIRES, firstLampTerminalName } from './guide-first-lamp';
+import {FIRST_LAMP_WIRES} from './guide-first-lamp';
+import {guideEquipmentName} from './guide-reference';
 
-/** Read-only terminal checklist for the exact circuit verified by the real worker and Chromium. */
+/** Read-only connection checklist. No simulator actions or automatic completion. */
 export function GuideFirstLampConnections(){
  return <section className="sg-lamp-checklist" data-steady-first-lamp>
-   <h3>Check the three virtual wires</h3>
-   <p>After placing one supply, one START NO button and one pilot lamp in a new paused project, join these exact terminals in Logical / Wiring. Select the first terminal, then the second.</p>
-   <ol>{FIRST_LAMP_WIRES.map(({from,to},index)=><li key={index}
-     data-steady-first-lamp-wire={index+1}
-     data-from-kind={from.kind} data-from-terminal={from.terminal}
-     data-to-kind={to.kind} data-to-terminal={to.terminal}>
-      <span>{index+1}</span>
-      <div><strong>{firstLampTerminalName(from)}</strong>
-       <span aria-hidden="true">→</span>
-       <strong>{firstLampTerminalName(to)}</strong>
-      </div>
-     </li>)}</ol>
-   <p className="sg-muted">These connections apply only to the virtual 24 V teaching model. They do not establish a real-world electrical installation or safety design.</p>
+  <h3>Three virtual wires to connect</h3>
+  <p>In a new paused project, place the supply, START button and lamp. In Logical / Wiring, select each first terminal then its destination.</p>
+  <ol>{FIRST_LAMP_WIRES.map(({from,to},i)=><li key={i}
+    data-steady-first-lamp-wire={i+1}
+    data-from-kind={from.kind} data-from-terminal={from.terminal}
+    data-to-kind={to.kind} data-to-terminal={to.terminal}>
+   <strong>{guideEquipmentName(from.kind)} · {from.terminal}</strong>
+   <span aria-hidden="true">→</span>
+   <strong>{guideEquipmentName(to.kind)} · {to.terminal}</strong>
+  </li>)}</ol>
+  <p className="sg-muted">Virtual 24 V teaching model only, not real electrical or safety instructions.</p>
  </section>;
 }

@@ -1,6 +1,7 @@
 import {describe,expect,it} from 'vitest';
 import { COMPONENTS } from '../src/components/registry';
-import {FIRST_LAMP_PARTS,FIRST_LAMP_WIRES,FIRST_LAMP_LABELS} from '../src/steady-guide/guide-first-lamp';
+import {FIRST_LAMP_PARTS,FIRST_LAMP_WIRES} from '../src/steady-guide/guide-first-lamp';
+import {guideEquipmentName} from '../src/steady-guide/guide-reference';
 import {createWorld,tick,renderSnapshot} from '../src/sim/orchestrator';
 import type {Command,WorldState} from '../src/sim/signals';
 /** Independently verifies the beginner guide's exact P24 → START → lamp → M0 circuit with the real worker model. */
@@ -22,7 +23,7 @@ describe('Steady Guide first-lamp instructions use the authoritative simulator',
  it('every advertised wire references a real registered terminal and one of the three actual parts',()=>{
   expect([...FIRST_LAMP_PARTS]).toEqual(['supply','start','lamp']);
   expect(FIRST_LAMP_WIRES).toHaveLength(3);
-  expect(FIRST_LAMP_LABELS.lamp).toMatch(/pilot lamp/i);
+  expect(guideEquipmentName('lamp')).toMatch(/pilot lamp/i);
   for(const link of FIRST_LAMP_WIRES){
    for(const endpoint of [link.from,link.to]){
     expect(FIRST_LAMP_PARTS).toContain(endpoint.kind);
