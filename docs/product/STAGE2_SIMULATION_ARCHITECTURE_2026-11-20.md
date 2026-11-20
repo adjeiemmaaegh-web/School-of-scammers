@@ -43,6 +43,19 @@ The engine already had four pure phases (`controller-scan`, `actuators`, `equipm
 
 10. **PLC fault isolation:** Every PLC runtime-error path in `src/sim/phases/controller-scan.ts` now clears the full legacy output group and prior three-phase display state, rather than leaving Fill/Drain/Forward/Reverse or virtual drive state lingering after an invalid typed ST output. The simulated electrical voltage image is also cleared for invalid output-type faults.
 
+## Further Stage 2 development continuation
+
+11. **Controller failure observability:** `deenergisedPlcs` clears stale output tags as well as coil state, keeping monitoring consistent after a runtime exception while leaving inputs and numeric registers available for diagnostics.
+12. **PLC ownership and promotion:** When the first PLC is removed, the next PLC retains its own FBD document alongside its LD/ST program. Program updates now reject non-existent controller IDs rather than creating orphaned code records.
+13. **Replay event bounds:** Named replay checkpoints retain at most 512 events each and explicitly report overflow counts; simulation scripts cannot accumulate unlimited debug-event arrays across thousands of scans.
+14. **Powered numeric preview:** Paused I/O inspection requires an actual modeled 24 V differential between the sensor's L+ and M terminals, not simply the presence of voltage-map entries. Floating or unpowered wires are not labeled powered.
+15. **Signal provenance display:** The inspector now describes digital electrical I/O, numeric process measurements, plant model values and actuator output images by their registered origin and relative scan timing. Unsupported ranges, actual-current equivalents and hidden fault identities remain unspecified.
+16. **Pause priority:** A standalone Pause command can bypass a saturated Web Worker edit queue. Pending edits are cancelled with acknowledgements instead of executing after the pause; this is virtual learning-model control, not a safety-rated physical stop.
+
+These changes do not rewrite `tick()`, alter existing 50 ms / 10 ms scheduling, migrate the persisted `formatVersion: 1` schema or authorize any real PLC/hardware control.
+
+**Stage 2 development is still open.** Remaining scope includes deeper first-class PLC runtime consolidation, truthful device-level range/power/fault metadata where the underlying models support it, and full R3 contract/document consolidation. This handoff does **not** claim that the entire Stage 2 or R3 roadmap has been completed.
+
 **Limitations:** This continuation was performed through live GitHub source commits rather than a complete local checkout. No compile, test suite, browser acceptance, hardware work, merge or deployment is claimed. Replay comparison is an implemented utility, not independently established determinism for every scenario.
 
 ## Next engineering and acceptance work
