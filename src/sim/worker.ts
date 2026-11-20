@@ -1,38 +1,96 @@
 /// <reference lib="webworker" />
 import { createWorld, renderSnapshot, tick, SCAN_MS } from './orchestrator';
-import type { WorkerRequest, WorkerResponse } from './signals';
+import { haltedSimulationWorld } from './phases/fail-closed';
+import { parseWorkerIngress, WorkerMailbox } from './worker-mailbox';
+import { boundedWorkerEvents } from './event-stream';
+import type { Command, WorkerResponse } from './signals';
 
 const ctx: DedicatedWorkerGlobalScope = self as DedicatedWorkerGlobalScope;
 let world = createWorld();
-const pending: WorkerRequest['commands'] = [];
-const pendingRequestIds: number[] = [];
-function dispatch(commands: WorkerRequest['commands'] = [], requestId?: number, requestIds?: number[]): void {
+const mailbox = new WorkerMailbox();
+
+/** Reject a complete malformed or overflowing message, ACK its request ID, and
+ * leave the authoritative world and queued commands untouched. */
+function reject(message: string, requestId?: number, requestIds?: number[]): void {
+  const reply: WorkerResponse = {
+    kind: 'snapshot',
+    snapshot: { ...renderSnapshot(world), lastError: message },
+    events: boundedWorkerEvents([{ tick: world.tick, kind: 'error', detail: message }]),
+    ...(requestId === undefined ? {} : { requestId }),
+    ...(requestIds?.length ? { requestIds } : {}),
+  };
+  ctx.postMessage(reply);
+}
+
+/** An unexpected simulation exception stops the modeled controllers and
+ * actuators; it must not leave stale energised outputs running invisibly. */
+function haltOnException(message: string): void {
+  world = haltedSimulationWorld(world, message,
+    'Worker tick interrupted; simulated outputs deenergized', 30);
+}
+
+function dispatch(commands: readonly Command[] = [], requestId?: number, requestIds?: number[]): void {
   const before = world.project;
-  const result = tick(world, commands);
+  let result: ReturnType<typeof tick>;
+  try {
+    result = tick(world, commands);
+  } catch (error) {
+    const message = 'Simulation tick failed: ' + (error instanceof Error ? error.message : 'unknown error');
+    haltOnException(message);
+    reject(message, requestId, requestIds);
+    return;
+  }
   world = result.world;
-  // tick() keeps the same project object when nothing was edited (tests/r3-project-identity.test.ts), so the full-project
-  // JSON compare only runs when the object actually changed, not on every 50 ms scan.
-  const documentChanged = before !== world.project && JSON.stringify(before) !== JSON.stringify(world.project);
-  const reply: WorkerResponse = { kind: 'snapshot', snapshot: result.snapshot, events: result.events,
+  // Pure clock scans retain the same project object. Only actual document
+  // changes need a full JSON compare for Undo/Redo history in the UI.
+  const documentChanged = before !== world.project &&
+    JSON.stringify(before) !== JSON.stringify(world.project);
+  const reply: WorkerResponse = {
+    kind: 'snapshot', snapshot: result.snapshot, events: boundedWorkerEvents(result.events),
     ...(requestId === undefined ? {} : { requestId }),
     ...(requestIds?.length ? { requestIds } : {}),
     ...(before !== world.project ? { project: world.project } : {}),
-    ...(documentChanged ? { previousProject: before } : {}) };
+    ...(documentChanged ? { previousProject: before } : {}),
+  };
   ctx.postMessage(reply);
 }
-ctx.onmessage = (event: MessageEvent<WorkerRequest>) => {
-  if (event.data?.kind !== 'commands' || !Array.isArray(event.data.commands)) return;
-  // While running, queue user actions for the next clock tick rather than inserting extra scans.
+
+ctx.onmessage = (event: MessageEvent<unknown>) => {
+  const parsed = parseWorkerIngress(event.data);
+  if (!parsed.ok) {
+    reject(parsed.error, parsed.requestId);
+    return;
+  }
+  const packet = parsed.packet;
+  // A standalone Pause must not be rejected by a saturated edit queue.
+  // It halts without advancing the plant. Drop pending edits and acknowledge
+  // their callers with an explicit cancellation, so no stale edits are applied
+  // by a later clock interval. This is educational model control, NOT an
+  // industrial safety-stop or real hardware emergency stop.
+  if (world.running && packet.commands.length === 1 && packet.commands[0].k === 'pause') {
+    const dropped = mailbox.take();
+    if (dropped.requestIds.length) {
+      reject('Queued simulation commands cancelled by priority Pause', undefined, dropped.requestIds);
+    }
+    dispatch(packet.commands, packet.requestId);
+    return;
+  }
+  // During Run the single 50 ms clock owns scans. A received command only
+  // joins a bounded FIFO; nothing can insert an extra PLC scan in this path.
   if (world.running) {
-    pending.push(...event.data.commands);
-    if (Number.isSafeInteger(event.data.requestId)) pendingRequestIds.push(event.data.requestId!);
-  } else dispatch(event.data.commands, Number.isSafeInteger(event.data.requestId) ? event.data.requestId : undefined);
+    const error = mailbox.enqueue(packet);
+    if (error) reject(error, packet.requestId);
+  } else dispatch(packet.commands, packet.requestId);
 };
-ctx.postMessage({ kind: 'snapshot', snapshot: renderSnapshot(world), events: [], project: world.project } satisfies WorkerResponse);
+
+ctx.postMessage({
+  kind: 'snapshot', snapshot: renderSnapshot(world), events: [], project: world.project,
+} satisfies WorkerResponse);
+
 setInterval(() => {
-  if (world.running || pending.length) {
-    const ids = pendingRequestIds.splice(0, pendingRequestIds.length);
-    dispatch(pending.splice(0, pending.length), ids.length === 1 ? ids[0] : undefined,
-      ids.length > 1 ? ids : undefined);
+  if (world.running || mailbox.hasPending) {
+    const { commands, requestIds } = mailbox.take();
+    dispatch(commands, requestIds.length === 1 ? requestIds[0] : undefined,
+      requestIds.length > 1 ? requestIds : undefined);
   }
 }, SCAN_MS);

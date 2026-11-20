@@ -40,6 +40,7 @@ import './ux4-canvas-focus.css';
 import './ux6-workbench.css';
 import './ux7-reference-layout.css';
 import './stage1-workspace.css';
+import './stage2-channels.css';
 
 // Loaded on demand so opening the simulator does not download the project dialog, lessons, checklist or report builder.
 const ProjectLibraryPanel = lazy(() => import('../ui/sandbox/ProjectLibraryPanel').then(m => ({ default: m.ProjectLibraryPanel })));

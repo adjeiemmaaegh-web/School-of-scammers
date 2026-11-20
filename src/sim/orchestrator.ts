@@ -11,28 +11,30 @@ import { applyLocalForce } from '../program/local-force';
 import { feedPlant, freshPlant, stepPlant } from '../plant/sorting-conveyor';
 import { freshTank } from '../plant/tank-process';
 import {
-  MAX_PLCS, blankProgram, defaultProgramFor, extraPlcs, freshPlcRuntime, legacyPrimaryId, namesFor, plcComponents, plcView,
+  MAX_PLCS, blankProgram, defaultProgramFor, extraPlcs, freshPlcRuntime, legacyPrimaryId, namesFor, plcComponents,
   primaryPlcId, programOf, runtimePlcs, scanPlc, withProgramOf,
 } from './plcs';
-import { LEGACY_IO, defaultIo, ioOf, isConfigurableIo, validateIoMap } from './plc-io';
+import { defaultIo, ioOf, isConfigurableIo, validateIoMap } from './plc-io';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { measureContinuity } from '../electrical/continuity';
 import { threePhaseWireError, threePhaseConnections } from '../electrical/three-phase-netlist';
 import { freshStarterPanel } from '../electrical/three-phase-types';
-import { stepWiredStarter } from '../electrical/wired-star-delta';
 import { readPhaseMeter } from '../electrical/phase-instruments';
 import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
 import { laneOf, lanesOf, vesselOf } from './stations';
 import { electricalDevices } from '../components/electrical-defs';
 import { stepEquipmentState } from './phases/equipment-state';
 import { stepActuators } from './phases/actuators';
+import { stepThreePhase } from './phases/three-phase';
 import { scanControllers } from './phases/controller-scan';
+import { plcObservationImage } from './plc-observation';
+import { anyControllerPowered as hasPoweredController, controllerPowerImage } from './plc-power';
 import { deenergisedPlcs, quietLanes } from './phases/fail-closed';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { pruneWireStyles, validateWireStyles, withWireStyle, type WireColor } from '../components/wire-style';
 import { clearedAlarm } from '../plant/cylinder';
-import { analogWireError, sampleAnalogInputs } from './analog';
+import { analogWireError } from './analog';
 import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
 import {firstNewCarrierSuperposition,carrierSuperpositionError} from '../workspace/carrier-clearance';
 import { freshProjectPlant, stepProjectPlant, sensorImage, validatePlantFaults } from './p3-plant-bridge';
@@ -848,26 +850,7 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       'Q0.4': world.coils.Forward === true, 'Q0.5': world.coils.Reverse === true,
       PlcPowered: world.powered },
     voltages: { ...world.voltages }, contactorOn: world.contactorOn, motorOn: world.motorOn, motorAngleRad: world.motorAngleRad,
-    plcs: Object.fromEntries(plcComponents(world.project).map(c => {
-      const lang = programOf(world.project, c.id).language;
-      const idle: Record<string, boolean> = {};
-      const rt = world.plcs[c.id];
-      const io = ioOf(world.project, c);
-      // Show the physical numeric connection on the paused bench before the first scan.
-      // While running, the live PLC view shows the previous scan's actual sampled value.
-      const analogPoints = io.analogInputs && !world.running
-        ? sampleAnalogInputs(world.project, world.vessels, c.id, io, rt?.powered ?? false,
-          new Set(faultsOf(world.project).filter(f => f.kind === 'wire-open').map(f => f.target)),
-          world.plantWorld, id => world.voltages[id + '.L+'] !== undefined && world.voltages[id + '.M'] !== undefined).points
-        : rt?.analogInputs ?? [];
-      return [c.id, c.id === legacyPrimaryId(world.project)
-        ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
-          { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory,
-            fbdSteps: world.fbdSteps }, [], world.debugForces[c.id] ?? {})
-        : plcView(c.kind, lang, rt?.powered ?? false, io, rt?.tagInputs ?? idle, rt?.coils ?? {},
-          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {},
-            fbdSteps: rt?.fbdSteps ?? [] }, analogPoints, world.debugForces[c.id] ?? {})];
-    })),
+    plcs: plcObservationImage(world),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
     plantWorld: {
       world: { ...world.plantWorld.world,
@@ -963,10 +946,13 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   }
   const shorted = circuit.diagnostics.some(d => d.startsWith('Supply short'));
   const plc = plcComponents(w.project)[0];
-  // "24 V" always means 24 V relative to the device's OWN reference, so isolated supplies cannot leak.
-  const powered = !!plc && !shorted && circuit.reads24(terminal(plc.id, 'L+'), terminal(plc.id, 'M'));
+  // One power image from each PLC's own solved L+/M reference: the classic
+  // mirror, generic PLC scans and project-wide belt interlocks now agree.
+  const powerById = controllerPowerImage(w.project, circuit, shorted);
+  const powered = plc ? powerById[plc.id] === true : false;
+  const anyControllerPowered = hasPoweredController(powerById);
   // 3-4. Sample the wired input image and scan every controller (see sim/phases/controller-scan.ts).
-  const scan = scanControllers(w, circuit, shorted, plc, powered, dtMs);
+  const scan = scanControllers(w, circuit, shorted, plc, powered, dtMs, powerById);
   if (scan.halt) return { world: scan.halt.world, snapshot: renderSnapshot(scan.halt.world), events: scan.halt.events };
   const { eyePowered, probePowered, inputs, ladderResult, stResult, fbdResult, coils, tagValues, nextPlcs, unpoweredExtras } = scan;
   // 5. Publish output image (Q0.0 follows coil Run, only when PLC is powered).
@@ -979,33 +965,11 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // outputs and the electrical actuator image settle. Geometry sensors feed the
   // following PLC scan, never the current scan's input image.
   const p3 = stepProjectPlant(w.plantWorld, w.project, circuit.energizedLoads, dtMs,
-    {controllerPowered:powered});
+    {controllerPowered:anyControllerPowered});
   for (const event of p3.events)
     events.push({ tick: w.tick + 1, kind: 'plant', detail: event.source + ': ' + event.detail });
-  // P4 three-phase process after the worker's actual 24V coil demand scan.
-  // Three-phase conductors are not supplied by the 24V electrical solver.
-  const connectedThreePhase=threePhaseConnections(w.project.components,w.project.wires.filter(wire=>
-    !faultsOf(w.project).some(f=>f.kind==='wire-open'&&f.target===wire.id)));
-  const nextThreePhase:WorldState['threePhase']={};
-  for(const part of w.project.components.filter(c=>c.kind==='star-delta-drive')){
-    const wired=connectedThreePhase[part.id]??null;
-    const live=wired&&w.threePhasePower[wired.supplyId]!==false?wired:null;
-    const coils={
-      main:circuit.energizedLoads.includes(part.id+'-MAIN'),
-      star:circuit.energizedLoads.includes(part.id+'-STAR'),
-      delta:circuit.energizedLoads.includes(part.id+'-DELTA'),
-      reset:circuit.energizedLoads.includes(part.id+'-RESET'),
-    };
-    const previous=w.threePhase[part.id]??freshStarterPanel();
-    const next=stepWiredStarter(previous,live,coils,dtMs);
-    nextThreePhase[part.id]=next;
-    deviceOn[part.id]=next.mainClosed&&(next.starClosed||next.deltaClosed);
-    if(next.motor.mode!==previous.motor.mode||next.motor.tripped!==previous.motor.tripped)
-      events.push({tick:w.tick+1,kind:'three-phase',detail:part.id+': '+next.motor.mode+
-        (next.motor.tripped?' (thermal trip)':'')});
-    if(next.conflict&&!previous.conflict)events.push({tick:w.tick+1,kind:'interlock',
-      detail:part.id+': STAR/DELTA control conflict; motor inhibited'});
-  }
+  // The isolated three-phase equipment phase follows the 24 V actuator image.
+  const nextThreePhase = stepThreePhase(w, circuit.energizedLoads, dtMs, deviceOn, events);
   // 8. Photoeye state from geometry is sampled by the circuit on NEXT scan.
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
