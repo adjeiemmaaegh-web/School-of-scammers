@@ -20,13 +20,13 @@ import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { measureContinuity } from '../electrical/continuity';
 import { threePhaseWireError, threePhaseConnections } from '../electrical/three-phase-netlist';
 import { freshStarterPanel } from '../electrical/three-phase-types';
-import { stepWiredStarter } from '../electrical/wired-star-delta';
 import { readPhaseMeter } from '../electrical/phase-instruments';
 import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
 import { laneOf, lanesOf, vesselOf } from './stations';
 import { electricalDevices } from '../components/electrical-defs';
 import { stepEquipmentState } from './phases/equipment-state';
 import { stepActuators } from './phases/actuators';
+import { stepThreePhase } from './phases/three-phase';
 import { scanControllers } from './phases/controller-scan';
 import { deenergisedPlcs, quietLanes } from './phases/fail-closed';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
@@ -982,30 +982,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     {controllerPowered:powered});
   for (const event of p3.events)
     events.push({ tick: w.tick + 1, kind: 'plant', detail: event.source + ': ' + event.detail });
-  // P4 three-phase process after the worker's actual 24V coil demand scan.
-  // Three-phase conductors are not supplied by the 24V electrical solver.
-  const connectedThreePhase=threePhaseConnections(w.project.components,w.project.wires.filter(wire=>
-    !faultsOf(w.project).some(f=>f.kind==='wire-open'&&f.target===wire.id)));
-  const nextThreePhase:WorldState['threePhase']={};
-  for(const part of w.project.components.filter(c=>c.kind==='star-delta-drive')){
-    const wired=connectedThreePhase[part.id]??null;
-    const live=wired&&w.threePhasePower[wired.supplyId]!==false?wired:null;
-    const coils={
-      main:circuit.energizedLoads.includes(part.id+'-MAIN'),
-      star:circuit.energizedLoads.includes(part.id+'-STAR'),
-      delta:circuit.energizedLoads.includes(part.id+'-DELTA'),
-      reset:circuit.energizedLoads.includes(part.id+'-RESET'),
-    };
-    const previous=w.threePhase[part.id]??freshStarterPanel();
-    const next=stepWiredStarter(previous,live,coils,dtMs);
-    nextThreePhase[part.id]=next;
-    deviceOn[part.id]=next.mainClosed&&(next.starClosed||next.deltaClosed);
-    if(next.motor.mode!==previous.motor.mode||next.motor.tripped!==previous.motor.tripped)
-      events.push({tick:w.tick+1,kind:'three-phase',detail:part.id+': '+next.motor.mode+
-        (next.motor.tripped?' (thermal trip)':'')});
-    if(next.conflict&&!previous.conflict)events.push({tick:w.tick+1,kind:'interlock',
-      detail:part.id+': STAR/DELTA control conflict; motor inhibited'});
-  }
+  // The isolated three-phase equipment phase follows the 24 V actuator image.
+  const nextThreePhase = stepThreePhase(w, circuit.energizedLoads, dtMs, deviceOn, events);
   // 8. Photoeye state from geometry is sampled by the circuit on NEXT scan.
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });
