@@ -2,6 +2,16 @@
 
 **Governing plan:** [`MASTER_ROADMAP.md`](MASTER_ROADMAP.md) (R0–R12). This page records what is *verified now*; the roadmap says what to do next. Task states: `NOT_STARTED`, `IMPLEMENTED_UNVERIFIED`, `CI_VERIFIED`, `OWNER_ACCEPTED`, `BLOCKED`, `DEFERRED`.
 
+## 2026-11-20 Stage 2 simulation architecture (stacked on Stage 1, not merged)
+
+**State: IMPLEMENTED_UNVERIFIED — NOT OWNER ACCEPTED.** The owner-facing Stage 2 name maps to the R3 simulation-kernel area in this roadmap; this is a scoped engineering increment, not closure of all R3 or outstanding R2 gates.
+
+- Extracted the virtual three-phase phase without intentionally changing tick sequencing, voltage-domain separation or project format.
+- Added bounded, FIFO Worker command ingress with one-ACK-per-request error responses, queue limits and a fail-closed unexpected tick exception path.
+- Added a capped, read-only per-device typed digital/numeric signal adapter, preserving disconnected analog values and not guessing missing engineering units.
+- Regression tests **authored, not executed**. Source inspection counted all **39/39** command names; no exact-head CI, TypeScript build, Vitest or real-browser evidence is claimed.
+- Full design, caveats and next checks: [Stage 2 development handoff](STAGE2_SIMULATION_ARCHITECTURE_2026-11-20.md). The working branch must merge behind Stage 1, if approved. R3.4 singleton generalization, complete R3.5 runtime integration and R3.7 full replay/mutation evidence remain open. **NO-GO** for release, merge/deploy unapproved.
+
 ## 1. Baseline (R0.1, R0.3) — measured 2026-11-17 in a fresh checkout
 
 | Item | Value |
