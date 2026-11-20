@@ -8,10 +8,10 @@
  * only affect each other through the 24 V netlist (a wire from one PLC's output to another's input).
  * Pure and deterministic, like everything under src/sim.
  */
-import { executeLadder, type LadderDocument, type LadderMemory, type LadderStep } from '../engineering/ladder';
-import { compileFbd, executeFbd, fbdMotorStarter, type FbdDocument, type FbdStep } from '../engineering/fbd';
+import { executeLadder, type LadderDocument, type LadderMemory, type LadderStep, type LadderResult } from '../engineering/ladder';
+import { compileFbd, executeFbd, fbdMotorStarter, type FbdDocument, type FbdStep, type FbdResult } from '../engineering/fbd';
 import type { AnalogPoint } from './analog';
-import { executeStructuredText, type STValue } from '../engineering/structured-text';
+import { executeStructuredText, type STValue, type STResult } from '../engineering/structured-text';
 import { compileSandboxST, DEFAULT_ST_SOURCE } from '../program/p2-contract';
 import { isPlcKind } from '../components/registry';
 import { defaultIo, ioOf, namesOf, type IoNames, type PlcIoMap } from './plc-io';
@@ -131,6 +131,14 @@ export const classicInputs = (tags: Record<string, STValue>): PlcInputs => ({
   TankHigh: tags.TankHigh === true, ReverseRequest: tags.ReverseRequest === true,
 });
 
+/** Executed interpreter result for trace/breakpoint compatibility on the classic PLC.
+ * Other PLCs do not need to collect this transient data.
+ */
+export type PlcExecution =
+  | { language: 'ladder'; result: LadderResult }
+  | { language: 'st'; result: STResult }
+  | { language: 'fbd'; result: FbdResult };
+
 /**
  * One scan of a PLC through its I/O map. `tagInputs` is the sampled input image keyed by tag; outputs come back
  * keyed by tag too. Throws on a runtime fault; the caller fails the whole plant closed.
@@ -139,6 +147,7 @@ export function scanPlc(
   cfg: ResolvedProgram, io: PlcIoMap, prior: PlcRuntime, tagInputs: Record<string, STValue>, powered: boolean, dtMs: number,
   analogInputs: AnalogPoint[] = [],
   localForces: Readonly<Record<string, boolean | number>> = {},
+  onExecuted?: (execution: PlcExecution) => void,
 ): PlcRuntime {
   const names = namesOf(io);
   const inputs = classicInputs(tagInputs);
@@ -157,6 +166,7 @@ export function scanPlc(
         throw new Error('Numeric input ' + node.tag + ' has no connected source');
     }
     const result = executeFbd(program, tagInputs, prior.coils, prior.fbdMemory, dtMs);
+    onExecuted?.({ language: 'fbd', result });
     const coils = result.outputs;
     return { ...prior, powered, inputs, tagInputs, analogInputs, coils,
       fbdMemory: result.memory, fbdSteps: result.steps,
@@ -179,6 +189,7 @@ export function scanPlc(
         throw new TypeError(names.requireRun ? 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL' : `PLC output ${name} must be BOOL`);
     }
     // Structured Text is case-insensitive; the physical bindings use the canonical mapped names.
+    onExecuted?.({ language: 'st', result });
     const coils = {
       ...Object.fromEntries(Object.entries(result.outputs).filter(([, v]) => typeof v === 'boolean')),
       ...Object.fromEntries(names.outputs.map(n => [n, out(n) === true])),
@@ -188,6 +199,7 @@ export function scanPlc(
       tagValues: { ...tagInputs, ...result.signals, ...coils, ...mappedOutputs(coils), Unused: false } };
   }
   const result = executeLadder(cfg.program, tagInputs, prior.coils, prior.ladderMemory, dtMs, prior.ladderNumeric, localForces);
+  onExecuted?.({ language: 'ladder', result });
   const coils = result.outputs;
   return { ...prior, powered, inputs, tagInputs, analogInputs, coils, stMemory: {}, ladderMemory: result.memory, ladderNumeric: result.numericValues, ladderSteps: [...result.steps],
     fbdMemory: {}, fbdSteps: [],
