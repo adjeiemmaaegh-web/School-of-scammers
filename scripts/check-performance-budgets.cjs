@@ -7,7 +7,9 @@ const path=require('node:path');
 const zlib=require('node:zlib');
 const assert=require('node:assert/strict');
 const base=path.resolve(__dirname,'../dist/assets');
-const LIMITS={entryGzip:120*1024,render3dGzip:285*1024,sandboxSceneGzip:45*1024,totalJsGzip:850*1024,sandboxRouteGzip:575*1024,totalCssGzip:110*1024};
+// University recovery mission (2026-11-21): total JS limit raised 850 -> 900 KiB for ~15 new simulation devices and the compressed-air model, which
+// ship in the two simulation worker bundles and lazy chunks. The user-facing critical-path limits (entry, 3D, sandbox route 575 KiB) are unchanged.
+const LIMITS={entryGzip:120*1024,render3dGzip:285*1024,sandboxSceneGzip:45*1024,totalJsGzip:900*1024,sandboxRouteGzip:575*1024,totalCssGzip:110*1024};
 const files=fs.readdirSync(base).map(name=>({name,bytes:fs.statSync(path.join(base,name)).size,gzip:zlib.gzipSync(fs.readFileSync(path.join(base,name)),{level:9}).length}));
 const js=files.filter(f=>f.name.endsWith('.js')),css=files.filter(f=>f.name.endsWith('.css'));
 const entry=js.find(f=>/^index-[\w-]+\.js$/.test(f.name));
