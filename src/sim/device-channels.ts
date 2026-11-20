@@ -14,7 +14,8 @@ export type DeviceChannel =
   | { kind: 'digital'; deviceId: string; endpoint: string; tag: string; value: boolean;
       source: 'plc-input' | 'plc-output' | 'plant' | 'actuator'; snapshotTick: number }
   | { kind: 'numeric'; deviceId: string; endpoint: string; tag: string; value: number | null;
-      unit?: string; connected: boolean; origin?: string; source: 'plc-analog-input' | 'plant'; snapshotTick: number };
+      unit?: string; connected: boolean; sampled?: boolean; origin?: string;
+      source: 'plc-analog-input' | 'plant'; snapshotTick: number };
 
 export type ChannelSemantics = {
   /** Direction is relative to the observed equipment, not a network packet. */
@@ -87,8 +88,11 @@ export function readDeviceChannels(
       for (const io of plc.io.analogInputs ?? []) append({
         kind: 'numeric', source: 'plc-analog-input', deviceId: part.id,
         endpoint: part.id + '.' + io.terminal, tag: io.tag,
-        value: io.connected && Number.isFinite(io.value) ? io.value : null,
+        // The wire can remain present while the PLC is unpowered, but a
+        // numeric value is not a live sample in that condition.
+        value: plc.powered && io.connected && Number.isFinite(io.value) ? io.value : null,
         unit: io.unit, connected: io.connected && Number.isFinite(io.value),
+        sampled: plc.powered,
         ...(io.source ? { origin: io.source } : {}), snapshotTick: snapshot.tick,
       });
     }
