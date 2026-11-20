@@ -74,14 +74,14 @@ const projectKey='efo-open-sandbox-project-v1';
    ids[item.kind]=idsOfKind[0];
   }
   assert.equal(await page.$$eval('.sandbox-device',items=>items.length),3);
-  assert.equal(await page.$eval('[data-p5-logical-device]',items=>items.length),3);
+  assert.equal(await page.$$eval('[data-p5-logical-device]',items=>items.length),3);
   await page.click('[data-ux6-tool="wire"]');
   // The wires list is intentionally unmounted while the engineering dock is
   // collapsed. Opening diagnostics is an ordinary UI action; without it a zero
   // length query gives a false negative even for valid worker-accepted wires.
   await page.$eval('[data-p5-dock-tab="diagnostics"]',el=>el.click());
   await page.waitForSelector('.sandbox-wire-list',{timeout:12000});
-  assert.equal(await page.$eval('.sandbox-wire-list>div',items=>items.length),0);
+  assert.equal(await page.$$eval('.sandbox-wire-list>div',items=>items.length),0);
   const wire=async(from,to,index)=>{
    const a='[data-terminal-id="'+from+'"]',b='[data-terminal-id="'+to+'"]';
    await page.$eval(a,el=>el.scrollIntoView({block:'center'}));
