@@ -11,10 +11,10 @@ import { applyLocalForce } from '../program/local-force';
 import { feedPlant, freshPlant, stepPlant } from '../plant/sorting-conveyor';
 import { freshTank } from '../plant/tank-process';
 import {
-  MAX_PLCS, blankProgram, defaultProgramFor, extraPlcs, freshPlcRuntime, legacyPrimaryId, namesFor, plcComponents, plcView,
+  MAX_PLCS, blankProgram, defaultProgramFor, extraPlcs, freshPlcRuntime, legacyPrimaryId, namesFor, plcComponents,
   primaryPlcId, programOf, runtimePlcs, scanPlc, withProgramOf,
 } from './plcs';
-import { LEGACY_IO, defaultIo, ioOf, isConfigurableIo, validateIoMap } from './plc-io';
+import { defaultIo, ioOf, isConfigurableIo, validateIoMap } from './plc-io';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { measureContinuity } from '../electrical/continuity';
@@ -28,11 +28,12 @@ import { stepEquipmentState } from './phases/equipment-state';
 import { stepActuators } from './phases/actuators';
 import { stepThreePhase } from './phases/three-phase';
 import { scanControllers } from './phases/controller-scan';
+import { plcObservationImage } from './plc-observation';
 import { deenergisedPlcs, quietLanes } from './phases/fail-closed';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { pruneWireStyles, validateWireStyles, withWireStyle, type WireColor } from '../components/wire-style';
 import { clearedAlarm } from '../plant/cylinder';
-import { analogWireError, sampleAnalogInputs } from './analog';
+import { analogWireError } from './analog';
 import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
 import {firstNewCarrierSuperposition,carrierSuperpositionError} from '../workspace/carrier-clearance';
 import { freshProjectPlant, stepProjectPlant, sensorImage, validatePlantFaults } from './p3-plant-bridge';
@@ -848,34 +849,7 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       'Q0.4': world.coils.Forward === true, 'Q0.5': world.coils.Reverse === true,
       PlcPowered: world.powered },
     voltages: { ...world.voltages }, contactorOn: world.contactorOn, motorOn: world.motorOn, motorAngleRad: world.motorAngleRad,
-    plcs: Object.fromEntries(plcComponents(world.project).map(c => {
-      const lang = programOf(world.project, c.id).language;
-      const idle: Record<string, boolean> = {};
-      const rt = world.plcs[c.id];
-      const io = ioOf(world.project, c);
-      // Show the physical numeric connection on the paused bench before the first scan.
-      // While running, the live PLC view shows the previous scan's actual sampled value.
-      const analogPoints = io.analogInputs && !world.running
-        ? sampleAnalogInputs(world.project, world.vessels, c.id, io, rt?.powered ?? false,
-          new Set(faultsOf(world.project).filter(f => f.kind === 'wire-open').map(f => f.target)),
-          world.plantWorld, id => {
-            // A voltage entry may be floating (null) or be at the same
-            // potential as M. Only a measured 24 V difference can energize a
-            // process sensor; mere presence of both keys is not proof of power.
-            const positive = world.voltages[id + '.L+'];
-            const negative = world.voltages[id + '.M'];
-            return typeof positive === 'number' && typeof negative === 'number' &&
-              Math.abs(positive - negative - 24) < 0.001;
-          }).points
-        : rt?.analogInputs ?? [];
-      return [c.id, c.id === legacyPrimaryId(world.project)
-        ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
-          { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory,
-            fbdSteps: world.fbdSteps }, [], world.debugForces[c.id] ?? {})
-        : plcView(c.kind, lang, rt?.powered ?? false, io, rt?.tagInputs ?? idle, rt?.coils ?? {},
-          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {},
-            fbdSteps: rt?.fbdSteps ?? [] }, analogPoints, world.debugForces[c.id] ?? {})];
-    })),
+    plcs: plcObservationImage(world),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
     plantWorld: {
       world: { ...world.plantWorld.world,
