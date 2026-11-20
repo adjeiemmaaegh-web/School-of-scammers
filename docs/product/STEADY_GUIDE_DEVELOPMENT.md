@@ -122,3 +122,9 @@ At commit `951f2af9`, Vite/typecheck and Vitest passed, but the aggregate (all l
 
 - Exact-head `c3b132a8` passed TypeScript, tests, the fixed JS budget and reached the browser journey, which failed immediately after placing the genuine three devices with `undefined !== 3`. This exposed **two test-only mistakes**: `$eval` was used for collection counts where `$$eval` is required (logical node count and diagnostics wire-row count). The simulator device placement had already succeeded.
 - Both assertions now use `$$eval`; a source guard scanned the complete new browser recipe for remaining single-node `length` assertions, and the script was syntax-checked. The test still must prove the actual three wires, virtual lamp ON/OFF and wire-disconnection negative in a fresh exact-head browser CI run.
+
+### First real Chrome positive behavior confirmed; negative test repair (2026-11-20)
+
+- Exact-head `8ef9f067` passed all build, fixed-size budget and native checks, and the real browser test advanced through **three actual UI-placed devices, three connected terminal wires and OFF → ILLUMINATED → OFF worker-observed lamp behavior**. It subsequently failed solely at the negative-test setup's wire removal assertion; the positive path is already evidenced by the strict test ordering and CI log.
+- The removal test previously assumed a fixed `from → to` string orientation and attempted removal immediately after issuing an asynchronous Pause. It now waits for the genuine wire-row removal control to become enabled, matches the exact START B/lamp L+ terminal pair in either displayed order, and reports all row states on timeout. It still removes a real worker project wire by clicking the existing UI control, then must prove the lamp stays OFF after START is pressed.
+- The negative test, return-to-Guide project isolation and full regression remain **unverified** until the new exact-head run passes. This is not real electrical or hardware safety validation.

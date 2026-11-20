@@ -119,9 +119,26 @@ const projectKey='efo-open-sandbox-project-v1';
   // Demonstrate a real negative: break START B -> lamp L+, then operate START.
   await command('Pause');
   const from=ids.start+'.B',to=ids.lamp+'.L+';
+  // Wait for Pause to unlock editing. Some worker wire records may display
+  // the two endpoints in reverse order; match by both exact terminal IDs.
+  await page.waitForFunction(([a,b])=>{
+   const row=[...document.querySelectorAll('.sandbox-wire-list>div')].find(el=>{
+    const code=el.querySelector('code')?.textContent||'';
+    return code.includes(a)&&code.includes(b);
+   });
+   const remove=row?.querySelector('button[aria-label^="Remove wire"]');
+   return !!remove&&!remove.disabled;
+  },{timeout:10000},[from,to]).catch(async error=>{
+   const rows=await page.$$eval('.sandbox-wire-list>div',els=>
+    els.map(el=>({code:el.querySelector('code')?.textContent,
+     disabled:el.querySelector('button[aria-label^="Remove wire"]')?.disabled})));
+   throw new Error('Wire not removable after Pause: '+JSON.stringify(rows)+'; '+error.message);
+  });
   const removed=await page.evaluate(([a,b])=>{
-   const row=[...document.querySelectorAll('.sandbox-wire-list>div')].find(el=>
-    el.querySelector('code')?.textContent?.includes(a+' → '+b));
+   const row=[...document.querySelectorAll('.sandbox-wire-list>div')].find(el=>{
+    const code=el.querySelector('code')?.textContent||'';
+    return code.includes(a)&&code.includes(b);
+   });
    const remove=row?.querySelector('button[aria-label^="Remove wire"]');
    if(!remove||remove.disabled)return false;
    remove.click();return true;
