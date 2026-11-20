@@ -111,8 +111,11 @@ export function compareSimulationReplay(project: ProjectFile, frames: readonly R
         JSON.stringify({ snapshot: b.snapshot, events: b.events, droppedEvents: b.droppedEvents }))
       return { identical: false, firstDifferentCheckpoint: a.name };
   }
+  const finalSame = JSON.stringify(left.finalSnapshot) === JSON.stringify(right.finalSnapshot);
   return {
-    identical: JSON.stringify(left.finalSnapshot) === JSON.stringify(right.finalSnapshot),
-    firstDifferentCheckpoint: null,
+    identical: finalSame,
+    // A divergence after the last named checkpoint must not be reported with
+    // a misleading null divergence location.
+    firstDifferentCheckpoint: finalSame ? null : 'final',
   };
 }
