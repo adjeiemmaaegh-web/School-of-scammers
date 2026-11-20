@@ -18,6 +18,7 @@ export function LearnPage() {
         <h1 className="page-title">Guided practice on the real simulator</h1>
         <p className="sub">Tutorials, ranked exercises and work-order scenarios. None of this is required: you can <Link to="/sandbox">open the simulator</Link> and build freely at any time.</p>
 
+        <p className="sub"><strong>New to this application?</strong> <Link to="/guide">Start with Steady Guide</Link> for genuine workbench screenshots, equipment terminals and navigation help before attempting exercises.</p>
         <div className="hub-cards">
           <Link to="/sandbox" className="hub-card"><h2>Open simulator</h2><p>An empty 3D floor. Build, wire, program and run anything the component library supports.</p><span className="go">Go to the simulator →</span></Link>
           <Link to="/trades" className="hub-card"><h2>Guided exercises</h2><p>A ranked 1&ndash;10 ladder of hands-on tasks, PLC first, with hints and instant feedback.</p><span className="go">Open the ladder →</span></Link>

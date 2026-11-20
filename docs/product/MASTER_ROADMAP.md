@@ -372,3 +372,21 @@ Milestones describe work completion, **not** independent authorization to deploy
 - [ ] Deployment or product release decision (owner only; not authorized by this document).
 
 **Final guidance:** Do not reward the project for having many simulated devices or passing many tests alone. Reward it for letting a student independently design, wire, program, inspect, break, repair and persist a genuinely new industrial automation system—then measure whether the same behavior survives crashes, offline use, low-spec hardware and formal educational review.
+
+---
+# I. R13 — Steady Guide beginner onboarding (added 2026-11-19)
+
+This new user-requested feature is developed in draft PR **#89** on \`feature/steady-guide\`, created from the production-verified \`main\` SHA \`4eb3cd1a\`. It **does not change the required R0–R12 industrial/educational release gates** and should not be mistaken for a new working PLC engine.
+
+| R13 unit | Deliverable | Current implementation state | Acceptance still needed |
+|---|---|---|---|
+| R13.1 | Separate first-time user Guide navigation and learn-first flow | Implemented on draft branch | Owner novice journey and mobile feedback |
+| R13.2 | Equipment/terminal reference and original scene atlas | 54 component kinds; 21 original scenes, source-parity tests | Verify explanation quality and equipment changes over time |
+| R13.3 | Hands-on selection guidance | Six task-based build plans linked to real labs/scenarios | Real new-user completion and safe example review |
+| R13.4 | In-workbench help and highlight | Eight opt-in visual targets, Escape/return focus, no worker commands | Cross-device visual review and keyboard assistive-tech test |
+| R13.5 | Authentic screenshots | Five original R1 PNGs embedded, 8 newer actual CI images reviewed, 14 states scripted | Complete SG-01..SG-18 including populated PLC/FBD/fault states; owner screenshot signoff |
+| R13.6 | Offline, storage and performance | Lazy guide route, separately isolated progress, route/size guardrails | Exact-head browser/offline/low-spec passes and owner acceptance |
+| R13.7 | Integration and release | Draft PR #89; main and production unchanged | Full CI green on exact source, review approval, explicit owner merge/deploy decision |
+
+Steady Guide must never reveal graded scenario answers, modify current projects or claim actual industrial safety/PLC firmware equivalence. Documentation and evidence: \`docs/product/STEADY_GUIDE_DEVELOPMENT.md\` and \`docs/qa/steady-guide/CAPTURE_MATRIX.md\`.
+

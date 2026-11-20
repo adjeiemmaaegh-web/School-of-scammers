@@ -1,0 +1,115 @@
+/** Browser smoke for Steady Guide. Read-only navigation must not alter a user's project keys. */
+const assert=require('node:assert/strict');
+const puppeteer=require('puppeteer');
+const base=process.env.PLC_BASE_URL||'http://127.0.0.1:4173';
+(async()=>{
+ const browser=await puppeteer.launch({headless:true,args:['--no-sandbox','--disable-setuid-sandbox','--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ const page=await browser.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(String(e)));
+ const go=async path=>{await page.goto(base+path,{waitUntil:'networkidle0',timeout:45000});await page.waitForSelector('[data-steady-guide]',{timeout:15000});};
+ try{
+  await page.setViewport({width:1366,height:768});
+  await go('/guide');
+  assert.match(await page.$eval('h1',x=>x.textContent),/Learn the application/i);
+  const nav=await page.$$eval('.primary-nav a',a=>a.map(x=>x.textContent.trim()));
+  assert.deepEqual(nav,['Simulator','Steady Guide','Learn & Practice','Assessments']);
+  const img=await page.$('[data-steady-screenshot] img');
+  assert.ok(img,'A genuine source screenshot is visible on the guide home');
+  await page.waitForFunction(()=>{const i=document.querySelector('[data-steady-screenshot] img');return i&&i.complete&&i.naturalWidth>0;},{timeout:12000});
+  const before=await page.evaluate(()=>Object.entries(localStorage).filter(([k])=>k.includes('sandbox')||k.includes('scenario')||k.includes('project')).sort());
+  await go('/guide/topic/first-lamp');
+  assert.equal(await page.$eval('[data-steady-topic]',x=>x.getAttribute('data-steady-topic')),'first-lamp');
+  assert.ok((await page.$$eval('.sg-steps>li',a=>a.length))>=5);
+  await page.click('.sg-actions button');
+  assert.equal(await page.$eval('.sg-actions button',x=>x.getAttribute('aria-pressed')),'true');
+  await go('/guide/equipment');
+  assert.equal(await page.$$eval('[data-steady-equipment-index] .sg-card',a=>a.length),54);
+  await go('/guide/equipment/photoeye');
+  assert.match(await page.$eval('[data-steady-equipment-detail] h2',x=>x.textContent),/photoeye/i);
+  assert.ok((await page.$$eval('.sg-terminal',a=>a.map(x=>x.textContent))).some(x=>x.includes('OUT')));
+  await go('/guide/builds');
+  assert.equal(await page.$$eval('[data-steady-build-index] .sg-card',a=>a.length),6);
+  await go('/guide/builds/first-lamp');
+  assert.equal(await page.$eval('[data-steady-build]',x=>x.getAttribute('data-steady-build')),'first-lamp');
+  assert.equal(await page.$$eval('[data-steady-build-parts] .sg-card',a=>a.length),3);
+  await go('/guide/scenes');
+  assert.equal(await page.$$eval('[data-steady-scene-index] .sg-card',a=>a.length),21);
+  await go('/guide/scenes/sorting-line');
+  assert.match(await page.$eval('[data-steady-scene-detail] h2',x=>x.textContent),/Photoeye/i);
+  await go('/guide');
+  await page.type('#sg-guide-search','PID');
+  const links=await page.$$eval('.sg-search-results a',a=>a.map(x=>x.getAttribute('href')));
+  assert.ok(links.some(x=>x.includes('language-tools')),'PID search must find the programming guide');
+  await page.click('#sg-guide-search');
+  await page.keyboard.down('Control');await page.keyboard.press('KeyA');await page.keyboard.up('Control');
+  await page.keyboard.press('Backspace');
+  await page.type('#sg-guide-search','pilot lamp');
+  await page.waitForFunction(()=>[...document.querySelectorAll('.sg-search-results a')].some(a=>a.getAttribute('href')==='/guide/equipment/lamp'),{timeout:8000});
+  assert.match(await page.$eval('.sg-search-results a[href="/guide/equipment/lamp"]',a=>a.textContent),/pilot lamp/i);
+  await page.click('#sg-guide-search');
+  await page.keyboard.down('Control');await page.keyboard.press('KeyA');await page.keyboard.up('Control');
+  await page.keyboard.press('Backspace');
+  await page.type('#sg-guide-search','qzx-unknown-factory-equipment');
+  assert.match(await page.$eval('.sg-search-results',el=>el.textContent),/No matches/i);
+  // Reading-progress confirmation never touches project storage.
+  await go('/guide');
+  assert.match(await page.$eval('.sg-side-progress strong',el=>el.textContent),/[1-9]/);
+  await page.click('[data-steady-reset-open]');
+  assert.equal(await page.$eval('[data-steady-reset-confirm]',el=>!el.closest('[hidden]')),true);
+  assert.match(await page.$eval('.sg-side-progress strong',el=>el.textContent),/[1-9]/);
+  await page.click('[data-steady-reset-cancel]');
+  assert.match(await page.$eval('.sg-side-progress strong',el=>el.textContent),/[1-9]/);
+  await page.click('[data-steady-reset-open]');
+  await page.click('[data-steady-reset-confirm]');
+  assert.match(await page.$eval('.sg-side-progress strong',el=>el.textContent),/^0 \/ /);
+  const after=await page.evaluate(()=>Object.entries(localStorage).filter(([k])=>k.includes('sandbox')||k.includes('scenario')||k.includes('project')).sort());
+  assert.deepEqual(after,before,'Reading and completing Steady Guide must not mutate projects or assessment storage');
+  // The in-workbench contextual drawer opens only on explicit request and closes with Escape.
+  await page.setViewport({width:1366,height:768});
+  await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:45000});
+  await page.waitForSelector('[data-steady-open-help]',{timeout:15000});
+  await page.waitForSelector('[data-library-tab-trigger="assemblies"]',{timeout:15000});
+  assert.equal(await page.$eval('[data-library-tab-trigger="assemblies"]',el=>el.getAttribute('aria-selected')),'false',
+    'The current tabbed UX8 component library must be present before showing Steady Guide help');
+  await page.click('.p5-menu-bar details:last-of-type > summary');
+  await page.click('[data-steady-open-help]');
+  await page.waitForSelector('[data-steady-drawer]',{timeout:12000});
+  assert.match(await page.$eval('[data-steady-drawer] h2',x=>x.textContent),/Need a hand/i);
+  const storedProjectBefore=await page.evaluate(()=>localStorage.getItem('efo-open-sandbox-project-v1'));
+  await page.click('[data-steady-locate="inspector"]');
+  await page.waitForSelector('[data-steady-spotlight="inspector"]',{timeout:8000});
+  await page.waitForFunction(()=>/control used to reveal/i.test(
+    document.querySelector('.sg-tour-status')?.textContent||''),{timeout:8000});
+  assert.match(await page.$eval('.sg-tour-status',el=>el.textContent),/control used to reveal/i,
+    'The closed Inspector must highlight its existing reveal control without opening the panel');
+  await page.click('[data-steady-locate="views"]');
+  await page.waitForSelector('[data-steady-spotlight="views"]',{timeout:8000});
+  await page.waitForFunction(()=>document.querySelector('.sg-tour-status')?.textContent?.includes('Highlighted'),{timeout:8000});
+  await page.click('[data-steady-locate="tools"]');
+  await page.waitForSelector('[data-steady-spotlight="tools"]',{timeout:8000});
+  assert.equal(await page.$$eval('[data-steady-spotlight]',x=>x.length),1,'Only one workbench region is highlighted');
+    await page.keyboard.press('Escape');
+  await page.waitForFunction(()=>!document.querySelector('[data-steady-drawer]'),{timeout:8000});
+  assert.equal(await page.$$eval('[data-steady-spotlight]',x=>x.length),0,'Escape clears all temporary highlights');
+  assert.equal(await page.evaluate(()=>document.activeElement?.hasAttribute('data-steady-open-help')),true,
+    'Dismissal returns keyboard focus to the Help trigger');
+  assert.equal(await page.evaluate(()=>localStorage.getItem('efo-open-sandbox-project-v1')),storedProjectBefore,
+    'Read-only spotlight guidance does not write or mutate the sandbox project');
+    await page.setViewport({width:390,height:844});
+  await go('/guide');
+  assert.equal(await page.$eval('[data-steady-mobile-nav]',el=>el.getAttribute('aria-expanded')),'false');
+  assert.equal(await page.$eval('#sg-sidebar-links',el=>getComputedStyle(el).display),'none',
+    'Phone section list begins collapsed');
+  await page.click('[data-steady-mobile-nav]');
+  await page.waitForFunction(()=>document.querySelector('[data-steady-mobile-nav]')?.getAttribute('aria-expanded')==='true');
+  assert.notEqual(await page.$eval('#sg-sidebar-links',el=>getComputedStyle(el).display),'none');
+  await page.click('#sg-sidebar-links a[href="/guide/equipment"]');
+  await page.waitForSelector('[data-steady-equipment-index]',{timeout:12000});
+  assert.equal(await page.$eval('[data-steady-mobile-nav]',el=>el.getAttribute('aria-expanded')),'false',
+    'Phone list collapses after navigation');
+  const sizes=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
+  assert.ok(sizes.scroll<=sizes.client+2,'No horizontal overflow on 390px: '+JSON.stringify(sizes));
+  assert.deepEqual(errors,[]);
+  console.log('STEADY GUIDE BROWSER PASS: 54 devices, 21 scenes, real screenshot, topic completion, search, read-only keys and 390px');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

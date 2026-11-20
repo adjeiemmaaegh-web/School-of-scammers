@@ -42,6 +42,22 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/offline-update-browser.cjs
       - name: R9 guided lessons - unwired starter, honest failure, UI build passes the outcome check, wrong build rejected, downloadable starters
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r9-lessons-browser.cjs
+      - name: Steady Guide first lamp - real UI placement, 3 wires, OFF ON OFF, disconnected wire refusal and project isolation
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/steady-guide-first-lamp-browser.cjs
+      - name: Steady Guide - read-only onboarding, 54 devices, 21 scenes, real screenshot, search and mobile
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/steady-guide-browser.cjs
+      - name: Capture authentic Steady Guide review screenshots (not automatically published)
+        env:
+          STEADY_GUIDE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/steady-guide-capture-browser.cjs
+      - name: Preserve Steady Guide raw screenshots for review (even if capture is incomplete)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: steady-guide-raw-captures
+          path: qa-artifacts/steady-guide-captures/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Browser - wire colour and net label (R5.1)
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r5-wire-style-browser.cjs
       - name: R1 contextual workbench - canvas share, no clipped controls at five sizes, explicit tools, shortcuts, preference recovery
