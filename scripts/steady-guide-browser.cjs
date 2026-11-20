@@ -56,6 +56,8 @@ const base=process.env.PLC_BASE_URL||'http://127.0.0.1:4173';
   const storedProjectBefore=await page.evaluate(()=>localStorage.getItem('efo-open-sandbox-project-v1'));
   await page.click('[data-steady-locate="inspector"]');
   await page.waitForSelector('[data-steady-spotlight="inspector"]',{timeout:8000});
+  await page.waitForFunction(()=>/control used to reveal/i.test(
+    document.querySelector('.sg-tour-status')?.textContent||''),{timeout:8000});
   assert.match(await page.$eval('.sg-tour-status',el=>el.textContent),/control used to reveal/i,
     'The closed Inspector must highlight its existing reveal control without opening the panel');
   await page.click('[data-steady-locate="views"]');

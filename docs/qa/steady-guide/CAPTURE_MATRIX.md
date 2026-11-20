@@ -50,3 +50,5 @@ The browser capture recipe now requires **actual project device and wire counts*
 | SG-13 | Twenty-one source-backed Guide atlas cards; simulator scene-picker comparison remains open |
 
 The existing fourteen screenshots remain separately identified (some explicitly empty-state). The expanded suite is **23 captured review states** if the run succeeds; state assertions prevent missing subjects from silently becoming accepted. Visual quality, current-version screenshot annotation and SG-14/15/17/18 advanced subjects still need review or further captures. CI artifacts are temporary evidence, never automatically copied into `public`. Earlier matrix statuses are conservative and are not converted into accepted simply because a screenshot exists.
+
+**CI correction:** The first attempt at this expansion (`8735ee32`) did not reach the capture step because a new asynchronous status-announcement test asserted too early. The next draft-branch commit fixes that wait and gives each populated capture a unique evidence ID (for example `SG-08-populated` with `subjectId: SG-08`). Actual 23-state image generation and review remain unverified until a new CI artifact exists.

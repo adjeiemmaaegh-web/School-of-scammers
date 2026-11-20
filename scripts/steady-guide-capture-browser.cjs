@@ -70,7 +70,7 @@ const dir='qa-artifacts/steady-guide-captures';
       id+' must be based on present real project state');
     await page.$eval(selector,element=>element.scrollIntoView({block:'center',inline:'nearest'}));
     await page.screenshot({path:dir+'/'+file,fullPage:false});
-    captures.push({id,route,viewport:'1440x940',state,file,
+    captures.push({id:id+'-populated',subjectId:id,route,viewport:'1440x940',state,file,
       source:'genuine Chromium app screenshot',
       proof:evidence,alt,review:'pending',scope:'review-only; subject limitations in CAPTURE_MATRIX.md'});
   }
@@ -148,7 +148,7 @@ const dir='qa-artifacts/steady-guide-captures';
   await genuine('SG-10','SG-10-authentic-st.png','/sandbox',
     'Actual Structured Text editor for the populated PLC; does not prove timer/PID programming',
     'Real Structured Text editor with its source and compile controls, without a timer or PID example.',
-    '.sandbox-st-editor',{language:'st',devices:6,wires:11,timerPidExample:false===true?'present':'not demonstrated'});
+    '.sandbox-st-editor',{language:'st',devices:6,wires:11,timerPidExample:'not demonstrated'});
   await page.evaluate(()=>{
     const button=[...document.querySelectorAll('.sandbox-language-tabs button')].find(b=>b.textContent.includes('Function Blocks'));
     if(!button||button.disabled)throw Error('FBD language action unavailable');
@@ -191,6 +191,8 @@ const dir='qa-artifacts/steady-guide-captures';
     'Steady Guide index of the twenty-one supported original virtual factory scenes.',
     '[data-steady-scene-index]',{sceneCards:21,view:'guide atlas only'});
 
+  const uniqueIds=new Set(captures.map(item=>item.id));
+  assert.equal(uniqueIds.size,captures.length,'Every screenshot must have a unique evidence ID');
   for(const item of captures){
     const png=fs.readFileSync(dir+'/'+item.file);
     assert.ok(png.length>1000 && png.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])),item.id+' is a nonempty original PNG');
