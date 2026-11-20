@@ -88,7 +88,7 @@ At commit `951f2af9`, Vite/typecheck and Vitest passed, but the aggregate (all l
 
 ## First-lamp source-of-truth and real browser journey — 2026-11-20
 
-- The `/guide/topic/first-lamp` walkthrough and `/guide/builds/first-lamp` use the same static, type-checked, named-terminal reference. The accessible three-wire checklist is `24V supply P24 → START NO A`, `START NO B → 24V pilot lamp L+`, `pilot lamp M- → supply M0`. **Educational virtual 24 V only**; never claim real-world electrical safety.
+- The `/guide/topic/first-lamp` walkthrough renders a static, type-checked named-terminal reference; `/guide/builds/first-lamp` links to that walkthrough and retains its equivalent instructions. The accessible three-wire checklist is `24V supply P24 → START NO A`, `START NO B → 24V pilot lamp L+`, `pilot lamp M- → supply M0`. **Educational virtual 24 V only**; never claim real-world electrical safety.
 - Tests compare every advertised endpoint to an existing component registry terminal. The original native worker behavior tests now derive their wires from the same instructional source, preventing silent Guide-vs-worker drift.
 - New `scripts/steady-guide-first-lamp-browser.cjs` starts from the actual Guide route, follows its Simulator link without resetting project data, searches and places the three devices through their UI controls in a fresh browser profile, connects the three exact terminal pairs, verifies the real worker lamp **OFF → ILLUMINATED → OFF**, then removes the START-to-lamp wire and proves that pressing START no longer illuminates the lamp. It returns to the Guide and checks the saved project has not changed.
 - The browser recipe uses a disposable isolated browser context, not a graded work order or hidden assessment answers. It never injects a pre-solved project. It runs in GitHub CI separately from the existing R9 guided starter and source-only native test.
@@ -99,3 +99,9 @@ At commit `951f2af9`, Vite/typecheck and Vitest passed, but the aggregate (all l
 - The first exact-commit build at `57d93887` passed TypeScript/Vitest/Vite, but the compressed all-JS budget check **failed by 178 bytes** (measured 872,626 B versus the existing 872,448 B/852 KiB limit). Because that pre-browser gate failed, this run did not verify the new Chrome first-lamp journey.
 - Removed redundant beginner component labels from the new first-lamp source and reused `guideEquipmentName` already present in the Guide’s lightweight equipment reference. Simplified the terminal list rendering while retaining all six exact endpoints, device context, semantic ordered list and no-auto-wiring guarantee.
 - The overall 852 KiB JS budget, 150 KiB Guide route budget, simulator budget and other performance budgets were **not** raised. Require a fresh exact-head build-size measurement and real browser result.
+
+### Second no-budget-increase optimization (2026-11-20)
+
+- Exact-head `a1606fea` still exceeded 852 KiB aggregate compressed JavaScript by **122 bytes** (872,570 B measured vs 872,448 B limit), despite passing TypeScript, Vitest, Vite, source-security and native coverage. The new E2E test remained unrun after the failed budget gate.
+- Simplified the virtual wiring checklist to a semantic ordered list of the same three accurate component+terminal pairs without redundant explanatory JSX, and removed its duplicate rendering/import from the build plan (which already includes the instructions and links to the Guide topic). The real Chrome test still reads exact terminal data from the Guide, and the unit worker test uses the same source.
+- Aggregate JS performance limit remains unchanged. Require another exact-commit gzip measurement and E2E result; no release claims.

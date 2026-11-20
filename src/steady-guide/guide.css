@@ -140,4 +140,4 @@
 .sg-lamp-checklist>p {font-size:13px;line-height:1.65;color:var(--muted)}
 .sg-lamp-checklist ol {margin:14px 0;padding-left:30px;display:grid;gap:8px}
 .sg-lamp-checklist li {padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);line-height:1.7;font-size:13px;overflow-wrap:anywhere}
-.sg-lamp-checklist li>span {margin-inline:8px;color:var(--accent-text);font-weight:800}
+
