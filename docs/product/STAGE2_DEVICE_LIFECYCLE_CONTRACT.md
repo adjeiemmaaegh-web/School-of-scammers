@@ -29,6 +29,13 @@ The read-only `src/sim/device-contract.ts:deviceIntegrationContract(kind)` joins
 6. Publish outputs and sensor measurements through the same Worker-owned snapshot. Any UI properties or telemetry must read the shared device contract and the real signal image.
 7. When a component is removed, clear its wires, device faults, parameter overrides, PLC mappings/programs (when relevant) and plant faults without affecting unrelated instances.
 
+## Shared PLC observation and power contracts
+
+- `src/sim/plc-observation.ts:plcObservationImage()` publishes one snapshot `plcs[id]` view for every placed PLC. The classic first PLC reads its existing historical `WorldState` fields; every PLC16 and additional classic PLC reads `WorldState.plcs[id]`. This **unifies the read-only projection**, not the instruction execution engine.
+- `src/sim/plc-power.ts:controllerPowerImage()` computes each controller's own L+-to-M energized state from the **same solved netlist** used by `orchestrator.tick()`; the map drives first-controller legacy power, generic PLC scans, and the teaching conveyor's any-controller-presence signal. The images are keyed by stable PLC instance ID, not by presumed first-controller order.
+- The current discrete 24 V solver deliberately inhibits all modeled loads on any detected supply short. That global fault behavior is retained; a future per-supply fault model is **not** silently asserted by this read-only refactoring. Multiple isolated supplies during normal operation still use reference-relative terminal readings.
+- The program of an additional PLC remains independently owned; removal of the first PLC promotes the next PLC's Ladder, ST **and FBD** documents. Explicit updates to unknown PLC IDs are rejected.
+
 ## Compatibility and open boundaries
 
 - The classic first-PLC runtime path and its legacy singleton presentation fields are maintained for existing projects. Generic PLC16 and secondary controllers use independent per-ID runtime state. **Full first-controller execution-path consolidation remains open.**
