@@ -2,7 +2,7 @@ import { describe,expect,it } from 'vitest';
 import { COMPONENTS,componentKinds } from '../src/components/registry';
 import { SCENES } from '../src/plant/scenes/catalogue';
 import { SCENE_METADATA } from '../src/plant/scenes/metadata';
-import { GUIDE_EQUIPMENT_KINDS,GUIDE_SCENES,GUIDE_SCENE_META } from '../src/steady-guide/guide-reference';
+import { GUIDE_EQUIPMENT_KINDS,GUIDE_SCENES,GUIDE_SCENE_META,GUIDE_EQUIPMENT_NAMES,searchGuideEquipment,guideEquipmentName } from '../src/steady-guide/guide-reference';
 import { GUIDE_TOPICS,GUIDE_GROUPS,guideTopicRoute,getGuideTopic,searchGuideTopics } from '../src/steady-guide/guide-data';
 describe('Steady Guide source-of-truth parity',()=>{
  it('covers every registered component exactly once, including all its actual terminal names',()=>{
@@ -37,6 +37,16 @@ describe('Steady Guide source-of-truth parity',()=>{
    expect(getGuideTopic(t.id)).toBe(t);
    expect(guideTopicRoute(t.id)).toBe('/guide/topic/'+t.id);
   }
+ });
+ it('searches learner-facing equipment names from the lightweight index',()=>{
+  expect(Object.keys(GUIDE_EQUIPMENT_NAMES).every(k=>GUIDE_EQUIPMENT_KINDS.some(id=>id===k))).toBe(true);
+  for(const kind of GUIDE_EQUIPMENT_KINDS)expect(guideEquipmentName(kind).length).toBeGreaterThan(1);
+  expect(searchGuideEquipment('pilot lamp')).toContain('lamp');
+  expect(searchGuideEquipment('24V supply')).toContain('supply');
+  expect(searchGuideEquipment('proximity sensor')).toEqual(expect.arrayContaining(['inductive-prox','capacitive-prox']));
+  expect(searchGuideEquipment('plc')).toEqual(expect.arrayContaining(['plc','plc16']));
+  expect(searchGuideEquipment('  ')).toEqual([]);
+  expect(searchGuideEquipment('zzzx not a device')).toEqual([]);
  });
  it('finds practical beginners terms and never yields unrelated topics',()=>{
   expect(searchGuideTopics('LAMP').some(t=>t.id==='first-lamp')).toBe(true);

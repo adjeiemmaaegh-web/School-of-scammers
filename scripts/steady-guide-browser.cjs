@@ -40,6 +40,28 @@ const base=process.env.PLC_BASE_URL||'http://127.0.0.1:4173';
   await page.type('#sg-guide-search','PID');
   const links=await page.$$eval('.sg-search-results a',a=>a.map(x=>x.getAttribute('href')));
   assert.ok(links.some(x=>x.includes('language-tools')),'PID search must find the programming guide');
+  await page.click('#sg-guide-search');
+  await page.keyboard.down('Control');await page.keyboard.press('KeyA');await page.keyboard.up('Control');
+  await page.keyboard.press('Backspace');
+  await page.type('#sg-guide-search','pilot lamp');
+  await page.waitForFunction(()=>[...document.querySelectorAll('.sg-search-results a')].some(a=>a.getAttribute('href')==='/guide/equipment/lamp'),{timeout:8000});
+  assert.match(await page.$eval('.sg-search-results a[href="/guide/equipment/lamp"]',a=>a.textContent),/pilot lamp/i);
+  await page.click('#sg-guide-search');
+  await page.keyboard.down('Control');await page.keyboard.press('KeyA');await page.keyboard.up('Control');
+  await page.keyboard.press('Backspace');
+  await page.type('#sg-guide-search','qzx-unknown-factory-equipment');
+  assert.match(await page.$eval('.sg-search-results',el=>el.textContent),/No matches/i);
+  // Reading-progress confirmation never touches project storage.
+  await go('/guide');
+  assert.match(await page.$eval('.sg-side-progress strong',el=>el.textContent),/[1-9]/);
+  await page.click('[data-steady-reset-open]');
+  assert.equal(await page.$eval('[data-steady-reset-confirm]',el=>!el.closest('[hidden]')),true);
+  assert.match(await page.$eval('.sg-side-progress strong',el=>el.textContent),/[1-9]/);
+  await page.click('[data-steady-reset-cancel]');
+  assert.match(await page.$eval('.sg-side-progress strong',el=>el.textContent),/[1-9]/);
+  await page.click('[data-steady-reset-open]');
+  await page.click('[data-steady-reset-confirm]');
+  assert.match(await page.$eval('.sg-side-progress strong',el=>el.textContent),/^0 \/ /);
   const after=await page.evaluate(()=>Object.entries(localStorage).filter(([k])=>k.includes('sandbox')||k.includes('scenario')||k.includes('project')).sort());
   assert.deepEqual(after,before,'Reading and completing Steady Guide must not mutate projects or assessment storage');
   // The in-workbench contextual drawer opens only on explicit request and closes with Escape.
@@ -75,6 +97,16 @@ const base=process.env.PLC_BASE_URL||'http://127.0.0.1:4173';
     'Read-only spotlight guidance does not write or mutate the sandbox project');
     await page.setViewport({width:390,height:844});
   await go('/guide');
+  assert.equal(await page.$eval('[data-steady-mobile-nav]',el=>el.getAttribute('aria-expanded')),'false');
+  assert.equal(await page.$eval('#sg-sidebar-links',el=>getComputedStyle(el).display),'none',
+    'Phone section list begins collapsed');
+  await page.click('[data-steady-mobile-nav]');
+  await page.waitForFunction(()=>document.querySelector('[data-steady-mobile-nav]')?.getAttribute('aria-expanded')==='true');
+  assert.notEqual(await page.$eval('#sg-sidebar-links',el=>getComputedStyle(el).display),'none');
+  await page.click('#sg-sidebar-links a[href="/guide/equipment"]');
+  await page.waitForSelector('[data-steady-equipment-index]',{timeout:12000});
+  assert.equal(await page.$eval('[data-steady-mobile-nav]',el=>el.getAttribute('aria-expanded')),'false',
+    'Phone list collapses after navigation');
   const sizes=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
   assert.ok(sizes.scroll<=sizes.client+2,'No horizontal overflow on 390px: '+JSON.stringify(sizes));
   assert.deepEqual(errors,[]);

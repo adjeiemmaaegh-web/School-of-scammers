@@ -1,11 +1,11 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AppHeader } from '../ui/AppHeader';
 import { COURSE } from '../exercises/course';
 import { LESSON_META } from '../exercises/lessons-meta';
 import { SCENARIO_META } from '../exercises/meta';
 import { GUIDE_GROUPS, GUIDE_TOPICS, getGuideTopic, guideTopicRoute, searchGuideTopics, type GuideTopic } from './guide-data';
-import { GUIDE_EQUIPMENT_KINDS, GUIDE_SCENES, GUIDE_GLOSSARY } from './guide-reference';
+import { GUIDE_SCENES, GUIDE_GLOSSARY, guideEquipmentName, searchGuideEquipment } from './guide-reference';
 import { GUIDE_SCREENSHOTS, GUIDE_SCREENSHOT_COMMIT } from './guide-media';
 import { emptyGuideProgress, readGuideProgress, saveGuideProgress } from './guide-progress';
 import './guide.css';
@@ -110,9 +110,12 @@ export function GuidePage(){
  const [progress,setProgress]=useState(()=>readGuideProgress(ids));
  const [search,setSearch]=useState('');
  const [storageWarning,setStorageWarning]=useState(false);
+ const [mobileNavOpen,setMobileNavOpen]=useState(false);
+ const [resetArmed,setResetArmed]=useState(false);
+ const resetTriggerRef=useRef<HTMLButtonElement|null>(null);
  const searched=search.trim().slice(0,80);
  const resultTopics=searched?searchGuideTopics(searched):[];
- const resultEquipment=searched?GUIDE_EQUIPMENT_KINDS.filter(k=>k.replaceAll('-',' ').includes(searched.toLowerCase())||k.includes(searched.toLowerCase())):[];
+ const resultEquipment=searched?searchGuideEquipment(searched):[];
  const resultScenes=searched?GUIDE_SCENES.filter(s=>[s.id,s.title,s.description].join(' ').toLowerCase().includes(searched.toLowerCase())):[];
  const resultGlossary=searched?GUIDE_GLOSSARY.filter(g=>[g.term,g.meaning].join(' ').toLowerCase().includes(searched.toLowerCase())):[];
  const done=(id:string)=>{
@@ -128,17 +131,36 @@ export function GuidePage(){
    <div className="sg-top"><Link to="/">Home</Link><span aria-hidden="true">/</span><strong>Steady Guide</strong><span className="sg-status">Offline-friendly · read-only help</span></div>
    <header className="sg-heading"><p className="sg-eyebrow">STEADY GUIDE</p><h1>Learn the application without getting lost.</h1><p>Real screenshots, step-by-step explanations, equipment terminals, factory scenes and practical next steps — all in one place.</p></header>
    <div className="sg-layout">
-    <nav className="sg-sidebar" aria-label="Steady Guide sections">{GUIDE_LINKS.map(n=><Link key={n.to} to={n.to} aria-current={isGuideLink(n.to,loc.pathname)?'page':undefined}>{n.label}</Link>)}
-     <div className="sg-side-progress"><small>Your guide progress</small><strong>{progress.completed.length} / {GUIDE_TOPICS.length} topics</strong><button type="button" onClick={reset}>Reset guide progress</button></div>
+    <nav className="sg-sidebar" aria-label="Steady Guide sections">
+     <button type="button" className="sg-mobile-nav-toggle" data-steady-mobile-nav
+       aria-expanded={mobileNavOpen} aria-controls="sg-sidebar-links"
+       onClick={()=>setMobileNavOpen(value=>!value)}>Guide sections <span aria-hidden="true">{mobileNavOpen?'▴':'▾'}</span></button>
+     <div className="sg-sidebar-links" id="sg-sidebar-links" data-mobile-open={mobileNavOpen?'true':'false'}>
+      {GUIDE_LINKS.map(n=><Link key={n.to} to={n.to} onClick={()=>setMobileNavOpen(false)}
+        aria-current={isGuideLink(n.to,loc.pathname)?'page':undefined}>{n.label}</Link>)}
+     </div>
+     <div className="sg-side-progress"><small>Your guide progress</small><strong>{progress.completed.length} / {GUIDE_TOPICS.length} topics</strong>
+      <button type="button" ref={resetTriggerRef} data-steady-reset-open aria-expanded={resetArmed}
+        aria-controls="sg-reset-confirmation" onClick={()=>setResetArmed(value=>!value)}>Reset guide progress</button>
+      <div className="sg-reset-confirmation" id="sg-reset-confirmation" role="group"
+        aria-label="Confirm resetting Steady Guide progress" hidden={!resetArmed}>
+       <p>Clear your Steady Guide reading progress on this device? Simulator projects and assessment results are not affected.</p>
+       <div>
+        <button type="button" data-steady-reset-cancel onClick={()=>{resetTriggerRef.current?.focus();setResetArmed(false);}}>Keep progress</button>
+        <button type="button" data-steady-reset-confirm onClick={()=>{reset();resetTriggerRef.current?.focus();setResetArmed(false);}}>Clear guide progress</button>
+       </div>
+      </div>
+     </div>
     </nav>
     <div className="sg-content">
      <div className="sg-search"><label htmlFor="sg-guide-search">Search Steady Guide</label><input id="sg-guide-search" value={search} onChange={e=>setSearch(e.target.value)} type="search" placeholder="Try 'PLC', 'sensor', 'save', 'sort', 'P24'…" autoComplete="off"/>
       {searched&&<div className="sg-search-results" role="region" aria-label="Search results">
        <h2>Results for “{searched}”</h2><p role="status">{resultTopics.length+resultEquipment.length+resultScenes.length+resultGlossary.length} matches across topics, equipment, scenes and terms</p>
        {resultTopics.length>0&&<section><h3>Walkthroughs</h3>{resultTopics.map(t=><Link key={t.id} to={guideTopicRoute(t.id)} onClick={()=>setSearch('')}>{t.title}</Link>)}</section>}
-       {resultEquipment.length>0&&<section><h3>Equipment</h3>{resultEquipment.map(k=><Link key={k} to={'/guide/equipment/'+k} onClick={()=>setSearch('')}>{k.replaceAll('-',' ')}</Link>)}</section>}
+       {resultEquipment.length>0&&<section><h3>Equipment</h3>{resultEquipment.map(k=><Link key={k} to={'/guide/equipment/'+k} onClick={()=>setSearch('')}>{guideEquipmentName(k)}</Link>)}</section>}
        {resultScenes.length>0&&<section><h3>Scenes</h3>{resultScenes.map(s=><Link key={s.id} to={'/guide/scenes/'+s.id} onClick={()=>setSearch('')}>{s.title}</Link>)}</section>}
        {resultGlossary.length>0&&<section><h3>Concepts</h3>{resultGlossary.map(g=><p key={g.term}><strong>{g.term}:</strong> {g.meaning}</p>)}</section>}
+       {resultTopics.length+resultEquipment.length+resultScenes.length+resultGlossary.length===0&&<p>No matches. Try a device name, terminal, factory scene or shorter phrase.</p>}
       </div>}
      </div>
      {storageWarning&&<div role="alert" className="sg-warning">Guide progress could not be saved in this browser. Your project data was not changed.</div>}

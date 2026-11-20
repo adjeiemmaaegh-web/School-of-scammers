@@ -192,3 +192,23 @@ export const GUIDE_GLOSSARY=[
 {term:'IndexedDB',meaning:'Local browser database used for the named project library and its revisions.'},
 {term:'Offline',meaning:'After caching, the app can run without a network connection; clearing browser site data may still remove projects.'},
 ] as const;
+
+/** Lightweight, reviewed beginner vocabulary without importing the simulation engine. */
+export const GUIDE_EQUIPMENT_NAMES:Partial<Record<(typeof GUIDE_EQUIPMENT_KINDS)[number],string>>={
+ supply:'24V supply',plc:'Virtual PLC',plc16:'Virtual PLC 16/16',
+ start:'START NO pushbutton',stop:'STOP NC pushbutton',lamp:'24V pilot lamp',
+ photoeye:'Mark photoeye','geometry-photoeye':'Geometry photoeye',
+ 'inductive-prox':'Inductive proximity sensor','capacitive-prox':'Capacitive proximity sensor',
+ estop:'Training E-stop','three-phase-supply':'Virtual 400V three-phase source',
+ timerelay:'On-delay timer relay',stacklight:'Stack light (R/Y/G)',
+ 'light-curtain':'Light curtain','star-delta-drive':'Star/delta motor drive',
+};
+export function guideEquipmentName(kind:(typeof GUIDE_EQUIPMENT_KINDS)[number]):string {
+ return GUIDE_EQUIPMENT_NAMES[kind]??kind.replaceAll('-',' ');
+}
+export function searchGuideEquipment(query:string):(typeof GUIDE_EQUIPMENT_KINDS)[number][]{
+ const term=query.trim().toLowerCase().slice(0,80);
+ if(!term)return [];
+ return GUIDE_EQUIPMENT_KINDS.filter(kind=>
+  [kind,kind.replaceAll('-',' '),guideEquipmentName(kind)].some(s=>s.toLowerCase().includes(term)));
+}
