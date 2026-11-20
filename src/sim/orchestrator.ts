@@ -31,6 +31,7 @@ import { scanControllers } from './phases/controller-scan';
 import { deenergisedPlcs, quietLanes } from './phases/fail-closed';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { pruneWireStyles, validateWireStyles, withWireStyle, type WireColor } from '../components/wire-style';
+import { DEFAULT_SCAN_MS, isValidScanMs, scanMsOf } from './scan-config';
 import { clearedAlarm } from '../plant/cylinder';
 import { analogWireError, sampleAnalogInputs } from './analog';
 import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
@@ -234,6 +235,7 @@ export function validateProject(raw: unknown): ProjectFile {
   const params = validateParams(p.params, components);
   const plantFaults = validatePlantFaults(p.plantFaults, { components });
   const wireStyles = validateWireStyles(p.wireStyles, wires);
+  if (p.scanMs !== undefined && !isValidScanMs(p.scanMs)) throw new Error('Invalid scan period (10-500 ms in steps of 10)');
   return {
     formatVersion: 1, components, wires, program: p.program,
     ...(p.language !== undefined ? { language: p.language } : {}),
@@ -246,6 +248,8 @@ export function validateProject(raw: unknown): ProjectFile {
     ...(params ? { params } : {}),
     ...(plantFaults ? { plantFaults } : {}),
     ...(wireStyles ? { wireStyles } : {}),
+    // The default period is never stored, so existing projects keep their exact shape.
+    ...(p.scanMs !== undefined && p.scanMs !== DEFAULT_SCAN_MS ? { scanMs: p.scanMs } : {}),
   };
 }
 /** Device settings: each key must be a setting its device kind defines, with an allowed value that differs from the default. */
@@ -542,6 +546,13 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         world = withFaults(world, faultsOf(world.project).filter(f => f.target !== cmd.target));
         world = resetCylinderAlarm(world, cmd.target);
         commandEvents.push({ tick: world.tick, kind: 'repair', detail: repairDetail(cmd.target) });
+      }
+    }
+    else if (cmd.k === 'setScanPeriod') {
+      if (!isValidScanMs(cmd.ms)) world = setError(world, 'Scan period must be 10-500 ms in steps of 10');
+      else {
+        const { scanMs: _previous, ...rest } = world.project;
+        world = { ...world, project: cmd.ms === DEFAULT_SCAN_MS ? rest : { ...rest, scanMs: cmd.ms }, lastError: null };
       }
     }
     else if (cmd.k === 'setWireStyle') {
@@ -916,12 +927,15 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     })) };
 }
 /** Only this function owns the ten phases. Sensor state is sampled for the NEXT tick. */
-export function tick(initial: WorldState, commands: readonly Command[] = [], dtMs = SCAN_MS):
+/** `dtOverride` is for tests and tools; normally one scan advances the project's own scan period (default 50 ms). */
+export function tick(initial: WorldState, commands: readonly Command[] = [], dtOverride?: number):
   { world: WorldState; snapshot: RenderSnapshot; events: SimEvent[] } {
-  if (!Number.isSafeInteger(dtMs) || dtMs < 1 || dtMs > 1000) throw new RangeError('Invalid simulation timestep');
+  if (dtOverride !== undefined && (!Number.isSafeInteger(dtOverride) || dtOverride < 1 || dtOverride > 1000)) throw new RangeError('Invalid simulation timestep');
   // 1. Apply commands. Run/Pause/Step are commands, not renderer state.
   const change = applyCommands(initial, commands);
   let w = change.world;
+  // The step is resolved AFTER commands so a project loaded or reconfigured in this call is scanned at its own period.
+  const dtMs = dtOverride ?? scanMsOf(w.project);
   const events: SimEvent[] = [...change.events];
   if (!w.running && !change.forceStep) {
     // Measurements update while paused without advancing PLC/plant state.

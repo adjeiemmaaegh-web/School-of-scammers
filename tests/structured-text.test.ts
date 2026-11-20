@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {compileStructuredText,executeStructuredText,runStructuredTextScans,ST_DEMO,ST_TYPED_DEMO} from '../src/engineering/structured-text';
+import {compileStructuredText,executeStructuredText,runStructuredTextScans,ST_DEMO,ST_TYPED_DEMO,ST_MAX_SOURCE_CHARS,ST_MAX_STATEMENTS_PER_SCAN} from '../src/engineering/structured-text';
 
 describe('bounded Structured Text interpreter',()=>{
  it('preserves BOOL seal-in output across scans and implements stop priority',()=>{
@@ -32,8 +32,8 @@ describe('bounded Structured Text interpreter',()=>{
   expect(()=>executeStructuredText(compileStructuredText('Result := 2 AND TRUE;'),{})).toThrow(/BOOL/);
  });
  it('bounds source, statements and execution scans',()=>{
-  expect(()=>compileStructuredText('X := 1;'.repeat(202))).toThrow(/Statement limit/);
-  expect(()=>compileStructuredText(' '.repeat(12001))).toThrow(/12,000/);
+  expect(()=>compileStructuredText('X := 1;'.repeat(ST_MAX_STATEMENTS_PER_SCAN+2))).toThrow(/Statement limit/);
+  expect(()=>compileStructuredText(' '.repeat(ST_MAX_SOURCE_CHARS+1))).toThrow(/64,000/);
   const p=compileStructuredText('Out := In;');
   expect(()=>runStructuredTextScans(p,[{scans:5001,inputs:{In:true}}])).toThrow(/5,000/);
  });

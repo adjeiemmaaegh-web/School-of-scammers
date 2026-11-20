@@ -51,7 +51,7 @@ export function scanControllers(
           inputs,w.coils,w.fbdMemory,dtMs);
       } else if (w.project.language === 'st') {
         const compiled = w.stCompiled ?? compileSandboxST(w.project.stSource ?? '');
-        stResult = executeStructuredText(compiled, inputs, w.stMemory);
+        stResult = executeStructuredText(compiled, inputs, w.stMemory, dtMs);
         const run = Object.entries(stResult.outputs).find(([key]) => key.toLowerCase() === 'run')?.[1];
         if (typeof run !== 'boolean') throw new TypeError('ST Run output must be BOOL');
       } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs, w.ladderNumeric,

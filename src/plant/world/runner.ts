@@ -57,7 +57,9 @@ export const samplePlant=(world:World,placements:readonly EquipmentPlacement[],l
  return signals;
 };
 export function stepScene(previous:SceneRuntime,placements:readonly EquipmentPlacement[],
- library:EquipmentLibrary,inputs:WorldInputs={},faults:Readonly<Record<string,string|null>>={}):SceneRuntime{
+ library:EquipmentLibrary,inputs:WorldInputs={},faults:Readonly<Record<string,string|null>>={},scanMs:number=SCAN_MS):SceneRuntime{
+ if(!Number.isSafeInteger(scanMs)||scanMs<SUBSTEP_MS||scanMs%SUBSTEP_MS!==0)
+  throw new RangeError('A scan must be a whole number of '+SUBSTEP_MS+' ms plant substeps');
  validatePlacements(placements,library);
  let world=previous.world;
  // Explicitly modelled stationary solid envelopes cast sight shadows.
@@ -67,7 +69,7 @@ export function stepScene(previous:SceneRuntime,placements:readonly EquipmentPla
   .filter(item=>STATIC_SOLID_KINDS.includes(item.kind))
   .map(item=>({id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,
    sizeMm:library[item.kind].footprint}));
- for(let i=0;i<SCAN_MS/SUBSTEP_MS;i++){
+ for(let i=0;i<scanMs/SUBSTEP_MS;i++){
   for(const item of placements){
    const def=library[item.kind],ctx=ctxOf(item,occluders);
    const state=world.model[item.id]??def.fresh(item.params);

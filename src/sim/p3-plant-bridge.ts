@@ -68,7 +68,8 @@ export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
  options:Readonly<{controllerPowered?:boolean}>={}):PlantTick{
  const placements=plantPlacements(project);
  if(!placements.length)return {runtime:previous,events:[]};
- if(dtMs!==50)throw new RangeError('P3 plant world advances by exactly five 10ms substeps per 50ms PLC scan');
+ if(!Number.isSafeInteger(dtMs)||dtMs<10||dtMs%10!==0)
+  throw new RangeError('The plant world advances in whole 10 ms substeps per PLC scan (scan period must be a multiple of 10 ms)');
  const inputs:Record<string,Record<string,boolean|number>>={};
  const set=new Set(energizedLoads);
  for(const item of placements){
@@ -91,7 +92,7 @@ export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
  if(typeof options.controllerPowered==='boolean')for(const item of placements)
   if(item.kind==='belt-conveyor')inputs[item.id]={...inputs[item.id],
    controllerPowered:options.controllerPowered};
- const updated=stepScene(previous,placements,PLANT_EQUIPMENT,inputs,project.plantFaults??{});
+ const updated=stepScene(previous,placements,PLANT_EQUIPMENT,inputs,project.plantFaults??{},dtMs);
  const drained=drainEvents(updated.world);
  return {runtime:{world:drained.world,signals:updated.signals},events:drained.events};
 }

@@ -18,6 +18,8 @@ Versioning policy: `package.json` version is the app/build version (0.x until th
 - R4: teaching PID function block in Structured Text (clamped output, anti-windup).
 - R11: more panels load on demand (programming dock, live monitor, troubleshooting, plant scene, floor plan); sandbox route 575 to 504 KiB gzip.
 - UX7: reference workbench layout for windows 1500 px and wider (full-width header, one compact selection toolbar, Move and Views menus, three-column component library). Account and notification icons and a CPU-load readout from the reference mock-up are deliberately not implemented.
+- R09/R23: configurable scan period (10-500 ms), simulation speed 0.1x-10x with scan-cost diagnostics.
+- R08: PLC capacity raised (256 rungs, 512 tags, ST 5000 statements) with static and run-time budgets.
 - R7/R11: bounded soak and benchmark test (10 simulated minutes, maximal project).
 
 ## 0.1.0 (merged to `main` as of PR #26 and PR #70)

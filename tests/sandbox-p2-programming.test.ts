@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createWorld, newProject, renderSnapshot, tick, validateProject, validateSandboxProgram } from '../src/sim/orchestrator';
-import { DEFAULT_ST_SOURCE } from '../src/program/p2-contract';
+import { DEFAULT_ST_SOURCE, MAX_SANDBOX_RUNGS } from '../src/program/p2-contract';
 import type { LadderDocument } from '../src/engineering/ladder';
 import type { Command, WorldState } from '../src/sim/signals';
 
@@ -152,11 +152,11 @@ describe('P2 real worker programming modes and scan-state contract', () => {
     const invalid = { ...delayProgram,
       rungs: [{ ...delayProgram.rungs[0], elements: [contact('UnknownBool')] }, ...delayProgram.rungs.slice(1)] };
     expect(validateSandboxProgram(invalid).join(' ')).toMatch(/unknown contact/);
-    const many = { ...delayProgram, rungs: Array.from({ length: 33 },
+    const many = { ...delayProgram, rungs: Array.from({ length: MAX_SANDBOX_RUNGS + 1 },
       (_, i) => ({ id: `r${i}`, elements: [contact('Start')], coil: `Aux${i}` })) };
-    expect(validateSandboxProgram(many).join(' ')).toMatch(/at most 32/);
-    const exactly = { ...delayProgram, symbols: Object.fromEntries(Array.from({ length: 32 }, (_, i) => [`Aux${i}`, { description: `aux ${i}` }])),
-      rungs: Array.from({ length: 32 }, (_, i) => ({ id: `r${i}`, elements: [contact('Start')], coil: `Aux${i}` })) };
+    expect(validateSandboxProgram(many).join(' ')).toMatch(new RegExp(`at most ${MAX_SANDBOX_RUNGS}`));
+    const exactly = { ...delayProgram, symbols: Object.fromEntries(Array.from({ length: MAX_SANDBOX_RUNGS }, (_, i) => [`Aux${i}`, { description: `aux ${i}` }])),
+      rungs: Array.from({ length: MAX_SANDBOX_RUNGS }, (_, i) => ({ id: `r${i}`, elements: [contact('Start')], coil: `Aux${i}` })) };
     expect(validateSandboxProgram(exactly)).toEqual([]);
   });
 });

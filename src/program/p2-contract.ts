@@ -3,9 +3,29 @@ import { validateLadder, type LadderDocument, type NumericOperand } from '../eng
 import { compileStructuredText, type STProgram } from '../engineering/structured-text';
 import { LEGACY_NAMES, type IoNames } from '../sim/plc-io';
 
-/** Teaching-subset program size: large enough for a multi-machine cell, still bounded for scan cost and validation. */
-export const MAX_SANDBOX_RUNGS = 32;
-export const MAX_SANDBOX_SYMBOLS = 48;
+/**
+ * Program capacity (R08). Sized for a multi-machine university exercise (a few hundred rungs, hundreds of tags) and bounded
+ * by MEASURABLE budgets instead of a tiny arbitrary cap: rungs, local tags and a static element budget (every contact,
+ * branch contact and instruction is one unit of scan cost). The worker also measures the real scan cost and reports the
+ * simulator load, so an expensive program is visible rather than silently slow. Raised from 32 rungs / 48 tags.
+ */
+export const MAX_SANDBOX_RUNGS = 256;
+export const MAX_SANDBOX_SYMBOLS = 512;
+/** Static scan-cost budget per Ladder program (contacts, branch contacts and the instruction of each rung). */
+export const MAX_SANDBOX_ELEMENTS = 2048;
+
+/** Static scan cost of a Ladder program: one unit per contact, per branch contact and per rung instruction. */
+export function ladderScanCost(program: LadderDocument): number {
+  let cost = 0;
+  for (const rung of program.rungs) {
+    for (const element of rung.elements ?? []) {
+      if (element?.type === 'branch') for (const alternative of element.alternatives ?? []) cost += Array.isArray(alternative) ? alternative.length : 0;
+      else cost += 1;
+    }
+    cost += 1; // the rung's coil or instruction
+  }
+  return cost;
+}
 export const SANDBOX_INPUTS = ['Start', 'StopOK', 'Photoeye', 'TankHigh', 'ReverseRequest'] as const;
 export const DEFAULT_ST_SOURCE = [
   'VAR_INPUT',
@@ -29,6 +49,7 @@ export function validateSandboxProgram(program: LadderDocument, names: IoNames =
   const errors = validateLadder(program);
   if (errors.length) return errors;
   if (program.rungs.length > MAX_SANDBOX_RUNGS) errors.push(`Sandbox supports at most ${MAX_SANDBOX_RUNGS} Ladder rungs`);
+  else if (ladderScanCost(program) > MAX_SANDBOX_ELEMENTS) errors.push(`Ladder scan cost ${ladderScanCost(program)} exceeds the budget of ${MAX_SANDBOX_ELEMENTS} elements (contacts, branches and instructions)`);
   const symbols = Object.keys(program.symbols ?? {});
   if (symbols.length > MAX_SANDBOX_SYMBOLS) errors.push(`Sandbox supports at most ${MAX_SANDBOX_SYMBOLS} local tags`);
   for (const tag of symbols) if (builtIns.has(tag) || !safeTag(tag)) errors.push(`Invalid or reserved local tag: ${tag}`);

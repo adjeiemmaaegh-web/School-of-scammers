@@ -29,7 +29,7 @@ import { appendEvidence, evidenceFromCommand } from '../exercises/evidence';
 import { scenarioStorageKey, type ScenarioRequest, type ScenarioSession } from '../exercises/session';
 import { getScenario } from '../exercises/catalogue';
 import type { AttemptResult, EvidenceEvent, RubricResult } from '../platform/types';
-import type { Command, ProjectFile, RenderSnapshot, WorkerResponse } from '../sim/signals';
+import type { Command, ProjectFile, RenderSnapshot, WorkerResponse, WorkerTiming } from '../sim/signals';
 import { validateProject } from '../sim/orchestrator';
 import { readSandboxProject, persistSandboxProject, sandboxRecoveryKey } from '../platform/sandbox-project-storage';
 import './sandbox.css';
@@ -39,6 +39,7 @@ import './ux2-command-layout.css';
 import './ux4-canvas-focus.css';
 import './ux6-workbench.css';
 import './ux7-reference-layout.css';
+import { DEFAULT_SCAN_MS, SCAN_PRESETS_MS, TIME_SCALES, scanMsOf, type ScanTiming } from '../sim/scan-config';
 
 // Loaded on demand so opening the simulator does not download the project dialog, lessons, checklist or report builder.
 const ProjectLibraryPanel = lazy(() => import('../ui/sandbox/ProjectLibraryPanel').then(m => ({ default: m.ProjectLibraryPanel })));
@@ -104,6 +105,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     return { ...rest, def };
   }, [request]);
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
+  // Pacing only (never saved in a project): how fast model time runs, and the worker's measured scan cost.
+  const [timeScale, setTimeScale] = useState(1);
+  const [timing, setTiming] = useState<ScanTiming | null>(null);
   const [project, setProject] = useState<ProjectFile | null>(null);
   // Undo for destructive edits (remove / add panel): the project as it was before each one that took effect.
   const projectRef = useRef<ProjectFile | null>(null);
@@ -175,7 +179,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     const id=requestId.current++;
     const editKinds = new Set(['place','move','wire','unwire','remove','addPanel','configureIo',
       'setParam','loadProgram','loadST','activateLanguage','clear','loadProject',
-      'editWorkspace','setWireStyle','injectFault','injectSeededFault','clearFault','revealFault','repair','loadPlantScene']);
+      'editWorkspace','setWireStyle','setScanPeriod','injectFault','injectSeededFault','clearFault','revealFault','repair','loadPlantScene']);
     if(commands.some(c=>editKinds.has(c.k))){
       historyRequests.current.set(id,historyMode);
       setHistoryPending(true);
@@ -186,6 +190,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     const engine = new Worker(new URL('../sim/worker.ts', import.meta.url), { type: 'module' });
     worker.current = engine;
     engine.onmessage = (ev: MessageEvent<WorkerResponse>) => {
+      const timingMessage = ev.data as unknown as WorkerTiming | undefined;
+      if (timingMessage?.kind === 'timing') { setTiming(timingMessage.timing); return; }
       if (ev.data?.kind !== 'snapshot') return;
       setSnapshot(ev.data.snapshot);
       // The initial Worker snapshot is blank; never autosave it over a project
@@ -793,6 +799,16 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         <button className="btn ghost small" onClick={() => send([{ k: 'step' }])} disabled={!editable}>Step scan</button>
         <button className="btn primary small" onClick={() => send([{ k: snapshot?.running ? 'pause' : 'run' }])}>
           {snapshot?.running ? 'Pause' : '▶ Run'}</button>
+        <label className="sandbox-time-control" title="How fast model time passes. PLC logic and machine behaviour are identical at every speed.">Speed
+          <select data-time-scale aria-label="Simulation speed" value={timeScale}
+            onChange={e => { const scale = Number(e.target.value); setTimeScale(scale); worker.current?.postMessage({ kind: 'timeScale', scale }); }}>
+            {TIME_SCALES.map(s => <option key={s} value={s}>{s === 1 ? '1× normal' : s < 1 ? `${s}× slow` : `${s}× fast`}</option>)}
+          </select></label>
+        <label className="sandbox-time-control" title="Simulated PLC scan period (pause to change). Timers and physics advance by this much per scan.">Scan period
+          <select data-scan-period aria-label="PLC scan period" disabled={!editable} value={scanMsOf(project ?? {})}
+            onChange={e => send([{ k: 'setScanPeriod', ms: Number(e.target.value) }])}>
+            {[...new Set([...SCAN_PRESETS_MS, scanMsOf(project ?? {})])].sort((a, b) => a - b).map(ms => <option key={ms} value={ms}>{ms} ms</option>)}
+          </select></label>
         <span className="sandbox-scan" aria-live="off">Scan {snapshot?.tick ?? 0}</span>
       </div>
       {!scenario && <div className="workspace-editing-strip" aria-label="Workspace tools"
@@ -1248,7 +1264,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       <div className="p5-simulation-status" role="status" aria-label="Authoritative simulation state">
         <strong data-p5-sim-state>{snapshot?.running?'Running':snapshot?.breakpointHit?'Breakpoint':'Paused / editing'}</strong>
         <span>Scan <b>{snapshot?.tick??0}</b></span>
-        <span>Model time <b>{((snapshot?.tick??0)*50/1000).toFixed(2)} s</b> · nominal 50 ms scans</span>
+        <span data-scan-diagnostics>Model time <b>{((snapshot?.tick??0)*scanMsOf(project ?? {})/1000).toFixed(2)} s</b> · {scanMsOf(project ?? {})} ms scans
+          {timeScale !== 1 && <> · ×{timeScale}</>}</span>
+        {snapshot?.running && timing && <span data-scan-load className={timing.behind ? 'p5-status-warning' : undefined}
+          title="Wall-clock cost of the simulation as a share of real time at the current speed and scan period">
+          Simulator load <b>{timing.loadPercent}%</b>{timing.behind && <> · cannot keep up at this speed ({timing.droppedScans} scans dropped)</>}</span>}
         <span>{project?.components.length??0} devices · {project?.wires.length??0} wires</span>
         {selectedTerminal&&<span>Wiring from <code>{selectedTerminal}</code></span>}
         {(clientError||snapshot?.lastError)&&<span className="p5-status-warning">Action error — inspect message above</span>}

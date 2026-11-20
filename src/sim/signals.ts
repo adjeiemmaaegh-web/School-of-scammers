@@ -113,6 +113,8 @@ export type ProjectFile = {
   params?: Record<string, Record<string, number>>;
   plantFaults?: Record<string,string>;
   /** Presentation only: colour and net label per wire id. Never read by the solver. */
+  /** Simulated PLC scan period in ms (10-500, multiples of 10); absent means the 50 ms default. See sim/scan-config.ts. */
+  scanMs?: number;
   wireStyles?: Record<string, { color?: 'red' | 'blue' | 'black' | 'green' | 'yellow' | 'orange' | 'white' | 'brown'; label?: string }>;
 };
 export type WorldState = {
@@ -204,6 +206,7 @@ export type Command =
   /** Delete a device and everything that depended on it (its wires, faults, PLC program). Paused only. */
   | { k: 'remove'; id: string }
   /** Colour and/or net label of one wire (null clears). Presentation only; paused only. */
+  | { k: 'setScanPeriod'; ms: number }
   | { k: 'setWireStyle'; id: string; color?: string | null; label?: string | null }
   /** Set a device setting (e.g. an on-delay relay's delay). Validated against its spec. Paused only. */
   | { k: 'setParam'; id: string; key: string; value: number }
@@ -297,6 +300,9 @@ export type RenderSnapshot = {
   breakpointInstruction: InstructionBreakpoint | null;
   scanTrace: ScanTrace[];
 };
-export type WorkerRequest = { kind: 'commands'; commands: Command[]; requestId?: number };
+export type WorkerRequest = { kind: 'commands'; commands: Command[]; requestId?: number }
+  | { kind: 'timeScale'; scale: number };
+/** Pacing diagnostics measured by the worker (wall-clock cost per scan, speed, dropped scans). Not part of the simulation state. */
+export type WorkerTiming = { kind: 'timing'; timing: import('./scan-config').ScanTiming };
 export type WorkerResponse = { kind: 'snapshot'; snapshot: RenderSnapshot; events: SimEvent[];
   requestId?: number; requestIds?: number[]; project?: ProjectFile; previousProject?: ProjectFile };

@@ -7,6 +7,13 @@ export type STType='BOOL'|'INT'|'DINT'|'REAL'|'LREAL';
 export type FbType='TON'|'TOF'|'TP'|'CTU'|'CTD'|'R_TRIG'|'F_TRIG'|'PID';
 /** The engine's fixed scan period; timer function blocks advance by this each scan (the simulator scan is 50 ms). */
 export const ST_SCAN_MS=50;
+/** Capacity (R08): declarations per program and statements executed per scan. Both are hard, measurable budgets (raised from 128 and 400). */
+export const ST_MAX_DECLARATIONS=512;
+/** Source size guard (raised from 12,000): bounds compile time and project size. */
+export const ST_MAX_SOURCE_CHARS=64000;
+/** Token guard (raised from 3,000), sized so a program at the statement budget still compiles. */
+export const ST_MAX_TOKENS=40000;
+export const ST_MAX_STATEMENTS_PER_SCAN=5000;
 const FB_SPEC:Readonly<Record<FbType,{inputs:readonly string[];outputs:readonly {name:string;type:STType}[];hidden:readonly string[];hiddenReal?:readonly string[]}>>={
  TON:{inputs:['IN','PT'],outputs:[{name:'Q',type:'BOOL'},{name:'ET',type:'DINT'}],hidden:[]},
  TOF:{inputs:['IN','PT'],outputs:[{name:'Q',type:'BOOL'},{name:'ET',type:'DINT'}],hidden:[]},
@@ -34,7 +41,7 @@ const BUILTINS = new Set(['ABS','MIN','MAX','LIMIT']);
 const precedence:Readonly<Record<string,number>>={OR:1,XOR:2,AND:3,'=':4,'<>':4,'<':4,'<=':4,'>':4,'>=':4,'+':5,'-':5,'*':6,'/':6,MOD:6};
 const RESERVED=new Set(['TON','TOF','TP','CTU','CTD','R_TRIG','F_TRIG','PID','IF','THEN','ELSIF','ELSE','END_IF','AND','OR','XOR','NOT','TRUE','FALSE','MOD','VAR','VAR_INPUT','VAR_OUTPUT','END_VAR','BOOL','INT','DINT','REAL','LREAL','CASE','OF','END_CASE','FOR','TO','BY','DO','END_FOR','WHILE','END_WHILE']);
 function tokenize(source:string):Token[]{
- if(typeof source!=='string'||source.length>12000)throw new RangeError('Structured Text must be at most 12,000 characters');
+ if(typeof source!=='string'||source.length>ST_MAX_SOURCE_CHARS)throw new RangeError(`Structured Text must be at most ${ST_MAX_SOURCE_CHARS.toLocaleString('en-US')} characters`);
  const tokens:Token[]=[];
  for(let i=0;i<source.length;){
   if(/\s/.test(source[i])){i++;continue;}
@@ -44,7 +51,7 @@ function tokenize(source:string):Token[]{
   const match=/^(?:[Tt]#(?:\d+(?:\.\d+)?(?:ms|s|m|h))+|(?:\d+(?:\.\d+)?|\.\d+)(?![A-Za-z_])|[A-Za-z][A-Za-z0-9_]*|:=|<=|>=|<>|[=<>+*\/\-();:,.])/.exec(rest);
   if(!match)throw new SyntaxError(`Unexpected character at ${i}: ${source[i]}`);
   tokens.push({value:match[0],offset:i});i+=match[0].length;
-  if(tokens.length>3000)throw new RangeError('Structured Text token limit (3,000) exceeded');
+  if(tokens.length>ST_MAX_TOKENS)throw new RangeError(`Structured Text token limit (${ST_MAX_TOKENS.toLocaleString('en-US')}) exceeded`);
  }
  tokens.push({value:'<EOF>',offset:source.length});return tokens;
 }
@@ -107,7 +114,7 @@ export function compileStructuredText(source:string):STProgram{
   let count=0;
   while(upper()!=='END_VAR'){
    if(peek()==='<EOF>')fail('Unterminated variable declaration block');
-   if(declarations.length>=128)throw new RangeError('Structured Text declaration limit (128) exceeded');
+   if(declarations.length>=ST_MAX_DECLARATIONS)throw new RangeError(`Structured Text declaration limit (${ST_MAX_DECLARATIONS}) exceeded`);
    const name=readName(),key=keyword(name);
    if(namedDeclarations.has(key))fail(`Duplicate variable declaration ${name}`);
    requireToken(':');
@@ -160,7 +167,7 @@ export function compileStructuredText(source:string):STProgram{
  function statements(terminators:ReadonlySet<string>,depth=0,caseBody=false):Statement[]{
   if(depth>16)throw new RangeError('IF nesting limit (16) exceeded');const result:Statement[]=[];
   while(peek()!=='<EOF>'&&!terminators.has(upper())&&!(caseBody&&startsCaseLabel())){
-   if(++statementCount>200)throw new RangeError('Statement limit (200) exceeded');
+   if(++statementCount>ST_MAX_STATEMENTS_PER_SCAN)throw new RangeError(`Statement limit (${ST_MAX_STATEMENTS_PER_SCAN}) exceeded`);
    if(accept('IF')){
     const branches:{when:Expression;body:Statement[]}[]=[];
     const first=expression();requireToken('THEN');branches.push({when:first,body:statements(new Set(['ELSIF','ELSE','END_IF']),depth+1)});
@@ -237,7 +244,7 @@ export function compileStructuredText(source:string):STProgram{
  return {source,bodySource:source.slice(bodyStart),statements:compiled,referencedInputs:Array.from(reads.entries()).filter(([key])=>!writes.has(key)).map(([,name])=>name),assignedOutputs:outputs,declarations};
 }
 /** One scan of a standard function block. State lives in the instance's synthetic variables, so it persists in scan memory. */
-function stepFunctionBlock(call:Extract<Statement,{kind:'fb'}>,values:Record<string,STValue>):void{
+function stepFunctionBlock(call:Extract<Statement,{kind:'fb'}>,values:Record<string,STValue>,scanMs:number):void{
  const get=(member:string)=>values[fbKey(call.instance,member)];
  const set=(member:string,value:STValue)=>{values[fbKey(call.instance,member)]=value;};
  const flag=(name:string)=>call.args[name]?bool(evaluate(call.args[name],values)):false;
@@ -252,15 +259,15 @@ function stepFunctionBlock(call:Extract<Statement,{kind:'fb'}>,values:Record<str
  const clampMs=(n:number)=>Math.max(0,Math.min(2147483647,n));
  switch(call.type){
   case 'TON':{const input=flag('IN'),pt=clampMs(int('PT'));
-   const et=input?Math.min(Number(get('ET'))+ST_SCAN_MS,pt):0;set('ET',et);set('Q',input&&et>=pt);break;}
+   const et=input?Math.min(Number(get('ET'))+scanMs,pt):0;set('ET',et);set('Q',input&&et>=pt);break;}
   case 'TOF':{const input=flag('IN'),pt=clampMs(int('PT'));
    if(input){set('Q',true);set('ET',0);}
-   else if(get('Q')===true){const et=Math.min(Number(get('ET'))+ST_SCAN_MS,pt);set('ET',et);if(et>=pt)set('Q',false);}
+   else if(get('Q')===true){const et=Math.min(Number(get('ET'))+scanMs,pt);set('ET',et);if(et>=pt)set('Q',false);}
    else set('ET',Math.min(Number(get('ET')),pt));break;}
   case 'TP':{const input=flag('IN'),pt=clampMs(int('PT'));
-   if(get('RUN')===true){const et=Math.min(Number(get('ET'))+ST_SCAN_MS,pt);set('ET',et);if(et>=pt){set('RUN',false);set('Q',false);}}
+   if(get('RUN')===true){const et=Math.min(Number(get('ET'))+scanMs,pt);set('ET',et);if(et>=pt){set('RUN',false);set('Q',false);}}
    else{
-    if(input&&get('PIN')!==true&&pt>0){set('RUN',true);set('Q',true);set('ET',Math.min(ST_SCAN_MS,pt));if(ST_SCAN_MS>=pt){set('RUN',false);set('Q',false);}}
+    if(input&&get('PIN')!==true&&pt>0){set('RUN',true);set('Q',true);set('ET',Math.min(scanMs,pt));if(scanMs>=pt){set('RUN',false);set('Q',false);}}
     else{set('Q',false);if(!input)set('ET',0);}
    }
    set('PIN',input);break;}
@@ -271,7 +278,7 @@ function stepFunctionBlock(call:Extract<Statement,{kind:'fb'}>,values:Record<str
    if(load)cv=Math.max(-32768,Math.min(32767,pv));else if(down&&get('PCD')!==true)cv=Math.max(cv-1,-32768);
    set('CV',cv);set('Q',cv<=0);set('PCD',down);break;}
   case 'PID':{
-   const dt=ST_SCAN_MS/1000,pv=real('PV',0),sp=real('SP',0),kp=real('KP',0),ki=real('KI',0),kd=real('KD',0),lo=real('OUT_MIN',0),hi=real('OUT_MAX',100);
+   const dt=scanMs/1000,pv=real('PV',0),sp=real('SP',0),kp=real('KP',0),ki=real('KI',0),kd=real('KD',0),lo=real('OUT_MIN',0),hi=real('OUT_MAX',100);
    if(lo>hi)throw new RangeError('PID.OUT_MIN must not exceed OUT_MAX');
    const e=sp-pv,primed=get('PRIMED')===true,integ=Number(get('INTEG')),perr=Number(get('PERR'));
    const trial=integ+ki*e*dt,d=primed?kd*(e-perr)/dt:0;
@@ -331,7 +338,7 @@ function evaluate(expr:Expression,signals:STSignals):STValue{
  return output;
 }
 function assertSignals(input:STSignals):void{
- if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).length>128)throw new RangeError('Signals must be a map of at most 128 BOOL/REAL tags');
+ if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).length>ST_MAX_DECLARATIONS*2)throw new RangeError(`Signals must be a map of at most ${ST_MAX_DECLARATIONS*2} BOOL/REAL tags`);
  const seen=new Set<string>();
  for(const [k,v] of Object.entries(input)){
   const key=keyword(k);
@@ -341,7 +348,9 @@ function assertSignals(input:STSignals):void{
  }
 }
 /** Each scan starts from last outputs, then samples current inputs; input tags cannot be overwritten. */
-export function executeStructuredText(program:STProgram,inputs:STSignals,previousOutputs:STSignals={}):STResult{
+/** `scanMs` is the simulated scan period this execution represents (timer function blocks and PID advance by it). */
+export function executeStructuredText(program:STProgram,inputs:STSignals,previousOutputs:STSignals={},scanMs:number=ST_SCAN_MS):STResult{
+ if(!Number.isSafeInteger(scanMs)||scanMs<1||scanMs>1000)throw new RangeError('Invalid scan period');
  assertSignals(inputs);assertSignals(previousOutputs);
  if(!program||!Array.isArray(program.statements))throw new TypeError('Compile Structured Text before executing');
  // IEC-style tag identifiers ignore case. Typed variables are initialized once,
@@ -372,9 +381,9 @@ export function executeStructuredText(program:STProgram,inputs:STSignals,previou
  const run=(statements:readonly Statement[],depth:number)=>{
   if(depth>16)throw new RangeError('Execution nesting limit exceeded');
   for(const statement of statements){
-   if(++operations>400)throw new RangeError('Execution statement budget exceeded');
+   if(++operations>ST_MAX_STATEMENTS_PER_SCAN)throw new RangeError(`Execution statement budget (${ST_MAX_STATEMENTS_PER_SCAN} per scan) exceeded`);
    if(statement.kind==='fb'){
-    stepFunctionBlock(statement,values);
+    stepFunctionBlock(statement,values,scanMs);
    }else if(statement.kind==='assign'){
     if(inputKeys.has(statement.name))throw new Error(`Cannot overwrite sampled input ${statement.name}`);
     const value=evaluate(statement.expr,values);

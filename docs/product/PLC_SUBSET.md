@@ -13,7 +13,7 @@ An educational teaching subset inspired by IEC 61131-3. It is **not** full IEC c
 - Contacts (NO/NC), series and parallel branches; coils and `SET`/`RESET`; rising/falling edge (`osr`/`osf`).
 - Timers `TON`, `TOF`, `RTO` (retentive), `TP`; counters `CTU` (with reset), `CTD` (with load).
 - Numeric: `compare` (`= <> < <= > >=`), `move`, `+ - * /` on literals or tags.
-- Limits: **32 rungs**, **48 local tags** per program (raised from 8 and 16 in R4); declared local tags only; no duplicate coils.
+- Limits (R08, raised from 32 rungs / 48 tags): **256 rungs**, **512 local tags**, a static scan-cost budget of **2048 elements** (every contact, branch contact and rung instruction is one unit; at most 8 series elements per rung), and for Structured Text **512 declarations**, **5000 statements** (compile-time and per-scan run-time), **40,000 tokens** and **64,000 characters**. The worker measures the real scan cost and shows the simulator load, so an expensive program is visible; declared local tags only; no duplicate coils.
 
 ## Structured Text (ST)
 
