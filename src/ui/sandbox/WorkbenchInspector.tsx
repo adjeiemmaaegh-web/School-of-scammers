@@ -163,6 +163,7 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
           {channelImage.channels.map(channel => <li key={channel.source + ':' + channel.endpoint}>
             <code>{channel.tag}</code>
             <strong>{channel.kind === 'digital' ? (channel.value ? 'ON' : 'OFF') :
+              channel.sampled === false ? 'PLC unpowered · no sample' :
               !channel.connected || channel.value === null ? 'Disconnected' :
               `${channel.value} ${channel.unit ?? ''}`.trim()}</strong>
             <small>{channelSemantics(channel).direction} · {channelSemantics(channel).domain} · {channelSemantics(channel).timing}{channel.kind === 'numeric' && channel.origin ? ` · from ${channel.origin}` : ''}</small>
