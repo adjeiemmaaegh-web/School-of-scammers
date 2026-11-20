@@ -41,6 +41,8 @@ The engine already had four pure phases (`controller-scan`, `actuators`, `equipm
 8. **Real typed telemetry in the inspector (R3.5):** `src/sim/device-channels.ts` now supports a selected-device scope and unit metadata taken from the registered physical model, not from heuristics; `WorkbenchInspector.tsx` exposes the snapshot's digital, numeric and disconnected channels with source labels. The list scrolls independently on tablets and desktop. A missing signal stays missing; numeric channels are not treated as 24 V power.
 9. **Bounded replay API (R3.7):** `src/sim/replay.ts` offers deterministic command/scan scripting and named snapshot checkpoints, with frame, command and scan limits. It reuses the one authoritative `tick()` implementation, and full serialized snapshots/events can be compared across two independent runs. No wall clock or second simulator was introduced.
 
+10. **PLC fault isolation:** Every PLC runtime-error path in `src/sim/phases/controller-scan.ts` now clears the full legacy output group and prior three-phase display state, rather than leaving Fill/Drain/Forward/Reverse or virtual drive state lingering after an invalid typed ST output. The simulated electrical voltage image is also cleared for invalid output-type faults.
+
 **Limitations:** This continuation was performed through live GitHub source commits rather than a complete local checkout. No compile, test suite, browser acceptance, hardware work, merge or deployment is claimed. Replay comparison is an implemented utility, not independently established determinism for every scenario.
 
 ## Next engineering and acceptance work
