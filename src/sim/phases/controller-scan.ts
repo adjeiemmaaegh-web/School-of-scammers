@@ -14,11 +14,10 @@ import { ioOf } from '../plc-io';
 import { classicInputs, freshPlcRuntime, namesFor, programOf, runtimePlcs, scanPlc } from '../plcs';
 import { sampleAnalogInputs } from '../analog';
 import { samplePlcDigitalInputs } from '../plc-input-image';
-import { deenergisedPlcs, quietLanes } from './fail-closed';
+import { haltedSimulationWorld } from './fail-closed';
 import type { PlacedComponent, PlcInputs, PlcRuntime, SimEvent, WorldState } from '../signals';
 
 const terminal = (id: string, pin: string) => `${id}.${pin}`;
-const QUIET_OUTPUTS = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
 export type ControllerScan = {
   halt?: undefined; eyePowered: boolean; probePowered: boolean; inputs: PlcInputs;
   ladderResult: LadderResult | null; stResult: STResult | null; fbdResult: FbdResult | null;
@@ -64,18 +63,8 @@ export function scanControllers(
     const message = error instanceof Error ? error.message : 'PLC runtime failed';
     // Fail closed in the *simulated* plant. Do not publish stale energized outputs
     // after an arithmetic fault (overflow, division by zero, invalid typed write).
-    const paused: WorldState = {
-      ...w, running: false, coils: { ...w.coils, ...QUIET_OUTPUTS },
-      tagValues: { ...w.tagValues, ...QUIET_OUTPUTS },
-      contactorOn: false, motorOn: false, conveyorOn: false, diverterOn: false,
-      pumpOn: false, drainOn: false, lampOn: false,
-      plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {}, threePhase: {},
-      forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
-      interlockConflict: false,
-      plant: { ...w.plant, photoeyeActive: false }, lanes: quietLanes(w.lanes), voltages: {},
-      diagnostics: [...w.diagnostics, 'PLC scan interrupted; simulated outputs deenergized'],
-      lastError: `PLC runtime error: ${message}`,
-    };
+    const paused = haltedSimulationWorld(w, `PLC runtime error: ${message}`,
+      'PLC scan interrupted; simulated outputs deenergized');
     return { halt: { world: paused, events: [{ tick: w.tick, kind: 'error', detail: message }] } };
   }
   const stRun = stResult
@@ -101,17 +90,7 @@ export function scanControllers(
       (stDrain !== undefined && typeof stDrain !== 'boolean') ||
       (stForward !== undefined && typeof stForward !== 'boolean') ||
       (stReverse !== undefined && typeof stReverse !== 'boolean')) {
-    const paused: WorldState = {
-      ...w, running: false, coils: { ...w.coils, ...QUIET_OUTPUTS },
-      tagValues: { ...w.tagValues, ...QUIET_OUTPUTS },
-      motorOn: false, conveyorOn: false, diverterOn: false, contactorOn: false,
-      pumpOn: false, drainOn: false, lampOn: false,
-      plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {}, threePhase: {},
-      forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
-      interlockConflict: false,
-      plant: { ...w.plant, photoeyeActive: false }, lanes: quietLanes(w.lanes), voltages: {},
-      lastError: 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL',
-    };
+    const paused = haltedSimulationWorld(w, 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL');
     return { halt: { world: paused, events: [{ tick: w.tick, kind: 'error', detail: 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL' }] } };
   }
   // Structured Text is case-insensitive; the physical Q0.0 binding is always canonical "Run".
@@ -148,17 +127,8 @@ export function scanControllers(
         tagInputs, extraPowered, dtMs, numeric.points, w.debugForces[extra.id] ?? {});
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PLC runtime failed';
-      const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
-      const paused: WorldState = {
-        ...w, running: false, coils: { ...w.coils, ...quiet }, tagValues: { ...w.tagValues, ...quiet },
-        plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {}, threePhase: {},
-        contactorOn: false, motorOn: false, conveyorOn: false, diverterOn: false,
-        pumpOn: false, drainOn: false, lampOn: false,
-        forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped', interlockConflict: false,
-        plant: { ...w.plant, photoeyeActive: false }, lanes: quietLanes(w.lanes), voltages: {},
-        diagnostics: [...w.diagnostics, 'PLC scan interrupted; simulated outputs deenergized'],
-        lastError: `PLC ${extra.id} runtime error: ${message}`,
-      };
+      const paused = haltedSimulationWorld(w, `PLC ${extra.id} runtime error: ${message}`,
+        'PLC scan interrupted; simulated outputs deenergized');
       return { halt: { world: paused, events: [{ tick: w.tick, kind: 'error', detail: `PLC ${extra.id}: ${message}` }] } };
     }
     if (!extraPowered && extra.id !== plc?.id) unpoweredExtras.push(extra.id);
