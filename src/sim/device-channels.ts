@@ -7,7 +7,7 @@
  * Unknown plant engineering units are intentionally not guessed.
  */
 import type { ProjectFile, RenderSnapshot } from './signals';
-import { PLANT_EQUIPMENT } from '../plant/equipment';
+import { deviceIntegrationContract } from './device-contract';
 
 export const MAX_DEVICE_CHANNELS = 512;
 export type DeviceChannel =
@@ -63,7 +63,7 @@ export function readDeviceChannels(
       else if (typeof reading === 'number' && Number.isFinite(reading)) {
         // Plant engineering units come ONLY from its registered signal definition.
         // Do not guess units from signal names or treat numeric readings as 24V.
-        const spec = PLANT_EQUIPMENT[part.kind]?.signals.find(signal =>
+        const spec = deviceIntegrationContract(part.kind).plant?.signals.find(signal =>
           signal.name === tag && signal.kind === 'number');
         append({
           kind: 'numeric', source: 'plant', deviceId: part.id, endpoint: part.id + '.' + tag,
