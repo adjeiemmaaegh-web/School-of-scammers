@@ -16,6 +16,46 @@ export type DeviceChannel =
   | { kind: 'numeric'; deviceId: string; endpoint: string; tag: string; value: number | null;
       unit?: string; connected: boolean; origin?: string; source: 'plc-analog-input' | 'plant'; snapshotTick: number };
 
+export type ChannelSemantics = {
+  /** Direction is relative to the observed equipment, not a network packet. */
+  readonly direction: 'input' | 'output' | 'measurement' | 'status';
+  /** Signal domain is explicit so numbers cannot accidentally energize a 24 V path. */
+  readonly domain: 'dc24' | 'numeric-process' | 'plant-model' | 'actuator-state';
+  /** Exact provenance of this sample. A value is not inferred from 3D animation. */
+  readonly provenance: 'plc-input-image' | 'plc-output-image' | 'analog-input-image' |
+    'plant-model-snapshot' | 'actuator-output-image';
+  /** The plant's prior settled state is sampled by PLC numeric inputs. */
+  readonly timing: 'plc-scan' | 'prior-settled-plant' | 'plant-snapshot' | 'actuator-snapshot';
+  readonly powerReference?: 'plc-L+-to-M';
+  /** Unknown ranges and fault mechanisms stay unspecified: hidden faults must not be revealed. */
+  readonly unit?: string;
+};
+
+/** Stable truthful metadata for live, read-only worker channels.
+ * No custom device heuristics, safety claims, inferred electrical current or
+ * hidden fault details. This metadata never affects execution or persistence.
+ */
+export function channelSemantics(channel: DeviceChannel): ChannelSemantics {
+  switch (channel.source) {
+    case 'plc-input':
+      return { direction: 'input', domain: 'dc24', provenance: 'plc-input-image',
+        timing: 'plc-scan', powerReference: 'plc-L+-to-M' };
+    case 'plc-output':
+      return { direction: 'output', domain: 'dc24', provenance: 'plc-output-image',
+        timing: 'plc-scan', powerReference: 'plc-L+-to-M' };
+    case 'plc-analog-input':
+      return { direction: 'input', domain: 'numeric-process', provenance: 'analog-input-image',
+        timing: 'prior-settled-plant', ...(channel.unit ? { unit: channel.unit } : {}) };
+    case 'plant':
+      return { direction: 'measurement', domain: 'plant-model', provenance: 'plant-model-snapshot',
+        timing: 'plant-snapshot', ...(channel.kind === 'numeric' && channel.unit ?
+          { unit: channel.unit } : {}) };
+    case 'actuator':
+      return { direction: 'status', domain: 'actuator-state', provenance: 'actuator-output-image',
+        timing: 'actuator-snapshot' };
+  }
+}
+
 export type ChannelImage = { channels: DeviceChannel[]; truncated: boolean };
 
 /** One stable, bounded signal list in component order and channel order.
