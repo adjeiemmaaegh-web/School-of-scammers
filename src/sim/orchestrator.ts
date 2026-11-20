@@ -858,7 +858,15 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       const analogPoints = io.analogInputs && !world.running
         ? sampleAnalogInputs(world.project, world.vessels, c.id, io, rt?.powered ?? false,
           new Set(faultsOf(world.project).filter(f => f.kind === 'wire-open').map(f => f.target)),
-          world.plantWorld, id => world.voltages[id + '.L+'] !== undefined && world.voltages[id + '.M'] !== undefined).points
+          world.plantWorld, id => {
+            // A voltage entry may be floating (null) or be at the same
+            // potential as M. Only a measured 24 V difference can energize a
+            // process sensor; mere presence of both keys is not proof of power.
+            const positive = world.voltages[id + '.L+'];
+            const negative = world.voltages[id + '.M'];
+            return typeof positive === 'number' && typeof negative === 'number' &&
+              Math.abs(positive - negative - 24) < 0.001;
+          }).points
         : rt?.analogInputs ?? [];
       return [c.id, c.id === legacyPrimaryId(world.project)
         ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
