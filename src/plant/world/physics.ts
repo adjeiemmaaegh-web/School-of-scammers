@@ -6,7 +6,7 @@ import type {Body,EquipmentPlacement,EquipmentState,World,Vec3} from './types';
 import {G_MM_S2} from './types';
 import {clamp,face,footprintOverlap,insideFootprint,q,vec} from './math';
 import {addEvent} from './events';
-import {newlyContactsStaticSolid} from './solid-geometry';
+import {newlyContactsStaticSolid,staticSolidSize} from './solid-geometry';
 import {sweptBodyContact,bodyVolumeOverlap} from './swept-contact';
 
 const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','lift','scissor-lift',
@@ -45,13 +45,41 @@ function collide(body:Body,candidates:readonly Body[],move:Vec3,
  }
  return {delta:vec(x,y,move.z),blocked,blockedByBodyId};
 }
+/** Test hook (R10): disabling the broad phase restores the brute-force candidate list, the reference that differential tests compare against. */
+export const PHYSICS_DEBUG={broadPhase:true};
 /** One 10ms integration step; stable body ID order prevents nondeterministic contact resolution. */
 export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dtMs=10):World{
  if(dtMs!==10)throw new RangeError('Plant physics must use 10ms substeps');
  const sorted=[...world.bodies].sort((a,b)=>Number(a.id.slice(1))-Number(b.id.slice(1)));
  const next:Body[]=[];
  let changed:World=world;
- for(const original of sorted){
+ // Per-substep lookups built once (R10): first match wins, exactly like the linear searches they replace.
+ const itemById=new Map<string,EquipmentPlacement>();
+ for(const item of items)if(!itemById.has(item.id))itemById.set(item.id,item);
+ const blockers=items.filter(item=>BLOCKERS.has(item.kind));
+ const solids=items.filter(item=>item.params.blockMaterialFlow===1&&staticSolidSize(item.kind)!==null);
+ // Uniform-grid broad phase. Only bodies within one grid cell (cell >= largest body dimension + a movement margin) can touch,
+ // so far-away bodies are skipped; candidates are still visited in the original order, so contact results are unchanged.
+ let maxExtent=0;
+ for(const b of sorted)maxExtent=Math.max(maxExtent,b.size.x,b.size.y,b.size.z);
+ const cell=Math.max(200,maxExtent+100);
+ const cellKey=(x:number,y:number)=>Math.floor(x/cell)+','+Math.floor(y/cell);
+ const grid=new Map<string,number[]>();
+ sorted.forEach((b,index)=>{const k=cellKey(b.pos.x,b.pos.y);const list=grid.get(k);if(list)list.push(index);else grid.set(k,[index]);});
+ const nearby=(body:Body,self:number):Body[]=>{
+  if(!PHYSICS_DEBUG.broadPhase)return [...next,...sorted.slice(self+1)];
+  const cx=Math.floor(body.pos.x/cell),cy=Math.floor(body.pos.y/cell);
+  const indices:number[]=[];
+  for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){
+   const list=grid.get((cx+dx)+','+(cy+dy));
+   if(list)for(const index of list)if(index!==self)indices.push(index);
+  }
+  indices.sort((a,b)=>a-b);
+  // Bodies already stepped this substep are read from `next`, the rest from `sorted`: the same order as before.
+  return indices.map(index=>index<self?next[index]:sorted[index]);
+ };
+ for(let cur=0;cur<sorted.length;cur++){
+  const original=sorted[cur];
   const prior=original;
   let body={...prior,pos:{...prior.pos},vel:{...prior.vel}};
   // The gantry, arm and palletizer have already advanced a *gripped*
@@ -59,7 +87,7 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
   // positively restrained; conveyor-gravity integration must not overwrite
   // its XYZ position, detach it, or snap it to the 120 mm carrier surface.
   // A release immediately disables this exception on the next substep.
-  const grip=body.supportedBy?items.find(item=>item.id===body.supportedBy):undefined;
+  const grip=body.supportedBy?itemById.get(body.supportedBy):undefined;
   // The bounded pallet-pattern model represents an already-placed package as
   // supported by the palletizer's stable pallet/stack frame. Do not reclassify
   // it as an ordinary moving conveyor load or let gravity erase its counted
@@ -73,7 +101,7 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    next.push(body);
    continue;
   }
-  let carrier=body.supportedBy?items.find(item=>item.id===body.supportedBy):undefined;
+  let carrier=body.supportedBy?itemById.get(body.supportedBy):undefined;
   if(!carrier||!CARRIERS.has(carrier.kind))carrier=chooseCarrier(body,items,world.model);
   const state=carrier?world.model[carrier.id]:undefined;
   if(carrier&&state){
@@ -101,13 +129,13 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    body.pos.z=q(baseHeight(carrier,state));
    // A locked gate or extended stopper obstructs travel rather than teleporting cargo.
    const proposed=vec(body.vel.x*dtMs/1000,body.vel.y*dtMs/1000,0);
-   const blockingGate=items.find(item=>BLOCKERS.has(item.kind)&&world.model[item.id]?.engaged&&
+   const blockingGate=blockers.find(item=>world.model[item.id]?.engaged&&
     insideFootprint({x:body.pos.x+proposed.x,y:body.pos.y+proposed.y,z:body.pos.z},
      item.originMm,worldFootprint(item,Math.max(50,item.params.lengthMm??80),
       Math.max(50,item.params.widthMm??200))));
    const blocked=!!blockingGate;
    const moved={...body,pos:vec(body.pos.x+proposed.x,body.pos.y+proposed.y,body.pos.z)};
-   const solidBlocked=newlyContactsStaticSolid(body,moved,items);
+   const solidBlocked=newlyContactsStaticSolid(body,moved,solids);
    // A P20 gate trip has ALREADY been witnessed by the worker physics and
    // latched by the source belt on the prior substep. While the belt is
    // physically stopped at the contact boundary, proposed travel is zero;
@@ -148,7 +176,7 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
      detail:solidBlocked?'Body contacted a fixed solid':
       'Body '+body.id+' physically blocked by extended gate '+(blockingGate?.id??'unknown')});
    }else{
-    const contact=collide(body,[...next,...sorted.filter(o=>Number(o.id.slice(1))>Number(body.id.slice(1)))],proposed,
+    const contact=collide(body,nearby(body,cur),proposed,
       carrier.params.contactMode===1);
     if(contact.blocked){
      body.vel.x=0;body.vel.y=0;const tags:Body['tags']={...body.tags,jammed:true};

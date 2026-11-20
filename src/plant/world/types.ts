@@ -51,6 +51,7 @@ export type LiveSignal=Record<string,EquipmentSignal>;
 export type EquipmentDrawing={
  part:string;shape:BodyShape;pos:Vec3;size:Vec3;yawDeg:number;colour:string;
 };
-export const MAX_BODIES=60, MAX_WORLD_EVENTS=80, MAX_SCENE_EQUIPMENT=60;
+/** Factory scale (R10): raised from 60 bodies / 60 plant devices; see tests/factory-scale.test.ts for the profiled budgets. */
+export const MAX_BODIES=240, MAX_WORLD_EVENTS=80, MAX_SCENE_EQUIPMENT=200;
 export const QUANTUM=1e-6, SUBSTEP_MS=10, SCAN_MS=50;
 export const G_MM_S2=9810;

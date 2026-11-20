@@ -11,7 +11,7 @@ export type SpawnSpec={shape?:'box'|'cylinder';size:Vec3;massKg:number;pos:Vec3;
  yawDeg?:0|90|180|270;tags?:Body['tags'];supportedBy?:string|null};
 export function spawnBody(world:World,source:string,spec:SpawnSpec):World{
  if(world.bodies.length>=MAX_BODIES)
-  return addEvent(world,{kind:'limit',source,detail:'60-body capacity reached; spawn refused'});
+  return addEvent(world,{kind:'limit',source,detail:MAX_BODIES+'-body capacity reached; spawn refused'});
  if(!spec.size||!spec.pos||Object.values(spec.size).some(n=>!Number.isFinite(n)||n<=0||n>5000)||
     Object.values(spec.pos).some(n=>!Number.isFinite(n)||Math.abs(n)>100000)||
     !Number.isFinite(spec.massKg)||spec.massKg<=0||spec.massKg>5000)

@@ -8,8 +8,9 @@ import { pruneWireStyles } from '../components/wire-style';
 import { MAX_PLCS, extraPlcs, plcComponents, primaryPlcId, programOf, withProgramOf } from './plcs';
 import type { PlacedComponent, ProjectFile, Wire, XY } from './signals';
 
-export const MAX_COMPONENTS = 60;
-export const MAX_WIRES = 250;
+/** Factory scale (R10): raised from 60 components / 250 wires; bounded by the profiled budgets in tests/factory-scale.test.ts. */
+export const MAX_COMPONENTS = 250;
+export const MAX_WIRES = 1000;
 export const MAX_SUPPLIES = 6;
 
 const ownsTerminal = (terminal: string, id: string) => terminal.startsWith(`${id}.`);
