@@ -17,6 +17,7 @@ import { deenergisedPlcs, quietLanes } from './fail-closed';
 import type { PlacedComponent, PlcInputs, PlcRuntime, SimEvent, WorldState } from '../signals';
 
 const terminal = (id: string, pin: string) => `${id}.${pin}`;
+const QUIET_OUTPUTS = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
 export type ControllerScan = {
   halt?: undefined; eyePowered: boolean; probePowered: boolean; inputs: PlcInputs;
   ladderResult: LadderResult | null; stResult: STResult | null; fbdResult: FbdResult | null;
@@ -62,11 +63,11 @@ export function scanControllers(
     // Fail closed in the *simulated* plant. Do not publish stale energized outputs
     // after an arithmetic fault (overflow, division by zero, invalid typed write).
     const paused: WorldState = {
-      ...w, running: false, coils: { ...w.coils, Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
-      tagValues: { ...w.tagValues, Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false },
+      ...w, running: false, coils: { ...w.coils, ...QUIET_OUTPUTS },
+      tagValues: { ...w.tagValues, ...QUIET_OUTPUTS },
       contactorOn: false, motorOn: false, conveyorOn: false, diverterOn: false,
       pumpOn: false, drainOn: false, lampOn: false,
-      plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {},
+      plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {}, threePhase: {},
       forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
       interlockConflict: false,
       plant: { ...w.plant, photoeyeActive: false }, lanes: quietLanes(w.lanes), voltages: {},
@@ -99,13 +100,14 @@ export function scanControllers(
       (stForward !== undefined && typeof stForward !== 'boolean') ||
       (stReverse !== undefined && typeof stReverse !== 'boolean')) {
     const paused: WorldState = {
-      ...w, running: false, coils: { ...w.coils, Run: false, Sort: false },
-      tagValues: { ...w.tagValues, Run: false, Sort: false },
+      ...w, running: false, coils: { ...w.coils, ...QUIET_OUTPUTS },
+      tagValues: { ...w.tagValues, ...QUIET_OUTPUTS },
       motorOn: false, conveyorOn: false, diverterOn: false, contactorOn: false,
       pumpOn: false, drainOn: false, lampOn: false,
-      plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {},
+      plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {}, threePhase: {},
       forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped',
       interlockConflict: false,
+      plant: { ...w.plant, photoeyeActive: false }, lanes: quietLanes(w.lanes), voltages: {},
       lastError: 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL',
     };
     return { halt: { world: paused, events: [{ tick: w.tick, kind: 'error', detail: 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL' }] } };
@@ -148,7 +150,7 @@ export function scanControllers(
       const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
       const paused: WorldState = {
         ...w, running: false, coils: { ...w.coils, ...quiet }, tagValues: { ...w.tagValues, ...quiet },
-        plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {},
+        plcs: deenergisedPlcs(w.plcs), deviceOn: {}, timers: {}, threePhase: {},
         contactorOn: false, motorOn: false, conveyorOn: false, diverterOn: false,
         pumpOn: false, drainOn: false, lampOn: false,
         forwardContactorOn: false, reverseContactorOn: false, motorDirection: 'stopped', interlockConflict: false,
