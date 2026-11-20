@@ -52,3 +52,45 @@ describe('R01 tipping in the live scan engine', () => {
     expect(crash('carton', 1000).tags.tipped).toBeUndefined();
   });
 });
+
+describe('R01 sliding, friction and pushing on the floor', () => {
+  const slide = (specs: Array<{ x: number; vx: number; mass: number; mu?: number }>, scans: number) => {
+    let w = freshWorld();
+    for (const s of specs) w = spawnBody(w, 't', { size: vec(100, 100, 100), massKg: s.mass, pos: vec(s.x, 0, 0), tags: { frictionMu: s.mu ?? 0.4, floorDynamics: true } });
+    w = { ...w, bodies: w.bodies.map((b, i) => ({ ...b, vel: vec(specs[i].vx, 0, 0) })) };
+    let r = freshRuntime(w, [], PLANT_EQUIPMENT);
+    for (let i = 0; i < scans; i++) r = stepScene(r, [], PLANT_EQUIPMENT, {});
+    return r.world.bodies;
+  };
+  it('a sliding body decelerates under Coulomb friction and stops at v^2/(2 mu g)', () => {
+    const [b] = slide([{ x: 0, vx: 1000, mass: 2 }], 200);
+    expect(b.vel.x).toBe(0);
+    const expected = 1000 * 1000 / (2 * 0.4 * 9810);                     // about 127 mm
+    expect(b.pos.x).toBeGreaterThan(expected * 0.9); expect(b.pos.x).toBeLessThan(expected * 1.1);
+  });
+  it('a slippery body slides further than a grippy one', () => {
+    expect(slide([{ x: 0, vx: 1000, mass: 2, mu: 0.1 }], 200)[0].pos.x).toBeGreaterThan(slide([{ x: 0, vx: 1000, mass: 2, mu: 0.6 }], 200)[0].pos.x * 3);
+  });
+  it('a heavy body pushes a light one ahead of it and momentum is shared', () => {
+    const [heavy, light] = slide([{ x: 0, vx: 800, mass: 10, mu: 0.05 }, { x: 150, vx: 0, mass: 1, mu: 0.05 }], 6);
+    expect(light.pos.x).toBeGreaterThan(150);                         // pushed forward
+    expect(heavy.pos.x).toBeLessThan(light.pos.x);                    // never passes through
+    expect(Math.abs(heavy.vel.x - light.vel.x)).toBeLessThan(15);   // inelastic: shared velocity (one substep of friction apart)
+    expect(heavy.vel.x).toBeGreaterThan(500); // about 10/11 of 800 less friction
+  });
+  it('a light body hitting a heavy one barely moves it', () => {
+    const [light, heavy] = slide([{ x: 0, vx: 800, mass: 1, mu: 0.05 }, { x: 150, vx: 0, mass: 50, mu: 0.05 }], 6);
+    expect(heavy.vel.x).toBeLessThan(40);
+    expect(light.pos.x).toBeLessThan(heavy.pos.x);
+  });
+});
+
+describe('R01 compatibility: bodies without floorDynamics coast exactly as before', () => {
+  it('a legacy sliding body is not slowed', () => {
+    let w = spawnBody(freshWorld(), 't', { size: vec(100, 100, 100), massKg: 2, pos: vec(0, 0, 0), tags: { frictionMu: 0.4 } });
+    w = { ...w, bodies: w.bodies.map(b => ({ ...b, vel: vec(500, 0, 0) })) };
+    let r = freshRuntime(w, [], PLANT_EQUIPMENT);
+    for (let i = 0; i < 20; i++) r = stepScene(r, [], PLANT_EQUIPMENT, {});
+    expect(r.world.bodies[0].vel.x).toBe(500);
+  });
+});

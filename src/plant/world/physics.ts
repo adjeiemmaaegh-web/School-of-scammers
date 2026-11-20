@@ -21,6 +21,7 @@ const tipIfFastStop=(body:Body,vx:number,vy:number):boolean=>{
  Object.assign(body,tipOver(body,dir));
  return true;
 };
+const frictionOf=(b:Body):number=>typeof b.tags.frictionMu==='number'?b.tags.frictionMu:.4;
 const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','lift','scissor-lift',
  'pick-and-place','palletizer','asrs-crane']);
 const BLOCKERS=new Set(['stopper','diverter-gate','safety-fence','guard-door']);
@@ -242,9 +243,34 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    }
   }else{
    body.supportedBy=null;
+   const onFloor=body.pos.z===0&&body.vel.z===0;
    body.vel.z=q(Math.max(-2000,body.vel.z-G_MM_S2*dtMs/1000));
-   body.pos=qPosition({...body.pos,x:body.pos.x+body.vel.x*dtMs/1000,
-    y:body.pos.y+body.vel.y*dtMs/1000,z:Math.max(0,body.pos.z+body.vel.z*dtMs/1000)});
+   let moveX=body.vel.x*dtMs/1000,moveY=body.vel.y*dtMs/1000;
+   if(onFloor&&body.tags.floorDynamics===true&&(body.vel.x!==0||body.vel.y!==0)){
+    // Opt-in (tag floorDynamics): a legacy body leaving a belt keeps coasting to its collector exactly as before. A body sliding on the floor: Coulomb friction brings it to rest, and it pushes what it meets (inelastic impact: the two
+    // share momentum along the line of travel). Bodies at rest or carried by equipment never reach this code.
+    const speed=Math.hypot(body.vel.x,body.vel.y);
+    const slowed=Math.max(0,speed-frictionOf(body)*G_MM_S2*dtMs/1000),k=speed>0?slowed/speed:0;
+    body.vel.x=q(body.vel.x*k);body.vel.y=q(body.vel.y*k);
+    if(slowed<1){body.vel.x=0;body.vel.y=0;}
+    moveX=body.vel.x*dtMs/1000;moveY=body.vel.y*dtMs/1000;
+    if(moveX!==0||moveY!==0){
+     const hit=collide(body,nearby(body,cur),vec(moveX,moveY,0),true);
+     if(hit.blocked&&hit.blockedByBodyId){
+      const idx=sorted.findIndex(o=>o.id===hit.blockedByBodyId);
+      const other=idx<cur?next[idx]:sorted[idx];
+      if(other&&!other.supportedBy&&other.pos.z===body.pos.z&&!(other.tags.palletized)){
+       const m1=body.massKg,m2=other.massKg,common={x:(m1*body.vel.x+m2*other.vel.x)/(m1+m2),y:(m1*body.vel.y+m2*other.vel.y)/(m1+m2)};
+       const pushed={...other,vel:vec(q(common.x),q(common.y),0)};
+       if(idx<cur)next[idx]=pushed;else sorted[idx]=pushed;
+       body.vel.x=q(common.x);body.vel.y=q(common.y);
+       changed=addEvent(changed,{kind:'contact',source:body.id,bodyId:other.id,detail:'Sliding body pushed '+other.id});
+      }else{body.vel.x=0;body.vel.y=0;}
+      moveX=0;moveY=0;
+     }
+    }
+   }
+   body.pos=qPosition({...body.pos,x:body.pos.x+moveX,y:body.pos.y+moveY,z:Math.max(0,body.pos.z+body.vel.z*dtMs/1000)});
    if(body.pos.z===0)body.vel.z=0;
   }
   // Simple vertical stack: a body can rest on another with 60% overlap and
