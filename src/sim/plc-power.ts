@@ -17,11 +17,9 @@ export function controllerPowerImage(
   circuit: PowerCircuit,
   shorted: boolean,
 ): Record<string, boolean> {
-  const result: Record<string, boolean> = {};
-  for (const plc of plcComponents(project)) {
-    result[plc.id] = !shorted && circuit.reads24(plc.id + '.L+', plc.id + '.M');
-  }
-  return result;
+  return Object.fromEntries(plcComponents(project).map(plc => [
+    plc.id, !shorted && circuit.reads24(plc.id + '.L+', plc.id + '.M'),
+  ]));
 }
 
 /** This reports virtual controller availability across a bench. It does NOT
