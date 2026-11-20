@@ -21,6 +21,7 @@ Versioning policy: `package.json` version is the app/build version (0.x until th
 - R09/R23: configurable scan period (10-500 ms), simulation speed 0.1x-10x with scan-cost diagnostics.
 - R08: PLC capacity raised (256 rungs, 512 tags, ST 5000 statements) with static and run-time budgets.
 - R10: factory scale raised to 250 components, 1000 wires, 240 bodies, 200 plant devices; physics broad phase (4.5x faster at the maximum) with a differential test against brute force.
+- R12 (part): maintained selector switch, 24 V buzzer and 24 V alarm siren (electrical-model loads and contacts, PLC-drivable).
 - R7/R11: bounded soak and benchmark test (10 simulated minutes, maximal project).
 
 ## 0.1.0 (merged to `main` as of PR #26 and PR #70)

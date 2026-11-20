@@ -153,6 +153,19 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
     <mesh position={[0.29,0.84,-0.38]}><sphereGeometry args={[0.06,10,8]} />
       <meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.48} /></mesh>
   </group>;
+  if (kind === 'selector') return <group>
+    <mesh position={[0, 0.22, 0]}><boxGeometry args={[0.86, 0.38, 0.76]} /><meshStandardMaterial color={COLORS.chassis} metalness={0.2} /></mesh>
+    <mesh position={[0, 0.44, 0]}><cylinderGeometry args={[0.26, 0.28, 0.1, 24]} /><meshStandardMaterial color={COLORS.steel} metalness={0.35} /></mesh>
+    <mesh position={[0, 0.58, 0]} rotation={[0, 0, pressed ? -0.7 : 0.7]}><boxGeometry args={[0.1, 0.3, 0.1]} /><meshStandardMaterial color={pressed ? '#16a77b' : '#e3e8ee'} metalness={0.2} /></mesh>
+  </group>;
+  if (kind === 'buzzer') return <group>
+    <mesh position={[0, 0.2, 0]}><cylinderGeometry args={[0.38, 0.38, 0.22, 20]} /><meshStandardMaterial color={COLORS.panel} metalness={0.5} /></mesh>
+    <mesh position={[0, 0.42, 0]}><cylinderGeometry args={[0.28, 0.32, 0.24, 20]} /><meshStandardMaterial color={active ? '#f06d4c' : '#4a5663'} emissive={active ? '#f06d4c' : '#000000'} emissiveIntensity={active ? 0.4 : 0} /></mesh>
+  </group>;
+  if (kind === 'siren') return <group>
+    <mesh position={[0, 0.18, 0]}><boxGeometry args={[0.7, 0.2, 0.7]} /><meshStandardMaterial color={COLORS.panel} metalness={0.5} /></mesh>
+    <mesh position={[0, 0.5, 0]}><cylinderGeometry args={[0.1, 0.34, 0.46, 20]} /><meshStandardMaterial color={active ? '#f0b34c' : '#59646f'} emissive={active ? '#f0b34c' : '#000000'} emissiveIntensity={active ? 0.45 : 0} /></mesh>
+  </group>;
   if (kind === 'lamp') return <group>
     <mesh position={[0,0.20,0]}><cylinderGeometry args={[0.40,0.40,0.18,18]} />
       <meshStandardMaterial color={COLORS.panel} metalness={0.5} /></mesh>
@@ -332,10 +345,12 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
           c.kind === 'drainvalve' ? (active ? 'DRAIN OPEN' : 'CLOSED') :
           c.kind === 'breaker' ? (active ? 'CLOSED' : 'TRIPPED') :
           c.kind === 'overload' ? (active ? '95-96 CLOSED' : 'TRIPPED') :
+          c.kind === 'selector' ? (c.pressed ? 'POSITION 2 · CLOSED' : 'POSITION 1 · OPEN') :
+          c.kind === 'buzzer' || c.kind === 'siren' ? (active ? 'SOUNDING' : 'SILENT') :
           c.kind === 'lamp' ? (active ? 'ILLUMINATED' : 'OFF') :
           c.kind === 'supply' ? '24 V DC' : c.kind === 'estop' ?
           (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') : c.pressed ? 'PRESSED' : 'RELEASED'}</small>
-        {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') && <button type="button"
+        {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton' || c.kind === 'selector') && <button type="button"
           disabled={false} onPointerDown={e => e.stopPropagation()}
           onClick={e => { e.stopPropagation(); onOperate(c.id); }}>{c.pressed ? 'Release' : 'Press'}</button>}
       </div>
@@ -676,7 +691,7 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusS
         c.kind === 'photoeye' ? snapshot.io.Photoeye :
         c.kind === 'levelprobe' ? snapshot.io.TankHigh :
         c.kind === 'estop' ? !c.pressed :
-        c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false)}
+        c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' || c.kind === 'selector' ? c.pressed : false)}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect}
       onPress={start} onLabelPress={startLabel}
       placeKind={placeKind}

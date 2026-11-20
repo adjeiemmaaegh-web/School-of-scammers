@@ -17,7 +17,7 @@ export type DeviceFamily = (typeof DEVICE_FAMILIES)[number]['id'];
 const families: Record<Exclude<DeviceFamily,'all'>,readonly string[]> = {
   plc:['plc','plc16'],
   electrical:['supply','breaker','overload','contactor','forwardcontactor',
-    'reversecontactor','relay','timerelay','estop','start','stop','reversebutton',
+    'reversecontactor','relay','timerelay','estop','start','stop','reversebutton','selector',
     'three-phase-supply','star-delta-drive'],
   sensors:['photoeye','levelprobe','geometry-photoeye','inductive-prox',
     'capacitive-prox','light-curtain','weigh-cell'],
@@ -27,7 +27,7 @@ const families: Record<Exclude<DeviceFamily,'all'>,readonly string[]> = {
   motion:['cylinder','lift','scissor-lift','rotary-actuator','pick-and-place','robot-arm'],
   process:['tank','pump','drainvalve','process-tank','mixer','heater',
     'proportional-valve','filler','capper'],
-  indicators:['lamp','stacklight'],
+  indicators:['lamp','stacklight','buzzer','siren'],
 };
 export function familyForKind(kind:string):Exclude<DeviceFamily,'all'> {
   for (const [family,kinds] of Object.entries(families)) {

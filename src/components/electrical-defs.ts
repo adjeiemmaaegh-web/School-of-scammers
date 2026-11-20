@@ -63,6 +63,9 @@ const DEFS: Partial<Record<PlacedComponent['kind'], Def>> = {
     ];
   },
   // Three signal lamps on one column, each its own load to the common return.
+  // Audible indicators are plain 24 V loads: they sound exactly when their own two terminals are energised.
+  buzzer: c => [load(c.id, t(c.id, 'L+'), t(c.id, 'M-'))],
+  siren: c => [load(c.id, t(c.id, 'L+'), t(c.id, 'M-'))],
   stacklight: c => ['R', 'Y', 'G'].map(lamp => load(`${c.id}-${lamp}`, t(c.id, lamp), t(c.id, 'M-'))),
   // Two solenoid coils to a common return, and two limit switches that close when the rod is at that end.
   cylinder: (c, ctx) => {

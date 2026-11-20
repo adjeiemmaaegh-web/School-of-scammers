@@ -47,10 +47,9 @@ jobs:
       - name: R09/R23 scan period and simulation speed - same model-time behaviour at different periods and speeds, diagnostics, persistence
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-scan-time-browser.cjs
       - name: R10 factory scale - 250-component project loads, runs in the real worker and reports load
-        run: |
-          BIG_PROJECT=/tmp/big-project.json
-          PROJECT_OUT=$BIG_PROJECT npx vitest run tests/factory-scale.test.ts
-          BIG_PROJECT=$BIG_PROJECT PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-factory-scale-browser.cjs
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-factory-scale-browser.cjs
+      - name: R12 operator devices - selector switch, buzzer and siren built from an empty floor, fault consequence, reload
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-operator-devices-browser.cjs
       - name: R1 contextual workbench - canvas share, no clipped controls at five sizes, explicit tools, shortcuts, preference recovery
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r1-workbench-browser.cjs
       - name: Open sandbox P1 - place, wire, program, run and test failures

@@ -105,7 +105,7 @@ export function WorkbenchInspector({
   const isLive = selectedDevice.kind === 'revmotor' ? snapshot.motorDirection !== 'stopped' :
     selectedDevice.kind === 'forwardcontactor' ? snapshot.forwardContactorOn :
     selectedDevice.kind === 'reversecontactor' ? snapshot.reverseContactorOn :
-    selectedDevice.kind === 'reversebutton' ? isPressed :
+    selectedDevice.kind === 'reversebutton' || selectedDevice.kind === 'selector' ? isPressed :
     selectedDevice.kind === 'levelprobe' ? snapshot.io.TankHigh :
     selectedDevice.kind === 'photoeye' ? snapshot.io.Photoeye :
     perDeviceLive(snapshot, selectedDevice) !== undefined ? perDeviceLive(snapshot, selectedDevice) === true :
@@ -120,6 +120,8 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
     selectedDevice.kind === 'forwardcontactor' ? (isLive ? 'Forward contact closed' : 'Open') :
     selectedDevice.kind === 'reversecontactor' ? (isLive ? 'Reverse contact closed' : 'Open') :
     selectedDevice.kind === 'reversebutton' ? (isPressed ? 'Request pressed' : 'Released') :
+    selectedDevice.kind === 'selector' ? (isPressed ? 'Position 2 · contact closed' : 'Position 1 · contact open') :
+    selectedDevice.kind === 'buzzer' || selectedDevice.kind === 'siren' ? (isLive ? 'Sounding' : 'Silent') :
     selectedDevice.kind === 'breaker' ? (isLive ? 'Closed' : 'Tripped open') :
     selectedDevice.kind === 'overload' ? (isLive ? '95-96 closed' : '95-96 tripped open') :
     selectedDevice.kind === 'lamp' ? (isLive ? 'Illuminated' : 'Off') :
@@ -166,11 +168,12 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
     <p className="sandbox-help">Sensors, diverters, pumps and level switches act on the conveyor or tank they are placed beside, so exact positions matter.</p>
     <button type="button" className="btn ghost small sandbox-inspector-move" disabled={!editable}
       onClick={() => onMove(selectedDevice.id)}>Move on 3D floor</button>
-    {(selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' || selectedDevice.kind === 'reversebutton') &&
+    {(selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' || selectedDevice.kind === 'reversebutton' || selectedDevice.kind === 'selector') &&
       <button type="button" className="btn primary small sandbox-inspector-operate"
         onClick={() => onOperate(selectedDevice.id)}>
         {selectedDevice.kind === 'estop' ?
           (isPressed ? 'Reset training E-stop' : 'Press training E-stop') :
+          selectedDevice.kind === 'selector' ? (isPressed ? 'Turn to position 1' : 'Turn to position 2') :
           isPressed ? 'Release pushbutton' : 'Press pushbutton'}
       </button>}
     <div className="sandbox-inspector-subheading"><h3>Terminals</h3><small>{definition.terminals.length ?

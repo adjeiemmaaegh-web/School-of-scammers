@@ -1,7 +1,7 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
 import { EQUIPMENT } from '../plant/equipment';
 import type { EquipmentDef } from '../plant/world/equipment';
-export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive';
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive' | 'selector' | 'buzzer' | 'siren';
 export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' | 'three-phase' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
@@ -118,6 +118,12 @@ const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
       { name: 'TRIP_OUT', side: 'right', y: 89, role: 'output' },
       { name: 'STAR_OUT', side: 'right', y: 117, role: 'output' },
       { name: 'DELTA_OUT', side: 'right', y: 145, role: 'output' }] },
+  selector: { kind: 'selector', label: 'Selector switch (2-position)', help: 'Maintained two-position selector: turning it to position 2 closes its A-B contact and it stays there until turned back. Wire it like a pushbutton. Educational model.', terminals: [
+    { name: 'A', side: 'left', y: 70, role: 'passive' }, { name: 'B', side: 'right', y: 70, role: 'passive' }] },
+  buzzer: { kind: 'buzzer', label: '24V buzzer', help: 'Sounds only when its two actual 24V DC terminals are energized (simulated tone, no audio hardware)', terminals: [
+    { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
+  siren: { kind: 'siren', label: '24V alarm siren', help: 'Sounds only when its two actual 24V DC terminals are energized (simulated alarm, no audio hardware)', terminals: [
+    { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
   lamp: { kind: 'lamp', label: '24V pilot lamp', help: 'Illuminates only when its two actual 24V DC terminals are energized', terminals: [
     { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
 };

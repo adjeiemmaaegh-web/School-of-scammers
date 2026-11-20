@@ -492,8 +492,8 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       } };
     } else if (cmd.k === 'operate' || cmd.k === 'operateToggle') {
       const target = world.project.components.find(c => c.id === cmd.id &&
-        (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton'));
-      if (!target) world = setError(world, 'Only pushbuttons and training E-stop can be operated');
+        (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton' || c.kind === 'selector'));
+      if (!target) world = setError(world, 'Only pushbuttons, selector switches and training E-stop can be operated');
       else {
         // A toggle is resolved here, against authoritative state, in command order. Resolving it in
         // the UI from a snapshot loses presses when clicks land between scans.
@@ -788,12 +788,12 @@ function buildCircuit(world: WorldState): Device[] {
       id: c.id, kind: 'switch', a: terminal(c.id,'95'), b: terminal(c.id,'96'),
       closed: world.tripped[c.id] !== true,
     });
-    if (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') {
+    if (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton' || c.kind === 'selector') {
       // A stuck-button fault overrides what the operator did; the circuit sees the stuck contact.
       const pressed = effectivePressed(world.project, c);
       devices.push({
         id: c.id, kind: 'switch', a: terminal(c.id, 'A'), b: terminal(c.id, 'B'),
-        closed: c.kind === 'start' || c.kind === 'reversebutton' ? pressed : !pressed,
+        closed: c.kind === 'start' || c.kind === 'reversebutton' || c.kind === 'selector' ? pressed : !pressed,
       });
     }
     if (isPlcKind(c.kind)) {

@@ -16,6 +16,8 @@ export function perDeviceLive(snapshot: RenderSnapshot, c: Pick<PlacedComponent,
     case 'contactor': return snapshot.deviceOn[c.id] ?? snapshot.contactorOn;
     case 'lamp': return snapshot.deviceOn[c.id] ?? snapshot.lampOn;
     case 'conveyor': return snapshot.deviceOn[c.id] ?? snapshot.conveyorOn;
+    case 'buzzer':
+    case 'siren':
     case 'relay':
     case 'timerelay': return snapshot.deviceOn[c.id] ?? false;
     case 'stacklight': return ['R', 'Y', 'G'].some(l => snapshot.deviceOn[`${c.id}-${l}`] === true);

@@ -916,7 +916,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                   kind === 'drainvalve' ? 'VAL' : kind === 'estop' ? 'E-STOP' : kind === 'breaker' ? 'CB' :
                   kind === 'overload' ? 'OL' : kind === 'reversebutton' ? 'REV' :
                   kind === 'forwardcontactor' ? 'KF' : kind === 'reversecontactor' ? 'KR' :
-                  kind === 'revmotor' ? 'M↔' : kind === 'lamp' ? 'LED' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
+                  kind === 'revmotor' ? 'M↔' : kind === 'selector' ? 'SEL' : kind === 'buzzer' ? 'BZR' : kind === 'siren' ? 'SIR' : kind === 'lamp' ? 'LED' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
               </span>}
               <span className={scenario ? undefined : 'ux2-equipment-name'}><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
               <span className={`sandbox-add-device${scenario ? '' : ' ux2-add-device'}`} aria-hidden="true">+</span>
@@ -1005,7 +1005,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                   c.kind === 'revmotor' ? snapshot?.motorDirection !== 'stopped' :
                   c.kind === 'forwardcontactor' ? snapshot?.forwardContactorOn :
                   c.kind === 'reversecontactor' ? snapshot?.reverseContactorOn :
-                  c.kind === 'reversebutton' ? c.pressed :
+                  c.kind === 'reversebutton' || c.kind === 'selector' ? c.pressed :
                   c.kind === 'estop' ? !c.pressed :
                   c.kind === 'levelprobe' ? snapshot?.io.TankHigh :
                   c.kind === 'photoeye' ? snapshot?.io.Photoeye :
@@ -1034,14 +1034,17 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                         (live ? 'CLOSED' : 'OPEN') :
                       c.kind === 'reversebutton' ? (c.pressed ? 'PRESSED' : 'RELEASED') :
                       c.kind === 'estop' ? (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') :
+                      c.kind === 'selector' ? (c.pressed ? 'POSITION 2 · CLOSED' : 'POSITION 1 · OPEN') :
+                      c.kind === 'buzzer' || c.kind === 'siren' ? (live ? 'SOUNDING' : 'SILENT') :
                       c.kind === 'lamp' ? (live ? 'ILLUMINATED' : 'OFF') :
                       c.kind === 'supply' ? '24V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</span>
                   </div>
                   <div className="sandbox-patch-actions">
-                    {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') && <button
+                    {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton' || c.kind === 'selector') && <button
                       className={`sandbox-operate ${c.pressed ? 'pressed' : ''}`}
                       onClick={() => send([{ k: 'operateToggle', id: c.id }])}>
                         {c.kind === 'estop' ? (c.pressed ? 'Reset E-stop (training)' : 'Press E-stop (training)') :
+                          c.kind === 'selector' ? (c.pressed ? 'Turn to position 1' : 'Turn to position 2') :
                           c.pressed ? 'Release' : 'Press'}</button>}
                     {(c.kind === 'breaker' || c.kind === 'overload') && <button
                       type="button" className="sandbox-operate"

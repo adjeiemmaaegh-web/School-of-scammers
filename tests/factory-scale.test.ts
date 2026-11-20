@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { writeFileSync } from 'node:fs';
 import { freshWorld, spawnBody, conserved } from '../src/plant/world/bodies';
 import { freshRuntime, stepScene } from '../src/plant/world/runner';
 import { PLANT_EQUIPMENT } from '../src/plant/equipment';
@@ -116,7 +115,6 @@ describe('R10 the electrical project at the component cap', () => {
     expect(w.lastError).toBeNull();
     expect(w.project.components).toHaveLength(MAX_COMPONENTS);
     expect(w.project.wires.length).toBeGreaterThanOrEqual(2 * (MAX_COMPONENTS - 1));
-    if (process.env.PROJECT_OUT) writeFileSync(process.env.PROJECT_OUT, JSON.stringify(w.project));
     const reloaded = validateProject(JSON.parse(JSON.stringify(w.project)));
     expect(reloaded.components).toHaveLength(MAX_COMPONENTS);
     w = tick(w, [{ k: 'run' }]).world;
@@ -134,8 +132,7 @@ describe('R10 the electrical project at the component cap', () => {
     expect(w.lastError).toMatch(/Invalid component placement/);
     expect(w.project.components).toHaveLength(MAX_COMPONENTS);
   });
-  it('records the profile when asked', () => {
-    if (process.env.PROFILE_OUT) writeFileSync(process.env.PROFILE_OUT, JSON.stringify(profile, null, 2));
+  it('keeps a profile of the measured costs for the run', () => {
     expect(Object.keys(profile).length).toBeGreaterThan(0);
   });
 });

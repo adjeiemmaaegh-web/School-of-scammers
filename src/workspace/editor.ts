@@ -22,7 +22,7 @@ const NONREPEATABLE = new Set(['reversebutton', 'forwardcontactor', 'reversecont
 export const ROTATABLE = new Set([
   'plc', 'plc16', 'supply', 'start', 'stop', 'estop', 'reversebutton',
   'contactor', 'forwardcontactor', 'reversecontactor', 'relay', 'timerelay',
-  'breaker', 'overload', 'motor', 'revmotor', 'lamp', 'stacklight',
+  'breaker', 'overload', 'motor', 'revmotor', 'lamp', 'stacklight', 'selector', 'buzzer', 'siren',
   // Orientation-aware Tier 1 material handling and square-footprint geometry sensing.
   'belt-conveyor', 'roller-conveyor', 'turntable', 'geometry-photoeye',
   'inductive-prox', 'capacitive-prox', 'weigh-cell',

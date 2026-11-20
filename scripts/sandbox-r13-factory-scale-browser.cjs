@@ -1,16 +1,12 @@
 /** Real-Chrome acceptance for R10: the application loads, renders, runs and reports load for a project at the
- *  250-component cap (249 lamps wired in parallel across one supply, ~500 wires). Needs BIG_PROJECT=<path to project json>
- *  (written by tests/factory-scale.test.ts with PROJECT_OUT). Every lamp must light in the real worker and the
- *  status bar must show the measured simulator load. */
+ *  250-component cap (249 lamps wired in parallel across one supply, 498 wires). Every lamp must light in the real worker
+ *  and the status bar must show the measured simulator load. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const puppeteer = require('puppeteer');
 const base = process.env.PLC_BASE_URL || 'http://127.0.0.1:4173';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
-  const projectPath = process.env.BIG_PROJECT;
-  assert.ok(projectPath && fs.existsSync(projectPath), 'BIG_PROJECT must point to the exported 250-component project');
-  const project = fs.readFileSync(projectPath, 'utf8');
   const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const page = await browser.newPage();
   const errors = [];
@@ -18,7 +14,25 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.setViewport({ width: 1440, height: 940, deviceScaleFactor: 1 });
   try {
     await page.goto(base + '/sandbox', { waitUntil: 'networkidle0', timeout: 30000 });
-    await page.evaluate(p => { localStorage.clear(); localStorage.setItem('efo-open-sandbox-project-v1', p); }, project);
+    // Build the project from the app's OWN saved format: place one supply through the UI, read what the app saved, then
+    // extend it to the cap (249 lamps wired in parallel) and reload it through the normal restore path.
+    await page.evaluate(() => localStorage.clear());
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForSelector('.sandbox-palette-item:not([disabled])');
+    await page.evaluate(() => [...document.querySelectorAll('.sandbox-palette-item')].find(b => b.querySelector('strong')?.textContent.trim() === '24V supply').click());
+    await page.waitForFunction(() => { try { return JSON.parse(localStorage.getItem('efo-open-sandbox-project-v1') || 'null')?.components?.length === 1; } catch { return false; } }, { timeout: 15000 });
+    await page.evaluate(() => {
+      const key = 'efo-open-sandbox-project-v1';
+      const project = JSON.parse(localStorage.getItem(key));
+      const supply = project.components[0];
+      const components = [supply];
+      const wires = [];
+      for (let i = 0; i < 249; i++) {
+        components.push({ ...supply, id: `l${i}`, kind: 'lamp', x: 10 + (i % 25) * 40, y: 120 + Math.floor(i / 25) * 40, pressed: false });
+        wires.push({ id: `a${i}`, from: `${supply.id}.P24`, to: `l${i}.L+` }, { id: `b${i}`, from: `l${i}.M-`, to: `${supply.id}.M0` });
+      }
+      localStorage.setItem(key, JSON.stringify({ ...project, components, wires }));
+    });
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForFunction(() => /250 devices/.test(document.body.textContent), { timeout: 30000 });
     console.log('1. the app loaded a 250-component project:', await page.$eval('.p5-statusbar, [data-scan-diagnostics]', e => e.parentElement.textContent.replace(/\s+/g, ' ').slice(0, 140)).catch(() => 'status bar present'));

@@ -67,7 +67,7 @@ export function stepActuators(w: WorldState, energizedLoads: readonly string[], 
   const deviceOn: Record<string, boolean> = {};
   const motorAngles: Record<string, number> = {};
   for (const c of w.project.components) {
-    if (!['contactor', 'motor', 'lamp', 'conveyor', 'diverter', 'pump', 'drainvalve', 'relay', 'stacklight'].includes(c.kind)) continue;
+    if (!['contactor', 'motor', 'lamp', 'conveyor', 'diverter', 'pump', 'drainvalve', 'relay', 'stacklight', 'buzzer', 'siren'].includes(c.kind)) continue;
     const on = energizedLoads.includes(c.id);
     deviceOn[c.id] = on;
     // A stack light has three lamps, each its own load: record every lamp by `<id>-R`, `-Y` and `-G`.
