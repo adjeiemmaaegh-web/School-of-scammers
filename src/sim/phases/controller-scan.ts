@@ -11,8 +11,9 @@ import { compileSandboxST } from '../../program/p2-contract';
 import { solveNetAware } from '../../engineering/electrical';
 import { faultsOf } from '../faults';
 import { ioOf } from '../plc-io';
-import { freshPlcRuntime, namesFor, programOf, runtimePlcs, scanPlc } from '../plcs';
+import { classicInputs, freshPlcRuntime, namesFor, programOf, runtimePlcs, scanPlc } from '../plcs';
 import { sampleAnalogInputs } from '../analog';
+import { samplePlcDigitalInputs } from '../plc-input-image';
 import { deenergisedPlcs, quietLanes } from './fail-closed';
 import type { PlacedComponent, PlcInputs, PlcRuntime, SimEvent, WorldState } from '../signals';
 
@@ -35,13 +36,12 @@ export function scanControllers(
   // The photoeye's optical state was determined by the PRIOR plant scan.
   const eyePowered = !shorted && w.project.components.some(c => c.kind === 'photoeye' && circuit.reads24(terminal(c.id, 'L+'), terminal(c.id, 'M')));
   const probePowered = !shorted && w.project.components.some(c => c.kind === 'levelprobe' && circuit.reads24(terminal(c.id, 'L+'), terminal(c.id, 'M')));
-  const inputs = {
-    Start: powered && circuit.reads24(terminal(plc!.id, 'I0.0'), terminal(plc!.id, 'M')),
-    StopOK: powered && circuit.reads24(terminal(plc!.id, 'I0.1'), terminal(plc!.id, 'M')),
-    Photoeye: powered && eyePowered && circuit.reads24(terminal(plc!.id, 'I0.2'), terminal(plc!.id, 'M')),
-    TankHigh: powered && probePowered && circuit.reads24(terminal(plc!.id, 'I0.3'), terminal(plc!.id, 'M')),
-    ReverseRequest: powered && circuit.reads24(terminal(plc!.id, 'I0.4'), terminal(plc!.id, 'M')),
-  };
+  const sensors = { photoeye: eyePowered, levelprobe: probePowered };
+  // One sampler for the classic fixed map and every configurable controller;
+  // when no PLC is placed the historical five-tag observation stays all false.
+  const inputs = classicInputs(plc
+    ? samplePlcDigitalInputs(plc.id, ioOf(w.project, plc), powered, circuit, sensors)
+    : {});
   // 4. Execute the learner's exact document in the salvaged bounded LD or ST engine.
   let ladderResult: LadderResult | null = null;
   let stResult: STResult | null = null;
@@ -136,9 +136,7 @@ export function scanControllers(
       (!shorted && circuit.reads24(terminal(extra.id, 'L+'), terminal(extra.id, 'M')));
     const io = ioOf(w.project, extra);
     // A sensor-named input only reads high if some powered sensor of that kind exists (guards a wire straight to P24).
-    const digitalInputs = Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => [tag, extraPowered &&
-      (tag === 'Photoeye' ? eyePowered : tag === 'TankHigh' ? probePowered : true) &&
-      circuit.reads24(terminal(extra.id, pin), terminal(extra.id, 'M'))]));
+    const digitalInputs = samplePlcDigitalInputs(extra.id, io, extraPowered, circuit, sensors);
     const cfg = programOf(w.project, extra.id);
     try {
       const openAnalogWires = new Set(faultsOf(w.project).filter(f => f.kind === 'wire-open').map(f => f.target));
