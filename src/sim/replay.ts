@@ -1,0 +1,103 @@
+/**
+ * R3.7 — Deterministic, bounded replay of the authoritative simulator.
+ *
+ * Frames represent successive worker dispatch boundaries (one 50 ms tick
+ * each); extraScans advances the SAME tick path with no commands.
+ * This is a reusable source-level replay primitive for instructor scenarios
+ * and diagnostics, not an alternative runtime or a wall-clock scheduler.
+ */
+import { createWorld, renderSnapshot, tick } from './orchestrator';
+import type { Command, ProjectFile, RenderSnapshot, SimEvent, WorldState } from './signals';
+
+export const MAX_REPLAY_FRAMES = 512;
+export const MAX_REPLAY_EXTRA_SCANS = 5_000;
+export const MAX_REPLAY_COMMANDS = 4_096;
+export const MAX_REPLAY_CHECKPOINTS = 64;
+
+export type ReplayFrame = {
+  readonly commands?: readonly Command[];
+  readonly extraScans?: number;
+  /** Named snapshot checkpoint. Unlabelled frames are not retained. */
+  readonly checkpoint?: string;
+};
+export type ReplayCheckpoint = {
+  readonly name: string;
+  readonly frame: number;
+  readonly tick: number;
+  /** Snapshot retained only at requested checkpoints; never persisted to a project. */
+  readonly snapshot: RenderSnapshot;
+  readonly events: readonly SimEvent[];
+};
+export type ReplayResult = {
+  readonly finalTick: number;
+  readonly checkpoints: readonly ReplayCheckpoint[];
+  readonly finalSnapshot: RenderSnapshot;
+};
+
+function validateFrames(frames: readonly ReplayFrame[]): void {
+  if (frames.length > MAX_REPLAY_FRAMES)
+    throw new RangeError('Replay exceeds its frame limit');
+  let commands = 0, scans = 0, checkpoints = 0;
+  for (const frame of frames) {
+    if (!frame || typeof frame !== 'object' || (frame.commands && !Array.isArray(frame.commands)))
+      throw new TypeError('Malformed replay frame');
+    const length = frame.commands?.length ?? 0;
+    if (length > 128) throw new RangeError('Too many commands in a replay frame');
+    commands += length;
+    if (frame.extraScans !== undefined && (!Number.isSafeInteger(frame.extraScans) || frame.extraScans < 0))
+      throw new RangeError('Invalid replay scan count');
+    scans += frame.extraScans ?? 0;
+    if (frame.checkpoint !== undefined) {
+      if (typeof frame.checkpoint !== 'string' || frame.checkpoint.length < 1 ||
+          frame.checkpoint.length > 64) throw new RangeError('Invalid replay checkpoint name');
+      checkpoints++;
+    }
+  }
+  if (commands > MAX_REPLAY_COMMANDS || scans > MAX_REPLAY_EXTRA_SCANS ||
+      checkpoints > MAX_REPLAY_CHECKPOINTS)
+    throw new RangeError('Replay exceeds its command, scan or checkpoint budget');
+}
+
+/** Executes a validated script using the existing 50 ms kernel. */
+export function replaySimulation(project: ProjectFile, frames: readonly ReplayFrame[]): ReplayResult {
+  validateFrames(frames);
+  let world: WorldState = createWorld(project);
+  const checkpoints: ReplayCheckpoint[] = [];
+  for (let i = 0; i < frames.length; i++) {
+    const frame = frames[i];
+    let result = tick(world, frame.commands ?? []);
+    world = result.world;
+    const events: SimEvent[] = [...result.events];
+    for (let n = 0; n < (frame.extraScans ?? 0); n++) {
+      result = tick(world);
+      world = result.world;
+      events.push(...result.events);
+    }
+    if (frame.checkpoint) checkpoints.push({
+      name: frame.checkpoint, frame: i, tick: world.tick,
+      snapshot: renderSnapshot(world), events,
+    });
+  }
+  return { finalTick: world.tick, checkpoints, finalSnapshot: renderSnapshot(world) };
+}
+
+/** Compare two independent replays by exact serialized snapshot and event data.
+ * A digest alone is not proof of equality: compare full values instead.
+ * This does not mutate or record either input project or script.
+ */
+export function compareSimulationReplay(project: ProjectFile, frames: readonly ReplayFrame[]): {
+  identical: boolean; firstDifferentCheckpoint: string | null;
+} {
+  const left = replaySimulation(project, frames);
+  const right = replaySimulation(project, frames);
+  for (let i = 0; i < left.checkpoints.length; i++) {
+    const a = left.checkpoints[i], b = right.checkpoints[i];
+    if (JSON.stringify({ snapshot: a.snapshot, events: a.events }) !==
+        JSON.stringify({ snapshot: b.snapshot, events: b.events }))
+      return { identical: false, firstDifferentCheckpoint: a.name };
+  }
+  return {
+    identical: JSON.stringify(left.finalSnapshot) === JSON.stringify(right.finalSnapshot),
+    firstDifferentCheckpoint: null,
+  };
+}
