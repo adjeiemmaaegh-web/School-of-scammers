@@ -44,9 +44,9 @@ export function scanControllers(
   // 4. The first classic PLC executes through the SAME canonical scanPlc
   // interpreter path as every additional controller. Its historical WorldState
   // fields remain the storage/trace compatibility mirror (no project migration).
-  let ladderResult: LadderResult | null = null;
-  let stResult: STResult | null = null;
-  let fbdResult: FbdResult | null = null;
+  const executed: { ladderResult: LadderResult | null; stResult: STResult | null; fbdResult: FbdResult | null } = {
+    ladderResult: null, stResult: null, fbdResult: null,
+  };
   let legacyScan: PlcRuntime | null = null;
   try {
     if (powered && plc?.kind === 'plc') {
@@ -59,9 +59,9 @@ export function scanControllers(
       };
       legacyScan = scanPlc(programOf(w.project, plc.id), LEGACY_IO, prior, inputs,
         powered, dtMs, [], w.debugForces[plc.id] ?? {}, execution => {
-          if (execution.language === 'ladder') ladderResult = execution.result;
-          else if (execution.language === 'st') stResult = execution.result;
-          else fbdResult = execution.result;
+          if (execution.language === 'ladder') executed.ladderResult = execution.result;
+          else if (execution.language === 'st') executed.stResult = execution.result;
+          else executed.fbdResult = execution.result;
         });
     }
   } catch (error) {
@@ -73,6 +73,7 @@ export function scanControllers(
       outputTypeError ? undefined : 'PLC scan interrupted; simulated outputs deenergized');
     return { halt: { world: paused, events: [{ tick: w.tick, kind: 'error', detail: message }] } };
   }
+  const { ladderResult, stResult, fbdResult } = executed;
   // These fixed-name mirrors are still required by existing dashboard traces,
   // breakpoints and v1 projects. Execution itself is now shared with PLC16.
   const coils: Record<string, boolean> = legacyScan?.coils ?? {};
