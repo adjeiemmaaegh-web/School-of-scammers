@@ -42,6 +42,7 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
    'An industrial scene opens in 3D by default, not a 2D plan');
   assert.equal(await page.$eval('[data-3d-camera-mode="orbit"]',el=>el.getAttribute('aria-pressed')),'true');
   // R6.2: orthogonal view presets move the real camera (status line is only shown in fly mode, so read it via a quick mode check).
+  await page.$eval('[data-3d-presets]',d=>{d.open=true;});
   await page.click('[data-3d-view-preset="top"]');
   await page.click('[data-3d-view-preset="side"]');
   assert.equal(await page.$eval('[data-3d-camera-mode="orbit"]',el=>el.getAttribute('aria-pressed')),'true','presets keep orbit mode');

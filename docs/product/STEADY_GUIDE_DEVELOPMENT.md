@@ -40,3 +40,10 @@ At commit `951f2af9`, Vite/typecheck and Vitest passed, but the aggregate (all l
 - Kept the existing UX2 assembly-library selector aligned with the already-shipped R1 palette layout rather than reintroducing old UI.
 - Fixed a TypeScript literal-union test set and a Puppeteer `$eval`/`$$eval` selector-count mistake in new Steady Guide tests; these were test defects caught by CI.
 - The root npm 10 install of `@vitest/coverage-v8@5.1.0` failed reproducibly with `Cannot read properties of null (reading 'edgesOut')` (optional peer resolver). Isolated installation with `--legacy-peer-deps` and a symlink to pinned project Vitest produced a **passing** full native-coverage job at commit `404e2a59`; continue checking on final head.
+
+## Reconciliation increment — 2026-11-20
+
+- Integrated the newest `main@7aaeee92201dfbba25d22b74ca9ae77b3f52cd53` into this draft branch without writing to `main`. The feature's previous head is preserved at `backup/steady-guide-pre-main-reconcile-2026-11-20`.
+- Retained UX7 wide-screen workbench geometry, UX8 component/assembly library tabs, newer theme icon and current UX2 browser selectors. Preserved Steady Guide routes, read-only contextual drawer, help links, 54-device index, 21 scenes, build plans and all source screenshots.
+- Corrected collection-count browser assertions that previously used Puppeteer `$eval` (single element) instead of `$$eval` (list); previous exact-head build CI failed with `undefined !== 6` in the Steady Guide browser step. Added an integration assertion for the existing UX8 Assemblies tab.
+- This is a development reconciliation, **not** acceptance. Require new exact-head CI (including browser, coverage and offline), visual capture reviews, novice and controls-engineer assessment, owner release gates and explicit approval before any `main` merge.

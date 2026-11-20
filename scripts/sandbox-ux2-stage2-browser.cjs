@@ -47,8 +47,8 @@ const targets=[
           toolbar:rect('.ux2-command-stack > .sandbox-toolbar'),
           views:rect('.ux2-command-stack > .p5-view-tools'),
           authoring:rect('.ux2-command-stack > .workspace-editing-strip'),
-          // R1 moved the assembly library into the equipment palette; accept both the current home and legacy slot.
-          assemblies:rect('.sandbox-palette > .sandbox-assembly-library')||rect('.ux2-command-stack > .sandbox-assembly-library'),
+          // UX8 moved the assembly editor out of the command stack into its own library tab.
+          assemblies:rect('[data-library-tab-trigger="assemblies"]'),
           runReachable:reachable,
           runRect:runRect?{left:runRect.left,right:runRect.right,top:runRect.top,bottom:runRect.bottom}:null,
           toolButtonVisibility:[...document.querySelectorAll('.ux2-command-stack > .p5-view-tools button')].map(el=>{

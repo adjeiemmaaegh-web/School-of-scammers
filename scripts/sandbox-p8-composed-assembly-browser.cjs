@@ -32,6 +32,7 @@ const fragmentB={version:1,components:[
     {id:2,name:'Photoeye station',fragment:fragmentB}]);
   await page.reload({waitUntil:'networkidle0',timeout:45000});
   await page.waitForSelector('[data-p7-assembly-library]',{timeout:20000});
+  await page.click('[data-library-tab-trigger="assemblies"]');
   await page.$eval('[data-p7-assembly-library]',el=>el.open=true);
   await page.select('[data-assembly-select]','1');
   await page.click('[data-assembly-compose-add]');

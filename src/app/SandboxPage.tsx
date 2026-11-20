@@ -38,18 +38,20 @@ import './ux2-workbench.css';
 import './ux2-command-layout.css';
 import './ux4-canvas-focus.css';
 import './ux6-workbench.css';
+import './ux7-reference-layout.css';
 
 // Loaded on demand so opening the simulator does not download the project dialog, lessons, checklist or report builder.
 const ProjectLibraryPanel = lazy(() => import('../ui/sandbox/ProjectLibraryPanel').then(m => ({ default: m.ProjectLibraryPanel })));
 const SteadyGuideDrawer = lazy(() => import('../steady-guide/GuideDrawer').then(m => ({ default: m.GuideDrawer })));
-
 const LessonPanel = lazy(() => import('../ui/sandbox/LessonPanel').then(m => ({ default: m.LessonPanel })));
 const FatChecklist = lazy(() => import('../ui/sandbox/FatChecklist').then(m => ({ default: m.FatChecklist })));
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
 const UX2_LAYOUT_KEY = 'efo-ux2-layout-v1';
 type UiPanelSizes = {library:number;inspector:number;dock:number};
-const defaultPanelSizes:UiPanelSizes = {library:228,inspector:238,dock:205};
+// Wide desktop windows get the roomier three-column library of the reference layout (ux7-reference-layout.css).
+const WIDE_WINDOW = typeof window !== 'undefined' && window.innerWidth >= 1500;
+const defaultPanelSizes:UiPanelSizes = {library:WIDE_WINDOW?330:228,inspector:238,dock:205};
 type UiPanelVisible = {library:boolean;inspector:boolean;dock:boolean};
 const defaultPanelVisible:UiPanelVisible = {library:true,inspector:false,dock:false};
 /** Panel visibility is a view preference stored beside the panel sizes, never in the project. Bad values fall back to defaults. */
@@ -71,7 +73,7 @@ const initialPanelSizes = ():UiPanelSizes => {
     const stored=JSON.parse(window.localStorage.getItem(UX2_LAYOUT_KEY)??'null') as Partial<UiPanelSizes>|null;
     if(!stored||typeof stored!=='object')return defaultPanelSizes;
     return {
-      library:panelSize(stored.library,228,160,320),
+      library:panelSize(stored.library,defaultPanelSizes.library,160,360),
       inspector:panelSize(stored.inspector,238,190,350),
       dock:panelSize(stored.dock,205,125,390),
     };
@@ -121,6 +123,15 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const setSelectedDeviceId = (id: string | null) => setSelectedDeviceIds(id ? [id] : []);
   const [selectedPlcId, setSelectedPlcId] = useState<string | null>(null);
   const [libraryQuery, setLibraryQuery] = useState('');
+  // Library-only UI state: never persisted into a PLC project or worker commands.
+  const [libraryTab,setLibraryTab] = useState<'components'|'assemblies'>('components');
+  const componentListRef=useRef<HTMLDivElement|null>(null);
+  const componentScrollRef=useRef(0);
+  useEffect(()=>{
+    if(libraryTab==='components'&&componentListRef.current){
+      componentListRef.current.scrollTop=componentScrollRef.current;
+    }
+  },[libraryTab]);
   const [grid,setGrid] = useState<GridStep>(5);
   const [clipboard,setClipboard] = useState<WorkspaceFragment|null>(null);
   const pasteIndex=useRef(0);
@@ -724,7 +735,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <button type="button" onClick={()=>{setDockFocus('program');setDockExpanded(true);}}>Open PLC programming</button>
           {!scenario&&<div className="ux2-panel-settings" role="group" aria-label="Resize workbench panels">
             <label>Component library width <output>{panelSizes.library}px</output>
-              <input type="range" min="160" max="320" step="10" data-ux2-resize="library"
+              <input type="range" min="160" max="360" step="10" data-ux2-resize="library"
                 value={panelSizes.library} onChange={e=>setPanelSizes(v=>({...v,library:Number(e.target.value)}))}/>
             </label>
             <label>Inspector width <output>{panelSizes.inspector}px</output>
@@ -815,6 +826,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onRotate={rotateSelection} onNudge={moveSelection}/>
       </div>}
       <div className="p5-view-tools" role="toolbar" aria-label="Canvas views and active tools">
+        <div className="p5-view-row">
         <div className="p5-view-tabs" role="group" aria-label="Project view">
           <button type="button" data-p5-view="logical" aria-pressed={workspaceView==='logical'}
             onClick={()=>setWorkspaceView('logical')}>Logical / Wiring</button>
@@ -835,6 +847,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
             Measure / diagnose</button>
           <span className="ux6-tool-chip" data-ux6-active-tool={activeTool} role="status" aria-live="polite"
             title={activeTool==='run'?lockedHint:'Shortcuts: V select, T wire, I measure, Esc cancel'}>Tool: {toolLabel}</span>
+        </div>
         </div>
         <div className="p5-panel-toggles" role="group" aria-label="Workspace panels">
           <button type="button" aria-pressed={libraryExpanded}
@@ -865,23 +878,51 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         {libraryExpanded&&<aside className="sandbox-palette panel" aria-label="Component library" data-p5-library>
           <div className="sandbox-rail-heading"><span className="eyebrow">Device library</span><h2>Components</h2>
             <small>{visibleKinds.length} types available</small></div>
+          {!scenario && <div className="sandbox-library-tabs" role="tablist" aria-label="Component library sections"
+            onKeyDown={event=>{
+              let next:'components'|'assemblies'|null=null;
+              if(event.key==='ArrowRight'||event.key==='ArrowLeft')next=libraryTab==='components'?'assemblies':'components';
+              if(event.key==='Home')next='components';
+              if(event.key==='End')next='assemblies';
+              if(next){
+                event.preventDefault();
+                setLibraryTab(next);
+                document.getElementById(next==='components'?'sandbox-components-tab':'sandbox-assemblies-tab')?.focus();
+              }
+            }}>
+            <button type="button" role="tab" id="sandbox-components-tab" data-library-tab-trigger="components"
+              aria-controls="sandbox-components-panel" aria-selected={libraryTab==='components'}
+              tabIndex={libraryTab==='components'?0:-1} onClick={()=>setLibraryTab('components')}>Components</button>
+            <button type="button" role="tab" id="sandbox-assemblies-tab" data-library-tab-trigger="assemblies"
+              aria-controls="sandbox-assemblies-panel" aria-selected={libraryTab==='assemblies'}
+              tabIndex={libraryTab==='assemblies'?0:-1} onClick={()=>setLibraryTab('assemblies')}>Assemblies</button>
+          </div>}
+          <div className="sandbox-library-components" id="sandbox-components-panel" data-library-components
+            role={!scenario?'tabpanel':undefined} aria-labelledby={!scenario?'sandbox-components-tab':undefined}
+            hidden={!scenario&&libraryTab!=='components'}>
           <label className="sandbox-library-search">
             <span>Find equipment</span>
             <input type="search" value={libraryQuery} onChange={e => setLibraryQuery(e.target.value)}
               placeholder="Search motors, PLCs…" aria-label="Search component library" />
           </label>
           <div className="p5-device-families" role="group" aria-label="Industrial device families">
-            {DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).map(f=>
+            {DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).slice(0,2).map(f=>
               <button key={f.id} type="button" data-p5-category={f.id}
                 aria-pressed={libraryFamily===f.id} onClick={()=>setLibraryFamily(f.id)}>
                 {f.label}</button>)}
+            {DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).length>2 &&
+              <select className="p5-family-more" data-p5-category-more aria-label="More device categories"
+                data-active={DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).slice(2).some(f=>f.id===libraryFamily)?'true':'false'}
+                value={DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).slice(2).some(f=>f.id===libraryFamily)?libraryFamily:''}
+                onChange={e=>{if(e.target.value)setLibraryFamily(e.target.value as DeviceFamily);}}>
+                <option value="">More categories</option>
+                {DEVICE_FAMILIES.filter(f=>availableFamilies.includes(f.id)).slice(2).map(f=><option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>}
           </div>
           <p className="sandbox-library-help">Drag an available device onto the 3D floor or 2D plan,
             or click to place it. The registry determines what really works. Pause to edit.</p>
-          {!scenario && <AssemblyLibrary project={project} selectedIds={selectedDeviceIds}
-            editable={editable} grid={grid}
-            onInsert={(fragment,at)=>edit({kind:'paste',fragment,at,grid})}/>}
-          <div className="sandbox-palette-list">
+          <div className="sandbox-palette-list" ref={componentListRef}
+            onScroll={event=>{componentScrollRef.current=event.currentTarget.scrollTop;}}>
             {visibleKinds.map(kind => <button key={kind} draggable={editable && !primaryTouch}
               onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}
               onClick={() => place(kind)} disabled={!editable}
@@ -906,6 +947,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>
           <div className="sandbox-library-foot"><strong>Educational models</strong>
             <span>{componentKinds.length} registered kinds · no live equipment</span></div>
+          </div>
+          {!scenario && <div className="sandbox-library-assemblies" id="sandbox-assemblies-panel"
+            data-library-assemblies role="tabpanel" aria-labelledby="sandbox-assemblies-tab"
+            hidden={libraryTab!=='assemblies'}>
+            <AssemblyLibrary project={project} selectedIds={selectedDeviceIds}
+              editable={editable} grid={grid}
+              onInsert={(fragment,at)=>edit({kind:'paste',fragment,at,grid})}/>
+          </div>}
         </aside>}
         <div className="sandbox-main" id="sandbox-stage-build">
           {!scenario && <div className="efo-canvas-actions" role="group" aria-label="Canvas display and simulation controls">
