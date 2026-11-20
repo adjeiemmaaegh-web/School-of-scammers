@@ -28,6 +28,8 @@ export type ControllerHalt = { halt: { world: WorldState; events: SimEvent[] } }
 export function scanControllers(
   w: WorldState, circuit: ReturnType<typeof solveNetAware>, shorted: boolean,
   plc: PlacedComponent | undefined, powered: boolean, dtMs: number,
+  /** Optional precomputed per-controller image from the same settled netlist. */
+  powerById?: Readonly<Record<string, boolean>>,
 ): ControllerScan | ControllerHalt {
   // 3. Sample actual wired 24V input image, including powered mark photoeye.
   // The photoeye's optical state was determined by the PRIOR plant scan.
@@ -130,7 +132,8 @@ export function scanControllers(
   const nextPlcs: Record<string, PlcRuntime> = {};
   const unpoweredExtras: string[] = [];
   for (const extra of runtimePlcs(w.project)) {
-    const extraPowered = !shorted && circuit.reads24(terminal(extra.id, 'L+'), terminal(extra.id, 'M'));
+    const extraPowered = powerById?.[extra.id] ??
+      (!shorted && circuit.reads24(terminal(extra.id, 'L+'), terminal(extra.id, 'M')));
     const io = ioOf(w.project, extra);
     // A sensor-named input only reads high if some powered sensor of that kind exists (guards a wire straight to P24).
     const digitalInputs = Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => [tag, extraPowered &&
