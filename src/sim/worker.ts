@@ -28,7 +28,7 @@ function haltOnException(message: string): void {
   const stopped: WorldState = {
     ...world, running: false, coils: { ...world.coils, ...quiet },
     tagValues: { ...world.tagValues, ...quiet }, plcs: deenergisedPlcs(world.plcs),
-    deviceOn: {}, timers: {}, contactorOn: false, motorOn: false,
+    deviceOn: {}, timers: {}, threePhase: {}, contactorOn: false, motorOn: false,
     conveyorOn: false, diverterOn: false, pumpOn: false, drainOn: false,
     lampOn: false, forwardContactorOn: false, reverseContactorOn: false,
     motorDirection: 'stopped', interlockConflict: false,
