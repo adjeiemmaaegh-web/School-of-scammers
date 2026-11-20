@@ -56,6 +56,16 @@ These changes do not rewrite `tick()`, alter existing 50 ms / 10 ms scheduling, 
 
 **Stage 2 development is still open.** Remaining scope includes deeper first-class PLC runtime consolidation, truthful device-level range/power/fault metadata where the underlying models support it, and full R3 contract/document consolidation. This handoff does **not** claim that the entire Stage 2 or R3 roadmap has been completed.
 
+## Current continuation — Stage 2 source improvements
+
+17. **Plant equipment cleanup:** Removing a device now also removes its keyed `plantFaults` entry. Previously the deleted component could leave an invalid orphan fault in the saved v1 project.
+18. **Controller order independence:** The P3 conveyor interlock sees the observed presence of **any** 24 V-powered PLC, not only the first controller. The legacy primary I/O/trace path remains unchanged. This signal is project-wide, **not** a claim of per-belt controller ownership.
+19. **Analog status accuracy:** The inspector distinguishes an unpowered PLC's unavailable numeric sample from disconnected wiring and actual numeric readings, without changing the runtime's electrical/analog simulation.
+20. **Bounded Worker event stream:** Outbound events are limited to 256 per reply, details are capped at 512 characters, and a deterministic overflow notice records omissions. Replay comparison now identifies mismatches in the final snapshot instead of returning no divergence location.
+21. **Canonical lifecycle contract:** [Stage 2 device lifecycle and simulation integration](STAGE2_DEVICE_LIFECYCLE_CONTRACT.md) documents one device identity, canonical source modules, port domains, lifecycle, telemetry and compatibility boundaries. No second registry or simulation authority was added.
+
+**Remaining development:** The classic first-controller execution path still differs from generic runtime controllers; per-belt controller attribution and fully defined signal ranges/power/fault metadata need source-backed designs; the full R3 kernel consolidation is not finished. Earlier performance and acceptance work remains outside this owner-requested development-only continuation.
+
 **Limitations:** This continuation was performed through live GitHub source commits rather than a complete local checkout. No compile, test suite, browser acceptance, hardware work, merge or deployment is claimed. Replay comparison is an implemented utility, not independently established determinism for every scenario.
 
 ## Next engineering and acceptance work
