@@ -3,6 +3,7 @@ import {Link} from 'react-router-dom';
 import {COMPONENTS} from '../components/registry';
 import {GUIDE_BUILDS,findGuideBuild} from './guide-builds-data';
 import {guideTopicRoute} from './guide-data';
+import {GuideFirstLampConnections} from './GuideFirstLampConnections';
 export function GuideBuilds({id}:{id?:string}){
  const [level,setLevel]=useState('All');
  const plan=id?findGuideBuild(id):undefined;
@@ -15,6 +16,7 @@ export function GuideBuilds({id}:{id?:string}){
   <div className="sg-card-grid" data-steady-build-parts>{plan.devices.map(kind=><Link className="sg-card" key={kind} to={'/guide/equipment/'+kind}><small>Registered virtual component</small><h3>{COMPONENTS[kind].label}</h3><p>{COMPONENTS[kind].help}</p><span>See exact terminals</span></Link>)}</div>
   {plan.optional&&<><h3>Optional equipment</h3><p>{plan.optional.map((kind,i)=><span key={kind}>{i>0?' · ':''}<Link to={'/guide/equipment/'+kind}>{COMPONENTS[kind].label}</Link></span>)}</p></>}
   <h3>Follow this workflow</h3><ol className="sg-course">{plan.whatToDo.map(step=><li key={step}>{step}</li>)}</ol>
+  {plan.id==='first-lamp'&&<GuideFirstLampConnections/>}
   <div className="sg-note"><strong>What success looks like:</strong> {plan.observableResult}</div>
   <div className="sg-note"><strong>Common mistake:</strong> {plan.commonMistake}</div>
   <div className="sg-actions"><Link className="sg-button" to={plan.practiceRoute}>{plan.practiceLabel}</Link>

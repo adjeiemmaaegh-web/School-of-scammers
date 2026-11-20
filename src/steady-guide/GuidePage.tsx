@@ -8,6 +8,7 @@ import { GUIDE_GROUPS, GUIDE_TOPICS, getGuideTopic, guideTopicRoute, searchGuide
 import { GUIDE_SCENES, GUIDE_GLOSSARY, guideEquipmentName, searchGuideEquipment } from './guide-reference';
 import { GUIDE_SCREENSHOTS, GUIDE_SCREENSHOT_COMMIT } from './guide-media';
 import { emptyGuideProgress, readGuideProgress, saveGuideProgress } from './guide-progress';
+import { GuideFirstLampConnections } from './GuideFirstLampConnections';
 import './guide.css';
 
 const Equipment=lazy(()=>import('./GuideEquipment').then(m=>({default:m.GuideEquipment})));
@@ -54,7 +55,7 @@ function GuideTopicArticle({topic,completed,onComplete}:{topic:GuideTopic;comple
    <span className="sg-step-number" aria-hidden="true">{String(i+1).padStart(2,'0')}</span>
    <div><h3>{s.title}</h3><p>{s.body}</p>{s.lookFor&&<p className="sg-lookfor"><strong>Look for:</strong> {s.lookFor}</p>}</div>
   </li>)}</ol>
-  {topic.id==='first-lamp'&&<p className="sg-warning">Before starting a new empty project, save/export anything already in your simulator. The guide never changes an existing project for you.</p>}
+  {topic.id==='first-lamp'&&<><GuideFirstLampConnections/><p className="sg-warning">Before starting a new empty project, save/export anything already in your simulator. The guide never changes an existing project for you.</p></>}
   {topic.id==='diagnose'&&<p className="sg-warning">Graded mystery-fault answers and assessment solutions are intentionally not supplied by this guide.</p>}
   <div className="sg-actions">
    <button type="button" className="sg-button" onClick={()=>onComplete(topic.id)} aria-pressed={completed}>{completed?'Completed ✓':'Mark walkthrough complete'}</button>

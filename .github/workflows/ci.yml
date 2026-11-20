@@ -42,6 +42,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/offline-update-browser.cjs
       - name: R9 guided lessons - unwired starter, honest failure, UI build passes the outcome check, wrong build rejected, downloadable starters
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r9-lessons-browser.cjs
+      - name: Steady Guide first lamp - real UI placement, 3 wires, OFF ON OFF, disconnected wire refusal and project isolation
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/steady-guide-first-lamp-browser.cjs
       - name: Steady Guide - read-only onboarding, 54 devices, 21 scenes, real screenshot, search and mobile
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/steady-guide-browser.cjs
       - name: Capture authentic Steady Guide review screenshots (not automatically published)
