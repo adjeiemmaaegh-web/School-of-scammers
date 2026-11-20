@@ -2,9 +2,11 @@
  * Several PLCs in one project (Packet-Tracer-style: any number of controllers on the bench).
  *
  * The FIRST PLC component keeps its program in the legacy top-level `ProjectFile` fields and its scan
- * state in the legacy `WorldState` fields, so every single-PLC project, test and saved file behaves
- * exactly as before. Every further PLC has its program in `ProjectFile.plcPrograms[id]` and its scan
- * state in `WorldState.plcs[id]`. Each PLC samples its OWN terminals and drives its OWN outputs; PLCs
+ * state in the legacy `WorldState` compatibility fields. Its Ladder/ST/FBD program now executes via
+ * the same `scanPlc` interpreter path as every further PLC; the first controller's results are mirrored
+ * into historical state and trace fields without changing the saved v1 format. Further PLCs own programs
+ * in `ProjectFile.plcPrograms[id]` and runtime state in `WorldState.plcs[id]`. Each PLC samples its OWN
+ * terminals and drives its OWN outputs; PLCs
  * only affect each other through the 24 V netlist (a wire from one PLC's output to another's input).
  * Pure and deterministic, like everything under src/sim.
  */
