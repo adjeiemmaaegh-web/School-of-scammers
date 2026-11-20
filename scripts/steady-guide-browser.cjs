@@ -53,6 +53,11 @@ const base=process.env.PLC_BASE_URL||'http://127.0.0.1:4173';
   await page.click('[data-steady-open-help]');
   await page.waitForSelector('[data-steady-drawer]',{timeout:12000});
   assert.match(await page.$eval('[data-steady-drawer] h2',x=>x.textContent),/Need a hand/i);
+  const storedProjectBefore=await page.evaluate(()=>localStorage.getItem('efo-open-sandbox-project-v1'));
+  await page.click('[data-steady-locate="inspector"]');
+  await page.waitForSelector('[data-steady-spotlight="inspector"]',{timeout:8000});
+  assert.match(await page.$eval('.sg-tour-status',el=>el.textContent),/control used to reveal/i,
+    'The closed Inspector must highlight its existing reveal control without opening the panel');
   await page.click('[data-steady-locate="views"]');
   await page.waitForSelector('[data-steady-spotlight="views"]',{timeout:8000});
   await page.waitForFunction(()=>document.querySelector('.sg-tour-status')?.textContent?.includes('Highlighted'),{timeout:8000});
@@ -62,6 +67,10 @@ const base=process.env.PLC_BASE_URL||'http://127.0.0.1:4173';
     await page.keyboard.press('Escape');
   await page.waitForFunction(()=>!document.querySelector('[data-steady-drawer]'),{timeout:8000});
   assert.equal(await page.$$eval('[data-steady-spotlight]',x=>x.length),0,'Escape clears all temporary highlights');
+  assert.equal(await page.evaluate(()=>document.activeElement?.hasAttribute('data-steady-open-help')),true,
+    'Dismissal returns keyboard focus to the Help trigger');
+  assert.equal(await page.evaluate(()=>localStorage.getItem('efo-open-sandbox-project-v1')),storedProjectBefore,
+    'Read-only spotlight guidance does not write or mutate the sandbox project');
     await page.setViewport({width:390,height:844});
   await go('/guide');
   const sizes=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));

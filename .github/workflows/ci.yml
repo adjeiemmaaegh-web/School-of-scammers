@@ -45,6 +45,8 @@ jobs:
       - name: Steady Guide - read-only onboarding, 54 devices, 21 scenes, real screenshot, search and mobile
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/steady-guide-browser.cjs
       - name: Capture authentic Steady Guide review screenshots (not automatically published)
+        env:
+          STEADY_GUIDE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/steady-guide-capture-browser.cjs
       - name: Browser - wire colour and net label (R5.1)
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r5-wire-style-browser.cjs

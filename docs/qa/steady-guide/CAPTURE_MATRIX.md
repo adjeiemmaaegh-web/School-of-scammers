@@ -32,3 +32,21 @@ Review viewports: 1440×940, 1366×768, 1280×720, 1024×768, 768×1024 and 390�
 An **eight-image genuine Chromium set** from draft PR #89 commit `f280fc5e` was captured on 2026-11-19 at 12:36 UTC and visually reviewed. It contains actual Home, Steady Guide, empty workbench, Logical view, Floor Plan, 768×1024 tablet, 390×844 Guide and Learn & Practice. These are **review evidence**, not final approved in-app training illustrations. The browser action also now scripts **14 capture states** on the feature branch, adding a filtered photoeye library, program dock (no PLC), diagnostics on empty project, Inspector without a selected device, and local project-library dialog. The richer SG-08/09/12 subject acceptance is **not yet met** by empty-state images. Captured state and training adequacy are different checks; final screenshots require a genuinely populated virtual project.
 
 Source CI artifact: https://github.com/adjeiemmaaegh-web/School-of-scammers/actions/runs/44524998472/artifacts/14532642115 . This artifact is temporary; separately reviewed binary assets are still not committed to `/public` beyond the existing five authentic R1 workbench PNGs.
+
+## Populated screenshot evidence workflow (2026-11-20, feature development)
+
+The browser capture recipe now requires **actual project device and wire counts** and records SHA-256 for each original PNG, the checked-out source commit, viewport, state, a descriptive ALT candidate and pending human-review status. An isolated disposable browser profile creates a real six-component starter panel, connects eleven named terminal wires through existing simulator buttons, and captures these verified review subjects:
+
+| New candidate | Programmatic proof and important limit |
+|---|---|
+| SG-04 | Six actual placed starter devices including PLC and motor; does **not** prove two selected industrial machines or field 3D acceptance |
+| SG-05 | Eleven real terminal wires and visible logical schematic; not real electrical safety compliance |
+| SG-06 | Populated 2D Floor Plan of that same project |
+| SG-08 | Motor selected through real schematic; Inspector is populated, not an empty placeholder |
+| SG-09 | Three-contact Ladder example actually loaded into the real PLC editor |
+| SG-10 | Real ST editor; **timer/PID source still not demonstrated** |
+| SG-11 | Real FBD graph editor; compiled FBD execution still not demonstrated |
+| SG-12 | Real worker scans and 24 V virtual meter probes; comprehensive live-I/O review still open |
+| SG-13 | Twenty-one source-backed Guide atlas cards; simulator scene-picker comparison remains open |
+
+The existing fourteen screenshots remain separately identified (some explicitly empty-state). The expanded suite is **23 captured review states** if the run succeeds; state assertions prevent missing subjects from silently becoming accepted. Visual quality, current-version screenshot annotation and SG-14/15/17/18 advanced subjects still need review or further captures. CI artifacts are temporary evidence, never automatically copied into `public`. Earlier matrix statuses are conservative and are not converted into accepted simply because a screenshot exists.
