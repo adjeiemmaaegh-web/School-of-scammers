@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, isPlcKind, type ComponentKind } from '../components/registry';
 import { IoMappingPanel } from '../ui/sandbox/IoMappingPanel';
@@ -39,6 +39,7 @@ import './ux2-command-layout.css';
 import './ux4-canvas-focus.css';
 import './ux6-workbench.css';
 import './ux7-reference-layout.css';
+import './stage1-workspace.css';
 
 // Loaded on demand so opening the simulator does not download the project dialog, lessons, checklist or report builder.
 const ProjectLibraryPanel = lazy(() => import('../ui/sandbox/ProjectLibraryPanel').then(m => ({ default: m.ProjectLibraryPanel })));
@@ -48,6 +49,10 @@ const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ def
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
 const UX2_LAYOUT_KEY = 'efo-ux2-layout-v1';
 type UiPanelSizes = {library:number;inspector:number;dock:number};
+type ResizePanel = keyof UiPanelSizes;
+const RESIZE_LIMITS:Record<ResizePanel,{min:number;max:number}>={
+  library:{min:160,max:360},inspector:{min:190,max:350},dock:{min:125,max:390},
+};
 // Wide desktop windows get the roomier three-column library of the reference layout (ux7-reference-layout.css).
 const WIDE_WINDOW = typeof window !== 'undefined' && window.innerWidth >= 1500;
 const defaultPanelSizes:UiPanelSizes = {library:WIDE_WINDOW?330:228,inspector:238,dock:205};
@@ -136,6 +141,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const pasteIndex=useRef(0);
   // View/panel preferences do not belong to PLC or electrical project state.
   const [libraryFamily,setLibraryFamily] = useState<DeviceFamily>('all');
+  // Changed filters should never leave an empty-looking, scrolled-away equipment grid.
+  useEffect(()=>{
+    componentScrollRef.current=0;
+    if(componentListRef.current)componentListRef.current.scrollTop=0;
+  },[libraryQuery,libraryFamily]);
   const [workspaceView,setWorkspaceView] = useState<'physical'|'logical'|'plan'>('physical');
   const [initialVisible] = useState<UiPanelVisible>(()=>scenario?defaultPanelVisible:initialPanelVisible());
   const [libraryExpanded,setLibraryExpanded] = useState(initialVisible.library);
@@ -148,6 +158,40 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [workspaceHelp,setWorkspaceHelp] = useState(false);
   // These affect layout only; they never enter a saved PLC project.
   const [panelSizes,setPanelSizes] = useState<UiPanelSizes>(initialPanelSizes);
+  const resizeGesture=useRef<{panel:ResizePanel;pointerId:number;x:number;y:number;size:number}|null>(null);
+  // Panel resizing changes only view preferences; touch, pen and mouse use pointer capture.
+  const onResizeStart=(panel:ResizePanel,event:ReactPointerEvent<HTMLDivElement>)=>{
+    if(event.button!==0||canvasFocused)return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeGesture.current={panel,pointerId:event.pointerId,x:event.clientX,y:event.clientY,size:panelSizes[panel]};
+  };
+  const onResizeMove=(event:ReactPointerEvent<HTMLDivElement>)=>{
+    const drag=resizeGesture.current;
+    if(!drag||drag.pointerId!==event.pointerId)return;
+    const delta=drag.panel==='library'?event.clientX-drag.x:
+      drag.panel==='inspector'?drag.x-event.clientX:drag.y-event.clientY;
+    const {min,max}=RESIZE_LIMITS[drag.panel];
+    const size=panelSize(drag.size+delta,drag.size,min,max);
+    setPanelSizes(current=>current[drag.panel]===size?current:{...current,[drag.panel]:size});
+  };
+  const onResizeEnd=(event:ReactPointerEvent<HTMLDivElement>)=>{
+    if(resizeGesture.current?.pointerId!==event.pointerId)return;
+    resizeGesture.current=null;
+    if(event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+  const onResizeKey=(panel:ResizePanel,event:ReactKeyboardEvent<HTMLDivElement>)=>{
+    const delta=panel==='dock'?(event.key==='ArrowUp'?1:event.key==='ArrowDown'?-1:0):
+      event.key==='ArrowRight'?(panel==='library'?1:-1):
+      event.key==='ArrowLeft'?(panel==='library'?-1:1):0;
+    if(!delta&&event.key!=='Home'&&event.key!=='End')return;
+    event.preventDefault();
+    event.stopPropagation(); // resizing must never nudge selected machines
+    const {min,max}=RESIZE_LIMITS[panel];
+    setPanelSizes(current=>({...current,[panel]:event.key==='Home'?min:
+      event.key==='End'?max:panelSize(current[panel]+delta*(event.shiftKey?25:10),current[panel],min,max)}));
+  };
   useEffect(()=>{
     if(scenario)return;
     try{window.localStorage.setItem(UX2_LAYOUT_KEY,JSON.stringify({...panelSizes,visible:{library:libraryExpanded,inspector:inspectorExpanded,dock:dockExpanded}}));}
@@ -582,6 +626,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         shiftKey:event.shiftKey,altKey:event.altKey,targetTag:target?.tagName,
         isContentEditable:target?.isContentEditable});
       if(!shortcut)return;
+      if(target?.closest('[data-library-scroll]')&&shortcut.startsWith('nudge-'))return;
       if(shortcut==='clear-selection'){if(selectedDeviceIds.length){event.preventDefault();setSelectedDeviceIds([]);}return;}
       if(snapshot?.running||scenario)return;
       if(shortcut==='undo'&&!historyPending&&historyRef.current.undo.length){event.preventDefault();undo();return;}
@@ -623,6 +668,12 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       const typing=!!target&&(/^(input|textarea|select)$/i.test(target.tagName)||target.isContentEditable);
       if (event.key==='Escape' && canvasFocused) {
         event.preventDefault();setCanvasFocused(false);return;
+      }
+      if(event.altKey&&!event.ctrlKey&&!event.metaKey&&!typing&&!event.repeat){
+        const shortcut=event.key.toLowerCase();
+        if(shortcut==='l'){event.preventDefault();setLibraryExpanded(v=>!v);return;}
+        if(shortcut==='i'){event.preventDefault();setInspectorExpanded(v=>!v);return;}
+        if(shortcut==='d'){event.preventDefault();setDockExpanded(v=>!v);return;}
       }
       if (event.altKey && event.key==='Enter' && !typing && !event.repeat) {
         event.preventDefault();setCanvasFocused(v=>!v);
@@ -720,6 +771,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           <button type="button" onClick={()=>setLibraryExpanded(v=>!v)}>Toggle device library</button>
           <button type="button" onClick={()=>setInspectorExpanded(v=>!v)}>Toggle inspector</button>
           <button type="button" onClick={()=>setDockExpanded(v=>!v)}>Toggle engineering dock</button>
+           {!scenario&&<button type="button" onClick={()=>{
+             setPanelSizes(defaultPanelSizes);setLibraryExpanded(true);
+             setInspectorExpanded(false);setDockExpanded(false);setCanvasFocused(false);
+           }}>Restore default workspace layout</button>}
         </div></details>
         <details><summary>Simulation</summary><div className="p5-menu-content">
           <button type="button" onClick={()=>send([{k:snapshot?.running?'pause':'run'}])}>
@@ -749,7 +804,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         </div></details>
         <details><summary>Help</summary><div className="p5-menu-content">
           <button type="button" onClick={()=>setWorkspaceHelp(v=>!v)}>Toggle workspace instructions</button>
-          <span>Alt+1 logical · Alt+2 3D · Alt+3 plan · Ctrl+S export · Esc cancel</span>
+          <span>Alt+1 logical · Alt+2 3D · Alt+3 plan · Alt+L library · Alt+I inspector · Alt+D dock · Ctrl+S export · Esc cancel</span>
           <span>Educational model only: no real PLC firmware, certified electrical protection, safety-rated E-stop, or field hardware equivalence.</span>
         </div></details>
       </nav>
