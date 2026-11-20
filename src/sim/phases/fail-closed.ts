@@ -1,6 +1,6 @@
 /** Fail-closed helpers shared by the tick phases and the orchestrator's pause paths. */
 import type { SortingPlant } from '../../plant/sorting-conveyor';
-import type { PlcRuntime } from '../signals';
+import type { PlcRuntime, WorldState } from '../signals';
 
 export const quietLanes = (lanes: Record<string, SortingPlant>): Record<string, SortingPlant> =>
   Object.fromEntries(Object.entries(lanes).map(([id, lane]) => [id, { ...lane, photoeyeActive: false }]));
@@ -20,3 +20,46 @@ export const deenergisedPlcs = (plcs: Record<string, PlcRuntime>): Record<string
       tagValues: { ...rt.tagValues, ...offTags },
     }];
   }));
+
+/** Standard virtual-plant failure image shared by the controller phase and
+ * the Worker exception boundary. Only the six historical output tags are
+ * explicitly shut off: a learner's unrelated inputs, numeric readings,
+ * memory and project document are retained for diagnosis.
+ *
+ * This is an educational model stop, NOT a certified real-world safety stop.
+ */
+export function haltedSimulationWorld(
+  w: WorldState,
+  message: string,
+  diagnostic?: string,
+  maxDiagnostics?: number,
+): WorldState {
+  const off = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
+  const nextDiagnostics = diagnostic ? [...w.diagnostics, diagnostic] : w.diagnostics;
+  return {
+    ...w,
+    running: false,
+    coils: { ...w.coils, ...off },
+    tagValues: { ...w.tagValues, ...off },
+    plcs: deenergisedPlcs(w.plcs),
+    deviceOn: {},
+    timers: {},
+    threePhase: {},
+    contactorOn: false,
+    motorOn: false,
+    conveyorOn: false,
+    diverterOn: false,
+    pumpOn: false,
+    drainOn: false,
+    lampOn: false,
+    forwardContactorOn: false,
+    reverseContactorOn: false,
+    motorDirection: 'stopped',
+    interlockConflict: false,
+    plant: { ...w.plant, photoeyeActive: false },
+    lanes: quietLanes(w.lanes),
+    voltages: {},
+    diagnostics: maxDiagnostics === undefined ? nextDiagnostics : nextDiagnostics.slice(-maxDiagnostics),
+    lastError: message,
+  };
+}
