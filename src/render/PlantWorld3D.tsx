@@ -49,6 +49,7 @@ function Drawing({drawing,kind,progress=0}:{drawing:EquipmentDrawing;kind:string
  const railWidth=.028;
  return <group position={equipmentPosition(drawing)}
    rotation={[0,-drawing.yawDeg*Math.PI/180,0]}>
+  <group rotation={[0,0,(drawing.pitchDeg??0)*Math.PI/180]}>
    {roller ? <>
      <mesh position={[0,-height*.22,0]}>
        <boxGeometry args={[len,clampPositive(height*.4),depth]}/>
@@ -154,6 +155,7 @@ function Drawing({drawing,kind,progress=0}:{drawing:EquipmentDrawing;kind:string
        <cylinderGeometry args={[len/2,len/2,height,20]}/>}
       <meshStandardMaterial color={drawing.colour} metalness={.25} roughness={.6}/>
    </mesh>}
+ </group>
  </group>;
 }
 /** This volume is projected from the *same* sensor-zone descriptor read

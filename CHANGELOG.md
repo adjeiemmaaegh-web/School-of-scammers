@@ -23,6 +23,7 @@ Versioning policy: `package.json` version is the app/build version (0.x until th
 - R10: factory scale raised to 250 components, 1000 wires, 240 bodies, 200 plant devices; physics broad phase (4.5x faster at the maximum) with a differential test against brute force.
 - R12 (part): maintained selector switch, 24 V buzzer and 24 V alarm siren (electrical-model loads and contacts, PLC-drivable).
 - R02/R16/R26: material catalogue, friction-limited belt carry, feeder quantity/depletion/variation, product collector; hard-wired belts now run without a PLC; plant devices show live status.
+- R03 (part): inclined belt conveyor (friction decides who climbs).
 - R7/R11: bounded soak and benchmark test (10 simulated minutes, maximal project).
 
 ## 0.1.0 (merged to `main` as of PR #26 and PR #70)

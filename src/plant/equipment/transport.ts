@@ -29,7 +29,9 @@ export const beltConveyor:EquipmentDef={
   spec('accumulationTripMode','Body-to-body accumulation trip','0=legacy, 1=latched',0,1,1,0),
   spec('accumulationDwellMs','Required continuous queue dwell','ms',100,4000,50,500),
   spec('zoneSensorMode','Physical belt-zone occupancy','0=off, 1=actual bodies',0,1,1,0),
-  spec('zoneCapacity','Observed carton capacity','bodies',1,5,1,2)],
+  spec('zoneCapacity','Observed carton capacity','bodies',1,5,1,2),
+  // R03: an inclined belt raises its cargo; friction decides whether a load climbs or slides back (see world/physics.ts).
+  spec('inclineDeg','Incline','degrees',0,30,5,0)],
  faults:['belt-slip','belt-jammed','motor-dead'],
  fresh:()=>initial({}),
  step:(state,world,commands,dt,fault,ctx)=>{
@@ -150,8 +152,14 @@ export const beltConveyor:EquipmentDef={
    zoneCount:count,
    speed:s.engaged?s.speedMmS:0};
  },
- describe:(s,ctx)=>[draw(ctx,'frame','box',vec(param(ctx,'lengthMm',600),param(ctx,'widthMm',300),120),60,
-  s.engaged?'#397fa0':'#5f7380')],
+ describe:(s,ctx)=>{
+  const length=param(ctx,'lengthMm',600),incline=param(ctx,'inclineDeg',0);
+  const frame=draw(ctx,'frame','box',vec(length,param(ctx,'widthMm',300),120),60,s.engaged?'#397fa0':'#5f7380');
+  if(!incline)return [frame];
+  // The belt frame tilts about its centre: raise it by half the rise and pitch it.
+  const rise=length*Math.tan(incline*Math.PI/180);
+  return [{...frame,pos:{...frame.pos,z:frame.pos.z+rise/2},pitchDeg:incline}];
+ },
 };
 export const rollerConveyor:EquipmentDef={
  kind:'roller-conveyor',label:'Powered/gravity rollers',footprint:vec(600,300,120),

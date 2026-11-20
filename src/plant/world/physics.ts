@@ -16,13 +16,23 @@ const clampVelocity=(value:number,target:number,dtMs:number,accel=3500):number=>
  q(value+clamp(target-value,-accel*dtMs/1000,accel*dtMs/1000));
 const baseHeight=(item:EquipmentPlacement,state:EquipmentState):number=>
  item.kind==='lift'||item.kind==='scissor-lift'?Math.max(0,state.positionMm):item.originMm.z+120;
+/** Degrees of incline of a belt (0 for everything else): the belt rises toward its heading end. */
+const inclineOf=(item:EquipmentPlacement):number=>item.kind==='belt-conveyor'?(item.params.inclineDeg??0):0;
+/** Height of the carrying surface under a point: flat for most equipment, a ramp for an inclined belt. */
+const surfaceHeight=(item:EquipmentPlacement,state:EquipmentState,pos:Vec3):number=>{
+ const base=baseHeight(item,state),deg=inclineOf(item);
+ if(!deg)return base;
+ const length=item.params.lengthMm??600,dir=face(item.yawDeg);
+ const along=clamp((pos.x-item.originMm.x)*dir.x+(pos.y-item.originMm.y)*dir.y+length/2,0,length);
+ return base+along*Math.tan(deg*Math.PI/180);
+};
 /** Equipment length/width are local axes; 90/270 degree yaw swaps world-space footprint. */
 const worldFootprint=(item:EquipmentPlacement,length:number,width:number):Vec3=>
  item.yawDeg===90||item.yawDeg===270?vec(width,length,0):vec(length,width,0);
 function chooseCarrier(body:Body,items:readonly EquipmentPlacement[],states:World['model']):EquipmentPlacement|undefined{
  return items.find(item=>CARRIERS.has(item.kind)&&insideFootprint(body.pos,item.originMm,
   worldFootprint(item,item.params.lengthMm??600,item.params.widthMm??300)) &&
-  Math.abs(body.pos.z-baseHeight(item,states[item.id]))<150);
+  Math.abs(body.pos.z-surfaceHeight(item,states[item.id],body.pos))<150);
 }
 function collide(body:Body,candidates:readonly Body[],move:Vec3,
  swept3D=false):{delta:Vec3;blocked:boolean;blockedByBodyId:string|null}{
@@ -125,12 +135,26 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    // Catalogue materials carry a static friction coefficient: the belt can accelerate a load by at most mu x g, so a
    // slippery glass bottle takes longer to reach belt speed than a carton. Legacy bodies (no frictionMu) keep 3500 mm/s2.
    const mu=body.tags.frictionMu;
-   const pull=typeof mu==='number'&&mu>0?mu*G_MM_S2:undefined;
-   body.vel.x=mechanicallyStopped?0:clampVelocity(body.vel.x,targetX,dtMs,pull);
-   body.vel.y=mechanicallyStopped?0:clampVelocity(body.vel.y,targetY,dtMs,pull);
+   let pull=typeof mu==='number'&&mu>0?mu*G_MM_S2:undefined;
+   let aimX=targetX,aimY=targetY;
+   const slope=inclineOf(carrier);
+   if(slope>0){
+    // Inclined belt: friction must overcome the slope. Climbing accelerates at g(mu cos - sin); if that is not positive
+    // the load slides back down regardless of belt motion (a slippery bottle slides where a carton climbs).
+    const theta=slope*Math.PI/180,muEff=typeof mu==='number'&&mu>0?mu:3500/G_MM_S2;
+    const uphill=state.speedMmS>=0;
+    const net=G_MM_S2*(uphill?muEff*Math.cos(theta)-Math.sin(theta):muEff*Math.cos(theta)+Math.sin(theta));
+    if(net>0)pull=net;
+    else{
+     pull=G_MM_S2*(Math.sin(theta)-muEff*Math.cos(theta));
+     aimX=-direction.x*400;aimY=-direction.y*400;
+    }
+   }
+   body.vel.x=mechanicallyStopped?0:clampVelocity(body.vel.x,aimX,dtMs,pull);
+   body.vel.y=mechanicallyStopped?0:clampVelocity(body.vel.y,aimY,dtMs,pull);
    body.vel.z=0;
    body.supportedBy=carrier.id;
-   body.pos.z=q(baseHeight(carrier,state));
+   body.pos.z=q(surfaceHeight(carrier,state,body.pos));
    // A locked gate or extended stopper obstructs travel rather than teleporting cargo.
    const proposed=vec(body.vel.x*dtMs/1000,body.vel.y*dtMs/1000,0);
    const blockingGate=blockers.find(item=>world.model[item.id]?.engaged&&

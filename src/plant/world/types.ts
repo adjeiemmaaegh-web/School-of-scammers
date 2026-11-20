@@ -50,6 +50,8 @@ export type EquipmentSignal=boolean|number;
 export type LiveSignal=Record<string,EquipmentSignal>;
 export type EquipmentDrawing={
  part:string;shape:BodyShape;pos:Vec3;size:Vec3;yawDeg:number;colour:string;
+ /** Optional tilt about the drawing's own width axis (inclined conveyors): positive raises the heading end. */
+ pitchDeg?:number;
 };
 /** Factory scale (R10): raised from 60 bodies / 60 plant devices; see tests/factory-scale.test.ts for the profiled budgets. */
 export const MAX_BODIES=240, MAX_WORLD_EVENTS=80, MAX_SCENE_EQUIPMENT=200;
