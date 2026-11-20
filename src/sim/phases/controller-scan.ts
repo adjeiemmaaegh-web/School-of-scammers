@@ -4,10 +4,9 @@
  * `scanPlc`. Extracted verbatim from `tick()`; a runtime fault returns `halt`, which the caller turns into the same
  * fail-closed paused world as before. Behaviour is pinned by `tests/r3-golden-tick.test.ts` and the scenario suites.
  */
-import { executeLadder, type LadderResult } from '../../engineering/ladder';
-import { compileFbd, executeFbd, type FbdResult } from '../../engineering/fbd';
-import { executeStructuredText, type STResult, type STValue } from '../../engineering/structured-text';
-import { compileSandboxST } from '../../program/p2-contract';
+import type { LadderResult } from '../../engineering/ladder';
+import type { FbdResult } from '../../engineering/fbd';
+import type { STResult, STValue } from '../../engineering/structured-text';
 import { solveNetAware } from '../../engineering/electrical';
 import { faultsOf } from '../faults';
 import { ioOf, LEGACY_IO } from '../plc-io';
@@ -42,66 +41,43 @@ export function scanControllers(
   const inputs = classicInputs(plc
     ? samplePlcDigitalInputs(plc.id, LEGACY_IO, powered, circuit, sensors)
     : {});
-  // 4. Execute the learner's exact document in the salvaged bounded LD or ST engine.
+  // 4. The first classic PLC executes through the SAME canonical scanPlc
+  // interpreter path as every additional controller. Its historical WorldState
+  // fields remain the storage/trace compatibility mirror (no project migration).
   let ladderResult: LadderResult | null = null;
   let stResult: STResult | null = null;
   let fbdResult: FbdResult | null = null;
+  let legacyScan: PlcRuntime | null = null;
   try {
-    // Only a classic first PLC runs through this original fixed-name path; every other PLC takes the generic path below.
     if (powered && plc?.kind === 'plc') {
-      if(w.project.language==='fbd') {
-        fbdResult=executeFbd(compileFbd(programOf(w.project,plc.id).fbd,namesFor(w.project,plc.id)),
-          inputs,w.coils,w.fbdMemory,dtMs);
-      } else if (w.project.language === 'st') {
-        const compiled = w.stCompiled ?? compileSandboxST(w.project.stSource ?? '');
-        stResult = executeStructuredText(compiled, inputs, w.stMemory);
-        const run = Object.entries(stResult.outputs).find(([key]) => key.toLowerCase() === 'run')?.[1];
-        if (typeof run !== 'boolean') throw new TypeError('ST Run output must be BOOL');
-      } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs, w.ladderNumeric,
-        w.debugForces[plc.id] ?? {});
+      const prior: PlcRuntime = {
+        powered: w.powered, inputs: w.inputs, tagInputs: w.inputs, analogInputs: [],
+        coils: w.coils, tagValues: w.tagValues,
+        ladderMemory: w.ladderMemory, ladderNumeric: w.ladderNumeric, ladderSteps: w.ladderSteps,
+        stCompiled: w.stCompiled, stMemory: w.stMemory,
+        fbdMemory: w.fbdMemory, fbdSteps: w.fbdSteps,
+      };
+      legacyScan = scanPlc(programOf(w.project, plc.id), LEGACY_IO, prior, inputs,
+        powered, dtMs, [], w.debugForces[plc.id] ?? {}, execution => {
+          if (execution.language === 'ladder') ladderResult = execution.result;
+          else if (execution.language === 'st') stResult = execution.result;
+          else fbdResult = execution.result;
+        });
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'PLC runtime failed';
-    // Fail closed in the *simulated* plant. Do not publish stale energized outputs
-    // after an arithmetic fault (overflow, division by zero, invalid typed write).
-    const paused = haltedSimulationWorld(w, `PLC runtime error: ${message}`,
-      'PLC scan interrupted; simulated outputs deenergized');
+    // Historically a non-BOOL secondary ST output used a distinct top-level
+    // error string without appending the generic PLC scan diagnostic.
+    const outputTypeError = message === 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL';
+    const paused = haltedSimulationWorld(w, outputTypeError ? message : `PLC runtime error: ${message}`,
+      outputTypeError ? undefined : 'PLC scan interrupted; simulated outputs deenergized');
     return { halt: { world: paused, events: [{ tick: w.tick, kind: 'error', detail: message }] } };
   }
-  const stRun = stResult
-    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'run')?.[1]
-    : undefined;
-  const stSort = stResult
-    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'sort')?.[1]
-    : undefined;
-  const stFill = stResult
-    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'fill')?.[1]
-    : undefined;
-  const stDrain = stResult
-    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'drain')?.[1]
-    : undefined;
-  const stForward = stResult
-    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'forward')?.[1]
-    : undefined;
-  const stReverse = stResult
-    ? Object.entries(stResult.outputs).find(([name]) => name.toLowerCase() === 'reverse')?.[1]
-    : undefined;
-  if ((stSort !== undefined && typeof stSort !== 'boolean') ||
-      (stFill !== undefined && typeof stFill !== 'boolean') ||
-      (stDrain !== undefined && typeof stDrain !== 'boolean') ||
-      (stForward !== undefined && typeof stForward !== 'boolean') ||
-      (stReverse !== undefined && typeof stReverse !== 'boolean')) {
-    const paused = haltedSimulationWorld(w, 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL');
-    return { halt: { world: paused, events: [{ tick: w.tick, kind: 'error', detail: 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL' }] } };
-  }
-  // Structured Text is case-insensitive; the physical Q0.0 binding is always canonical "Run".
-  const coils: Record<string, boolean> = stResult
-    ? { ...Object.fromEntries(Object.entries(stResult.outputs).filter(([, value]) => typeof value === 'boolean')),
-        Run: stRun === true, Sort: stSort === true, Fill: stFill === true, Drain: stDrain === true,
-        Forward: stForward === true, Reverse: stReverse === true }
-    : fbdResult?.outputs ?? ladderResult?.outputs ?? {};
+  // These fixed-name mirrors are still required by existing dashboard traces,
+  // breakpoints and v1 projects. Execution itself is now shared with PLC16.
+  const coils: Record<string, boolean> = legacyScan?.coils ?? {};
   const tagValues: Record<string, STValue> = {
-    ...inputs, ...(stResult?.signals ?? {}), ...(w.debugForces[plc?.id ?? '']??{}),
+    ...inputs, ...(stResult?.signals ?? {}), ...(w.debugForces[plc?.id ?? ''] ?? {}),
     ...(ladderResult?.numericValues ?? {}), ...coils,
     Run: coils.Run === true, Sort: coils.Sort === true,
     Fill: coils.Fill === true, Drain: coils.Drain === true,
