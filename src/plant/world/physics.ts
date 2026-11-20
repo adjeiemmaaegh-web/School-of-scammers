@@ -7,8 +7,20 @@ import {G_MM_S2} from './types';
 import {clamp,face,insideFootprint,q,vec} from './math';
 import {addEvent} from './events';
 import {newlyContactsStaticSolid,staticSolidSize} from './solid-geometry';
-import {bodiesTouch,isComposite,supportTopAt,sweptContact,volumeOverlap} from './geometry';
+import {bodiesTouch,isComposite,supportTopAt,sweptContact,tipOver,tipSpeed,volumeOverlap} from './geometry';
 
+/**
+ * Rigid-body tipping on a sudden stop: a body travelling faster than its tip speed that is stopped dead by a stopper, solid or
+ * another body falls over about its leading edge (see geometry.tipSpeed). Mutates the body; returns true when it tipped.
+ */
+const tipIfFastStop=(body:Body,vx:number,vy:number):boolean=>{
+ const speed=Math.hypot(vx,vy);
+ if(body.tags.tipped||speed<1)return false;
+ const dir={x:vx/speed,y:vy/speed};
+ if(speed<=tipSpeed(body,dir))return false;
+ Object.assign(body,tipOver(body,dir));
+ return true;
+};
 const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','lift','scissor-lift',
  'pick-and-place','palletizer','asrs-crane']);
 const BLOCKERS=new Set(['stopper','diverter-gate','safety-fence','guard-door']);
@@ -194,8 +206,10 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
     body.tags={...body.tags,jammed:true,
      jammedByBody:state.accumulationBlockingBodyId};
    }else if(blocked||solidBlocked){
+    const tipped=tipIfFastStop(body,body.vel.x,body.vel.y);
     body.vel.x=0;body.vel.y=0;
     const tags:Body['tags']={...body.tags,jammed:true};
+    if(tipped)changed=addEvent(changed,{kind:'contact',source:carrier.id,bodyId:body.id,detail:'Body tipped over on sudden stop'});
     if(blockingGate)tags.jammedByGate=blockingGate.id;
     else delete tags.jammedByGate;
     delete tags.jammedByBody;
@@ -207,6 +221,8 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
     const contact=collide(body,nearby(body,cur),proposed,
       carrier.params.contactMode===1);
     if(contact.blocked){
+     const tipped=tipIfFastStop(body,body.vel.x,body.vel.y);
+     if(tipped)changed=addEvent(changed,{kind:'contact',source:carrier.id,bodyId:body.id,detail:'Body tipped over on sudden stop'});
      body.vel.x=0;body.vel.y=0;const tags:Body['tags']={...body.tags,jammed:true};
      delete tags.jammedByGate;
      if(contact.blockedByBodyId)tags.jammedByBody=contact.blockedByBodyId;
