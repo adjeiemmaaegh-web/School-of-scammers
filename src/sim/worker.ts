@@ -1,9 +1,9 @@
 /// <reference lib="webworker" />
 import { createWorld, renderSnapshot, tick, SCAN_MS } from './orchestrator';
-import { deenergisedPlcs, quietLanes } from './phases/fail-closed';
+import { haltedSimulationWorld } from './phases/fail-closed';
 import { parseWorkerIngress, WorkerMailbox } from './worker-mailbox';
 import { boundedWorkerEvents } from './event-stream';
-import type { Command, WorkerResponse, WorldState } from './signals';
+import type { Command, WorkerResponse } from './signals';
 
 const ctx: DedicatedWorkerGlobalScope = self as DedicatedWorkerGlobalScope;
 let world = createWorld();
@@ -25,19 +25,8 @@ function reject(message: string, requestId?: number, requestIds?: number[]): voi
 /** An unexpected simulation exception stops the modeled controllers and
  * actuators; it must not leave stale energised outputs running invisibly. */
 function haltOnException(message: string): void {
-  const quiet = { Run: false, Sort: false, Fill: false, Drain: false, Forward: false, Reverse: false };
-  const stopped: WorldState = {
-    ...world, running: false, coils: { ...world.coils, ...quiet },
-    tagValues: { ...world.tagValues, ...quiet }, plcs: deenergisedPlcs(world.plcs),
-    deviceOn: {}, timers: {}, threePhase: {}, contactorOn: false, motorOn: false,
-    conveyorOn: false, diverterOn: false, pumpOn: false, drainOn: false,
-    lampOn: false, forwardContactorOn: false, reverseContactorOn: false,
-    motorDirection: 'stopped', interlockConflict: false,
-    plant: { ...world.plant, photoeyeActive: false }, lanes: quietLanes(world.lanes),
-    voltages: {}, diagnostics: [...world.diagnostics, 'Worker tick interrupted; simulated outputs deenergized'].slice(-30),
-    lastError: message,
-  };
-  world = stopped;
+  world = haltedSimulationWorld(world, message,
+    'Worker tick interrupted; simulated outputs deenergized', 30);
 }
 
 function dispatch(commands: readonly Command[] = [], requestId?: number, requestIds?: number[]): void {
