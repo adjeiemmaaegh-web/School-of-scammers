@@ -59,3 +59,9 @@ At commit `951f2af9`, Vite/typecheck and Vitest passed, but the aggregate (all l
 - Commit `8735ee32` passed its repo QA/security and native coverage; full build passed before browser checks, but its **Steady Guide browser step failed**. The drawer highlighted the Inspector fallback before React asynchronously updated the live status text. The test incorrectly asserted the old introductory status immediately after the highlight. This continuation waits for the real status announcement; it does not mask missing fallback content.
 - Populated screenshot evidence IDs are now suffixed `-populated` and include a canonical `subjectId`, so original empty-state and populated-state evidence cannot collide in a manifest. The capture script asserts unique IDs.
 - The 23-state screenshot run did **not** execute on `8735ee32` because GitHub Actions stopped at the browser failure. A new exact-head run is required to validate capture code. No release approval.
+
+### Second screenshot capture CI failure and fix (2026-11-20)
+
+- `c7c0a489` browser smoke passed the new status/focus/storage checks, but 23-state screenshot capture stopped after staging the six-device project. The selected-device inspector has a different markup path from its empty-state checklist: `.sandbox-inspector-top h2` vs `.sandbox-inspector-heading h2`. The test was waiting for the nonexistent empty-state heading on a populated device and timed out at script line 100.
+- The corrected capture check now asserts the populated Inspector title, exact selected `motor-4` device ID and its real model-limit explanation. No simulated component implementation was changed.
+- CI uploads the raw evidence folder immediately after the screenshot step even when later acceptance fails; missing/partial manifests remain visibly unapproved. Next exact-head run must reach and verify the entire 23-image recipe.

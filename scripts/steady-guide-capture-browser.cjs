@@ -97,7 +97,12 @@ const dir='qa-artifacts/steady-guide-captures';
   await page.$eval('.p5-panel-toggles button:nth-child(2)',el=>{
     if(el.getAttribute('aria-pressed')!=='true')el.click();
   });
-  await page.waitForFunction(()=>/motor/i.test(document.querySelector('[data-p5-inspector] .sandbox-inspector-heading h2')?.textContent||''),{timeout:8000});
+  await page.waitForFunction(()=>{
+    const panel=document.querySelector('[data-p5-inspector] .sandbox-inspector');
+    return /motor/i.test(panel?.querySelector('.sandbox-inspector-top h2')?.textContent||'') &&
+      panel?.querySelector('.sandbox-inspector-properties code')?.textContent?.trim()==='motor-4' &&
+      !!panel.querySelector('[data-model-limit]');
+  },{timeout:10000});
   await genuine('SG-08','SG-08-selected-motor.png','/sandbox',
     'Selected real motor component with its Inspector model and terminals',
     'The actual selected motor is shown in the component Inspector, not an empty placeholder.',
