@@ -45,7 +45,7 @@ const projectKey='efo-open-sandbox-project-v1';
   await page.waitForSelector('[data-p5-logical-canvas]',{timeout:12000});
   const search='input[aria-label="Search component library"]';
   const components=[
-   {kind:'supply',label:'24V supply',term:'supply'},
+   {kind:'supply',label:'24V supply',term:'24V supply'},
    {kind:'start',label:'START NO',term:'START NO'},
    {kind:'lamp',label:'24V pilot lamp',term:'pilot lamp'},
   ];
@@ -58,12 +58,15 @@ const projectKey='efo-open-sandbox-project-v1';
    await page.keyboard.up('Control');
    await page.keyboard.press('Backspace');
    await page.type(search,item.term);
-   await page.waitForFunction(label=>{
-    const found=[...document.querySelectorAll('.sandbox-palette-item:not([disabled])')];
-    return found.length===1&&found[0].getAttribute('title')?.startsWith('Place '+label+'.');
-   },{timeout:10000},item.label);
-   await page.$eval('.sandbox-palette-item:not([disabled])',el=>el.scrollIntoView({block:'center'}));
-   await page.click('.sandbox-palette-item:not([disabled])');
+   // A broad search may return multiple valid components. Click the exact name.
+   const entry='.sandbox-palette-item[title^="Place '+item.label+'."]:not([disabled])';
+   await page.waitForSelector(entry,{timeout:10000}).catch(async error=>{
+    const candidates=await page.$$eval('.sandbox-palette-item',nodes=>
+     nodes.map(node=>node.getAttribute('title')).slice(0,12));
+    throw new Error('Missing exact '+item.label+' search result: '+JSON.stringify(candidates)+'; '+error.message);
+   });
+   await page.$eval(entry,el=>el.scrollIntoView({block:'center'}));
+   await page.click(entry);
    await page.waitForFunction(count=>document.querySelectorAll('.sandbox-device').length===count,{timeout:12000},i+1);
    const idsOfKind=await page.$$eval('.sandbox-device', (nodes,kind)=>
     nodes.map(node=>node.getAttribute('data-device-id')).filter(id=>id?.startsWith(kind+'-')),item.kind);

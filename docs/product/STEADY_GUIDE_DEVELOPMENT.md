@@ -105,3 +105,9 @@ At commit `951f2af9`, Vite/typecheck and Vitest passed, but the aggregate (all l
 - Exact-head `a1606fea` still exceeded 852 KiB aggregate compressed JavaScript by **122 bytes** (872,570 B measured vs 872,448 B limit), despite passing TypeScript, Vitest, Vite, source-security and native coverage. The new E2E test remained unrun after the failed budget gate.
 - Simplified the virtual wiring checklist to a semantic ordered list of the same three accurate component+terminal pairs without redundant explanatory JSX, and removed its duplicate rendering/import from the build plan (which already includes the instructions and links to the Guide topic). The real Chrome test still reads exact terminal data from the Guide, and the unit worker test uses the same source.
 - Aggregate JS performance limit remains unchanged. Require another exact-commit gzip measurement and E2E result; no release claims.
+
+### Dedicated browser recipe first-failure analysis (2026-11-20)
+
+- Exact-head `5d8e41f4` passed the original **852 KiB compressed JavaScript budget**, TypeScript/Vitest/Vite and repo security/native coverage, but the new first-lamp E2E failed after 10 seconds at its **palette search selector**, before it placed any components. The test assumed `found.length===1` for a search containing `supply`; the catalog can legitimately return more than one result. This is a brittle test condition, not evidence that the application cannot place a virtual supply.
+- New test chooses a narrow **24V supply** query and selects the exact registered component by its real `title="Place <label>. ..."` prefix, even if the filter returns multiple devices. On absence, the failing test now reports the visible candidate titles for diagnosis. This leaves the application UI, simulator and project data untouched.
+- A new exact-head CI run must still pass the actual placement/wiring/lamp-negative proof. Until then, the first-lamp browser acceptance remains **unverified**.
