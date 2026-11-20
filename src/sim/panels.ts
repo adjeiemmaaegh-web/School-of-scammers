@@ -49,7 +49,9 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     if (promoted) {
       const cfg = programOf(project, promoted.id);
       delete remaining[promoted.id];
-      next = { ...next, program: cfg.program, language: cfg.language, stSource: cfg.stSource };
+      // The promoted controller must keep its FBD graph as well as LD/ST code.
+      // Otherwise an existing top-level FBD from the removed controller wins.
+      next = { ...next, program: cfg.program, language: cfg.language, stSource: cfg.stSource, fbd: cfg.fbd };
     }
     const { plcPrograms: _old, plcIo: _oldIo, ...rest } = next;
     const io = { ...(project.plcIo ?? {}) };
