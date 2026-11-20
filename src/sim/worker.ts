@@ -2,6 +2,7 @@
 import { createWorld, renderSnapshot, tick, SCAN_MS } from './orchestrator';
 import { deenergisedPlcs, quietLanes } from './phases/fail-closed';
 import { parseWorkerIngress, WorkerMailbox } from './worker-mailbox';
+import { boundedWorkerEvents } from './event-stream';
 import type { Command, WorkerResponse, WorldState } from './signals';
 
 const ctx: DedicatedWorkerGlobalScope = self as DedicatedWorkerGlobalScope;
@@ -14,7 +15,7 @@ function reject(message: string, requestId?: number, requestIds?: number[]): voi
   const reply: WorkerResponse = {
     kind: 'snapshot',
     snapshot: { ...renderSnapshot(world), lastError: message },
-    events: [{ tick: world.tick, kind: 'error', detail: message }],
+    events: boundedWorkerEvents([{ tick: world.tick, kind: 'error', detail: message }]),
     ...(requestId === undefined ? {} : { requestId }),
     ...(requestIds?.length ? { requestIds } : {}),
   };
@@ -56,7 +57,7 @@ function dispatch(commands: readonly Command[] = [], requestId?: number, request
   const documentChanged = before !== world.project &&
     JSON.stringify(before) !== JSON.stringify(world.project);
   const reply: WorkerResponse = {
-    kind: 'snapshot', snapshot: result.snapshot, events: result.events,
+    kind: 'snapshot', snapshot: result.snapshot, events: boundedWorkerEvents(result.events),
     ...(requestId === undefined ? {} : { requestId }),
     ...(requestIds?.length ? { requestIds } : {}),
     ...(before !== world.project ? { project: world.project } : {}),
