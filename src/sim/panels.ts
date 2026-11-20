@@ -41,6 +41,15 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     delete kept[id];
     next = Object.keys(kept).length ? { ...rest, params: kept } : rest;
   }
+  // Plant faults belong to physical instances, not a global singleton. A
+  // removed device must not leave a stale fault against an absent component:
+  // it would invalidate the next project import/reload.
+  if (project.plantFaults && Object.prototype.hasOwnProperty.call(project.plantFaults, id)) {
+    const { plantFaults: _old, ...rest } = next;
+    const kept = { ...project.plantFaults };
+    delete kept[id];
+    next = Object.keys(kept).length ? { ...rest, plantFaults: kept } : rest;
+  }
   if (isPlcKind(target.kind)) {
     const wasFirst = primaryPlcId(project) === id;
     const promoted = wasFirst ? extraPlcs(project)[0] : undefined;
