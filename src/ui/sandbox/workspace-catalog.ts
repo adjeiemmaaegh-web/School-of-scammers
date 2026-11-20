@@ -20,7 +20,7 @@ const families: Record<Exclude<DeviceFamily,'all'>,readonly string[]> = {
     'reversecontactor','relay','timerelay','estop','start','stop','reversebutton','selector',
     'three-phase-supply','star-delta-drive'],
   sensors:['photoeye','levelprobe','geometry-photoeye','inductive-prox',
-    'capacitive-prox','light-curtain','weigh-cell'],
+    'capacitive-prox','light-curtain','weigh-cell','retro-photoeye','laser-distance','rfid-reader','vision-sensor','incremental-encoder'],
   drives:['motor','revmotor'],
   handling:['conveyor','diverter','belt-conveyor','roller-conveyor','turntable',
     'stopper','pusher','diverter-gate','box-feeder','collector','palletizer','shelf','asrs-crane'],

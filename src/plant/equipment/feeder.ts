@@ -16,7 +16,9 @@ export const boxFeeder:EquipmentDef={
   // R26/R02: choose a catalogue material (0 keeps the original random cardboard/metal box), cap the production run, and mix sizes.
   spec('materialId','Material','0=original, 1-'+MATERIALS.length+'=catalogue',0,MATERIALS.length,1,0),
   spec('quantity','Production quantity','0=unlimited',0,1000,1,0),
-  spec('variationPct','Size and weight variation','percent',0,50,5,0)],
+  spec('variationPct','Size and weight variation','percent',0,50,5,0),
+  // R04: 1 gives every body a sequential numeric RFID tag (count + 1) that an RFID reader can read; 0 leaves bodies untagged.
+  spec('rfidTags','RFID tag on each body','0=none, 1=sequential',0,1,1,0)],
  faults:['feeder-empty','feeder-jammed'],
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
@@ -58,7 +60,13 @@ export const boxFeeder:EquipmentDef={
     tags:{material,marked:rng.unit>.75,origin:ctx.id,
      ...(bottle?{bottle:true,filledMl:0,capped:false}:{})},
    });
-   if(world.spawnedCount>before)count++;
+   if(world.spawnedCount>before){
+    count++;
+    if(param(ctx,'rfidTags',0)===1){
+     const last=world.bodies[world.bodies.length-1];
+     world={...world,bodies:world.bodies.map(b=>b.id===last.id?{...b,tags:{...b.tags,rfid:count}}:b)};
+    }
+   }
   }
   return {world,state:{...s,engaged:enabled,lastCommand:flag(c,'feed'),
    elapsedMs:q(remaining),count,done:due,faulted:!!f}};

@@ -26,7 +26,7 @@ export const CATEGORY_BY_KIND: Record<ComponentKind, WorkspaceCategory> = {
   'diverter-gate': 'Conveyance', 'box-feeder': 'Conveyance', collector: 'Conveyance',
   'geometry-photoeye': 'Sensors', 'inductive-prox': 'Sensors',
   'capacitive-prox': 'Sensors', 'light-curtain': 'Sensors',
-  'weigh-cell': 'Sensors',
+  'weigh-cell': 'Sensors', 'retro-photoeye': 'Sensors', 'laser-distance': 'Sensors', 'rfid-reader': 'Sensors', 'vision-sensor': 'Sensors', 'incremental-encoder': 'Sensors',
   lift: 'Motors & actuators', 'scissor-lift': 'Motors & actuators',
   'rotary-actuator': 'Motors & actuators', 'pick-and-place': 'Motors & actuators',
   palletizer: 'Motors & actuators', shelf: 'Conveyance', 'asrs-crane': 'Conveyance',
