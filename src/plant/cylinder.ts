@@ -26,10 +26,10 @@ export const engineFault = (kind: FaultKind | undefined): PneumaticFault => ({
 /** Clearing an alarm is part of repairing the cylinder: the engine latches it until it is reset. */
 export const clearedAlarm = (state: CylinderState): CylinderState => ({ ...state, alarm: null, travelMs: 0 });
 
-export function stepCylinder(prior: CylinderState, extendOn: boolean, retractOn: boolean, dtMs: number, fault: PneumaticFault = 'none'): CylinderStep {
+export function stepCylinder(prior: CylinderState, extendOn: boolean, retractOn: boolean, dtMs: number, fault: PneumaticFault = 'none', supplyBar?: number): CylinderStep {
   const conflict = extendOn && retractOn;
   const command = conflict ? 'neutral' : extendOn ? 'extend' : retractOn ? 'retract' : 'neutral';
-  const next = stepPneumatic({ ...prior, events: [] }, { command, airOn: true, guardClosed: true, emergencyStop: false, fault }, dtMs);
+  const next = stepPneumatic({ ...prior, events: [] }, { command, airOn: true, guardClosed: true, emergencyStop: false, fault, ...(supplyBar === undefined ? {} : { supplyBar }) }, dtMs);
   const events: string[] = [];
   if (conflict && !prior.conflict) events.push('Both solenoids energised: valve holds the rod in place');
   if (!prior.extendLimit && next.extendLimit) events.push('Cylinder reached the EXTENDED limit');

@@ -210,6 +210,15 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
           <meshStandardMaterial color={lit ? colour : '#3a4651'} emissive={lit ? colour : '#000000'} emissiveIntensity={lit ? 1.1 : 0} transparent opacity={lit ? 1 : 0.7} /></mesh>; })}
     </group>;
   }
+  if (kind === 'compressor') return <group>
+    <mesh position={[0, 0.2, 0]}><boxGeometry args={[1.1, 0.16, 0.6]} /><meshStandardMaterial color={COLORS.panel} metalness={0.4} /></mesh>
+    <mesh position={[-0.1, 0.5, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.24, 0.24, 0.8, 20]} /><meshStandardMaterial color={active ? '#3f8d6a' : COLORS.chassis} metalness={0.5} roughness={0.4} /></mesh>
+    <mesh position={[0.5, 0.42, 0]}><boxGeometry args={[0.24, 0.3, 0.3]} /><meshStandardMaterial color={active ? '#d9a441' : '#5b6672'} /></mesh>
+  </group>;
+  if (kind === 'air-regulator') return <group>
+    <mesh position={[0, 0.3, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.13, 0.13, 0.9, 16]} /><meshStandardMaterial color={COLORS.steel} metalness={0.7} roughness={0.3} /></mesh>
+    <mesh position={[0, 0.56, 0]}><cylinderGeometry args={[0.15, 0.2, 0.22, 16]} /><meshStandardMaterial color="#3c7fa6" metalness={0.3} /></mesh>
+  </group>;
   if (kind === 'cylinder') {
     const out = Math.max(0, Math.min(1, rod ?? 0));
     return <group>
@@ -346,6 +355,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
           c.kind === 'drainvalve' ? (active ? 'DRAIN OPEN' : 'CLOSED') :
           c.kind === 'breaker' ? (active ? 'CLOSED' : 'TRIPPED') :
           c.kind === 'overload' ? (active ? '95-96 CLOSED' : 'TRIPPED') :
+          c.kind === 'compressor' ? (active ? 'RUNNING' : 'OFF') : c.kind === 'air-regulator' ? 'REGULATING' :
           c.kind === 'selector' ? (c.pressed ? 'POSITION 2 · CLOSED' : 'POSITION 1 · OPEN') :
           c.kind === 'buzzer' || c.kind === 'siren' ? (active ? 'SOUNDING' : 'SILENT') :
           c.kind === 'lamp' ? (active ? 'ILLUMINATED' : 'OFF') :

@@ -22,7 +22,8 @@ export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: b
 export type Wire = { id: string; from: string; to: string };
 /** Component/wire failures that alter what the circuit solver sees (P5). */
 export type FaultKind = 'wire-open' | 'contactor-coil-open' | 'contactor-welded' | 'motor-open-winding' | 'button-stuck' | 'sensor-stuck'
-  | 'cylinder-no-air' | 'cylinder-jammed' | 'cylinder-ext-switch-dead' | 'cylinder-ret-switch-dead';
+  | 'cylinder-no-air' | 'cylinder-jammed' | 'cylinder-ext-switch-dead' | 'cylinder-ret-switch-dead'
+  | 'compressor-motor-fault' | 'air-leak';
 export type FaultSpec = {
   id: string;
   kind: FaultKind;
@@ -151,6 +152,8 @@ export type WorldState = {
   tripped: Record<string, boolean>;
   /** Rod position, limit switches and valve state of every pneumatic cylinder, by component id. */
   cylinders: Record<string, CylinderState>;
+  /** Receiver tank of every compressor by component id (R06). Empty unless the project has a compressor. */
+  air: Record<string, import('../plant/air').Receiver>;
   /** Milliseconds each on-delay relay's coil has been energised (capped at its delay), by component id. */
   timers: Record<string, number>;
   /** Scan state of every PLC after the first, by component id. */
@@ -263,6 +266,8 @@ export type RenderSnapshot = {
   /** Every on-delay relay by component id: elapsed and preset milliseconds, and whether its contacts have transferred. */
   timers: Record<string, { elapsedMs: number; delayMs: number; done: boolean }>;
   cylinders: Record<string, { position: number; extendLimit: boolean; retractLimit: boolean; command: string; alarm: string | null; conflict: boolean }>;
+  /** Compressed-air state (R06): present only when the project has a compressor. Receiver pressure and pump state by compressor id, and the working pressure (bar) at every cylinder's AIR port. */
+  air?: { receivers: Record<string, { pressureBar: number; pumping: boolean }>; working: Record<string, number> };
   /** Energised state of every contactor, motor and lamp by component id. */
   deviceOn: Record<string, boolean>;
   /** Shaft angle of every motor by component id. */

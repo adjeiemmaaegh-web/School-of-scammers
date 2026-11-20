@@ -910,7 +910,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               {!scenario ? <span className={`ux2-equipment-illustration kind-${kind}`} aria-hidden="true">
                 <EquipmentThumbnail kind={kind} />
               </span> : <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
-                {kind === 'plc' ? 'PLC' : kind === 'plc16' ? '16/16' : kind === 'relay' ? 'RLY' : kind === 'timerelay' ? 'TDR' : kind === 'cylinder' ? 'CYL' : kind === 'stacklight' ? 'STK' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
+                {kind === 'plc' ? 'PLC' : kind === 'plc16' ? '16/16' : kind === 'relay' ? 'RLY' : kind === 'timerelay' ? 'TDR' : kind === 'cylinder' ? 'CYL' : kind === 'compressor' ? 'CMP' : kind === 'air-regulator' ? 'REG' : kind === 'stacklight' ? 'STK' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
                   kind === 'conveyor' ? 'BELT' : kind === 'photoeye' ? 'EYE' :
                   kind === 'diverter' ? 'DIV' : kind === 'tank' ? 'TANK' :
                   kind === 'pump' ? 'PUMP' : kind === 'levelprobe' ? 'LVL' :
@@ -1019,7 +1019,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                       c.kind === 'contactor' || c.kind === 'relay' ? (live ? 'COIL ON' : 'COIL OFF') :
                       c.kind === 'timerelay' ? (() => { const t = snapshot?.timers[c.id]; return !t || t.elapsedMs === 0 ? 'COIL OFF' : t.done ? 'CONTACTS ON' : `TIMING ${Math.round(t.elapsedMs / t.delayMs * 100)}%`; })() :
                       c.kind === 'stacklight' ? (['R', 'Y', 'G'].filter(l => snapshot?.deviceOn[`${c.id}-${l}`]).join(' · ') || 'ALL OFF') :
-                      c.kind === 'cylinder' ? (() => { const r = snapshot?.cylinders[c.id]; const base = !r || r.retractLimit ? 'RETRACTED' : r.extendLimit ? 'EXTENDED' : `MOVING ${Math.round(r.position * 100)}%`; return r?.alarm ? `${base} · ${r.alarm}` : base; })() :
+                      c.kind === 'cylinder' ? (() => { const r = snapshot?.cylinders[c.id]; const base = !r || r.retractLimit ? 'RETRACTED' : r.extendLimit ? 'EXTENDED' : `MOVING ${Math.round(r.position * 100)}%`; const bar = snapshot?.air ? ` · ${(snapshot.air.working[c.id] ?? 0).toFixed(1)} bar` : ''; return r?.alarm ? `${base}${bar} · ${r.alarm}` : `${base}${bar}`; })() :
+                      c.kind === 'compressor' ? (() => { const a = snapshot?.air?.receivers[c.id]; return a ? `${a.pressureBar.toFixed(1)} bar${a.pumping ? ' · PUMPING' : ''}` : 'NO DATA'; })() :
+                      c.kind === 'air-regulator' ? `OUT ${(snapshot?.air?.working[c.id] ?? 0).toFixed(1)} bar` :
                       isPlcKind(c.kind) ? (live ? 'POWER OK' : 'NO POWER') :
                       c.kind === 'conveyor' ? (live ? 'BELT MOVING' : 'BELT STOPPED') :
                       c.kind === 'photoeye' ? (live ? 'MARK DETECTED' : 'NO MARK') :

@@ -32,6 +32,7 @@ import { deenergisedPlcs, quietLanes } from './phases/fail-closed';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { pruneWireStyles, validateWireStyles, withWireStyle, type WireColor } from '../components/wire-style';
 import { DEFAULT_SCAN_MS, isValidScanMs, scanMsOf } from './scan-config';
+import { airWireError, solveAir } from '../plant/air';
 import { clearedAlarm } from '../plant/cylinder';
 import { analogWireError, sampleAnalogInputs } from './analog';
 import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
@@ -146,7 +147,7 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     breakpointScan: null, breakpointHit: null, breakpointTag: null, breakpointInstruction: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     plcs: Object.fromEntries(runtimePlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id), namesFor(project, c.id))])),
-    lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
+    lanes: {}, vessels: {}, tripped: {}, cylinders: {}, air: {}, timers: {},
     plantWorld: freshProjectPlant(project),
     threePhase: {}, threePhasePower: {},
     deviceOn: {}, motorAngles: {},
@@ -207,7 +208,7 @@ export function validateProject(raw: unknown): ProjectFile {
         !terminalExists(wire.from, components) || !terminalExists(wire.to, components)) throw new Error('Invalid wire in project');
     const phaseError = threePhaseWireError(wire.from, wire.to, phaseOwners);
     if (phaseError) throw new Error(phaseError);
-    const domainError = analogWireError(wire.from, wire.to, components, wiresChecked);
+    const domainError = airWireError(wire.from, wire.to, components) ?? analogWireError(wire.from, wire.to, components, wiresChecked);
     if (domainError) throw new Error(domainError);
     wiresChecked.push({ id: wire.id, from: wire.from, to: wire.to });
     wireIds.add(wire.id);
@@ -684,7 +685,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
     } else if (cmd.k === 'wire') {
       const phaseError = threePhaseWireError(cmd.from, cmd.to,
         Object.fromEntries(world.project.components.map(c => [c.id, c.kind])));
-      const domainError = phaseError ?? analogWireError(cmd.from, cmd.to, world.project.components, world.project.wires);
+      const domainError = phaseError ?? airWireError(cmd.from, cmd.to, world.project.components) ?? analogWireError(cmd.from, cmd.to, world.project.components, world.project.wires);
       if (domainError) world = setError(world, domainError);
       else if (!validId(cmd.id) || world.project.wires.some(w => w.id === cmd.id || (w.from === cmd.from && w.to === cmd.to) || (w.from === cmd.to && w.to === cmd.from)) ||
           cmd.from === cmd.to || !terminalExists(cmd.from, world.project.components) ||
@@ -770,6 +771,22 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
   }
   return { world, forceStep, events: commandEvents };
 }
+/** Compressed-air view for the snapshot (R06). Empty object for a project without a compressor, so nothing else changes. */
+function airSnapshot(world: WorldState): { air?: NonNullable<RenderSnapshot['air']> } {
+  if (!world.project.components.some(c => c.kind === 'compressor')) return {};
+  const setpoints = Object.fromEntries(world.project.components.filter(c => c.kind === 'air-regulator')
+    .map(r => [r.id, paramValue(world.project.params, r.id, paramSpecsOf('air-regulator')[0])]));
+  const solution = solveAir(world.project.components, world.project.wires.filter(x => !hasFault(world.project, 'wire-open', x.id)), world.air, setpoints);
+  return { air: {
+    receivers: Object.fromEntries(world.project.components.filter(c => c.kind === 'compressor')
+      .map(c => [c.id, { pressureBar: world.air[c.id]?.pressureBar ?? 0, pumping: world.air[c.id]?.pumping === true }])),
+    // Working pressure at every cylinder AIR port, and at every regulator OUTLET (keyed by component id).
+    working: Object.fromEntries([
+      ...world.project.components.filter(c => c.kind === 'cylinder').map(c => [c.id, solution.pressureAt(`${c.id}.AIR`)] as const),
+      ...world.project.components.filter(c => c.kind === 'air-regulator').map(r => [r.id, solution.pressureAt(`${r.id}.AIR_OUT`)] as const),
+    ]),
+  } };
+}
 function buildCircuit(world: WorldState): Device[] {
   const devices: Device[] = [];
   const primary = legacyPrimaryId(world.project);
@@ -777,7 +794,8 @@ function buildCircuit(world: WorldState): Device[] {
     // Equipment described as data (relay, cylinder): the definition says which loads and switches it contributes.
     const described = electricalDevices(c, { on: world.deviceOn[c.id] === true, hasFault: kind => hasFault(world.project, kind, c.id),
       cylinder: world.cylinders[c.id], plantSignals: sensorImage(world.plantWorld, c.id),
-      threePhase: world.threePhase[c.id] });
+      threePhase: world.threePhase[c.id],
+      ...(c.kind === 'compressor' ? { airOk: (world.air[c.id]?.pressureBar ?? 0) >= paramValue(world.project.params, c.id, paramSpecsOf('compressor')[3]) } : {}) });
     if (described) { devices.push(...described); continue; }
     if (c.kind === 'supply') devices.push({ id: c.id, kind: 'supply', positive: terminal(c.id, 'P24'), negative: terminal(c.id, 'M0'), volts: 24 });
     if (c.kind === 'breaker') devices.push({
@@ -907,6 +925,7 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     })),
     cylinders: Object.fromEntries(Object.entries(world.cylinders).map(([id, c]) => [id, {
       position: c.position, extendLimit: c.extendLimit, retractLimit: c.retractLimit, command: c.command, alarm: c.alarm, conflict: c.conflict }])),
+    ...(airSnapshot(world)),
     forwardContactorOn: world.forwardContactorOn, reverseContactorOn: world.reverseContactorOn,
     motorDirection: world.motorDirection, reverseMotorAngleRad: world.reverseMotorAngleRad,
     interlockConflict: world.interlockConflict,
@@ -988,7 +1007,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtO
   // Actuator image: legacy single-device flags plus per-instance state (see sim/phases/actuators.ts).
   const { contactor, motor, conveyor, diverter, pump, drain, lamp, forwardContactor, reverseContactor, reversibleMotor, forwardCoilOn, reverseCoilOn, interlockConflict, forwardContactorOn, reverseContactorOn, forwardMotorPowered, reverseMotorPowered, opposingDrives, motorDirection, reverseMotorAngleRad, contactorOn, motorOn, motorAngleRad, conveyorOn, diverterOn, nextLanes, pumpOn, drainOn, lampOn, deviceOn, motorAngles } = stepActuators(w, circuit.energizedLoads, dtMs, events);
   // On-delay relays, pneumatic cylinders and tank vessels advance from the solved circuit (see sim/phases/equipment-state.ts).
-  const { nextTimers, nextCylinders, nextVessels } = stepEquipmentState(w, circuit.energizedLoads, dtMs, deviceOn, events);
+  const { nextTimers, nextCylinders, nextVessels, nextAir } = stepEquipmentState(w, circuit.energizedLoads, dtMs, deviceOn, events);
   // The authoritative P3 world advances exactly five 10 ms substeps AFTER PLC
   // outputs and the electrical actuator image settle. Geometry sensors feed the
   // following PLC scan, never the current scan's input image.
@@ -1070,7 +1089,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtO
     alarms: alarmUpdate.alarms, alarmWatch: alarmUpdate.watch,
     forwardContactorOn, reverseContactorOn, motorDirection,
     reverseMotorAngleRad, interlockConflict,
-    conveyorOn, diverterOn, lanes: nextLanes, vessels: nextVessels, cylinders: nextCylinders, timers: nextTimers,
+    conveyorOn, diverterOn, lanes: nextLanes, vessels: nextVessels, cylinders: nextCylinders, air: nextAir, timers: nextTimers,
     plantWorld: p3.runtime,
     pumpOn, drainOn, lampOn,
     voltages: circuit.voltage,

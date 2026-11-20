@@ -127,6 +127,8 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
     selectedDevice.kind === 'overload' ? (isLive ? '95-96 closed' : '95-96 tripped open') :
     selectedDevice.kind === 'lamp' ? (isLive ? 'Illuminated' : 'Off') :
     selectedDevice.kind === 'stacklight' ? (['R', 'Y', 'G'].filter(l => snapshot.deviceOn[`${selectedDevice.id}-${l}`]).join(' · ') || 'All lamps off') :
+    selectedDevice.kind === 'compressor' ? (() => { const a = snapshot.air?.receivers[selectedDevice.id]; return a ? `${a.pressureBar.toFixed(1)} bar${a.pumping ? ' · pump running' : ' · pump stopped'}` : 'Not simulated'; })() :
+    selectedDevice.kind === 'air-regulator' ? `Outlet ${(snapshot.air?.working[selectedDevice.id] ?? 0).toFixed(1)} bar` :
     selectedDevice.kind === 'cylinder' ? (() => { const r = snapshot.cylinders[selectedDevice.id]; const base = !r || r.retractLimit ? 'Retracted' : r.extendLimit ? 'Extended' : `Moving ${Math.round(r.position * 100)}%`; return r?.alarm ? `${base} · ${r.alarm}` : base; })() :
     selectedDevice.kind === 'relay' ? (isLive ? 'Energised' : 'Released') :
     selectedDevice.kind === 'timerelay' ? (() => { const t = snapshot.timers[selectedDevice.id]; return !t || t.elapsedMs === 0 ? 'Coil off' : t.done ? 'Contacts transferred' : `Timing ${(t.elapsedMs / 1000).toFixed(1)} / ${(t.delayMs / 1000).toFixed(1)} s`; })() :

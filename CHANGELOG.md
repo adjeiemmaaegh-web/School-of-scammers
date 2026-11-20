@@ -25,6 +25,7 @@ Versioning policy: `package.json` version is the app/build version (0.x until th
 - R02/R16/R26: material catalogue, friction-limited belt carry, feeder quantity/depletion/variation, product collector; hard-wired belts now run without a PLC; plant devices show live status.
 - R03 (part): inclined belt conveyor (friction decides who climbs).
 - R04/R17/R21 (part): retroreflective photoeye, laser displacement sensor, RFID reader, machine-vision inspection sensor and measuring-wheel encoder, with continuous aim.
+- R06 (part): compressed-air supply (compressor receiver, regulator, air lines) with pressure-aware cylinders and faults; device settings accept decimal steps.
 - R7/R11: bounded soak and benchmark test (10 simulated minutes, maximal project).
 
 ## 0.1.0 (merged to `main` as of PR #26 and PR #70)

@@ -1,8 +1,8 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
 import { EQUIPMENT } from '../plant/equipment';
 import type { EquipmentDef } from '../plant/world/equipment';
-export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive' | 'selector' | 'buzzer' | 'siren' | 'collector' | 'retro-photoeye' | 'laser-distance' | 'rfid-reader' | 'vision-sensor' | 'incremental-encoder';
-export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' | 'three-phase' };
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive' | 'selector' | 'buzzer' | 'siren' | 'collector' | 'retro-photoeye' | 'laser-distance' | 'rfid-reader' | 'vision-sensor' | 'incremental-encoder' | 'compressor' | 'air-regulator';
+export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' | 'three-phase' | 'air' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
 export const isPlcKind = (kind: string): boolean => kind === 'plc' || kind === 'plc16';
@@ -29,10 +29,11 @@ const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
     { name: 'A1', side: 'left', y: 24, role: 'load' }, { name: 'A2', side: 'left', y: 48, role: 'load' },
     { name: '13', side: 'left', y: 100, role: 'passive' }, { name: '14', side: 'right', y: 100, role: 'passive' },
     { name: '21', side: 'left', y: 126, role: 'passive' }, { name: '22', side: 'right', y: 126, role: 'passive' }] },
-  cylinder: { kind: 'cylinder', label: 'Pneumatic cylinder', help: 'Double-acting cylinder: EXT+ / RET+ solenoids to M- (energising both holds it), limit switches EXT_LS / RET_LS powered from L+. Air is assumed available.', terminals: [
+  cylinder: { kind: 'cylinder', label: 'Pneumatic cylinder', help: 'Double-acting cylinder: EXT+ / RET+ solenoids to M- (energising both holds it), limit switches EXT_LS / RET_LS powered from L+. Air is assumed available unless the project has an air compressor: then plumb the AIR port to a compressor or regulator.', terminals: [
     { name: 'EXT+', side: 'left', y: 28, role: 'load' }, { name: 'RET+', side: 'left', y: 54, role: 'load' },
     { name: 'M-', side: 'left', y: 80, role: 'load' }, { name: 'L+', side: 'left', y: 106, role: 'supply' },
-    { name: 'EXT_LS', side: 'right', y: 54, role: 'output' }, { name: 'RET_LS', side: 'right', y: 90, role: 'output' }] },
+    { name: 'EXT_LS', side: 'right', y: 54, role: 'output' }, { name: 'RET_LS', side: 'right', y: 90, role: 'output' },
+    { name: 'AIR', side: 'right', y: 124, role: 'air' }] },
   plc16: { kind: 'plc16', label: 'Virtual PLC 16/16', help: '24V PLC, 16 digital inputs and 16 high-side outputs with names you choose', terminals: plc16Terminals() },
   supply: { kind: 'supply', label: '24V supply', help: 'Educational DC source', terminals: [
     { name: 'P24', side: 'right', y: 45, role: 'supply' }, { name: 'M0', side: 'right', y: 92, role: 'return' }] },
@@ -124,6 +125,12 @@ const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
     { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
   siren: { kind: 'siren', label: '24V alarm siren', help: 'Sounds only when its two actual 24V DC terminals are energized (simulated alarm, no audio hardware)', terminals: [
     { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
+  compressor: { kind: 'compressor', label: 'Air compressor with receiver', help: 'Motor coil A1-A2 (24V) pumps a receiver tank between its cut-in and cut-out pressure; PS_A-PS_B is a pressure-switch contact that closes when the receiver is at or above the switch pressure; AIR is the outlet to air lines. Educational lumped model.', terminals: [
+    { name: 'A1', side: 'left', y: 40, role: 'load' }, { name: 'A2', side: 'left', y: 90, role: 'load' },
+    { name: 'PS_A', side: 'left', y: 118, role: 'passive' }, { name: 'PS_B', side: 'right', y: 118, role: 'passive' },
+    { name: 'AIR', side: 'right', y: 60, role: 'air' }] },
+  'air-regulator': { kind: 'air-regulator', label: 'Air pressure regulator', help: 'Passes air from AIR_IN to AIR_OUT, never above its set pressure (one way). Wire air lines between air ports only.', terminals: [
+    { name: 'AIR_IN', side: 'left', y: 70, role: 'air' }, { name: 'AIR_OUT', side: 'right', y: 70, role: 'air' }] },
   lamp: { kind: 'lamp', label: '24V pilot lamp', help: 'Illuminates only when its two actual 24V DC terminals are energized', terminals: [
     { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
 };

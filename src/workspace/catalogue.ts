@@ -15,7 +15,7 @@ export const CATEGORY_BY_KIND: Record<ComponentKind, WorkspaceCategory> = {
   reversecontactor: 'Control gear', relay: 'Control gear', timerelay: 'Control gear',
   photoeye: 'Sensors', levelprobe: 'Sensors',
   motor: 'Motors & actuators', revmotor: 'Motors & actuators',
-  cylinder: 'Motors & actuators', diverter: 'Motors & actuators',
+  cylinder: 'Motors & actuators', diverter: 'Motors & actuators', compressor: 'Motors & actuators', 'air-regulator': 'Motors & actuators',
   conveyor: 'Conveyance',
   tank: 'Process', pump: 'Process', drainvalve: 'Process',
   lamp: 'Indicators', stacklight: 'Indicators', buzzer: 'Indicators', siren: 'Indicators',

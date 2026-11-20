@@ -24,7 +24,7 @@ const families: Record<Exclude<DeviceFamily,'all'>,readonly string[]> = {
   drives:['motor','revmotor'],
   handling:['conveyor','diverter','belt-conveyor','roller-conveyor','turntable',
     'stopper','pusher','diverter-gate','box-feeder','collector','palletizer','shelf','asrs-crane'],
-  motion:['cylinder','lift','scissor-lift','rotary-actuator','pick-and-place','robot-arm'],
+  motion:['cylinder','compressor','air-regulator','lift','scissor-lift','rotary-actuator','pick-and-place','robot-arm'],
   process:['tank','pump','drainvalve','process-tank','mixer','heater',
     'proportional-valve','filler','capper'],
   indicators:['lamp','stacklight','buzzer','siren'],

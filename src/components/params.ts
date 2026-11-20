@@ -11,6 +11,14 @@ export type ParamSpec = { key: string; label: string; unit: string; min: number;
 export const PARAM_SPECS: Partial<Record<ComponentKind, readonly ParamSpec[]>> = {
   // One scan is 50 ms, so the finest useful delay is 100 ms; a bench timer relay dial tops out around a minute.
   timerelay: [{ key: 'delayMs', label: 'On-delay', unit: 'ms', min: 100, max: 60000, step: 100, default: 2000 }],
+  // R06 compressed-air supply: receiver cut-in / cut-out, pump rate and the pressure-switch point; regulator outlet limit.
+  compressor: [
+    { key: 'cutInBar', label: 'Cut-in pressure', unit: 'bar', min: 2, max: 8, step: 1, default: 6 },
+    { key: 'cutOutBar', label: 'Cut-out pressure', unit: 'bar', min: 4, max: 10, step: 1, default: 8 },
+    { key: 'fillBarPerS', label: 'Pump rate', unit: 'bar/s', min: 0.1, max: 2, step: 0.1, default: 0.6 },
+    { key: 'switchBar', label: 'Pressure-switch point', unit: 'bar', min: 1, max: 8, step: 1, default: 5 },
+  ],
+  'air-regulator': [{ key: 'setpointBar', label: 'Outlet pressure limit', unit: 'bar', min: 1, max: 8, step: 0.5, default: 4 }],
   ...Object.fromEntries(EQUIPMENT.map(def=>[def.kind,def.params])),
 };
 
@@ -26,6 +34,7 @@ export function paramValue(params: Record<string, Record<string, number>> | unde
 export function paramError(spec: ParamSpec, value: unknown): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return `${spec.label} must be a number`;
   if (value < spec.min || value > spec.max) return `${spec.label} must be between ${spec.min} and ${spec.max} ${spec.unit}`;
-  if (Math.round(value / spec.step) * spec.step !== value) return `${spec.label} must be a multiple of ${spec.step} ${spec.unit}`;
+  // Tolerance for decimal steps: 3 x 0.1 is 0.30000000000000004 in floating point, which is still a valid multiple of 0.1.
+  if (Math.abs(Math.round(value / spec.step) * spec.step - value) > 1e-7) return `${spec.label} must be a multiple of ${spec.step} ${spec.unit}`;
   return null;
 }

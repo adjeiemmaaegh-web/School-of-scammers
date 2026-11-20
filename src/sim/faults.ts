@@ -23,6 +23,7 @@ export const MAX_FAULTS = 8;
 export const FAULT_KINDS: readonly FaultKind[] = [
   'wire-open', 'contactor-coil-open', 'contactor-welded', 'motor-open-winding', 'button-stuck', 'sensor-stuck',
   'cylinder-no-air', 'cylinder-jammed', 'cylinder-ext-switch-dead', 'cylinder-ret-switch-dead',
+  'compressor-motor-fault', 'air-leak',
 ];
 const COMPONENT_TARGETS: Record<Exclude<FaultKind, 'wire-open'>, readonly ComponentKind[]> = {
   'contactor-coil-open': ['contactor', 'forwardcontactor', 'reversecontactor', 'relay', 'timerelay'],
@@ -36,6 +37,9 @@ const COMPONENT_TARGETS: Record<Exclude<FaultKind, 'wire-open'>, readonly Compon
   'cylinder-jammed': ['cylinder'],
   'cylinder-ext-switch-dead': ['cylinder'],
   'cylinder-ret-switch-dead': ['cylinder'],
+  // R06: a compressor whose pump will not run, and a leak that bleeds its receiver.
+  'compressor-motor-fault': ['compressor'],
+  'air-leak': ['compressor'],
 };
 export const FAULT_LABEL: Record<FaultKind, string> = {
   'wire-open': 'Open conductor (broken wire)',
@@ -48,6 +52,8 @@ export const FAULT_LABEL: Record<FaultKind, string> = {
   'cylinder-jammed': 'Cylinder: rod jammed',
   'cylinder-ext-switch-dead': 'Cylinder: EXTENDED limit switch dead',
   'cylinder-ret-switch-dead': 'Cylinder: RETRACTED limit switch dead',
+  'compressor-motor-fault': 'Compressor: pump motor will not run',
+  'air-leak': 'Compressor: air leak in the receiver',
 };
 const ID = /^[A-Za-z0-9_-]{1,45}$/;
 
@@ -123,6 +129,8 @@ export function describeFault(f: FaultSpec): string {
     case 'cylinder-jammed': return `Rod of cylinder ${f.target} jammed`;
     case 'cylinder-ext-switch-dead': return `EXTENDED limit switch of cylinder ${f.target} dead`;
     case 'cylinder-ret-switch-dead': return `RETRACTED limit switch of cylinder ${f.target} dead`;
+    case 'compressor-motor-fault': return `Pump motor of compressor ${f.target} will not run`;
+    case 'air-leak': return `Air leak in the receiver of compressor ${f.target}`;
   }
 }
 
