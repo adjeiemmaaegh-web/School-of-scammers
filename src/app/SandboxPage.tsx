@@ -896,11 +896,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         </div>
         </div>
         <div className="p5-panel-toggles" role="group" aria-label="Workspace panels">
-          <button type="button" aria-pressed={libraryExpanded}
+          <button type="button" aria-pressed={libraryExpanded} aria-keyshortcuts="Alt+L"
             onClick={()=>setLibraryExpanded(v=>!v)}>Library</button>
-          <button type="button" aria-pressed={inspectorExpanded}
+          <button type="button" aria-pressed={inspectorExpanded} aria-keyshortcuts="Alt+I"
             onClick={()=>setInspectorExpanded(v=>!v)}>Inspector</button>
-          <button type="button" aria-pressed={dockExpanded}
+          <button type="button" aria-pressed={dockExpanded} aria-keyshortcuts="Alt+D"
             onClick={()=>setDockExpanded(v=>!v)}>Dock</button>
         </div>
       </div>
@@ -921,7 +921,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         onSubmit={submitScenario} onRestart={restartScenario} />}
       <div className={`sandbox-layout p5-layout ${!libraryExpanded?'p5-no-library':''} ${!inspectorExpanded?'p5-no-inspector':''}`}
         data-p5-view-active={workspaceView}>
-        {libraryExpanded&&<aside className="sandbox-palette panel" aria-label="Component library" data-p5-library>
+        {libraryExpanded&&<aside id="sandbox-component-library" className="sandbox-palette panel" aria-label="Component library" data-p5-library>
           <div className="sandbox-rail-heading"><span className="eyebrow">Device library</span><h2>Components</h2>
             <small>{visibleKinds.length} types available</small></div>
           {!scenario && <div className="sandbox-library-tabs" role="tablist" aria-label="Component library sections"
@@ -967,7 +967,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>
           <p className="sandbox-library-help">Drag an available device onto the 3D floor or 2D plan,
             or click to place it. The registry determines what really works. Pause to edit.</p>
-          <div className="sandbox-palette-list" ref={componentListRef}
+          <div className="sandbox-palette-list" ref={componentListRef} role="region" tabIndex={0}
+            aria-label="Scrollable equipment components" data-library-scroll
             onScroll={event=>{componentScrollRef.current=event.currentTarget.scrollTop;}}>
             {visibleKinds.map(kind => <button key={kind} draggable={editable && !primaryTouch}
               onDragStart={ev => ev.dataTransfer.setData('text/plain', `add:${kind}`)}
@@ -989,7 +990,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               <span className={scenario ? undefined : 'ux2-equipment-name'}><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
               <span className={`sandbox-add-device${scenario ? '' : ' ux2-add-device'}`} aria-hidden="true">+</span>
             </button>)}
-            {!visibleKinds.length && <p className="sandbox-help" role="status">No devices match your search. Try “motor” or “PLC”.</p>}
+            {!visibleKinds.length && <p className="sandbox-help" role="status">No devices match your search.
+              <button type="button" onClick={()=>{setLibraryQuery('');setLibraryFamily('all');}}>Clear filters</button>
+            </p>}
           </div>
           <div className="sandbox-library-foot"><strong>Educational models</strong>
             <span>{componentKinds.length} registered kinds · no live equipment</span></div>
@@ -1001,6 +1004,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               editable={editable} grid={grid}
               onInsert={(fragment,at)=>edit({kind:'paste',fragment,at,grid})}/>
           </div>}
+          {!scenario&&<div className="stage1-resize-handle stage1-resize-handle--library"
+            role="separator" tabIndex={0} aria-label="Resize component library" aria-orientation="vertical"
+            aria-controls="sandbox-stage-build" aria-valuemin={RESIZE_LIMITS.library.min}
+            aria-valuemax={RESIZE_LIMITS.library.max} aria-valuenow={panelSizes.library}
+            aria-valuetext={`${panelSizes.library} pixels`} title="Drag or press left/right arrows to resize the library"
+            onPointerDown={event=>onResizeStart('library',event)}
+            onPointerMove={onResizeMove} onPointerUp={onResizeEnd} onPointerCancel={onResizeEnd}
+            onKeyDown={event=>onResizeKey('library',event)}/>}
         </aside>}
         <div className="sandbox-main" id="sandbox-stage-build">
           {!scenario && <div className="efo-canvas-actions" role="group" aria-label="Canvas display and simulation controls">
@@ -1304,7 +1315,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               <p className="sandbox-help">{protectedDOLGuide}</p></details>}
           </section>}
         </div>
-        {inspectorExpanded&&<div className="p5-inspector-slot" data-p5-inspector>
+        {inspectorExpanded&&<div id="sandbox-inspector" className="p5-inspector-slot" data-p5-inspector>
         <WorkbenchInspector project={project ?? { formatVersion: 1, components: [], wires: [], program: { id: 'pending', version: '1', rungs: [] } }}
           snapshot={snapshot ?? { tick: 0, running: false, components: [], wires: [],
             io: { Start: false, StopOK: false, Photoeye: false, TankHigh: false, ReverseRequest: false,
@@ -1335,6 +1346,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onSetParam={(id, key, value) => send([{ k: 'setParam', id, key, value }])}
           onOperate={id => send([{ k: 'operateToggle', id }])}
           onClearSelection={() => setSelectedDeviceId(null)} />
+          {!scenario&&<div className="stage1-resize-handle stage1-resize-handle--inspector"
+            role="separator" tabIndex={0} aria-label="Resize inspector" aria-orientation="vertical"
+            aria-controls="sandbox-inspector" aria-valuemin={RESIZE_LIMITS.inspector.min}
+            aria-valuemax={RESIZE_LIMITS.inspector.max} aria-valuenow={panelSizes.inspector}
+            aria-valuetext={`${panelSizes.inspector} pixels`} title="Drag or press left/right arrows to resize the inspector"
+            onPointerDown={event=>onResizeStart('inspector',event)}
+            onPointerMove={onResizeMove} onPointerUp={onResizeEnd} onPointerCancel={onResizeEnd}
+            onKeyDown={event=>onResizeKey('inspector',event)}/>}
         </div>}
       </div>
       <div className="p5-simulation-status" role="status" aria-label="Authoritative simulation state">
@@ -1345,7 +1364,15 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         {selectedTerminal&&<span>Wiring from <code>{selectedTerminal}</code></span>}
         {(clientError||snapshot?.lastError)&&<span className="p5-status-warning">Action error — inspect message above</span>}
       </div>
-      <section className={`p5-engineering-dock${dockExpanded ? '' : ' ux2-dock-collapsed'}`} data-p5-dock={dockFocus}>
+      <section id="sandbox-engineering-dock" className={`p5-engineering-dock${dockExpanded ? '' : ' ux2-dock-collapsed'}`} data-p5-dock={dockFocus}>
+        {!scenario&&dockExpanded&&<div className="stage1-resize-handle stage1-resize-handle--dock"
+          role="separator" tabIndex={0} aria-label="Resize engineering dock" aria-orientation="horizontal"
+          aria-controls="sandbox-engineering-dock" aria-valuemin={RESIZE_LIMITS.dock.min}
+          aria-valuemax={RESIZE_LIMITS.dock.max} aria-valuenow={panelSizes.dock}
+          aria-valuetext={`${panelSizes.dock} pixels`} title="Drag or press up/down arrows to resize the dock"
+          onPointerDown={event=>onResizeStart('dock',event)}
+          onPointerMove={onResizeMove} onPointerUp={onResizeEnd} onPointerCancel={onResizeEnd}
+          onKeyDown={event=>onResizeKey('dock',event)}/>}
         <header className="p5-dock-heading">
           <strong>Engineering dock</strong>
           <div role="group" aria-label="Dock panels">
