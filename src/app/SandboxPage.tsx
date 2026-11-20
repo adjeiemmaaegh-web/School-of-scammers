@@ -22,7 +22,8 @@ import { AppHeader } from '../ui/AppHeader';
 import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
 import {DEVICE_FAMILIES,matchesFamily,supportedFamilies,type DeviceFamily} from '../ui/sandbox/workspace-catalog';
 import { ScenarioPanel } from '../ui/sandbox/ScenarioPanel';
-import { perDeviceLive } from '../sim/device-state';
+import { perDeviceLive, plantStatusText } from '../sim/device-state';
+import { isP3Equipment } from '../sim/p3-plant-bridge';
 import { plcComponents, programOf } from '../sim/plcs';
 import { vesselsOf } from '../sim/stations';
 import { appendEvidence, evidenceFromCommand } from '../exercises/evidence';
@@ -1037,7 +1038,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                       c.kind === 'selector' ? (c.pressed ? 'POSITION 2 · CLOSED' : 'POSITION 1 · OPEN') :
                       c.kind === 'buzzer' || c.kind === 'siren' ? (live ? 'SOUNDING' : 'SILENT') :
                       c.kind === 'lamp' ? (live ? 'ILLUMINATED' : 'OFF') :
-                      c.kind === 'supply' ? '24V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</span>
+                      c.kind === 'supply' ? '24V DC' : plantStatusText(snapshot?.plantWorld.signals[c.id]) ?? (isP3Equipment(c.kind) ? 'IDLE' : c.pressed ? 'PRESSED' : 'RELEASED')}</span>
                   </div>
                   <div className="sandbox-patch-actions">
                     {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton' || c.kind === 'selector') && <button

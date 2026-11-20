@@ -5,6 +5,7 @@ import {STATIC_SOLID_KINDS} from '../world/solid-geometry';
 import {beltConveyor,rollerConveyor,turntable} from './transport';
 import {stopper,pusher,diverterGate} from './actuators';
 import {boxFeeder} from './feeder';
+import {collector} from './collector';
 import {photoeye,inductiveProx,capacitiveProx,lightCurtain,weighCell} from './sensors';
 import {lift,scissorLift,rotaryActuator,pickAndPlace,palletizer} from './positioning';
 import {shelf,asrsCrane} from './storage';
@@ -15,6 +16,7 @@ const SOURCE_EQUIPMENT:readonly EquipmentDef[]=[
  photoeye,inductiveProx,capacitiveProx,lightCurtain,weighCell,
  lift,scissorLift,rotaryActuator,pickAndPlace,palletizer,
  shelf,asrsCrane,robotArm,processTank,mixer,heater,proportionalValve,filler,capper,
+ collector,
 ];
 /** Opt-in static collision is a shared *registered* equipment capability.
  * No modification to older projects: an absent setting defaults to 0.

@@ -50,6 +50,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-factory-scale-browser.cjs
       - name: R12 operator devices - selector switch, buzzer and siren built from an empty floor, fault consequence, reload
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-operator-devices-browser.cjs
+      - name: R02/R16/R26 material flow - feeder quantity, collector counting, conservation, live status
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-material-flow-browser.cjs
       - name: R1 contextual workbench - canvas share, no clipped controls at five sizes, explicit tools, shortcuts, preference recovery
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r1-workbench-browser.cjs
       - name: Open sandbox P1 - place, wire, program, run and test failures

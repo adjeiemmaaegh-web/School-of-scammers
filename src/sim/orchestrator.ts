@@ -993,7 +993,9 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtO
   // outputs and the electrical actuator image settle. Geometry sensors feed the
   // following PLC scan, never the current scan's input image.
   const p3 = stepProjectPlant(w.plantWorld, w.project, circuit.energizedLoads, dtMs,
-    {controllerPowered:powered});
+    // The controller-supply condition only exists when the project HAS a controller: a hard-wired cell (no PLC) must not
+    // be held off by a PLC that was never placed (R14/R28: a working cell can be built from an empty workspace).
+    {...(plc ? {controllerPowered:powered} : {})});
   for (const event of p3.events)
     events.push({ tick: w.tick + 1, kind: 'plant', detail: event.source + ': ' + event.detail });
   // P4 three-phase process after the worker's actual 24V coil demand scan.

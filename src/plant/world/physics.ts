@@ -122,8 +122,12 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    const mechanicallyStopped=carrier.kind==='belt-conveyor'&&
     state.stalled&&(carrier.params.obstructionTripMode===1||
     carrier.params.accumulationTripMode===1);
-   body.vel.x=mechanicallyStopped?0:clampVelocity(body.vel.x,targetX,dtMs);
-   body.vel.y=mechanicallyStopped?0:clampVelocity(body.vel.y,targetY,dtMs);
+   // Catalogue materials carry a static friction coefficient: the belt can accelerate a load by at most mu x g, so a
+   // slippery glass bottle takes longer to reach belt speed than a carton. Legacy bodies (no frictionMu) keep 3500 mm/s2.
+   const mu=body.tags.frictionMu;
+   const pull=typeof mu==='number'&&mu>0?mu*G_MM_S2:undefined;
+   body.vel.x=mechanicallyStopped?0:clampVelocity(body.vel.x,targetX,dtMs,pull);
+   body.vel.y=mechanicallyStopped?0:clampVelocity(body.vel.y,targetY,dtMs,pull);
    body.vel.z=0;
    body.supportedBy=carrier.id;
    body.pos.z=q(baseHeight(carrier,state));

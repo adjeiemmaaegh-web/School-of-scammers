@@ -14,7 +14,8 @@ import type { PlacedComponent, ProjectFile, RenderSnapshot, XY } from '../sim/si
 import type { Parcel } from '../plant/sorting-conveyor';
 import { supportsWebGL } from '../components/SceneShell';
 import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-coordinates';
-import { perDeviceLive } from '../sim/device-state';
+import { perDeviceLive, plantStatusText } from '../sim/device-state';
+import { isP3Equipment } from '../sim/p3-plant-bridge';
 import { PlantWorld3D } from './PlantWorld3D';
 import { PLANT_EQUIPMENT } from '../plant/equipment';
 import { footprintOf } from '../workspace/floor-plan';
@@ -267,8 +268,8 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
   </group>;
 }
 
-function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPress, onLabelPress, placeKind, onMoveDrag, onEndDrag, onFocus }: {
-  c: PlacedComponent; project: ProjectFile; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean };
+function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, plantText, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPress, onLabelPress, placeKind, onMoveDrag, onEndDrag, onFocus }: {
+  c: PlacedComponent; project: ProjectFile; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean }; plantText?: string;
   editable: boolean; selected: boolean; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
   onSelect: (id: string, additive: boolean) => void;
@@ -349,7 +350,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
           c.kind === 'buzzer' || c.kind === 'siren' ? (active ? 'SOUNDING' : 'SILENT') :
           c.kind === 'lamp' ? (active ? 'ILLUMINATED' : 'OFF') :
           c.kind === 'supply' ? '24 V DC' : c.kind === 'estop' ?
-          (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') : c.pressed ? 'PRESSED' : 'RELEASED'}</small>
+          (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') : plantText ?? (c.pressed ? 'PRESSED' : 'RELEASED')}</small>
         {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton' || c.kind === 'selector') && <button type="button"
           disabled={false} onPointerDown={e => e.stopPropagation()}
           onClick={e => { e.stopPropagation(); onOperate(c.id); }}>{c.pressed ? 'Release' : 'Press'}</button>}
@@ -683,6 +684,7 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusS
       direction={c.kind === 'revmotor' ? snapshot.motorDirection : undefined}
       parcel={c.kind === 'conveyor' ? snapshot.lanes[c.id]?.parcel ?? null : null} tankLevelMl={c.kind === 'tank' ? snapshot.vessels[c.id]?.levelMl ?? 0 : 0}
       rod={c.kind === 'cylinder' ? snapshot.cylinders[c.id]?.position ?? 0 : undefined}
+      plantText={isP3Equipment(c.kind) ? (plantStatusText(snapshot.plantWorld.signals[c.id]) ?? 'IDLE') : undefined}
       lamps={c.kind === 'stacklight' ? { R: !!snapshot.deviceOn[`${c.id}-R`], Y: !!snapshot.deviceOn[`${c.id}-Y`], G: !!snapshot.deviceOn[`${c.id}-G`] } : undefined}
       selectedTerminal={selectedTerminal} moveTarget={moveTarget}
       active={perDeviceLive(snapshot, c) ?? (c.kind === 'revmotor' ? snapshot.motorDirection !== 'stopped' :

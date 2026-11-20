@@ -3,7 +3,8 @@ import { COMPONENTS } from '../../components/registry';
 import { modelLimitFor } from '../../components/model-limits';
 import { paramSpecsOf, paramValue, type ParamSpec } from '../../components/params';
 import type { PlacedComponent, ProjectFile, RenderSnapshot } from '../../sim/signals';
-import { perDeviceLive } from '../../sim/device-state';
+import { perDeviceLive, plantStatusText } from '../../sim/device-state';
+import { isP3Equipment } from '../../sim/p3-plant-bridge';
 
 type Props = {
   project: ProjectFile;
@@ -130,6 +131,7 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
     selectedDevice.kind === 'relay' ? (isLive ? 'Energised' : 'Released') :
     selectedDevice.kind === 'timerelay' ? (() => { const t = snapshot.timers[selectedDevice.id]; return !t || t.elapsedMs === 0 ? 'Coil off' : t.done ? 'Contacts transferred' : `Timing ${(t.elapsedMs / 1000).toFixed(1)} / ${(t.delayMs / 1000).toFixed(1)} s`; })() :
     selectedDevice.kind === 'tank' ? `${Math.round(snapshot.vessels[selectedDevice.id]?.levelMl ?? 0)} / 1000 ml` :
+    isP3Equipment(selectedDevice.kind) ? (plantStatusText(snapshot.plantWorld.signals[selectedDevice.id]) ?? 'Idle') :
     selectedDevice.kind === 'pump' ? (isLive ? 'Filling' : 'Off') :
     selectedDevice.kind === 'levelprobe' ? (isLive ? 'High level' : 'Below level switch') :
     selectedDevice.kind === 'drainvalve' ? (isLive ? 'Open' : 'Closed') :
