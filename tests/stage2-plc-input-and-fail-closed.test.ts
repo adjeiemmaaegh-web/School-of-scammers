@@ -19,6 +19,15 @@ describe('Stage 2 canonical per-controller input sampling', () => {
     });
   });
 
+  it('retains a positional legacy I/O mirror beside the first PLC16 mapped runtime', () => {
+    const high = circuit('first.I0.0|first.M');
+    const legacyMirror = samplePlcDigitalInputs('first', LEGACY_IO, true, high, sensorPower);
+    const independentProgramInputs = samplePlcDigitalInputs('first', defaultIo('plc16'), true, high, sensorPower);
+    expect(legacyMirror.Start).toBe(true);
+    expect(independentProgramInputs.In0).toBe(true);
+    expect(independentProgramInputs.Start).toBeUndefined();
+  });
+
   it('requires a powered physical sensor even when the named input terminal is high', () => {
     const high = circuit('p.I0.2|p.M', 'p.I0.3|p.M');
     expect(samplePlcDigitalInputs('p', LEGACY_IO, true, high,
