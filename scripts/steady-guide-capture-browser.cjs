@@ -68,11 +68,40 @@ const dir='qa-artifacts/steady-guide-captures';
   async function genuine(id,file,route,state,alt,selector,evidence){
     assert.ok(evidence && Object.values(evidence).every(value=>value!==null&&value!==undefined&&value!==false),
       id+' must be based on present real project state');
-    await page.$eval(selector,element=>element.scrollIntoView({block:'center',inline:'nearest'}));
+    // Atlas is tall: align its heading, not a random midpoint of the twenty-one cards.
+    await page.$eval(selector,(element,subject)=>element.scrollIntoView({
+      block:subject==='SG-13'?'start':'center',inline:'nearest'
+    }),id);
     await page.screenshot({path:dir+'/'+file,fullPage:false});
     captures.push({id:id+'-populated',subjectId:id,route,viewport:'1440x940',state,file,
       source:'genuine Chromium app screenshot',
       proof:evidence,alt,review:'pending',scope:'review-only; subject limitations in CAPTURE_MATRIX.md'});
+    // A real app region is captured at native CSS pixels for readability. This is a
+    // literal Puppeteer element screenshot, not a redrawn or invented user interface.
+    // Preserve the 1440x940 parent capture above as provenance/context.
+    const focusTarget={
+      'SG-08':'[data-p5-inspector] .sandbox-inspector',
+      'SG-09':'.sandbox-editor',
+      'SG-10':'.sandbox-st-editor',
+      'SG-11':'.sandbox-fbd-editor',
+      'SG-12':'#diag-meter',
+    }[id];
+    if(focusTarget){
+      const element=await page.$(focusTarget);
+      assert.ok(element,'Real focus target required: '+id);
+      const geometry=await element.boundingBox();
+      assert.ok(geometry && geometry.width>=80 && geometry.height>=24,
+        'Unusable focus region: '+id+' '+JSON.stringify(geometry));
+      const detailFile=id+'-focused.png';
+      await element.screenshot({path:dir+'/'+detailFile});
+      captures.push({id:id+'-focused',subjectId:id,route,viewport:'1440x940 source viewport',
+        state:state+' · direct region screenshot',file:detailFile,
+        source:'native screenshot of a real application DOM element',
+        parentFile:file,focusSelector:focusTarget,
+        cropDimensions:{width:Math.round(geometry.width),height:Math.round(geometry.height)},
+        proof:evidence,alt:'Focused original application region: '+alt,
+        review:'pending',scope:'review-only readable crop; never presented as an entire application screen'});
+    }
   }
   await page.setViewport({width:1440,height:940,deviceScaleFactor:1});
   await page.goto(base+'/sandbox',{waitUntil:'networkidle0',timeout:45000});
@@ -209,7 +238,7 @@ const dir='qa-artifacts/steady-guide-captures';
   const data={generatedAt:new Date().toISOString(),sourceCommit,workflowCommit:process.env.GITHUB_SHA||null,
     note:'Automated selectors and genuine PNG digests are provenance checks, NOT owner or visual approval. Never publish review artifacts automatically.',captures};
   fs.writeFileSync(dir+'/manifest.json',JSON.stringify(data,null,2));
-  assert.equal(captures.length,23);
+  assert.equal(captures.length,28);
   console.log('STEADY GUIDE REAL SCREENSHOT CAPTURE PASS: '+captures.length+' authentic states with SHA256 provenance; human review pending');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

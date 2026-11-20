@@ -65,3 +65,9 @@ At commit `951f2af9`, Vite/typecheck and Vitest passed, but the aggregate (all l
 - `c7c0a489` browser smoke passed the new status/focus/storage checks, but 23-state screenshot capture stopped after staging the six-device project. The selected-device inspector has a different markup path from its empty-state checklist: `.sandbox-inspector-top h2` vs `.sandbox-inspector-heading h2`. The test was waiting for the nonexistent empty-state heading on a populated device and timed out at script line 100.
 - The corrected capture check now asserts the populated Inspector title, exact selected `motor-4` device ID and its real model-limit explanation. No simulated component implementation was changed.
 - CI uploads the raw evidence folder immediately after the screenshot step even when later acceptance fails; missing/partial manifests remain visibly unapproved. Next exact-head run must reach and verify the entire 23-image recipe.
+
+### R13 readability increment — original visual artifact review (2026-11-20)
+
+- Downloaded the successful `2139c994` screenshot artifact and independently checked 23/23 PNG hashes and 23 unique IDs. The real project and 24 V meter are genuine, but full-window views made the bottom-docked Ladder/ST/FBD/meter interfaces partially truncated or too small for instructional illustrations.
+- Updated capture source to preserve the original 23 context images and add five real DOM element captures (Inspector, Ladder, ST, FBD and two-probe DC meter) directly from Chromium, with parent-image provenance and native geometry. Scene atlas starts at its heading instead of a mid-list scroll position. **28-state recipe is newly authored; not yet executed.**
+- No AI-generated fake screenshots, source project mutations outside an isolated QA browser, automatic public promotion, owner screenshot signoff or merge/deploy authorization.
