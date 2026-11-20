@@ -4,10 +4,10 @@
  */
 import type {Body,EquipmentPlacement,EquipmentState,World,Vec3} from './types';
 import {G_MM_S2} from './types';
-import {clamp,face,footprintOverlap,insideFootprint,q,vec} from './math';
+import {clamp,face,insideFootprint,q,vec} from './math';
 import {addEvent} from './events';
 import {newlyContactsStaticSolid,staticSolidSize} from './solid-geometry';
-import {sweptBodyContact,bodyVolumeOverlap} from './swept-contact';
+import {bodiesTouch,isComposite,supportTopAt,sweptContact,volumeOverlap} from './geometry';
 
 const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','lift','scissor-lift',
  'pick-and-place','palletizer','asrs-crane']);
@@ -44,11 +44,11 @@ function collide(body:Body,candidates:readonly Body[],move:Vec3,
    // Broad-phase swept 3D bounds account for quarter-turn footprint and
    // actual vertical separation. Already-overlapping legacy starts are
    // handled by the old endpoint queue test to avoid drawing cargo through.
-   const contact=sweptBodyContact(body,other,vec(x,y,0));
-   if(contact===null&&!bodyVolumeOverlap(shifted,other))continue;
+   const contact=sweptContact(body,other,vec(x,y,0));
+   if(contact===null&&!volumeOverlap(shifted,other))continue;
   }else{
    if(Math.abs(other.pos.z-body.pos.z)>Math.min(body.size.z,other.size.z))continue;
-   if(!footprintOverlap(shifted,other))continue;
+   if(!bodiesTouch(shifted,other))continue;
   }
   // The cheaper/simpler contact solver keeps previous motion axis if another body occupies its destination.
   x=0;y=0;blocked=true;blockedByBodyId=other.id;break;
@@ -234,11 +234,22 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
   // Simple vertical stack: a body can rest on another with 60% overlap and
   // approximate centre-of-mass support; otherwise it falls, never floats.
   if(!body.supportedBy&&body.pos.z>0){
-   const support=[...next,...sorted.filter(o=>o.id!==body.id)].find(other=>
-    other.id!==body.id&&Math.abs(other.pos.z+other.size.z-body.pos.z)<15&&
-    Math.abs(other.pos.x-body.pos.x)<=other.size.x*.30&&
-    Math.abs(other.pos.y-body.pos.y)<=other.size.y*.30);
-   if(support){body.supportedBy=support.id;body.pos.z=q(support.pos.z+support.size.z);body.vel.z=0;}
+   // Plain bodies keep the original rule (a body resting within 30% of the centre of the one below). A COMPOSITE body
+   // supports only where it actually has material under the point: its pallet deck, its low arm, its tower, never a gap.
+   let supportTop=0;
+   const support=[...next,...sorted.filter(o=>o.id!==body.id)].find(other=>{
+    if(other.id===body.id)return false;
+    if(isComposite(other)){
+     const top=supportTopAt(other,body.pos.x,body.pos.y);
+     if(top===null||Math.abs(top-body.pos.z)>=15)return false;
+     supportTop=top;return true;
+    }
+    if(Math.abs(other.pos.z+other.size.z-body.pos.z)<15&&
+     Math.abs(other.pos.x-body.pos.x)<=other.size.x*.30&&
+     Math.abs(other.pos.y-body.pos.y)<=other.size.y*.30){supportTop=other.pos.z+other.size.z;return true;}
+    return false;
+   });
+   if(support){body.supportedBy=support.id;body.pos.z=q(supportTop);body.vel.z=0;}
   }
   body.pos=qPosition(body.pos);
   next.push(body);

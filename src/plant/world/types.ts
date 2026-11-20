@@ -5,6 +5,12 @@
  */
 export type Vec3={x:number;y:number;z:number};
 export type BodyShape='box'|'cylinder';
+/**
+ * One solid part of a composite body, in the body's own frame: (dx, dy) is the part centre's offset from the body's (x, y)
+ * and `z` is the part's bottom above the body's bottom. A body with parts collides, rests on others and is sensed PART BY
+ * PART, so an L-bracket has a notch, a pallet has gaps between stringers and a bottle has a narrow neck.
+ */
+export type BodyPart={dx:number;dy:number;z:number;sx:number;sy:number;sz:number;shape?:BodyShape};
 export type Body={
  id:string;shape:BodyShape;size:Vec3;massKg:number;pos:Vec3;
  yawDeg:0|90|180|270;vel:Vec3;supportedBy:string|null;
@@ -12,6 +18,8 @@ export type Body={
   * collision broad phase remains conservative until discrete index completion. */
  visualYawDeg?:number;
  tags:Record<string,string|number|boolean>;
+ /** Optional composite geometry (see BodyPart). `size` stays the overall envelope used by broad-phase checks. */
+ parts?:readonly BodyPart[];
 };
 export type WorldEvent={atMs:number;kind:'spawn'|'despawn'|'jam'|'contact'|'motion'|'fault'|'limit'|'process';source:string;bodyId?:string;detail:string};
 export type World={

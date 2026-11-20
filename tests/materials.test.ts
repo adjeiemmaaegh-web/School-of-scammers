@@ -16,7 +16,7 @@ const run = (items: EquipmentPlacement[], world: World, inputs: Record<string, R
 
 describe('R02/R16 material catalogue', () => {
   it('is a stable, valid catalogue covering every required material class', () => {
-    expect(MATERIAL_IDS).toEqual(['carton', 'carton-small', 'bottle-glass', 'bottle-pet', 'pallet', 'metal-workpiece', 'plastic-part', 'lid', 'base', 'raw-material', 'assembled-product', 'crate-irregular']);
+    expect(MATERIAL_IDS).toEqual(['carton', 'carton-small', 'bottle-glass', 'bottle-pet', 'pallet', 'metal-workpiece', 'plastic-part', 'lid', 'base', 'raw-material', 'assembled-product', 'crate-irregular', 'bracket-l']);
     expect(new Set(MATERIAL_IDS).size).toBe(MATERIALS.length);
     const categories = new Set(MATERIALS.map(x => x.category));
     for (const c of ['package', 'container', 'pallet', 'workpiece', 'component', 'raw', 'product']) expect(categories.has(c as never), c).toBe(true);
@@ -27,7 +27,7 @@ describe('R02/R16 material catalogue', () => {
     }
     expect(MATERIALS.some(x => x.sizeMm.x < 100) && MATERIALS.some(x => x.sizeMm.x >= 1200)).toBe(true); // from lids to pallets
     expect(materialById('carton')?.label).toMatch(/Carton/);
-    expect(materialByIndex(0)).toBeUndefined(); expect(materialByIndex(13)).toBeUndefined(); expect(materialByIndex(3)?.id).toBe('bottle-glass');
+    expect(materialByIndex(0)).toBeUndefined(); expect(materialByIndex(14)).toBeUndefined(); expect(materialByIndex(3)?.id).toBe('bottle-glass');
   });
   it('contributes the sensor tags the existing sensors read, plus friction, category and stage', () => {
     expect(materialTags(materialById('metal-workpiece')!)).toMatchObject({ material: 'metal-workpiece', metal: true, reflective: true, category: 'workpiece', stage: 'raw', frictionMu: 0.3 });

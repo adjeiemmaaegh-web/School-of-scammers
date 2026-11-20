@@ -9,6 +9,7 @@ import type {EquipmentContext,EquipmentDef} from '../world/equipment';
 import {draw,initial,param,spec} from '../world/equipment';
 import type {Body} from '../world/types';
 import {q,vec} from '../world/math';
+import {isComposite,partBoxes} from '../world/geometry';
 
 const RAD=Math.PI/180;
 /** Beam direction in the horizontal plane: placement yaw plus the continuous aim angle. */
@@ -40,6 +41,23 @@ function rayHit(ox:number,oy:number,d:{x:number;y:number},b:Body):number|null{
  }
  return tmin;
 }
+/**
+ * Distance along a horizontal ray at height `z` to the nearest solid of a body, or null. A plain body is one box or circle
+ * crossing that height; a COMPOSITE body is tested part by part, so a beam through a pallet's gap or over a bracket's low arm
+ * finds nothing while the same beam at another height or position finds the stringer or the upright.
+ */
+function rayAtHeight(ox:number,oy:number,d:{x:number;y:number},b:Body,z:number):number|null{
+ if(!isComposite(b))return b.pos.z-1<=z&&z<=b.pos.z+b.size.z+1?rayHit(ox,oy,d,b):null;
+ let best:number|null=null;
+ for(const part of partBoxes(b)){
+  if(z<part.center.z-part.half.z-1||z>part.center.z+part.half.z+1)continue;
+  const stand:Body={...b,id:b.id+'.part',shape:part.shape,pos:{x:part.center.x,y:part.center.y,z:0},yawDeg:0,
+   size:{x:part.half.x*2,y:part.half.y*2,z:part.half.z*2},parts:undefined};
+  const t=rayHit(ox,oy,d,stand);
+  if(t!==null&&(best===null||t<best))best=t;
+ }
+ return best;
+}
 const beamZ=(ctx:EquipmentContext):number=>ctx.originMm.z+param(ctx,'beamHeightMm',150);
 const crossesBeamHeight=(b:Body,z:number):boolean=>b.pos.z-1<=z&&z<=b.pos.z+b.size.z+1;
 const aimSpec=spec('aimDeg','Aim angle','degrees',-180,180,5,0);
@@ -66,11 +84,12 @@ export const retroPhotoeye:EquipmentDef={
   const z=beamZ(ctx),half=param(ctx,'beamWidthMm',20)/2;
   const polarised=param(ctx,'polarised',0)===1;
   const seen=w.bodies.some(b=>{
-   if(!crossesBeamHeight(b,z))return false;
+   if(!isComposite(b)&&!crossesBeamHeight(b,z))return false;
    if(b.tags.transparent===true)return false; // light passes through clear material
    if(b.tags.reflective===true&&!polarised)return false; // reflects the beam: receiver still sees light
-   const hit=rayHit(ctx.originMm.x,ctx.originMm.y,d,b);
+   const hit=rayAtHeight(ctx.originMm.x,ctx.originMm.y,d,b,z);
    if(hit!==null)return hit<=range;
+   if(isComposite(b))return false;
    // Wide bodies beside the beam line still clip a beam of non-zero width: test the body centre's lateral offset.
    const fx=b.pos.x-ctx.originMm.x,fy=b.pos.y-ctx.originMm.y;
    const along=fx*d.x+fy*d.y,lateral=Math.abs(-fx*d.y+fy*d.x);
@@ -98,8 +117,7 @@ export const laserDistance:EquipmentDef={
   const z=beamZ(ctx);
   let nearest=Infinity;
   if(f!=='sensor-stuck-off')for(const b of w.bodies){
-   if(!crossesBeamHeight(b,z))continue;
-   const hit=rayHit(ctx.originMm.x,ctx.originMm.y,d,b);
+   const hit=rayAtHeight(ctx.originMm.x,ctx.originMm.y,d,b,z);
    if(hit!==null&&hit<nearest)nearest=hit;
   }
   const found=nearest<=range;
