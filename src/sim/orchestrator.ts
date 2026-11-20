@@ -29,6 +29,7 @@ import { stepActuators } from './phases/actuators';
 import { stepThreePhase } from './phases/three-phase';
 import { scanControllers } from './phases/controller-scan';
 import { plcObservationImage } from './plc-observation';
+import { anyControllerPowered as hasPoweredController, controllerPowerImage } from './plc-power';
 import { deenergisedPlcs, quietLanes } from './phases/fail-closed';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { pruneWireStyles, validateWireStyles, withWireStyle, type WireColor } from '../components/wire-style';
@@ -944,19 +945,14 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     }
   }
   const shorted = circuit.diagnostics.some(d => d.startsWith('Supply short'));
-  const controllers = plcComponents(w.project);
-  const plc = controllers[0];
-  // "24 V" always means 24 V relative to the device's OWN reference, so isolated supplies cannot leak.
-  // Retain the original primary-PLC power image for legacy I/O and trace fields.
-  const powered = !!plc && !shorted && circuit.reads24(terminal(plc.id, 'L+'), terminal(plc.id, 'M'));
-  // Plant interlock availability must not implicitly depend on component order:
-  // a powered secondary PLC still counts when the first PLC is disconnected.
-  // This is a classroom-wide controller-presence signal, not per-conveyor
-  // provenance or a replacement for actual terminal-level control wiring.
-  const anyControllerPowered = !shorted && (powered || controllers.slice(1).some(c =>
-    circuit.reads24(terminal(c.id, 'L+'), terminal(c.id, 'M'))));
+  const plc = plcComponents(w.project)[0];
+  // One power image from each PLC's own solved L+/M reference: the classic
+  // mirror, generic PLC scans and project-wide belt interlocks now agree.
+  const powerById = controllerPowerImage(w.project, circuit, shorted);
+  const powered = plc ? powerById[plc.id] === true : false;
+  const anyControllerPowered = hasPoweredController(powerById);
   // 3-4. Sample the wired input image and scan every controller (see sim/phases/controller-scan.ts).
-  const scan = scanControllers(w, circuit, shorted, plc, powered, dtMs);
+  const scan = scanControllers(w, circuit, shorted, plc, powered, dtMs, powerById);
   if (scan.halt) return { world: scan.halt.world, snapshot: renderSnapshot(scan.halt.world), events: scan.halt.events };
   const { eyePowered, probePowered, inputs, ladderResult, stResult, fbdResult, coils, tagValues, nextPlcs, unpoweredExtras } = scan;
   // 5. Publish output image (Q0.0 follows coil Run, only when PLC is powered).
