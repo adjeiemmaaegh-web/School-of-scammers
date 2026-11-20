@@ -66,6 +66,12 @@ These changes do not rewrite `tick()`, alter existing 50 ms / 10 ms scheduling, 
 
 **Remaining development:** The classic first-controller execution path still differs from generic runtime controllers; per-belt controller attribution and fully defined signal ranges/power/fault metadata need source-backed designs; the full R3 kernel consolidation is not finished. Earlier performance and acceptance work remains outside this owner-requested development-only continuation.
 
+## Further Stage 2 progress — PLC observation consolidation
+
+22. **Unified PLC snapshot projection (R3.4):** `src/sim/plc-observation.ts` now builds every read-only `plcs[id]` snapshot through one canonical function. The classic first PLC still reads its historical scan fields; independent PLC16 and secondary controllers read per-instance runtimes. All snapshots retain the existing layout and PLC scan ownership.
+23. **Shared PLC power image (R3.4):** `src/sim/plc-power.ts` reads each PLC's own L+/M terminals from the one solved 24 V circuit. The same per-ID readings now drive the primary PLC power image, subsequent PLC scans and the virtual plant's project-wide PLC presence. No extra PLC scan, shadow engine or persisted field is introduced.
+24. **Electrical fault boundary:** The present solver globally inhibits loads when any supply short is detected; the stage preserves that legacy global-short behavior. Real per-supply short isolation, per-belt PLC ownership and a fully generalized first-controller execution engine are **not implemented** by these additions.
+
 **Limitations:** This continuation was performed through live GitHub source commits rather than a complete local checkout. No compile, test suite, browser acceptance, hardware work, merge or deployment is claimed. Replay comparison is an implemented utility, not independently established determinism for every scenario.
 
 ## Next engineering and acceptance work
