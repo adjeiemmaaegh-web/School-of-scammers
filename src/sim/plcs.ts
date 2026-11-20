@@ -42,7 +42,7 @@ export const extraPlcs = (project: HasComponents): PlacedComponent[] =>
   plcComponents(project).slice(1);
 /**
  * The first PLC keeps its program in the legacy fields; if it is the classic `plc` it ALSO keeps its scan state in
- * the legacy `WorldState` fields and its original fixed-name code path. Any other PLC (every PLC after the first,
+ * the legacy `WorldState` compatibility fields, now populated by the shared `scanPlc` executor. Any other PLC (every PLC after the first,
  * and a first PLC that is a configurable `plc16`) is scanned by the generic path and lives in `WorldState.plcs`.
  */
 export const legacyPrimaryId = (project: HasComponents): string | undefined => {
