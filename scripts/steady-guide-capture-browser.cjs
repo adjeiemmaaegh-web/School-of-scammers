@@ -87,20 +87,53 @@ const dir='qa-artifacts/steady-guide-captures';
       'SG-12':'#diag-meter',
     }[id];
     if(focusTarget){
-      const element=await page.$(focusTarget);
-      assert.ok(element,'Real focus target required: '+id);
-      const geometry=await element.boundingBox();
-      assert.ok(geometry && geometry.width>=80 && geometry.height>=24,
-        'Unusable focus region: '+id+' '+JSON.stringify(geometry));
+      // Resize through the EXISTING user control, not a synthetic alternate UI.
+      // Desktop UX2 locks page scroll and makes engineering editors scroll within
+      // their own dock. ElementHandle.screenshot() produced misframed captures
+      // because those oversized descendants lie outside the visible dock pane.
+      const setting=id==='SG-08'?'inspector':'dock';
+      await page.$eval('[data-ux2-resize="'+setting+'"]',el=>{
+        const menu=el.closest('details');
+        if(menu)menu.open=true;
+      });
+      await page.focus('[data-ux2-resize="'+setting+'"]');
+      await page.keyboard.press('End');
+      await page.waitForFunction(type=>{
+        const range=document.querySelector('[data-ux2-resize="'+type+'"]');
+        return range && Number(range.value)===Number(range.max);
+      },{timeout:6000},setting);
+      await page.$eval('[data-ux2-resize="'+setting+'"]',el=>{
+        const menu=el.closest('details');
+        if(menu)menu.open=false;
+      });
+      const paneSelector=id==='SG-08'?'[data-p5-inspector] .sandbox-inspector':
+        id==='SG-12'?'.sandbox-instruments':'.sandbox-program-dock';
+      await page.evaluate((targetSelector,pane)=>{
+        const target=document.querySelector(targetSelector),scrollbox=document.querySelector(pane);
+        if(!target||!scrollbox||!scrollbox.contains(target))throw Error('Target not inside real pane '+targetSelector);
+        if(target===scrollbox)scrollbox.scrollTop=0;
+        else scrollbox.scrollTop+=target.getBoundingClientRect().top-scrollbox.getBoundingClientRect().top-6;
+      },focusTarget,paneSelector);
+      // Capture *visible viewport pixels*, not an offscreen element rectangle.
+      // This avoids Chromium cropping an unrelated piece of the factory canvas.
+      const clip=await page.$eval(paneSelector,el=>{
+        const r=el.getBoundingClientRect();
+        const x=Math.max(0,Math.floor(r.left)),y=Math.max(0,Math.floor(r.top));
+        const right=Math.min(window.innerWidth,Math.floor(r.right));
+        const bottom=Math.min(window.innerHeight,Math.floor(r.bottom));
+        return {x,y,width:right-x,height:bottom-y};
+      });
+      assert.ok(clip.width>=170 && clip.height>=120,
+        'Real pane not sufficiently visible for focused screenshot: '+id+' '+JSON.stringify(clip));
       const detailFile=id+'-focused.png';
-      await element.screenshot({path:dir+'/'+detailFile});
+      await page.screenshot({path:dir+'/'+detailFile,clip,captureBeyondViewport:false});
       captures.push({id:id+'-focused',subjectId:id,route,viewport:'1440x940 source viewport',
-        state:state+' · direct region screenshot',file:detailFile,
-        source:'native screenshot of a real application DOM element',
-        parentFile:file,focusSelector:focusTarget,
-        cropDimensions:{width:Math.round(geometry.width),height:Math.round(geometry.height)},
-        proof:evidence,alt:'Focused original application region: '+alt,
-        review:'pending',scope:'review-only readable crop; never presented as an entire application screen'});
+        state:state+' · visible real '+(setting==='dock'?'expanded dock':'wider inspector')+' pane',
+        file:detailFile,source:'unaltered viewport pixels from real scrollable app pane',
+        parentFile:file,focusSelector:focusTarget,paneSelector,
+        cropDimensions:{width:clip.width,height:clip.height},proof:evidence,
+        alt:'Visible real application panel: '+alt,
+        review:'pending',scope:'review-only visible panel screenshot, not complete editor or full app'});
     }
   }
   await page.setViewport({width:1440,height:940,deviceScaleFactor:1});

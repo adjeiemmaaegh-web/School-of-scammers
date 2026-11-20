@@ -71,3 +71,9 @@ At commit `951f2af9`, Vite/typecheck and Vitest passed, but the aggregate (all l
 - Downloaded the successful `2139c994` screenshot artifact and independently checked 23/23 PNG hashes and 23 unique IDs. The real project and 24 V meter are genuine, but full-window views made the bottom-docked Ladder/ST/FBD/meter interfaces partially truncated or too small for instructional illustrations.
 - Updated capture source to preserve the original 23 context images and add five real DOM element captures (Inspector, Ladder, ST, FBD and two-probe DC meter) directly from Chromium, with parent-image provenance and native geometry. Scene atlas starts at its heading instead of a mid-list scroll position. **28-state recipe is newly authored; not yet executed.**
 - No AI-generated fake screenshots, source project mutations outside an isolated QA browser, automatic public promotion, owner screenshot signoff or merge/deploy authorization.
+
+### Visible pane capture remediation (2026-11-20)
+
+- The `d72451b3` **28-file manifest and PNG hashes passed**, but independent image inspection revealed incorrectly framed focus crops of scrolled engineering panes. The raw PNG data were authentic; subject alignment was not acceptable.
+- Corrected focus capture to enlarge the real dock/Inspector using actual user-facing range controls, scroll the actual editor into its own clipped workbench pane, and take a viewport clip of the genuinely visible pane instead of requesting an offscreen whole-element capture. Added explicit pane-source metadata and limited visible-pane ALT/scope wording.
+- Automated capture success is only a provenance/state gate. Final selected screenshot visual acceptability still requires inspection of the new resulting five images; no production or owner approval.
