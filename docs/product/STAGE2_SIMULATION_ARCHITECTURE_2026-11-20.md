@@ -78,6 +78,14 @@ These changes do not rewrite `tick()`, alter existing 50 ms / 10 ms scheduling, 
 
 **What remains:** full first-controller execution-path unification, justified physical metadata and per-device PLC-to-plant associations remain open. These changes consolidate integration boundaries without creating another scan, changing the 50 ms / 10 ms timing contract or claiming complete Stage 2 development.
 
+## Current continuation — canonical PLC execution unification
+
+28. **Shared PLC language execution (R3.4):** The first classic PLC now invokes the same `src/sim/plcs.ts:scanPlc()` execution path as later classic PLCs and PLC16s for Ladder, Structured Text and Function Block Diagram. The shared executor exposes a transient result callback used only to populate historical breakpoint and scan-trace data without running the interpreter twice. The first PLC's program remains in legacy v1 `ProjectFile` fields; its runtime remains mirrored in historical `WorldState` fields to avoid migration.
+29. **Compatibility specifics:** Fixed first-PLC electrical tag positions, output-key ordering, legacy LD/ST/FBD memory stores, and the distinct legacy invalid-ST-output error message are retained by design. Generic configurable PLC16 tagging remains independent. The one 50 ms tick and 10 ms plant substeps remain unchanged.
+30. **Regression specifications added:** `tests/stage2-unified-plc-execution.test.ts` defines direct-versus-worker classic Ladder equivalence, per-language single execution capture, unpowered no-execution and PLC16 isolation; original `tests/r3-golden-tick.test.ts` was not modified. No test execution, semantic typecheck, browser acceptance or build has been verified for this refactor.
+
+**Remaining development:** The first PLC's persisted-program and runtime **storage** mirrors are intentionally not converted into `plcs[id]`, as that is a separate migration risk. The wider R3 source consolidation also still has missing fully specified signal ranges/power attribution and further scene-body/worker profiling. R3 development and release acceptance therefore remain **open**.
+
 **Limitations:** This continuation was performed through live GitHub source commits rather than a complete local checkout. No compile, test suite, browser acceptance, hardware work, merge or deployment is claimed. Replay comparison is an implemented utility, not independently established determinism for every scenario.
 
 ## Next engineering and acceptance work
