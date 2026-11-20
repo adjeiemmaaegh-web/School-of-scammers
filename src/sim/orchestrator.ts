@@ -970,9 +970,17 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     }
   }
   const shorted = circuit.diagnostics.some(d => d.startsWith('Supply short'));
-  const plc = plcComponents(w.project)[0];
+  const controllers = plcComponents(w.project);
+  const plc = controllers[0];
   // "24 V" always means 24 V relative to the device's OWN reference, so isolated supplies cannot leak.
+  // Retain the original primary-PLC power image for legacy I/O and trace fields.
   const powered = !!plc && !shorted && circuit.reads24(terminal(plc.id, 'L+'), terminal(plc.id, 'M'));
+  // Plant interlock availability must not implicitly depend on component order:
+  // a powered secondary PLC still counts when the first PLC is disconnected.
+  // This is a classroom-wide controller-presence signal, not per-conveyor
+  // provenance or a replacement for actual terminal-level control wiring.
+  const anyControllerPowered = !shorted && (powered || controllers.slice(1).some(c =>
+    circuit.reads24(terminal(c.id, 'L+'), terminal(c.id, 'M'))));
   // 3-4. Sample the wired input image and scan every controller (see sim/phases/controller-scan.ts).
   const scan = scanControllers(w, circuit, shorted, plc, powered, dtMs);
   if (scan.halt) return { world: scan.halt.world, snapshot: renderSnapshot(scan.halt.world), events: scan.halt.events };
@@ -987,7 +995,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // outputs and the electrical actuator image settle. Geometry sensors feed the
   // following PLC scan, never the current scan's input image.
   const p3 = stepProjectPlant(w.plantWorld, w.project, circuit.energizedLoads, dtMs,
-    {controllerPowered:powered});
+    {controllerPowered:anyControllerPowered});
   for (const event of p3.events)
     events.push({ tick: w.tick + 1, kind: 'plant', detail: event.source + ': ' + event.detail });
   // The isolated three-phase equipment phase follows the 24 V actuator image.
