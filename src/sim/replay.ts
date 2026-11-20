@@ -13,6 +13,8 @@ export const MAX_REPLAY_FRAMES = 512;
 export const MAX_REPLAY_EXTRA_SCANS = 5_000;
 export const MAX_REPLAY_COMMANDS = 4_096;
 export const MAX_REPLAY_CHECKPOINTS = 64;
+/** Retain bounded diagnostic events even when one frame advances thousands of scans. */
+export const MAX_REPLAY_EVENTS_PER_CHECKPOINT = 512;
 
 export type ReplayFrame = {
   readonly commands?: readonly Command[];
@@ -27,6 +29,8 @@ export type ReplayCheckpoint = {
   /** Snapshot retained only at requested checkpoints; never persisted to a project. */
   readonly snapshot: RenderSnapshot;
   readonly events: readonly SimEvent[];
+  /** Count of older events intentionally discarded after the retained-event limit. */
+  readonly droppedEvents: number;
 };
 export type ReplayResult = {
   readonly finalTick: number;
@@ -67,15 +71,26 @@ export function replaySimulation(project: ProjectFile, frames: readonly ReplayFr
     const frame = frames[i];
     let result = tick(world, frame.commands ?? []);
     world = result.world;
-    const events: SimEvent[] = [...result.events];
+    // Only named checkpoints retain events. A 5000-scan replay cannot grow an
+    // unbounded intermediate list or exhaust the inspector's memory budget.
+    const events: SimEvent[] = [];
+    let droppedEvents = 0;
+    const collect = (next: readonly SimEvent[]): void => {
+      if (!frame.checkpoint) return;
+      for (const event of next) {
+        if (events.length < MAX_REPLAY_EVENTS_PER_CHECKPOINT) events.push(event);
+        else droppedEvents++;
+      }
+    };
+    collect(result.events);
     for (let n = 0; n < (frame.extraScans ?? 0); n++) {
       result = tick(world);
       world = result.world;
-      events.push(...result.events);
+      collect(result.events);
     }
     if (frame.checkpoint) checkpoints.push({
       name: frame.checkpoint, frame: i, tick: world.tick,
-      snapshot: renderSnapshot(world), events,
+      snapshot: renderSnapshot(world), events, droppedEvents,
     });
   }
   return { finalTick: world.tick, checkpoints, finalSnapshot: renderSnapshot(world) };
@@ -92,8 +107,8 @@ export function compareSimulationReplay(project: ProjectFile, frames: readonly R
   const right = replaySimulation(project, frames);
   for (let i = 0; i < left.checkpoints.length; i++) {
     const a = left.checkpoints[i], b = right.checkpoints[i];
-    if (JSON.stringify({ snapshot: a.snapshot, events: a.events }) !==
-        JSON.stringify({ snapshot: b.snapshot, events: b.events }))
+    if (JSON.stringify({ snapshot: a.snapshot, events: a.events, droppedEvents: a.droppedEvents }) !==
+        JSON.stringify({ snapshot: b.snapshot, events: b.events, droppedEvents: b.droppedEvents }))
       return { identical: false, firstDifferentCheckpoint: a.name };
   }
   return {
