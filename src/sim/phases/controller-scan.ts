@@ -10,7 +10,7 @@ import { executeStructuredText, type STResult, type STValue } from '../../engine
 import { compileSandboxST } from '../../program/p2-contract';
 import { solveNetAware } from '../../engineering/electrical';
 import { faultsOf } from '../faults';
-import { ioOf } from '../plc-io';
+import { ioOf, LEGACY_IO } from '../plc-io';
 import { classicInputs, freshPlcRuntime, namesFor, programOf, runtimePlcs, scanPlc } from '../plcs';
 import { sampleAnalogInputs } from '../analog';
 import { samplePlcDigitalInputs } from '../plc-input-image';
@@ -36,10 +36,11 @@ export function scanControllers(
   const eyePowered = !shorted && w.project.components.some(c => c.kind === 'photoeye' && circuit.reads24(terminal(c.id, 'L+'), terminal(c.id, 'M')));
   const probePowered = !shorted && w.project.components.some(c => c.kind === 'levelprobe' && circuit.reads24(terminal(c.id, 'L+'), terminal(c.id, 'M')));
   const sensors = { photoeye: eyePowered, levelprobe: probePowered };
-  // One sampler for the classic fixed map and every configurable controller;
-  // when no PLC is placed the historical five-tag observation stays all false.
+  // The global five-tag legacy mirror is always bound to physical I0.0-I0.4,
+  // even if a configurable PLC16 is placed first. Its independent runtime
+  // reads the user's configured I/O tags later in this same scan.
   const inputs = classicInputs(plc
-    ? samplePlcDigitalInputs(plc.id, ioOf(w.project, plc), powered, circuit, sensors)
+    ? samplePlcDigitalInputs(plc.id, LEGACY_IO, powered, circuit, sensors)
     : {});
   // 4. Execute the learner's exact document in the salvaged bounded LD or ST engine.
   let ladderResult: LadderResult | null = null;
