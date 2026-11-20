@@ -15,7 +15,7 @@ import {bodiesTouch,isComposite,supportTopAt,sweptContact,tipOver,tipSpeed,volum
  */
 const tipIfFastStop=(body:Body,vx:number,vy:number):boolean=>{
  const speed=Math.hypot(vx,vy);
- if(body.tags.tipped||speed<1)return false;
+ if(body.tags.tipped||body.headingDeg||speed<1)return false;
  const dir={x:vx/speed,y:vy/speed};
  if(speed<=tipSpeed(body,dir))return false;
  Object.assign(body,tipOver(body,dir));
@@ -84,7 +84,7 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
  // Uniform-grid broad phase. Only bodies within one grid cell (cell >= largest body dimension + a movement margin) can touch,
  // so far-away bodies are skipped; candidates are still visited in the original order, so contact results are unchanged.
  let maxExtent=0;
- for(const b of sorted)maxExtent=Math.max(maxExtent,b.size.x,b.size.y,b.size.z);
+ for(const b of sorted)maxExtent=Math.max(maxExtent,b.size.x,b.size.y,b.size.z,b.headingDeg?Math.hypot(b.size.x,b.size.y):0);
  const cell=Math.max(200,maxExtent+100);
  const cellKey=(x:number,y:number)=>Math.floor(x/cell)+','+Math.floor(y/cell);
  const grid=new Map<string,number[]>();

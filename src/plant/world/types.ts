@@ -17,6 +17,8 @@ export type Body={
  /** Worker-owned smooth quarter-turn payload orientation. Only visual yaw;
   * collision broad phase remains conservative until discrete index completion. */
  visualYawDeg?:number;
+ /** Free rotation about the vertical axis in degrees [0,360), applied on top of the quarter-turn `yawDeg`. Absent for an unrotated body. Contact, support and sensing use the conservative axis-aligned bounds of each rotated part. */
+ headingDeg?:number;
  tags:Record<string,string|number|boolean>;
  /** Optional composite geometry (see BodyPart). `size` stays the overall envelope used by broad-phase checks. */
  parts?:readonly BodyPart[];

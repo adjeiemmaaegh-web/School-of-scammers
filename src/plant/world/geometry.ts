@@ -10,13 +10,24 @@ import {footprintOverlap} from './math';
 import {bodyVolumeOverlap,sweptBodyContact,sweptBoxEntry} from './swept-contact';
 
 export type PartBox={center:Vec3;half:Vec3;shape:'box'|'cylinder'};
-export const isComposite=(b:Body):boolean=>!!b.parts&&b.parts.length>0;
+/** True when a body must go through the part-aware paths: it has parts, or it is freely rotated (then its single box is rotated too). */
+export const isComposite=(b:Body):boolean=>(!!b.parts&&b.parts.length>0)||!!b.headingDeg;
 export const partsOf=(b:Body):readonly BodyPart[]=>
- isComposite(b)?b.parts!:[{dx:0,dy:0,z:0,sx:b.size.x,sy:b.size.y,sz:b.size.z,shape:b.shape}];
+ b.parts&&b.parts.length>0?b.parts:[{dx:0,dy:0,z:0,sx:b.size.x,sy:b.size.y,sz:b.size.z,shape:b.shape}];
 const rotate=(dx:number,dy:number,yaw:number):[number,number]=>
  yaw===90?[-dy,dx]:yaw===180?[-dx,-dy]:yaw===270?[dy,-dx]:[dx,dy];
 /** Every part as a world-space axis-aligned box (quarter-turn yaw, as elsewhere in the plant model). */
 export function partBoxes(b:Body):PartBox[]{
+ if(b.headingDeg){
+  // Free rotation: offsets rotate exactly; each part's world box is the axis-aligned bounds of the rotated rectangle
+  // (conservative: never smaller than the true shape, so rotated bodies are never allowed to overlap). Round parts are rotation-invariant.
+  const th=(b.yawDeg+b.headingDeg)*Math.PI/180,c=Math.cos(th),s=Math.sin(th),ac=Math.abs(c),as=Math.abs(s);
+  return partsOf(b).map(p=>{
+   const round=(p.shape??'box')==='cylinder';
+   const hx=round?Math.max(p.sx,p.sy)/2:(ac*p.sx+as*p.sy)/2,hy=round?hx:(as*p.sx+ac*p.sy)/2;
+   return {center:{x:b.pos.x+c*p.dx-s*p.dy,y:b.pos.y+s*p.dx+c*p.dy,z:b.pos.z+p.z+p.sz/2},half:{x:hx,y:hy,z:p.sz/2},shape:p.shape??'box'};
+  });
+ }
  const quarter=b.yawDeg===90||b.yawDeg===270;
  return partsOf(b).map(p=>{
   const [rx,ry]=rotate(p.dx,p.dy,b.yawDeg);

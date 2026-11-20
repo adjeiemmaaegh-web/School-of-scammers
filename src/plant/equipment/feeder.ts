@@ -18,6 +18,8 @@ export const boxFeeder:EquipmentDef={
   spec('quantity','Production quantity','0=unlimited',0,1000,1,0),
   spec('variationPct','Size and weight variation','percent',0,50,5,0),
   // R04: 1 gives every body a sequential numeric RFID tag (count + 1) that an RFID reader can read; 0 leaves bodies untagged.
+  // R21/R02: orientation of each catalogue body on the belt, in degrees (any angle; 0 keeps the original unrotated placement).
+  spec('headingDeg','Body heading','degrees',0,355,5,0),
   spec('rfidTags','RFID tag on each body','0=none, 1=sequential',0,1,1,0)],
  faults:['feeder-empty','feeder-jammed'],
  fresh:()=>initial({}),
@@ -40,8 +42,14 @@ export const boxFeeder:EquipmentDef={
   const length=param(ctx,'boxLengthMm',160);
   const nominal=cat?cat.sizeMm:param(ctx,'shapeMode',0)===1?vec(90,90,190):vec(length,Math.max(70,length*.8),Math.max(50,length*.6));
   const pad=cat&&param(ctx,'variationPct',0)>0?1+param(ctx,'variationPct',0)/100:1;
-  const exitBlocked=due&&w.bodies.some(b=>Math.abs(b.pos.x-ctx.originMm.x)<(b.size.x+nominal.x*pad)/2&&
-   Math.abs(b.pos.y-ctx.originMm.y)<(b.size.y+nominal.y*pad)/2&&Math.abs(b.pos.z-(ctx.originMm.z+120))<150);
+  // A freely rotated body occupies the axis-aligned bounds of its rotated footprint, for the new body and for those already there.
+  const turned=(x:number,y:number,deg:number)=>{const t=deg*Math.PI/180,c=Math.abs(Math.cos(t)),s=Math.abs(Math.sin(t));return {x:c*x+s*y,y:s*x+c*y};};
+  const newHeading=cat?param(ctx,'headingDeg',0):0;
+  const newExtent=newHeading?turned(nominal.x*pad,nominal.y*pad,newHeading):{x:nominal.x*pad,y:nominal.y*pad};
+  const exitBlocked=due&&w.bodies.some(b=>{
+   const e=b.headingDeg?turned(b.size.x,b.size.y,b.headingDeg):b.size;
+   return Math.abs(b.pos.x-ctx.originMm.x)<(e.x+newExtent.x)/2&&
+    Math.abs(b.pos.y-ctx.originMm.y)<(e.y+newExtent.y)/2&&Math.abs(b.pos.z-(ctx.originMm.z+120))<150;});
   let world=w,count=s.count,remaining=due?(exitBlocked?elapsedMs:0):elapsedMs;
   if(due&&!exitBlocked){
    const rng=nextSeed(w.rngState);
@@ -59,7 +67,7 @@ export const boxFeeder:EquipmentDef={
     world=spawnBody({...w,rngState:vary.state},ctx.id,materialSpawn(catalogue,
      vec(ctx.originMm.x,ctx.originMm.y,ctx.originMm.z+120),
      {size:vec(Math.max(10,dims.x*scale),Math.max(10,dims.y*scale),Math.max(10,dims.z*scale)),
-      massKg:Math.max(.01,catalogue.massKg*scale*scale*scale),tags:{origin:ctx.id,marked:rng.unit>.75}}));
+      massKg:Math.max(.01,catalogue.massKg*scale*scale*scale),...(param(ctx,'headingDeg',0)?{headingDeg:param(ctx,'headingDeg',0)}:{}),tags:{origin:ctx.id,marked:rng.unit>.75}}));
    }else
    world=spawnBody({...w,rngState:rng.state},ctx.id,{
     shape:bottle?'cylinder':'box',

@@ -63,9 +63,9 @@ export function materialTags(spec:MaterialSpec):Record<string,string|number|bool
   ...(spec.optical==='reflective'?{reflective:true}:{}),...spec.extraTags};
 }
 /** A ready-to-spawn body of the given material at `pos`. Size and mass can be overridden for mixed-size, mixed-weight loads. */
-export function materialSpawn(spec:MaterialSpec,pos:Vec3,over:Partial<Pick<SpawnSpec,'size'|'massKg'|'supportedBy'|'yawDeg'>>&{tags?:Record<string,string|number|boolean>}={}):SpawnSpec{
+export function materialSpawn(spec:MaterialSpec,pos:Vec3,over:Partial<Pick<SpawnSpec,'size'|'massKg'|'supportedBy'|'yawDeg'|'headingDeg'>>&{tags?:Record<string,string|number|boolean>}={}):SpawnSpec{
  return {shape:spec.shape,size:over.size??spec.sizeMm,massKg:over.massKg??spec.massKg,pos,
-  ...(over.supportedBy!==undefined?{supportedBy:over.supportedBy}:{}),...(over.yawDeg!==undefined?{yawDeg:over.yawDeg}:{}),
+  ...(over.supportedBy!==undefined?{supportedBy:over.supportedBy}:{}),...(over.headingDeg?{headingDeg:over.headingDeg}:{}),...(over.yawDeg!==undefined?{yawDeg:over.yawDeg}:{}),
   tags:{...materialTags(spec),...over.tags},
   ...(spec.parts?{parts:scaleParts(spec.parts,spec.sizeMm,over.size??spec.sizeMm)}:{})};
 }
