@@ -4,7 +4,7 @@ import { modelLimitFor } from '../../components/model-limits';
 import { paramSpecsOf, paramValue, type ParamSpec } from '../../components/params';
 import type { PlacedComponent, ProjectFile, RenderSnapshot } from '../../sim/signals';
 import { perDeviceLive } from '../../sim/device-state';
-import { readDeviceChannels } from '../../sim/device-channels';
+import { channelSemantics, readDeviceChannels } from '../../sim/device-channels';
 
 type Props = {
   project: ProjectFile;
@@ -165,7 +165,7 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
             <strong>{channel.kind === 'digital' ? (channel.value ? 'ON' : 'OFF') :
               !channel.connected || channel.value === null ? 'Disconnected' :
               `${channel.value} ${channel.unit ?? ''}`.trim()}</strong>
-            <small>{channel.source}{channel.kind === 'numeric' && channel.origin ? ` · ${channel.origin}` : ''}</small>
+            <small>{channelSemantics(channel).direction} · {channelSemantics(channel).domain} · {channelSemantics(channel).timing}{channel.kind === 'numeric' && channel.origin ? ` · from ${channel.origin}` : ''}</small>
           </li>)}
         </ul>}
       {channelImage.truncated && <p className="sandbox-help">Only the first 512 channels are shown for this device.</p>}
