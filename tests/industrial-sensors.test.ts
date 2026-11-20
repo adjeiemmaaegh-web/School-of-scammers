@@ -106,9 +106,10 @@ describe('R04/R17 RFID reader', () => {
   });
   it('a feeder can tag every body with a sequential number, and the default leaves bodies untagged', () => {
     const run = (rfidTags: number) => {
-      const items: EquipmentPlacement[] = [{ id: 'feed', kind: 'box-feeder', originMm: vec(0, 0, 0), yawDeg: 0, params: { rateMs: 200, quantity: 3, rfidTags } }];
+      const items: EquipmentPlacement[] = [{ id: 'feed', kind: 'box-feeder', originMm: vec(0, 0, 0), yawDeg: 0, params: { rateMs: 200, quantity: 3, rfidTags } },
+        { id: 'away', kind: 'belt-conveyor', originMm: vec(600, 0, 0), yawDeg: 0, params: { lengthMm: 1600, speedMmS: 800 } }];
       let r = freshRuntime(freshWorld(), items, PLANT_EQUIPMENT);
-      for (let i = 0; i < 40; i++) r = stepScene(r, items, PLANT_EQUIPMENT, { feed: { enable: true } });
+      for (let i = 0; i < 80; i++) r = stepScene(r, items, PLANT_EQUIPMENT, { feed: { enable: true }, away: { run: true } });
       return r.world.bodies;
     };
     expect(run(1).map(b => b.tags.rfid)).toEqual([1, 2, 3]);

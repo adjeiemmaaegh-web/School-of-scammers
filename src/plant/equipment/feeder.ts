@@ -34,8 +34,16 @@ export const boxFeeder:EquipmentDef={
   // Continuous enable still follows the original interval and fault gates.
   const available=f!=='feeder-empty'&&f!=='feeder-jammed'&&!depleted;
   const due=available&&(enabled&&elapsedMs>=param(ctx,'rateMs',1250)||pulse);
-  let world=w,count=s.count,remaining=due?0:elapsedMs;
-  if(due){
+  // A magazine cannot discharge onto an occupied exit: if a body is already standing where the new one would appear, the
+  // feeder waits (and keeps its timer) instead of stacking bodies on top of each other, which would lock them together.
+  const cat=materialByIndex(param(ctx,'materialId',0));
+  const length=param(ctx,'boxLengthMm',160);
+  const nominal=cat?cat.sizeMm:param(ctx,'shapeMode',0)===1?vec(90,90,190):vec(length,Math.max(70,length*.8),Math.max(50,length*.6));
+  const pad=cat&&param(ctx,'variationPct',0)>0?1+param(ctx,'variationPct',0)/100:1;
+  const exitBlocked=due&&w.bodies.some(b=>Math.abs(b.pos.x-ctx.originMm.x)<(b.size.x+nominal.x*pad)/2&&
+   Math.abs(b.pos.y-ctx.originMm.y)<(b.size.y+nominal.y*pad)/2&&Math.abs(b.pos.z-(ctx.originMm.z+120))<150);
+  let world=w,count=s.count,remaining=due?(exitBlocked?elapsedMs:0):elapsedMs;
+  if(due&&!exitBlocked){
    const rng=nextSeed(w.rngState);
    const length=param(ctx,'boxLengthMm',160);
    const material=rng.unit>.5?'metal':'cardboard';
@@ -69,7 +77,7 @@ export const boxFeeder:EquipmentDef={
    }
   }
   return {world,state:{...s,engaged:enabled,lastCommand:flag(c,'feed'),
-   elapsedMs:q(remaining),count,done:due,faulted:!!f}};
+   elapsedMs:q(remaining),count,done:due&&!exitBlocked,stalled:exitBlocked,faulted:!!f}};
  },
  read:(s,w,ctx)=>({ready:!s.faulted&&!(param(ctx,'quantity',0)>0&&s.count>=param(ctx,'quantity',0)),
   empty:param(ctx,'quantity',0)>0&&s.count>=param(ctx,'quantity',0),count:s.count}),

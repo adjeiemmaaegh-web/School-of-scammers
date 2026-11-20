@@ -58,6 +58,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-sensors-browser.cjs
       - name: R06 pneumatics - compressor, regulator and cylinder (pressure builds, stroke follows the regulator, low pressure blocks)
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-pneumatics-browser.cjs
+      - name: R20 guard door - a closed interlocked door holds the line, the operator opens it, material flows
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-guard-door-browser.cjs
       - name: R1 contextual workbench - canvas share, no clipped controls at five sizes, explicit tools, shortcuts, preference recovery
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r1-workbench-browser.cjs
       - name: Open sandbox P1 - place, wire, program, run and test failures

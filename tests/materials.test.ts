@@ -86,32 +86,34 @@ describe('friction limits how fast a belt accelerates a load', () => {
 
 describe('R26 feeder: material choice, production quantity, depletion and variation', () => {
   const feeder = (params: Record<string, number>) => place('feed', 'box-feeder', 0, 0, { rateMs: 200, ...params });
+  /** A belt that carries each body away from the exit (a feeder waits while its exit is occupied). */
+  const carry = place('away', 'belt-conveyor', 600, 0, { lengthMm: 1600, speedMmS: 800 });
   it('spawns the chosen catalogue material with its shape and sensor tags', () => {
-    const r = run([feeder({ materialId: 3 })], freshWorld(), { feed: { enable: true } }, 10);
+    const r = run([feeder({ materialId: 3 }), carry], freshWorld(), { feed: { enable: true }, away: { run: true } }, 10);
     const b = r.world.bodies[0];
     expect(b.shape).toBe('cylinder'); expect(b.tags).toMatchObject({ material: 'bottle-glass', transparent: true, origin: 'feed' });
   });
   it('the original behaviour is untouched when no material is chosen', () => {
-    const r = run([feeder({})], freshWorld(), { feed: { enable: true } }, 10);
+    const r = run([feeder({}), carry], freshWorld(), { feed: { enable: true }, away: { run: true } }, 10);
     expect(['metal', 'cardboard']).toContain(r.world.bodies[0].tags.material);
     expect(r.world.bodies[0].tags.frictionMu).toBeUndefined();
   });
   it('a production run stops at its quantity, reports empty and conserves bodies', () => {
-    const r = run([feeder({ materialId: 2, quantity: 4 })], freshWorld(), { feed: { enable: true } }, 80);
+    const r = run([feeder({ materialId: 2, quantity: 4 }), carry], freshWorld(), { feed: { enable: true }, away: { run: true } }, 120);
     expect(r.world.spawnedCount).toBe(4); expect(r.world.bodies).toHaveLength(4);
     expect(r.signals.feed.empty).toBe(true); expect(r.signals.feed.ready).toBe(false); expect(r.signals.feed.count).toBe(4);
     expect(conserved(r.world)).toBe(true);
     // A depleted source also ignores a manual feed pulse (rising edge on CMD_feed).
-    const items = [feeder({ materialId: 2, quantity: 4 })];
+    const items = [feeder({ materialId: 2, quantity: 4 }), carry];
     let again = r;
     again = stepScene(again, items, PLANT_EQUIPMENT, { feed: { enable: false, feed: false } });
     again = stepScene(again, items, PLANT_EQUIPMENT, { feed: { enable: false, feed: true } });
     expect(again.world.spawnedCount).toBe(4);
-    const unlimited = run([feeder({ materialId: 2 })], freshWorld(), { feed: { enable: true } }, 80);
+    const unlimited = run([feeder({ materialId: 2 }), carry], freshWorld(), { feed: { enable: true }, away: { run: true } }, 120);
     expect(unlimited.world.spawnedCount).toBeGreaterThan(4); expect(unlimited.signals.feed.empty).toBe(false);
   });
   it('seeded variation makes mixed-size, mixed-weight loads deterministically', () => {
-    const go = () => run([feeder({ materialId: 1, variationPct: 40, quantity: 6 })], freshWorld(), { feed: { enable: true } }, 80).world.bodies;
+    const go = () => run([feeder({ materialId: 1, variationPct: 40, quantity: 6 }), carry], freshWorld(), { feed: { enable: true }, away: { run: true } }, 160).world.bodies;
     const a = go(), b = go();
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
     expect(new Set(a.map(x => x.massKg)).size).toBeGreaterThan(2);
@@ -232,5 +234,26 @@ describe('R14/R28 a hard-wired production cell works without any PLC', () => {
     stopped = tick(stopped, [{ k: 'run' }]).world;
     for (let i = 0; i < 100; i++) stopped = tick(stopped).world;
     expect(stopped.plantWorld.world.spawnedCount).toBe(0);
+  });
+});
+
+describe('R26 feeder exit: a magazine does not discharge onto an occupied exit', () => {
+  const feeder = place('feed', 'box-feeder', 0, 0, { rateMs: 100, materialId: 2 });
+  const away = place('away', 'belt-conveyor', 600, 0, { lengthMm: 1600, speedMmS: 800 });
+  it('with nothing to carry bodies away it holds after the first one instead of stacking overlapping bodies', () => {
+    const r = run([feeder], freshWorld(), { feed: { enable: true } }, 60);
+    expect(r.world.spawnedCount).toBe(1);
+    expect(r.world.bodies).toHaveLength(1);
+    expect(conserved(r.world)).toBe(true);
+  });
+  it('resumes at once when the exit clears, and never overlaps two bodies at the exit', () => {
+    const items = [feeder, away];
+    let r = freshRuntime(freshWorld(), items, PLANT_EQUIPMENT);
+    for (let i = 0; i < 100; i++) {
+      r = stepScene(r, items, PLANT_EQUIPMENT, { feed: { enable: true }, away: { run: true } });
+      for (const a of r.world.bodies) for (const b of r.world.bodies) if (a.id < b.id)
+        expect(Math.abs(a.pos.x - b.pos.x) < (a.size.x + b.size.x) / 2 - 1 && Math.abs(a.pos.y - b.pos.y) < (a.size.y + b.size.y) / 2 - 1, `${a.id}/${b.id} overlap at scan ${i}`).toBe(false);
+    }
+    expect(r.world.spawnedCount).toBeGreaterThan(5);
   });
 });

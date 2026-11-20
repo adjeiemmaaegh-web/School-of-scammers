@@ -11,7 +11,7 @@ import {sweptBodyContact,bodyVolumeOverlap} from './swept-contact';
 
 const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','lift','scissor-lift',
  'pick-and-place','palletizer','asrs-crane']);
-const BLOCKERS=new Set(['stopper','diverter-gate']);
+const BLOCKERS=new Set(['stopper','diverter-gate','safety-fence','guard-door']);
 const clampVelocity=(value:number,target:number,dtMs:number,accel=3500):number=>
  q(value+clamp(target-value,-accel*dtMs/1000,accel*dtMs/1000));
 const baseHeight=(item:EquipmentPlacement,state:EquipmentState):number=>

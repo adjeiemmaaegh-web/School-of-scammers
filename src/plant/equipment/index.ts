@@ -6,6 +6,7 @@ import {beltConveyor,rollerConveyor,turntable} from './transport';
 import {stopper,pusher,diverterGate} from './actuators';
 import {boxFeeder} from './feeder';
 import {collector} from './collector';
+import {safetyFence,guardDoor} from './infrastructure';
 import {retroPhotoeye,laserDistance,rfidReader,visionSensor,encoder} from './sensors-industrial';
 import {photoeye,inductiveProx,capacitiveProx,lightCurtain,weighCell} from './sensors';
 import {lift,scissorLift,rotaryActuator,pickAndPlace,palletizer} from './positioning';
@@ -17,7 +18,7 @@ const SOURCE_EQUIPMENT:readonly EquipmentDef[]=[
  photoeye,inductiveProx,capacitiveProx,lightCurtain,weighCell,
  lift,scissorLift,rotaryActuator,pickAndPlace,palletizer,
  shelf,asrsCrane,robotArm,processTank,mixer,heater,proportionalValve,filler,capper,
- collector,retroPhotoeye,laserDistance,rfidReader,visionSensor,encoder,
+ collector,retroPhotoeye,laserDistance,rfidReader,visionSensor,encoder,safetyFence,guardDoor,
 ];
 /** Opt-in static collision is a shared *registered* equipment capability.
  * No modification to older projects: an absent setting defaults to 0.
