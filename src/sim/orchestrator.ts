@@ -257,6 +257,19 @@ export function validateProject(raw: unknown): ProjectFile {
     ...(p.scanMs !== undefined && p.scanMs !== DEFAULT_SCAN_MS ? { scanMs: p.scanMs } : {}),
   };
 }
+/** R13: the previous scan's analog output values of every PLC16, keyed by terminal id (`plc.AO0`); 0 while a PLC is unpowered or has not written the tag. */
+function analogOutputsOf(w: WorldState): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const c of plcComponents(w.project)) {
+    const io = ioOf(w.project, c);
+    for (const [pin, tag] of Object.entries(io.analogOutputs ?? {})) {
+      const runtime = w.plcs[c.id];
+      const raw = runtime?.powered ? runtime.tagValues[tag] : undefined;
+      out[`${c.id}.${pin}`] = typeof raw === 'number' && Number.isFinite(raw) && Math.abs(raw) <= 1_000_000 ? raw : 0;
+    }
+  }
+  return out;
+}
 /** Device settings: each key must be a setting its device kind defines, with an allowed value that differs from the default. */
 function validateParams(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['params'] | undefined {
   if (raw === undefined) return undefined;
@@ -1032,7 +1045,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtO
   const p3 = stepProjectPlant(w.plantWorld, withOperatorValues(w.project, w.operatorValues), circuit.energizedLoads, dtMs,
     // The controller-supply condition only exists when the project HAS a controller: a hard-wired cell (no PLC) must not
     // be held off by a PLC that was never placed (R14/R28: a working cell can be built from an empty workspace).
-    {...(plc ? {controllerPowered:powered} : {}),isSourcePowered:(id:string)=>circuit.reads24(id+'.L+',id+'.M')});
+    {...(plc ? {controllerPowered:powered} : {}),isSourcePowered:(id:string)=>circuit.reads24(id+'.L+',id+'.M'),analogOutputs:analogOutputsOf(w)});
   for (const event of p3.events)
     events.push({ tick: w.tick + 1, kind: 'plant', detail: event.source + ': ' + event.detail });
   // P4 three-phase process after the worker's actual 24V coil demand scan.

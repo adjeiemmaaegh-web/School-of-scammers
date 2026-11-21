@@ -125,6 +125,12 @@ export function compileSandboxST(source: string, names: IoNames = LEGACY_NAMES):
         throw new SyntaxError('Declare Run : BOOL inside VAR_OUTPUT to control the motor');
     }
   }
+  // R13 analog outputs: only a REAL/LREAL VAR_OUTPUT may take an analog output name (it drives the wired numeric input).
+  for (const name of (names.numericOutputs ?? []).map(n => n.toLowerCase())) {
+    const output = compiled.declarations.find(d => d.name.toLowerCase() === name);
+    if (output && (output.scope !== 'output' || (output.type !== 'REAL' && output.type !== 'LREAL')))
+      throw new SyntaxError(`Declare analog output ${name} as REAL inside VAR_OUTPUT`);
+  }
   for (const name of names.outputs.filter(n => n !== 'Run').map(n => n.toLowerCase())) {
     const output = compiled.declarations.find(d => d.name.toLowerCase() === name);
     if (output && (output.scope !== 'output' || output.type !== 'BOOL'))

@@ -65,7 +65,7 @@ export function defaultUnwiredPlantNumber(
 export type PlantTick={runtime:SceneRuntime;events:WorldEvent[]};
 export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
  energizedLoads:readonly string[],dtMs:number,
- options:Readonly<{controllerPowered?:boolean;isSourcePowered?:(id:string)=>boolean}>={}):PlantTick{
+ options:Readonly<{controllerPowered?:boolean;isSourcePowered?:(id:string)=>boolean;analogOutputs?:Readonly<Record<string,number>>}>={}):PlantTick{
  const placements=plantPlacements(project);
  if(!placements.length)return {runtime:previous,events:[]};
  if(!Number.isSafeInteger(dtMs)||dtMs<10||dtMs%10!==0)
@@ -89,6 +89,9 @@ export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
     const link=project.wires.find(w=>w.from===item.id+'.SET_'+ch.name||w.to===item.id+'.SET_'+ch.name);
     const source=link?(link.from===item.id+'.SET_'+ch.name?link.to:link.from):'';
     const dot=source.indexOf('.');
+    // A PLC analog output (R13) wired to a numeric command: the value the program wrote on its previous scan.
+    const fromPlc=options.analogOutputs?.[source];
+    if(typeof fromPlc==='number'&&Number.isFinite(fromPlc))return [[ch.name,fromPlc]];
     if(dot>0&&source.slice(dot+1).startsWith('AN_')){
      const id=source.slice(0,dot),signal=source.slice(dot+4);
      const reading=previous.signals[id]?.[signal];
