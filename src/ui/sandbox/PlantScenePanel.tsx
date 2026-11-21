@@ -6,6 +6,7 @@
 import {useMemo,useState} from 'react';
 import type {ProjectFile,RenderSnapshot,Command} from '../../sim/signals';
 import {SCENES} from '../../plant/scenes/catalogue';
+import {DEMOS} from '../../plant/demos';
 import {sceneFromProject} from '../../plant/scenes/commissioning';
 import {SceneCommissioningPanel} from './SceneCommissioningPanel';
 import {PLANT_EQUIPMENT} from '../../plant/equipment';
@@ -44,7 +45,28 @@ export function PlantScenePanel({project,snapshot,editable,onCommands}:Props){
   setOpenedId(id);
   setPendingId(null);
  };
+ const [pendingDemo,setPendingDemo]=useState<string|null>(null);
+ const startDemo=(id:string)=>{
+  if(!editable)return;
+  if(project?.components.length&&pendingDemo!==id){setPendingDemo(id);return;}
+  const demo=DEMOS.find(d=>d.id===id);
+  if(demo)onCommands([{k:'loadProject',project:demo.build()}]);
+  setPendingDemo(null);
+ };
  return <>
+  <details className="sandbox-plant-scenes panel" data-sandbox-demos>
+   <summary>Demonstrations · {DEMOS.length} complete, wired and programmed example factories</summary>
+   <p className="sandbox-help">Unlike the unsolved scenes below, a demonstration is already wired and programmed so you can run it, then change it, break it with a fault and troubleshoot it. Every behaviour comes from the same simulation as your own projects. Educational simulation only.</p>
+   <div className="sandbox-plant-scene-grid">
+    {DEMOS.map(demo=><section key={demo.id} className="sandbox-plant-scene-choice" data-demo-card={demo.id}>
+     <strong>{demo.letter}. {demo.title}</strong>
+     <p>{demo.summary}</p>
+     {pendingDemo===demo.id&&<p role="status">This replaces your current project. Save or export it before confirming.</p>}
+     <button type="button" className="btn primary small" disabled={!editable} data-demo-load={demo.id}
+      onClick={()=>startDemo(demo.id)}>{pendingDemo===demo.id?'Confirm: replace project':'Load demonstration'}</button>
+    </section>)}
+   </div>
+  </details>
   <details className="sandbox-plant-scenes panel" data-p3-scene-gallery data-p9-scene-gallery>
    <summary>Plant Library · {SCENES.length} original editable learning scenes</summary>
    <p className="sandbox-help">Every scene starts unsolved: equipment and a blank wiring harness only.
