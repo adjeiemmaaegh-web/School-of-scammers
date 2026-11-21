@@ -56,7 +56,9 @@ export const processStation:EquipmentDef={
   const elapsedMs=canRun&&s.activeBodyId===main?.id?s.elapsedMs+dt:canRun?dt:0;
   const activeBodyId=canRun?main!.id:null;
   const base:typeof s={...s,value:wearNow,engaged:canRun,activeBodyId,elapsedMs,progress:canRun?q(Math.min(1,elapsedMs/cycleMs)):0,stalled:broken,faulted:!!f};
-  if(!canRun||elapsedMs<cycleMs)return {state:{...base,done:false},world:w};
+  // cycleDone stays true while a part this station has finished is still standing in it (a PLC samples levels, not pulses).
+  const finishedHere=(b:Body)=>op===1?b.tags.machinedBy===ctx.id:op===4?b.tags.inspectedBy===ctx.id:b.tags.assembledBy===ctx.id;
+  if(!canRun||elapsedMs<cycleMs)return {state:{...base,done:present.some(finishedHere)},world:w};
   // Cycle complete: transform the part(s).
   const life=param(ctx,'toolLifeCycles',0);
   const worn=op===1&&(f==='tool-worn'||(life>0&&wearNow>=life));
@@ -72,7 +74,7 @@ export const processStation:EquipmentDef={
    if(op===1){tags.stage='machined';tags.machinedBy=ctx.id;if(makesDefect)tags.defect=true;}
    if(op===2||op===3){tags.stage='assembled';tags.assembledBy=ctx.id;if(makesDefect)tags.defect=true;
     tags.parts=(typeof tags.parts==='number'?tags.parts:1)+1;}
-   if(op===4){tags.inspected=true;failed=tags.defect===true;tags.inspectResult=failed?'fail':'pass';
+   if(op===4){tags.inspected=true;tags.inspectedBy=ctx.id;failed=tags.defect===true;tags.inspectResult=failed?'fail':'pass';
     if(failed)tags.rejected=true;}
    return {...b,tags,massKg:q(b.massKg+(op===2||op===3?second!.massKg:0))};
   })};
