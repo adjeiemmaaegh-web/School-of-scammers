@@ -54,6 +54,10 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-demos-browser.cjs
       - name: R22 grouping - group, whole-group selection, rotate about the centre, ungroup, undo, reload
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r22-groups-browser.cjs
+      - name: R12 live operator controls - hold START on the station and watch the process respond
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r12-operator-live-browser.cjs
+      - name: R24 simulated operator - place, walk, blocked by the closed door, access request, walk in
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r24-operator-browser.cjs
       - name: R02/R16/R26 material flow - feeder quantity, collector counting, conservation, live status
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-material-flow-browser.cjs
       - name: R03 inclined belt - friction sorts cartons from glass bottles, incline set in the inspector

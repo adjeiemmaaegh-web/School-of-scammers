@@ -53,7 +53,22 @@ export function PlantScenePanel({project,snapshot,editable,onCommands}:Props){
   if(demo)onCommands([{k:'loadProject',project:demo.build()}]);
   setPendingDemo(null);
  };
+ const [opX,setOpX]=useState('0');
+ const [opY,setOpY]=useState('-2000');
+ const operator=snapshot?.plantWorld.world.trainingOperator;
+ const mm=(v:string)=>Math.max(-6000,Math.min(6000,Math.round(Number(v)||0)));
  return <>
+  <details className="sandbox-plant-scenes panel" data-sandbox-operator>
+   <summary>Simulated operator (R24) · {operator?`at ${Math.round(operator.pos.x)}, ${Math.round(operator.pos.y)} mm, height ${Math.round(operator.pos.z)} mm`:'not placed'}</summary>
+   <p className="sandbox-help">A training actor, not a camera or a real person detector. It walks at 1.2 m/s, is stopped by fences, closed guard doors, handrails, shelves and tanks, climbs only stairs, and is seen by zone sensors and operator-aware photoeyes at its real position and height. Floor coordinates are millimetres from the floor centre.</p>
+   <div className="sandbox-p9-scene-filter">
+    <label>X (mm)<input type="number" data-operator-x value={opX} min={-6000} max={6000} step={100} onChange={e=>setOpX(e.target.value)}/></label>
+    <label>Y (mm)<input type="number" data-operator-y value={opY} min={-6000} max={6000} step={100} onChange={e=>setOpY(e.target.value)}/></label>
+    <button type="button" className="btn ghost small" data-operator-place onClick={()=>onCommands([{k:'setTrainingOperator',enabled:true,xMm:mm(opX),yMm:mm(opY),feetMm:0}])}>Place operator here</button>
+    <button type="button" className="btn primary small" data-operator-walk disabled={!operator} onClick={()=>onCommands([{k:'walkOperator',xMm:mm(opX),yMm:mm(opY)}])}>Walk to here</button>
+    <button type="button" className="btn ghost small" data-operator-remove disabled={!operator} onClick={()=>onCommands([{k:'setTrainingOperator',enabled:false,xMm:0,yMm:0,feetMm:0}])}>Remove operator</button>
+   </div>
+  </details>
   <details className="sandbox-plant-scenes panel" data-sandbox-demos>
    <summary>Demonstrations · {DEMOS.length} complete, wired and programmed example factories</summary>
    <p className="sandbox-help">Unlike the unsolved scenes below, a demonstration is already wired and programmed so you can run it, then change it, break it with a fault and troubleshoot it. Every behaviour comes from the same simulation as your own projects. Educational simulation only.</p>
