@@ -23,7 +23,7 @@ export const CATEGORY_BY_KIND: Record<ComponentKind, WorkspaceCategory> = {
   'star-delta-drive': 'Motors & actuators',
   'belt-conveyor': 'Conveyance', 'roller-conveyor': 'Conveyance',
   turntable: 'Conveyance', stopper: 'Conveyance', pusher: 'Motors & actuators',
-  'diverter-gate': 'Conveyance', 'box-feeder': 'Conveyance', collector: 'Conveyance', 'curved-conveyor': 'Conveyance', 'transfer-unit': 'Conveyance', 'process-station': 'Process',
+  'diverter-gate': 'Conveyance', 'box-feeder': 'Conveyance', collector: 'Conveyance', 'curved-conveyor': 'Conveyance', 'transfer-unit': 'Conveyance', 'process-station': 'Process', potentiometer: 'Control gear', 'selector-3pos': 'Control gear', 'operator-station': 'Control gear', 'seven-segment': 'Indicators', 'numeric-display': 'Indicators', 'indicator-panel': 'Indicators',
   'geometry-photoeye': 'Sensors', 'inductive-prox': 'Sensors',
   'capacitive-prox': 'Sensors', 'light-curtain': 'Sensors',
   'weigh-cell': 'Sensors', 'retro-photoeye': 'Sensors', 'laser-distance': 'Sensors', 'rfid-reader': 'Sensors', 'vision-sensor': 'Sensors', 'incremental-encoder': 'Sensors', 'safety-fence': 'Conveyance', 'guard-door': 'Conveyance',

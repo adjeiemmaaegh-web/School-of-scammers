@@ -5,6 +5,7 @@ import { paramSpecsOf, paramValue, type ParamSpec } from '../../components/param
 import type { PlacedComponent, ProjectFile, RenderSnapshot } from '../../sim/signals';
 import { perDeviceLive, plantStatusText } from '../../sim/device-state';
 import { isP3Equipment } from '../../sim/p3-plant-bridge';
+import { OPERATOR_KEYS, OPERATOR_KINDS } from '../../sim/operator-values';
 
 type Props = {
   project: ProjectFile;
@@ -22,6 +23,8 @@ type Props = {
   onClearSelection: () => void;
   /** Change a device setting (see Command `setParam`). */
   onSetParam: (id: string, key: string, value: number) => void;
+  /** Turn a knob / selector / held button live while the simulation runs (see Command `setOperator`). */
+  onSetOperator?: (id: string, key: string, value: number) => void;
 };
 
 /** Largest top-left coordinates that keep a device (170 x 130) on the 1080 x 580 floor. */
@@ -48,6 +51,15 @@ function PositionField({ label, attr, max, value, disabled, onCommit }: {
 }
 
 /** A device setting (e.g. an on-delay relay's delay): a draft that commits on Enter or blur, clamped and snapped to the spec. */
+/** A live operator control: a slider for a knob or selector, a hold button for a pushbutton. Works while the simulation runs. */
+function OperatorControl({ spec, value, onSet }: { spec: ParamSpec; value: number; onSet: (n: number) => void }) {
+  if (spec.max === 1 && spec.step === 1)
+    return <button type="button" data-operator={spec.key} className={value === 1 ? 'btn primary small' : 'btn ghost small'} aria-pressed={value === 1}
+      onClick={() => onSet(value === 1 ? 0 : 1)}>{spec.label}: {value === 1 ? 'held (click to release)' : 'released (click to hold)'}</button>;
+  return <label>{spec.label} ({spec.unit}) <output>{value}</output>
+    <input type="range" data-operator={spec.key} min={spec.min} max={spec.max} step={spec.step} value={value} onChange={e => onSet(Number(e.target.value))} />
+  </label>;
+}
 function ParamField({ spec, value, disabled, onCommit }: { spec: ParamSpec; value: number; disabled: boolean; onCommit: (n: number) => void }) {
   const [draft, setDraft] = useState(String(value));
   useEffect(() => { setDraft(String(value)); }, [value]);
@@ -68,7 +80,7 @@ function ParamField({ spec, value, disabled, onCommit }: { spec: ParamSpec; valu
 /** Read-only contextual view of the worker snapshot. Actions emit existing Commands. */
 export function WorkbenchInspector({
   project, snapshot, selectedDevice, selectedTerminal, editable,
-  onTerminal, onCancelWire, onMove, onMoveTo, onOperate, onClearSelection, onSetParam,
+  onTerminal, onCancelWire, onMove, onMoveTo, onOperate, onClearSelection, onSetParam, onSetOperator,
 }: Props) {
   const hasLatchBranch = project.program.rungs.some(rung =>
     rung.elements.some(element => element.type === 'branch'));
@@ -168,6 +180,12 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
     {paramSpecsOf(selectedDevice.kind).length > 0 && <div className="sandbox-inspector-position" role="group" aria-label="Device settings">
       {paramSpecsOf(selectedDevice.kind).map(spec => <ParamField key={`${selectedDevice.id}-${spec.key}`} spec={spec} disabled={!editable}
         value={paramValue(project.params, selectedDevice.id, spec)} onCommit={n => onSetParam(selectedDevice.id, spec.key, n)} />)}
+    </div>}
+    {OPERATOR_KINDS.has(selectedDevice.kind) && onSetOperator && <div className="sandbox-inspector-position" role="group" aria-label="Operator controls (live)">
+      {paramSpecsOf(selectedDevice.kind).filter(spec => OPERATOR_KEYS.has(spec.key)).map(spec =>
+        <OperatorControl key={`${selectedDevice.id}-op-${spec.key}`} spec={spec}
+          value={snapshot.operatorValues?.[selectedDevice.id]?.[spec.key] ?? paramValue(project.params, selectedDevice.id, spec)}
+          onSet={n => onSetOperator(selectedDevice.id, spec.key, n)} />)}
     </div>}
     <p className="sandbox-help">Sensors, diverters, pumps and level switches act on the conveyor or tank they are placed beside, so exact positions matter.</p>
     <button type="button" className="btn ghost small sandbox-inspector-move" disabled={!editable}

@@ -152,6 +152,8 @@ export type WorldState = {
   tripped: Record<string, boolean>;
   /** Rod position, limit switches and valve state of every pneumatic cylinder, by component id. */
   cylinders: Record<string, CylinderState>;
+  /** Live operator settings (potentiometer knob, selector position, held station buttons) by component id; absent until used. */
+  operatorValues?: Record<string, Record<string, number>>;
   /** Receiver tank of every compressor by component id (R06). Empty unless the project has a compressor. */
   air: Record<string, import('../plant/air').Receiver>;
   /** Milliseconds each on-delay relay's coil has been energised (capped at its delay), by component id. */
@@ -213,6 +215,8 @@ export type Command =
   | { k: 'setWireStyle'; id: string; color?: string | null; label?: string | null }
   /** Set a device setting (e.g. an on-delay relay's delay). Validated against its spec. Paused only. */
   | { k: 'setParam'; id: string; key: string; value: number }
+  /** Turn an operator device (knob, selector, held button) while the simulation runs; the value lives in the running world only. */
+  | { k: 'setOperator'; id: string; key: string; value: number }
   /** Drop in a ready-made, pre-wired start/stop starter panel at a free spot (or `at`). Paused only. */
   | { k: 'addPanel'; template: 'motor-starter'; at?: XY }
   /** `conveyor` names the lane; omitted means the first conveyor (the single-conveyor behaviour). */
@@ -265,6 +269,8 @@ export type RenderSnapshot = {
   /** Every pneumatic cylinder by component id: rod position 0 (retracted)..1 (extended) and its limit switches. */
   /** Every on-delay relay by component id: elapsed and preset milliseconds, and whether its contacts have transferred. */
   timers: Record<string, { elapsedMs: number; delayMs: number; done: boolean }>;
+  /** Live operator settings by component id (R12/R19); present only after an operator turned something. */
+  operatorValues?: Record<string, Record<string, number>>;
   cylinders: Record<string, { position: number; extendLimit: boolean; retractLimit: boolean; command: string; alarm: string | null; conflict: boolean;
     /** R06: force, load and port pressure; present only for a cylinder with circuit settings. */
     circuit?: { forceN: number; loadN: number; portBar: number; holding: boolean } }>;

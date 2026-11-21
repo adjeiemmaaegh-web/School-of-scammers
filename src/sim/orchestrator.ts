@@ -35,6 +35,7 @@ import { DEFAULT_SCAN_MS, isValidScanMs, scanMsOf } from './scan-config';
 import { airWireError, solveAir } from '../plant/air';
 import { clearedAlarm } from '../plant/cylinder';
 import { analogWireError, sampleAnalogInputs } from './analog';
+import { OPERATOR_KEYS, OPERATOR_KINDS, withOperatorValues } from './operator-values';
 import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
 import {firstNewCarrierSuperposition,carrierSuperpositionError} from '../workspace/carrier-clearance';
 import { freshProjectPlant, stepProjectPlant, sensorImage, validatePlantFaults } from './p3-plant-bridge';
@@ -537,6 +538,12 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         world = withFaults(world, faultsOf(world.project).map(f => f.id === cmd.id ? { ...f, hidden: false } : f));
         commandEvents.push({ tick: world.tick, kind: 'fault', detail: `Fault revealed: ${describeFault(fault)}` });
       }
+    } else if (cmd.k === 'setOperator') {
+      const part = world.project.components.find(c => c.id === cmd.id);
+      const spec = part && OPERATOR_KINDS.has(part.kind) ? paramSpecsOf(part.kind).find(s => s.key === cmd.key && OPERATOR_KEYS.has(s.key)) : undefined;
+      const error = !part ? 'Unknown component' : !spec ? 'This device has no live operator setting' : paramError(spec, cmd.value);
+      if (error || !part || !spec) world = setError(world, error ?? 'Invalid setting');
+      else world = { ...world, operatorValues: { ...(world.operatorValues ?? {}), [part.id]: { ...(world.operatorValues?.[part.id] ?? {}), [spec.key]: cmd.value } }, lastError: null };
     } else if (!canEdit(world)) world = setError(world, 'Pause simulation before modifying the project');
     else if (cmd.k === 'repair') {
       // Replacing a part is only possible with the plant isolated (paused). The event is neutral on
@@ -927,6 +934,7 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       position: c.position, extendLimit: c.extendLimit, retractLimit: c.retractLimit, command: c.command, alarm: c.alarm, conflict: c.conflict,
       ...(c.circuit ? { circuit: c.circuit } : {}) }])),
     ...(airSnapshot(world)),
+    ...(world.operatorValues ? { operatorValues: Object.fromEntries(Object.entries(world.operatorValues).map(([id, v]) => [id, { ...v }])) } : {}),
     forwardContactorOn: world.forwardContactorOn, reverseContactorOn: world.reverseContactorOn,
     motorDirection: world.motorDirection, reverseMotorAngleRad: world.reverseMotorAngleRad,
     interlockConflict: world.interlockConflict,
@@ -1012,10 +1020,10 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtO
   // The authoritative P3 world advances exactly five 10 ms substeps AFTER PLC
   // outputs and the electrical actuator image settle. Geometry sensors feed the
   // following PLC scan, never the current scan's input image.
-  const p3 = stepProjectPlant(w.plantWorld, w.project, circuit.energizedLoads, dtMs,
+  const p3 = stepProjectPlant(w.plantWorld, withOperatorValues(w.project, w.operatorValues), circuit.energizedLoads, dtMs,
     // The controller-supply condition only exists when the project HAS a controller: a hard-wired cell (no PLC) must not
     // be held off by a PLC that was never placed (R14/R28: a working cell can be built from an empty workspace).
-    {...(plc ? {controllerPowered:powered} : {})});
+    {...(plc ? {controllerPowered:powered} : {}),isSourcePowered:(id:string)=>circuit.reads24(id+'.L+',id+'.M')});
   for (const event of p3.events)
     events.push({ tick: w.tick + 1, kind: 'plant', detail: event.source + ': ' + event.detail });
   // P4 three-phase process after the worker's actual 24V coil demand scan.

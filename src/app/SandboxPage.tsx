@@ -1263,6 +1263,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onMove={id => setMoveTarget(id)}
           onMoveTo={(id, at) => move(id, at)}
           onSetParam={(id, key, value) => send([{ k: 'setParam', id, key, value }])}
+          onSetOperator={(id, key, value) => send([{ k: 'setOperator', id, key, value }])}
           onOperate={id => send([{ k: 'operateToggle', id }])}
           onClearSelection={() => setSelectedDeviceId(null)} />
         </div>}

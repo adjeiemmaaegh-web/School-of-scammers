@@ -65,7 +65,7 @@ export function defaultUnwiredPlantNumber(
 export type PlantTick={runtime:SceneRuntime;events:WorldEvent[]};
 export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
  energizedLoads:readonly string[],dtMs:number,
- options:Readonly<{controllerPowered?:boolean}>={}):PlantTick{
+ options:Readonly<{controllerPowered?:boolean;isSourcePowered?:(id:string)=>boolean}>={}):PlantTick{
  const placements=plantPlacements(project);
  if(!placements.length)return {runtime:previous,events:[]};
  if(!Number.isSafeInteger(dtMs)||dtMs<10||dtMs%10!==0)
@@ -83,6 +83,19 @@ export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
    // output wiring implementation; PLC AO remains unavailable.
    if(ch.name==='height'&&(item.kind==='lift'||item.kind==='scissor-lift'))
     return [];
+   if(ch.kind==='number'){
+    // R12/R19 analog control: a numeric command terminal wired to another device's analog output (a potentiometer knob, a
+    // sensor) takes that device's value from the previous settled scan, only while the source is powered.
+    const link=project.wires.find(w=>w.from===item.id+'.SET_'+ch.name||w.to===item.id+'.SET_'+ch.name);
+    const source=link?(link.from===item.id+'.SET_'+ch.name?link.to:link.from):'';
+    const dot=source.indexOf('.');
+    if(dot>0&&source.slice(dot+1).startsWith('AN_')){
+     const id=source.slice(0,dot),signal=source.slice(dot+4);
+     const reading=previous.signals[id]?.[signal];
+     if(typeof reading==='number'&&Number.isFinite(reading)&&(options.isSourcePowered?options.isSourcePowered(id):false))
+      return [[ch.name,reading]];
+    }
+   }
    return [[ch.name,ch.kind==='bool'?set.has(item.id+'-CMD_'+ch.name):
     defaultUnwiredPlantNumber(item.kind,ch.name,item.params)]];
   }));
