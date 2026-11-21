@@ -10,7 +10,7 @@ import { executeStructuredText, type STResult, type STValue } from '../../engine
 import { compileSandboxST } from '../../program/p2-contract';
 import { solveNetAware } from '../../engineering/electrical';
 import { faultsOf } from '../faults';
-import { ioOf } from '../plc-io';
+import { ioOf, pinLocation } from '../plc-io';
 import { freshPlcRuntime, namesFor, programOf, runtimePlcs, scanPlc } from '../plcs';
 import { sampleAnalogInputs } from '../analog';
 import { deenergisedPlcs, quietLanes } from './fail-closed';
@@ -131,9 +131,14 @@ export function scanControllers(
     const extraPowered = !shorted && circuit.reads24(terminal(extra.id, 'L+'), terminal(extra.id, 'M'));
     const io = ioOf(w.project, extra);
     // A sensor-named input only reads high if some powered sensor of that kind exists (guards a wire straight to P24).
-    const digitalInputs = Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => [tag, extraPowered &&
-      (tag === 'Photoeye' ? eyePowered : tag === 'TankHigh' ? probePowered : true) &&
-      circuit.reads24(terminal(extra.id, pin), terminal(extra.id, 'M'))]));
+    // R13: an expansion-module pin reads against that module's own M, and only while the MODULE is powered.
+    const digitalInputs = Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => {
+      const at = pinLocation(extra.id, pin);
+      const live = at.module ? circuit.reads24(terminal(at.owner, 'L+'), terminal(at.owner, 'M')) : extraPowered;
+      return [tag, extraPowered && live &&
+        (tag === 'Photoeye' ? eyePowered : tag === 'TankHigh' ? probePowered : true) &&
+        circuit.reads24(terminal(at.owner, at.pin), terminal(at.owner, 'M'))];
+    }));
     const cfg = programOf(w.project, extra.id);
     try {
       const openAnalogWires = new Set(faultsOf(w.project).filter(f => f.kind === 'wire-open').map(f => f.target));

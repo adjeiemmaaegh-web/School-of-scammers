@@ -15,7 +15,7 @@ export const DEVICE_FAMILIES = [
 ] as const;
 export type DeviceFamily = (typeof DEVICE_FAMILIES)[number]['id'];
 const families: Record<Exclude<DeviceFamily,'all'>,readonly string[]> = {
-  plc:['plc','plc16'],
+  plc:['plc','plc16','io-di8','io-do8'],
   electrical:['supply','breaker','overload','contactor','forwardcontactor',
     'reversecontactor','relay','timerelay','estop','start','stop','reversebutton','selector',
     'three-phase-supply','star-delta-drive'],

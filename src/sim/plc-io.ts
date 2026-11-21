@@ -9,7 +9,7 @@
  *
  * Pure and deterministic like everything under src/sim.
  */
-import { PLC16_INPUT_TERMINALS, PLC16_OUTPUT_TERMINALS } from '../components/registry';
+import { IO_MODULE_POINTS, PLC16_INPUT_TERMINALS, PLC16_OUTPUT_TERMINALS, isIoModuleKind } from '../components/registry';
 import type { PlacedComponent, ProjectFile } from './signals';
 
 /** terminal -> tag, for inputs and for outputs. */
@@ -32,8 +32,41 @@ export const defaultIo = (kind: string): PlcIoMap => kind === 'plc16' ? {
 /** The classic controller's map is fixed; only the 16/16 controller can be renamed. */
 export const isConfigurableIo = (kind: string): boolean => kind === 'plc16';
 
-/** The resolved map of one PLC: its saved names laid over the defaults for its kind. */
-export function ioOf(project: Pick<ProjectFile, 'plcIo'>, plc: Pick<PlacedComponent, 'id' | 'kind'>): PlcIoMap {
+/** Expansion modules (R13): at most this many per PLC; slot numbers 1..MAX name the tags (`M1In0`, `M2Out3`). */
+export const MAX_IO_MODULES_PER_PLC = 4;
+/** A module pin inside a PLC map is `<moduleId>:<pin>`; a plain pin belongs to the PLC itself. */
+export const MODULE_PIN_SEPARATOR = ':';
+/** Where a map pin physically lives: the PLC's own terminal, or a terminal of an expansion module with that module's power pins. */
+export function pinLocation(plcId: string, pin: string): { owner: string; pin: string; module: boolean } {
+  const at = pin.indexOf(MODULE_PIN_SEPARATOR);
+  return at < 0 ? { owner: plcId, pin, module: false } : { owner: pin.slice(0, at), pin: pin.slice(at + 1), module: true };
+}
+/** Modules attached to one PLC, in slot order. Only modules still in the project count. */
+export function modulesOf(project: Partial<Pick<ProjectFile, 'components' | 'ioModules'>>, plcId: string): { id: string; kind: 'io-di8' | 'io-do8'; slot: number }[] {
+  const out: { id: string; kind: 'io-di8' | 'io-do8'; slot: number }[] = [];
+  for (const [id, link] of Object.entries(project.ioModules ?? {})) {
+    const c = project.components?.find(x => x.id === id);
+    if (c && link.plc === plcId && isIoModuleKind(c.kind)) out.push({ id, kind: c.kind as 'io-di8' | 'io-do8', slot: link.slot });
+  }
+  return out.sort((a, b) => a.slot - b.slot);
+}
+const withModules = (map: PlcIoMap, project: Partial<Pick<ProjectFile, 'components' | 'ioModules'>>, plc: Pick<PlacedComponent, 'id' | 'kind'>): PlcIoMap => {
+  if (plc.kind !== 'plc16') return map;
+  const mods = modulesOf(project, plc.id);
+  if (!mods.length) return map;
+  const inputs = { ...map.inputs }, outputs = { ...map.outputs };
+  for (const m of mods) for (let k = 0; k < IO_MODULE_POINTS; k++) {
+    if (m.kind === 'io-di8') inputs[`${m.id}${MODULE_PIN_SEPARATOR}I${k}`] = `M${m.slot}In${k}`;
+    else outputs[`${m.id}${MODULE_PIN_SEPARATOR}Q${k}`] = `M${m.slot}Out${k}`;
+  }
+  return { ...map, inputs, outputs };
+};
+
+/** The resolved map of one PLC: its saved names laid over the defaults for its kind, plus the channels of its expansion modules. */
+export function ioOf(project: Pick<ProjectFile, 'plcIo'> & Partial<Pick<ProjectFile, 'components' | 'ioModules'>>, plc: Pick<PlacedComponent, 'id' | 'kind'>): PlcIoMap {
+  return withModules(ownIoOf(project, plc), project, plc);
+}
+function ownIoOf(project: Pick<ProjectFile, 'plcIo'>, plc: Pick<PlacedComponent, 'id' | 'kind'>): PlcIoMap {
   const base = defaultIo(plc.kind);
   const saved = isConfigurableIo(plc.kind) ? project.plcIo?.[plc.id] : undefined;
   return saved ? { inputs: { ...base.inputs, ...saved.inputs }, outputs: { ...base.outputs, ...saved.outputs },

@@ -109,6 +109,8 @@ export type ProjectFile = {
   /** Programs of PLCs beyond the first, keyed by PLC component id. Omitted for single-PLC projects. */
   plcPrograms?: Record<string, PlcProgram>;
   /** Tag names of the configurable (16/16) controllers, by PLC id. Omitted when every name is the default. */
+  /** Expansion I/O modules (R13): module component id -> the PLC16 that reads/drives its channels and the slot (1..4) that names its tags. */
+  ioModules?: Record<string, { plc: string; slot: number }>;
   plcIo?: Record<string, { inputs: Record<string, string>; outputs: Record<string, string> }>;
   /** Device settings that differ from the default (a timer relay's delay), by component id then setting key. */
   params?: Record<string, Record<string, number>>;
@@ -236,6 +238,7 @@ export type Command =
   | { k: 'setThreePhasePower'; id: string; enabled: boolean }
   /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
   /** Rename the tags of a configurable (16/16) PLC. Refused if it would break that PLC's program. Paused only. */
+  | { k: 'attachIoModule'; module: string; plc: string | null }
   | { k: 'configureIo'; plc: string; io: { inputs: Record<string, string>; outputs: Record<string, string> } }
   | { k: 'loadProgram'; program: LadderDocument; plc?: string }
   | { k: 'loadST'; source: string; plc?: string }

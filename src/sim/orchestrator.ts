@@ -15,7 +15,7 @@ import {
   MAX_PLCS, blankProgram, defaultProgramFor, extraPlcs, freshPlcRuntime, legacyPrimaryId, namesFor, plcComponents, plcView,
   primaryPlcId, programOf, runtimePlcs, scanPlc, withProgramOf,
 } from './plcs';
-import { LEGACY_IO, defaultIo, ioOf, isConfigurableIo, validateIoMap } from './plc-io';
+import { LEGACY_IO, MAX_IO_MODULES_PER_PLC, defaultIo, ioOf, isConfigurableIo, modulesOf, pinLocation, validateIoMap } from './plc-io';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { measureContinuity } from '../electrical/continuity';
@@ -216,7 +216,8 @@ export function validateProject(raw: unknown): ProjectFile {
     wireIds.add(wire.id);
   }
   const plcIo = validatePlcIo(p.plcIo, components);
-  const names = namesFor({ components, plcIo } as ProjectFile, undefined);
+  const ioModules = validateIoModules(p.ioModules, components);
+  const names = namesFor({ components, plcIo, ioModules } as ProjectFile, undefined);
   const programErrors = validateSandboxProgram(p.program, names);
   if (programErrors.length) throw new Error(programErrors.join('; '));
   if (p.language !== undefined && p.language !== 'ladder' && p.language !== 'st' && p.language !== 'fbd')
@@ -228,13 +229,13 @@ export function validateProject(raw: unknown): ProjectFile {
     if (p.stSource) compileSandboxST(p.stSource, names);
   }
   if(p.fbd!==undefined||p.language==='fbd'){
-    const candidate={...p,components,plcIo} as ProjectFile;
+    const candidate={...p,components,plcIo,ioModules} as ProjectFile;
     const config=programOf(candidate,undefined);
     compileFbd(p.fbd??config.fbd,names);
   }
   const wires = p.wires.map(w => ({ id: w.id, from: w.from, to: w.to }));
   const faults = validateFaults(p.faults, components, wires);
-  const plcPrograms = validatePlcPrograms(p.plcPrograms, components, plcIo);
+  const plcPrograms = validatePlcPrograms(p.plcPrograms, components, plcIo, ioModules);
   const params = validateParams(p.params, components);
   const plantFaults = validatePlantFaults(p.plantFaults, { components });
   const wireStyles = validateWireStyles(p.wireStyles, wires);
@@ -249,6 +250,7 @@ export function validateProject(raw: unknown): ProjectFile {
     ...(faults.length ? { faults } : {}),
     ...(plcPrograms ? { plcPrograms } : {}),
     ...(plcIo ? { plcIo } : {}),
+    ...(ioModules ? { ioModules } : {}),
     ...(params ? { params } : {}),
     ...(plantFaults ? { plantFaults } : {}),
     ...(wireStyles ? { wireStyles } : {}),
@@ -307,7 +309,27 @@ function validatePlcIo(raw: unknown, components: readonly PlacedComponent[]): Pr
   }
   return Object.keys(out).length ? out : undefined;
 }
-function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[], plcIo: ProjectFile['plcIo']): Record<string, PlcProgram> | undefined {
+/** R13: each module is attached to one existing PLC16 with a free slot 1..MAX; nothing else may appear. */
+function validateIoModules(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['ioModules'] | undefined {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid expansion module configuration');
+  const out: NonNullable<ProjectFile['ioModules']> = {};
+  const used = new Set<string>();
+  for (const [id, link] of Object.entries(raw as Record<string, unknown>)) {
+    const mod = components.find(c => c.id === id);
+    if (!mod || (mod.kind !== 'io-di8' && mod.kind !== 'io-do8')) throw new Error(`Expansion module ${id}: not an expansion module in this project`);
+    const l = link as { plc?: unknown; slot?: unknown } | null;
+    const host = components.find(c => c.id === l?.plc);
+    if (!host || host.kind !== 'plc16') throw new Error(`Expansion module ${id}: host must be a 16/16 PLC in this project`);
+    if (!Number.isInteger(l?.slot) || (l?.slot as number) < 1 || (l?.slot as number) > MAX_IO_MODULES_PER_PLC) throw new Error(`Expansion module ${id}: slot must be 1 to ${MAX_IO_MODULES_PER_PLC}`);
+    const key = `${host.id}#${l?.slot}`;
+    if (used.has(key)) throw new Error(`Expansion module ${id}: slot ${l?.slot} of ${host.id} is already used`);
+    used.add(key);
+    out[id] = { plc: host.id, slot: l?.slot as number };
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[], plcIo: ProjectFile['plcIo'], ioModules?: ProjectFile['ioModules']): Record<string, PlcProgram> | undefined {
   if (raw === undefined) return undefined;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid PLC programs');
   const extras = new Set(extraPlcs({ components }).map(c => c.id));
@@ -316,7 +338,7 @@ function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[
     if (!extras.has(id)) throw new Error(`PLC program for ${id}: not an additional PLC in this project`);
     const e = entry as Partial<PlcProgram> | null;
     if (!e || typeof e !== 'object' || !e.program) throw new Error(`Invalid program for PLC ${id}`);
-    const names = namesFor({ components, plcIo } as ProjectFile, id);
+    const names = namesFor({ components, plcIo, ioModules } as ProjectFile, id);
     const issues = validateSandboxProgram(e.program, names);
     if (issues.length) throw new Error(`PLC ${id}: ${issues.join('; ')}`);
     if (e.language !== undefined && e.language !== 'ladder' && e.language !== 'st' && e.language !== 'fbd') throw new Error(`PLC ${id}: unknown language`);
@@ -325,7 +347,7 @@ function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[
     if (e.stSource) compileSandboxST(e.stSource, names);
     if (e.fbd!==undefined||e.language==='fbd'){
       const component=components.find(c=>c.id===id)!;
-      const cfg=defaultProgramFor(component.kind,ioOf({components,plcIo} as ProjectFile,component));
+      const cfg=defaultProgramFor(component.kind,ioOf({components,plcIo,ioModules} as ProjectFile,component));
       compileFbd(e.fbd??cfg.fbd,names);
     }
     out[id] = { program: e.program,
@@ -628,6 +650,44 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         }
       }
     }
+    else if (cmd.k === 'attachIoModule') {
+      // R13: attach / detach an expansion module while paused (it adds channels the programs may use).
+      const mod = world.project.components.find(c => c.id === cmd.module);
+      const host = cmd.plc === null ? undefined : plcComponents(world.project).find(c => c.id === cmd.plc);
+      const next = { ...(world.project.ioModules ?? {}) };
+      if (!mod || (mod.kind !== 'io-di8' && mod.kind !== 'io-do8')) world = setError(world, 'Unknown expansion module');
+      else if (cmd.plc !== null && (!host || host.kind !== 'plc16')) world = setError(world, 'Expansion modules attach to a 16/16 PLC');
+      else {
+        delete next[mod.id];
+        let slot = 1;
+        if (host) {
+          const taken = new Set(modulesOf({ components: world.project.components, ioModules: next }, host.id).map(m => m.slot));
+          while (taken.has(slot)) slot++;
+          if (slot <= MAX_IO_MODULES_PER_PLC) next[mod.id] = { plc: host.id, slot };
+        }
+        if (host && slot > MAX_IO_MODULES_PER_PLC) world = setError(world, `A PLC takes at most ${MAX_IO_MODULES_PER_PLC} expansion modules`);
+        else {
+          const { ioModules: _old, ...rest } = world.project;
+          const candidate: ProjectFile = Object.keys(next).length ? { ...rest, ioModules: next } : rest;
+          // Detaching removes tags: refuse rather than break a program that uses them.
+          let problem: string | null = null;
+          for (const plc of plcComponents(candidate)) {
+            const cfg = programOf(candidate, plc.id), names = namesFor(candidate, plc.id);
+            try {
+              if (cfg.language === 'st') compileSandboxST(cfg.stSource, names);
+              else if (cfg.language === 'fbd') compileFbd(cfg.fbd, names);
+              else { const issues = validateSandboxProgram(cfg.program, names); if (issues.length) problem = issues.join('; '); }
+            } catch (error) { problem = error instanceof Error ? error.message : 'Program no longer compiles'; }
+            if (problem) { problem = `${plc.id}: ${problem}`; break; }
+          }
+          if (problem) world = setError(world, `Cannot change expansion modules: ${problem}`);
+          else {
+            world = createWorld(candidate);
+            commandEvents.push({ tick: world.tick, kind: 'edit', detail: host ? `Attached ${mod.id} to ${host.id} (slot ${slot})` : `Detached ${mod.id}` });
+          }
+        }
+      }
+    }
     else if (cmd.k === 'configureIo') {
       const plc = plcComponents(world.project).find(c => c.id === cmd.plc);
       const errors = plc ? validateIoMap(plc.kind, cmd.io) : ['Unknown PLC'];
@@ -846,9 +906,13 @@ function buildCircuit(world: WorldState): Device[] {
     if (isPlcKind(c.kind)) {
       // Each PLC drives only its own output terminals, through its I/O map, from its own scan state.
       const coils = c.id === primary ? world.coils : world.plcs[c.id]?.coils ?? {};
-      Object.entries(ioOf(world.project, c).outputs).forEach(([pin, tag], i) => devices.push({
-        id: c.kind === 'plc' ? (i === 0 ? `${c.id}-Q` : `${c.id}-Q${i}`) : `${c.id}-${pin}`, kind: 'switch',
-        a: terminal(c.id, 'L+'), b: terminal(c.id, pin), closed: coils[tag] === true }));
+      Object.entries(ioOf(world.project, c).outputs).forEach(([pin, tag], i) => {
+        // R13: a module output switches the MODULE's own L+ onto the module's terminal.
+        const at = pinLocation(c.id, pin);
+        devices.push({
+          id: c.kind === 'plc' ? (i === 0 ? `${c.id}-Q` : `${c.id}-Q${i}`) : `${c.id}-${pin}`, kind: 'switch',
+          a: terminal(at.owner, 'L+'), b: terminal(at.owner, at.pin), closed: coils[tag] === true });
+      });
     }
     // A stuck-output sensor lies to the PLC: only its electrical output changes. The plant truth
     // (world.plant.photoeyeActive / world.tank.highLevel) keeps computing from real geometry and level.

@@ -44,6 +44,12 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     delete kept[id];
     next = Object.keys(kept).length ? { ...rest, params: kept } : rest;
   }
+  // R13: removing a module drops its link; removing a PLC16 drops the links of the modules it hosted (they stay as unattached devices).
+  if (project.ioModules && (project.ioModules[id] || Object.values(project.ioModules).some(l => l.plc === id))) {
+    const { ioModules: _old, ...rest } = next;
+    const kept = Object.fromEntries(Object.entries(project.ioModules).filter(([m, l]) => m !== id && l.plc !== id));
+    next = Object.keys(kept).length ? { ...rest, ioModules: kept } : rest;
+  }
   if (isPlcKind(target.kind)) {
     const wasFirst = primaryPlcId(project) === id;
     const promoted = wasFirst ? extraPlcs(project)[0] : undefined;

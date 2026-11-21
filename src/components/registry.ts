@@ -1,7 +1,7 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
 import { EQUIPMENT } from '../plant/equipment';
 import type { EquipmentDef } from '../plant/world/equipment';
-export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive' | 'selector' | 'buzzer' | 'siren' | 'collector' | 'retro-photoeye' | 'laser-distance' | 'rfid-reader' | 'vision-sensor' | 'incremental-encoder' | 'compressor' | 'air-regulator' | 'safety-fence' | 'guard-door' | 'curved-conveyor' | 'transfer-unit' | 'process-station' | 'handrail' | 'platform' | 'stairs' | 'work-zone' | 'potentiometer' | 'selector-3pos' | 'seven-segment' | 'numeric-display' | 'operator-station' | 'indicator-panel';
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive' | 'selector' | 'buzzer' | 'siren' | 'collector' | 'retro-photoeye' | 'laser-distance' | 'rfid-reader' | 'vision-sensor' | 'incremental-encoder' | 'compressor' | 'air-regulator' | 'safety-fence' | 'guard-door' | 'curved-conveyor' | 'transfer-unit' | 'process-station' | 'handrail' | 'platform' | 'stairs' | 'work-zone' | 'potentiometer' | 'selector-3pos' | 'seven-segment' | 'numeric-display' | 'operator-station' | 'indicator-panel' | 'io-di8' | 'io-do8';
 export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' | 'three-phase' | 'air' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
@@ -18,6 +18,14 @@ const plc16Terminals = (): Terminal[] => [
   { name:'AO0',side:'right',y:164,role:'analog-output' },
   { name:'AO1',side:'right',y:175,role:'analog-output' },
 ];
+/** Expansion I/O modules (R13): eight digital points each, powered separately from the PLC they extend. */
+export const IO_MODULE_POINTS = 8;
+export const isIoModuleKind = (kind: string): boolean => kind === 'io-di8' || kind === 'io-do8';
+function ioModuleTerminals(kind: 'io-di8' | 'io-do8'): Terminal[] {
+  const input = kind === 'io-di8';
+  return [{ name: 'L+', side: 'left', y: 8, role: 'supply' }, { name: 'M', side: 'left', y: 22, role: 'return' },
+    ...Array.from({ length: IO_MODULE_POINTS }, (_, i): Terminal => ({ name: `${input ? 'I' : 'Q'}${i}`, side: input ? 'left' : 'right', y: 36 + i * 12, role: input ? 'input' : 'output' }))];
+}
 const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
   stacklight: { kind: 'stacklight', label: 'Stack light (R/Y/G)', help: 'Three 24V signal lamps on one column: R, Y and G each to the common M-', terminals: [
     { name: 'R', side: 'left', y: 32, role: 'load' }, { name: 'Y', side: 'left', y: 62, role: 'load' },
@@ -37,6 +45,8 @@ const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
     { name: 'EXT_LS', side: 'right', y: 54, role: 'output' }, { name: 'RET_LS', side: 'right', y: 90, role: 'output' },
     { name: 'AIR', side: 'right', y: 124, role: 'air' }] },
   plc16: { kind: 'plc16', label: 'Virtual PLC 16/16', help: '24V PLC, 16 digital inputs and 16 high-side outputs with names you choose', terminals: plc16Terminals() },
+  'io-di8': { kind: 'io-di8', label: 'Expansion DI8 module', help: 'Eight-point 24V digital-input expansion module: power L+/M, inputs I0-I7 read by the host PLC chosen in the inspector (R13)', terminals: ioModuleTerminals('io-di8') },
+  'io-do8': { kind: 'io-do8', label: 'Expansion DO8 module', help: 'Eight-point 24V high-side digital-output expansion module: power L+/M, outputs Q0-Q7 driven by the host PLC chosen in the inspector (R13)', terminals: ioModuleTerminals('io-do8') },
   supply: { kind: 'supply', label: '24V supply', help: 'Educational DC source', terminals: [
     { name: 'P24', side: 'right', y: 45, role: 'supply' }, { name: 'M0', side: 'right', y: 92, role: 'return' }] },
   plc: { kind: 'plc', label: 'Virtual PLC', help: '24V PLC, five digital inputs and six high-side outputs', terminals: [
