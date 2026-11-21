@@ -24,7 +24,7 @@ export const ROTATABLE = new Set([
   'contactor', 'forwardcontactor', 'reversecontactor', 'relay', 'timerelay',
   'breaker', 'overload', 'motor', 'revmotor', 'lamp', 'stacklight', 'selector', 'buzzer', 'siren',
   // Orientation-aware Tier 1 material handling and square-footprint geometry sensing.
-  'belt-conveyor', 'roller-conveyor', 'turntable', 'geometry-photoeye',
+  'belt-conveyor', 'roller-conveyor', 'turntable', 'curved-conveyor', 'transfer-unit', 'geometry-photoeye',
   'inductive-prox', 'capacitive-prox', 'weigh-cell',
   // P8 fixed opaque solids now have worker-validated yaw-aware intersection.
   // Unlike a moving robot, a stationary rack/vessel has no orientation-sensitive kinematics.

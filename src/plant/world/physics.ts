@@ -7,6 +7,7 @@ import {G_MM_S2} from './types';
 import {clamp,face,insideFootprint,q,vec} from './math';
 import {addEvent} from './events';
 import {newlyContactsStaticSolid,staticSolidSize} from './solid-geometry';
+import {arcContains,arcTangent} from './arc';
 import {bodiesTouch,isComposite,supportTopAt,sweptContact,tipOver,tipSpeed,volumeOverlap} from './geometry';
 
 /**
@@ -23,7 +24,7 @@ const tipIfFastStop=(body:Body,vx:number,vy:number):boolean=>{
 };
 const frictionOf=(b:Body):number=>typeof b.tags.frictionMu==='number'?b.tags.frictionMu:.4;
 const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','lift','scissor-lift',
- 'pick-and-place','palletizer','asrs-crane']);
+ 'pick-and-place','palletizer','asrs-crane','curved-conveyor','transfer-unit']);
 const BLOCKERS=new Set(['stopper','diverter-gate','safety-fence','guard-door']);
 const clampVelocity=(value:number,target:number,dtMs:number,accel=3500):number=>
  q(value+clamp(target-value,-accel*dtMs/1000,accel*dtMs/1000));
@@ -42,9 +43,11 @@ const surfaceHeight=(item:EquipmentPlacement,state:EquipmentState,pos:Vec3):numb
 /** Equipment length/width are local axes; 90/270 degree yaw swaps world-space footprint. */
 const worldFootprint=(item:EquipmentPlacement,length:number,width:number):Vec3=>
  item.yawDeg===90||item.yawDeg===270?vec(width,length,0):vec(length,width,0);
+/** Whether a point is on a carrier's surface: the true quarter-annulus for a curved belt, the footprint rectangle for the rest. */
+const onSurface=(item:EquipmentPlacement,pos:Vec3):boolean=>item.kind==='curved-conveyor'?arcContains(item,pos):
+ insideFootprint(pos,item.originMm,worldFootprint(item,item.params.lengthMm??600,item.params.widthMm??300));
 function chooseCarrier(body:Body,items:readonly EquipmentPlacement[],states:World['model']):EquipmentPlacement|undefined{
- return items.find(item=>CARRIERS.has(item.kind)&&insideFootprint(body.pos,item.originMm,
-  worldFootprint(item,item.params.lengthMm??600,item.params.widthMm??300)) &&
+ return items.find(item=>CARRIERS.has(item.kind)&&onSurface(item,body.pos)&&
   Math.abs(body.pos.z-surfaceHeight(item,states[item.id],body.pos))<150);
 }
 function collide(body:Body,candidates:readonly Body[],move:Vec3,
@@ -132,7 +135,13 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    // after the real modeled transfer, not merely the appearance of its mesh.
    const travelYaw=carrier.kind==='turntable'&&state.done
      ? (carrier.yawDeg+90)%360 : carrier.yawDeg;
-   const direction=face(travelYaw);
+   // A curved belt carries along the tangent of its arc; a powered transfer unit that is transferring turns the load
+   // sideways (90 degrees chain, 45 degrees pop-up wheels) relative to its own heading.
+   let direction:{x:number;y:number}=carrier.kind==='curved-conveyor'?arcTangent(carrier,body.pos):face(travelYaw);
+   if(carrier.kind==='transfer-unit'&&state.done){
+    const turn=(carrier.params.side===1?-1:1)*(carrier.params.transferAngleDeg??90)*Math.PI/180,c=Math.cos(turn),sn=Math.sin(turn);
+    direction={x:direction.x*c-direction.y*sn,y:direction.x*sn+direction.y*c};
+   }
    // During P8 worker-timed table indexing, carried parcels rotate about
    // the fixed turntable centre; translation is temporarily locked. Prior
    // projects without the explicit opt-in retain legacy conveying behavior.
@@ -237,8 +246,7 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
       delete tags.jammedByBody;body.tags=tags;}
     }
    }
-   if(!insideFootprint(body.pos,carrier.originMm,
-     worldFootprint(carrier,carrier.params.lengthMm??600,carrier.params.widthMm??300))){
+   if(!onSurface(carrier,body.pos)){
     body.supportedBy=null;body.vel.z=0;
    }
   }else{

@@ -19,7 +19,7 @@ export type PlanFootprint = {
 /** Only independent transport surfaces are checked for potential overlap.
  * Photoeyes intentionally mount in a transport footprint; they aren't collisions.
  */
-const CARRIERS = new Set(['belt-conveyor', 'roller-conveyor', 'turntable', 'lift', 'scissor-lift']);
+const CARRIERS = new Set(['belt-conveyor', 'roller-conveyor', 'turntable', 'curved-conveyor', 'transfer-unit', 'lift', 'scissor-lift']);
 const finiteMm = (value: number): number => Number.isFinite(value) ? value : 0;
 export function footprintOf(
   item: PlacedComponent, params: ProjectFile['params'] = {},

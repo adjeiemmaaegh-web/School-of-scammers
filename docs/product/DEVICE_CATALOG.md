@@ -3,7 +3,7 @@
 **Generated from the code (`UPDATE_DEVICE_CATALOG=1 npx vitest run tests/device-catalog-doc.test.ts`); do not edit by hand.** A unit test fails when this file is stale.
 Educational simplifications only: nothing here is a calibrated, certified or safety-rated model. See `DEVICE_CONTRACT.md` for how a device is built.
 
-67 placeable kinds; 34 have a plant (motion/sensing) model, 33 are electrical or legacy only.
+69 placeable kinds; 36 have a plant (motion/sensing) model, 33 are electrical or legacy only.
 
 | Kind | Label | Terminals | Plant model | Settings | Injectable faults |
 |---|---|---|---|---|---|
@@ -19,6 +19,7 @@ Educational simplifications only: nothing here is a calibrated, certified or saf
 | `compressor` | Air compressor with receiver | A1 A2 PS_A PS_B AIR | no | Cut-in pressure (2–8 bar, default 6); Cut-out pressure (4–10 bar, default 8); Pump rate (0.1–2 bar/s, default 0.6); Pressure-switch point (1–8 bar, default 5) | Compressor: pump motor will not run; Compressor: air leak in the receiver |
 | `contactor` | Contactor | A1 A2 13 14 | no | — | Contactor coil open; Contactor contacts welded |
 | `conveyor` | 3D conveyor belt | L+ M- | no | — | Motor winding open |
+| `curved-conveyor` | Curved belt conveyor (90 degrees) | CMD_run+ CMD_reverse+ M- L+ M OUT_moving OUT_jam AN_speed SET_speed | yes | Centre-line radius (300–1500 mm, default 600); Belt width (150–500 mm, default 300); Surface speed (50–1000 mm/s, default 250); Turn direction (0–1 0=left, 1=right, default 0); Centre-line radius (300–1500 mm, default 600); Belt width (150–500 mm, default 300); Surface speed (50–1000 mm/s, default 250); Turn direction (0–1 0=left, 1=right, default 0) | belt-slip; belt-jammed; motor-dead |
 | `cylinder` | Pneumatic cylinder | EXT+ RET+ M- L+ EXT_LS RET_LS AIR | no | — | Cylinder: no air supply; Cylinder: rod jammed; Cylinder: EXTENDED limit switch dead; Cylinder: RETRACTED limit switch dead |
 | `diverter` | 24V diverter | A1 A2 | no | — | — |
 | `diverter-gate` | Sorting diverter gate | CMD_reject+ M- L+ M OUT_rejected OUT_home | yes | Gate transition (100–4000 ms, default 600); Gate transition (100–4000 ms, default 600) | gate-jammed; gate-slow |
@@ -71,6 +72,7 @@ Educational simplifications only: nothing here is a calibrated, certified or saf
 | `tank` | 3D process tank | LEVEL | no | — | — |
 | `three-phase-supply` | Virtual 400V three-phase source | L1 L2 L3 PE | no | — | — |
 | `timerelay` | 24V on-delay relay | A1 A2 13 14 21 22 | no | On-delay (100–60000 ms, default 2000) | Contactor coil open; Contactor contacts welded |
+| `transfer-unit` | Powered transfer (pop-up wheel / chain) | CMD_run+ CMD_transfer+ CMD_reverse+ M- L+ M OUT_moving OUT_transferring OUT_jam | yes | Length (200–2400 mm, default 400); Width (150–600 mm, default 300); Surface speed (50–1000 mm/s, default 250); Transfer side (0–1 0=left, 1=right, default 0); Transfer angle (15–90 degrees (45 pop-up wheel, 90 chain), default 90); Length (200–2400 mm, default 400); Width (150–600 mm, default 300); Surface speed (50–1000 mm/s, default 250); Transfer side (0–1 0=left, 1=right, default 0); Transfer angle (15–90 degrees (45 pop-up wheel, 90 chain), default 90) | motor-dead; transfer-stuck |
 | `turntable` | 90-degree turntable | CMD_turn+ CMD_run+ M- L+ M OUT_home OUT_rotated OUT_busy AN_angleDeg | yes | Quarter-turn time (100–8000 ms, default 2000); Rotate carried parcels (0–1 0=legacy, 1=continuous, default 0); Quarter-turn time (100–8000 ms, default 2000); Rotate carried parcels (0–1 0=legacy, 1=continuous, default 0) | turntable-stuck; home-switch-stuck |
 | `vision-sensor` | Machine-vision inspection sensor | L+ M OUT_present OUT_pass AN_classId AN_lengthMm | yes | Field of view (square side) (100–1000 mm, default 300); Expected length (0 = no size check) (0–1500 mm, default 0); Length tolerance (1–200 mm, default 10); Bottles must be capped (0–1 0=off, 1=on, default 0); Required stage (0 = off) (0–4 1=raw, 2=machined, 3=assembled, 4=finished, default 0); Field of view (square side) (100–1000 mm, default 300); Expected length (0 = no size check) (0–1500 mm, default 0); Length tolerance (1–200 mm, default 10); Bottles must be capped (0–1 0=off, 1=on, default 0); Required stage (0 = off) (0–4 1=raw, 2=machined, 3=assembled, 4=finished, default 0) | camera-offline; lighting-fault |
 | `weigh-cell` | Numeric weighing platform | L+ M OUT_present AN_weightKg | yes | Cell capacity (1–500 kg, default 100); Seeded noise amplitude (0–50 g, default 3); Cell capacity (1–500 kg, default 100); Seeded noise amplitude (0–50 g, default 3) | load-cell-drift; load-cell-dead |
