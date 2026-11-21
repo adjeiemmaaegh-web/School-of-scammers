@@ -3,6 +3,7 @@
  * Equipment reads previous settled body/plant state; commands are the mapped PLC
  * output image. No setTimeout, renderer state, Date.now or Math.random.
  */
+import {advanceOperator} from './operator-walk';
 import type {EquipmentDef,SceneOccluder} from './equipment';
 import {ctxOf} from './equipment';
 import type {EquipmentPlacement,LiveSignal,World,WorldInputs} from './types';
@@ -84,7 +85,7 @@ export function stepScene(previous:SceneRuntime,placements:readonly EquipmentPla
    if(!changed||!changed.state||!changed.world)throw new Error('Equipment step failed '+item.id);
    world={...changed.world,model:{...changed.world.model,[item.id]:changed.state}};
   }
-  world=advanceBodies(world,placements,SUBSTEP_MS);
+  world=advanceOperator(advanceBodies(world,placements,SUBSTEP_MS),placements,SUBSTEP_MS);
   world={...world,timeMs:q(world.timeMs+SUBSTEP_MS)};
  }
  return {world,signals:samplePlant(world,placements,library)};

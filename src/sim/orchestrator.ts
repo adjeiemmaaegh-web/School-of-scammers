@@ -412,9 +412,15 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           vel:{x:0,y:0,z:0},supportedBy:null,
           tags:{material:'person',trainingOperator:true},
         };
-        else delete next.trainingOperator;
+        else { delete next.trainingOperator; delete next.operatorGoal; }
         world={...world,plantWorld:{...world.plantWorld,world:next}};
       }
+    }
+    else if (cmd.k === 'walkOperator') {
+      const ok = (n: number) => Number.isSafeInteger(n) && n >= -6000 && n <= 6000;
+      if (!ok(cmd.xMm) || !ok(cmd.yMm)) world = setError(world, 'Invalid walking target');
+      else if (!world.plantWorld.world.trainingOperator) world = setError(world, 'Place the simulated operator first');
+      else world = { ...world, plantWorld: { ...world.plantWorld, world: { ...world.plantWorld.world, operatorGoal: { x: cmd.xMm, y: cmd.yMm } } }, lastError: null };
     }
     else if (cmd.k === 'setPlantFault') {
       if (world.running) world = setError(world, 'Pause before changing a plant equipment fault');

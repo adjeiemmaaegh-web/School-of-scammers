@@ -224,6 +224,8 @@ export type Command =
   | { k:'setPlantFault'; id:string; fault:string|null }
   /** User-controlled training-person proxy: ephemeral, in mm, worker authoritative. */
   | { k:'setTrainingOperator'; enabled:boolean; xMm:number; yMm:number; feetMm:number }
+  /** Walk the training operator toward a floor point at walking speed (R24); obstacles and stairs apply. */
+  | { k:'walkOperator'; xMm:number; yMm:number }
   | { k:'loadPlantScene'; id:string }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }

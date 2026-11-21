@@ -31,6 +31,8 @@ export type World={
  /** Explicit transient classroom operator used only for opt-in worker sensing.
   * It is never a camera inference, real human detector or physical collision body. */
  trainingOperator?:Body;
+ /** Where the training operator is walking to (R24); absent when standing still. */
+ operatorGoal?:{x:number;y:number};
 };
 export type EquipmentState={
  positionMm:number;speedMmS:number;progress:number;count:number;
