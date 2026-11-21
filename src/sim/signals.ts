@@ -265,7 +265,9 @@ export type RenderSnapshot = {
   /** Every pneumatic cylinder by component id: rod position 0 (retracted)..1 (extended) and its limit switches. */
   /** Every on-delay relay by component id: elapsed and preset milliseconds, and whether its contacts have transferred. */
   timers: Record<string, { elapsedMs: number; delayMs: number; done: boolean }>;
-  cylinders: Record<string, { position: number; extendLimit: boolean; retractLimit: boolean; command: string; alarm: string | null; conflict: boolean }>;
+  cylinders: Record<string, { position: number; extendLimit: boolean; retractLimit: boolean; command: string; alarm: string | null; conflict: boolean;
+    /** R06: force, load and port pressure; present only for a cylinder with circuit settings. */
+    circuit?: { forceN: number; loadN: number; portBar: number; holding: boolean } }>;
   /** Compressed-air state (R06): present only when the project has a compressor. Receiver pressure and pump state by compressor id, and the working pressure (bar) at every cylinder's AIR port. */
   air?: { receivers: Record<string, { pressureBar: number; pumping: boolean }>; working: Record<string, number> };
   /** Energised state of every contactor, motor and lamp by component id. */

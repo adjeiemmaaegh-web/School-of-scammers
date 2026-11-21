@@ -5,7 +5,7 @@
  * (`deviceOn` for a timer relay means "contacts transferred", which the circuit reads one scan later).
  */
 import { paramSpecsOf, paramValue } from '../../components/params';
-import { engineFault, freshCylinder, stepCylinder, type CylinderState } from '../../plant/cylinder';
+import { circuitFromSettings, engineFault, freshCylinder, stepCylinder, type CylinderState } from '../../plant/cylinder';
 import { freshTank, stepTank, type TankProcess } from '../../plant/tank-process';
 import { faultsOf, hasFault } from '../faults';
 import { AIR_DRAW_BAR_PER_S, freshReceiver, solveAir, stepReceiver, type Receiver } from '../../plant/air';
@@ -51,7 +51,8 @@ export function stepEquipmentState(
   for (const c of w.project.components.filter(x => x.kind === 'cylinder')) {
     const fault = engineFault(faultsOf(w.project).find(f => f.target === c.id && f.kind.startsWith('cylinder-'))?.kind);
     const prior = w.cylinders[c.id] ?? freshCylinder();
-    const step = stepCylinder(prior, energizedLoads.includes(`${c.id}-E`), energizedLoads.includes(`${c.id}-R`), dtMs, fault, air ? air.pressureAt(`${c.id}.AIR`) : undefined);
+    const step = stepCylinder(prior, energizedLoads.includes(`${c.id}-E`), energizedLoads.includes(`${c.id}-R`), dtMs, fault, air ? air.pressureAt(`${c.id}.AIR`) : undefined,
+      circuitFromSettings(Object.fromEntries(paramSpecsOf('cylinder').map(spec => [spec.key, paramValue(w.project.params, c.id, spec)]))));
     nextCylinders[c.id] = step.state;
     // A moving rod drains the receivers that feed it (shared equally between them).
     if (air && Math.abs(step.state.position - prior.position) > 1e-9) {

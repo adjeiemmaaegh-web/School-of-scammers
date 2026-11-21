@@ -924,7 +924,8 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       return [c.id, { elapsedMs, delayMs, done: elapsedMs >= delayMs }];
     })),
     cylinders: Object.fromEntries(Object.entries(world.cylinders).map(([id, c]) => [id, {
-      position: c.position, extendLimit: c.extendLimit, retractLimit: c.retractLimit, command: c.command, alarm: c.alarm, conflict: c.conflict }])),
+      position: c.position, extendLimit: c.extendLimit, retractLimit: c.retractLimit, command: c.command, alarm: c.alarm, conflict: c.conflict,
+      ...(c.circuit ? { circuit: c.circuit } : {}) }])),
     ...(airSnapshot(world)),
     forwardContactorOn: world.forwardContactorOn, reverseContactorOn: world.reverseContactorOn,
     motorDirection: world.motorDirection, reverseMotorAngleRad: world.reverseMotorAngleRad,
