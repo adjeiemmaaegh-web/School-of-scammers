@@ -10,6 +10,7 @@ import type { PlacedComponent, ProjectFile, Wire, XY } from '../sim/signals';
 import { assertSelection } from './selection';
 import { makeFragment } from './clipboard';
 import { boundedGroupDelta, clampPlacement, MAX_POSITION, turn } from './geometry';
+import { createGroup, expandSelection, ungroup } from './groups';
 import { alignedPositions } from './align';
 import type { WorkspaceEdit, WorkspaceFragment } from './types';
 
@@ -88,8 +89,19 @@ function insertFragment(project: ProjectFile, fragment: WorkspaceFragment, at: X
       inputs: { ...fragment.plcIo[old].inputs }, outputs: { ...fragment.plcIo[old].outputs },
     };
   }
+  // Copied groups are rebuilt over the fresh device ids (and fresh group ids), so a pasted structure stays one structure.
+  const groupMap = new Map<string, string>();
+  for (const g of fragment.groups ?? []) {
+    let n = 1; const taken = new Set([...(project.groups ?? []).map(x => x.id), ...project.components.map(c => c.id), ...components.map(c => c.id), ...groupMap.values()]);
+    while (taken.has('group-' + n)) n++;
+    groupMap.set(g.id, 'group-' + n);
+  }
+  const groups = [...(project.groups ?? []), ...(fragment.groups ?? []).map(g => ({
+    id: groupMap.get(g.id)!, name: g.name, members: g.members.map(m => map.get(m) ?? groupMap.get(m)!),
+  }))];
   let result: ProjectFile = {
     ...project, components: [...project.components, ...components], wires: [...project.wires, ...wires],
+    ...(groups.length ? { groups } : {}),
     ...(Object.keys(params).length ? { params } : {}),
     ...(Object.keys(plcIo).length ? { plcIo } : {}),
   };
@@ -104,8 +116,12 @@ function insertFragment(project: ProjectFile, fragment: WorkspaceFragment, at: X
 export function editWorkspace(project: ProjectFile, edit: WorkspaceEdit): ProjectFile {
   if (!edit || typeof edit !== 'object') throw new TypeError('Invalid workspace edit');
   if (edit.kind === 'paste') return insertFragment(project, edit.fragment, edit.at, edit.grid);
-  const parts = assertSelection(project.components, edit.ids);
-  const ids = new Set(edit.ids);
+  if (edit.kind === 'group') { assertSelection(project.components, edit.ids); return createGroup(project, edit.ids, edit.name); }
+  if (edit.kind === 'ungroup') { assertSelection(project.components, edit.ids); return ungroup(project, edit.ids); }
+  // Selecting any member of a group selects the whole group: every other edit acts on all of it.
+  const selected = expandSelection(project, edit.ids);
+  const parts = assertSelection(project.components, selected);
+  const ids = new Set(selected);
   switch (edit.kind) {
     case 'translate': {
       const delta = boundedGroupDelta(parts, edit.delta, edit.grid);
@@ -117,6 +133,24 @@ export function editWorkspace(project: ProjectFile, edit: WorkspaceEdit): Projec
       if (parts.some(c => !ROTATABLE.has(c.kind)))
         throw new Error('Selected plant equipment has orientation-locked physics. Rotation is not yet supported.');
       if (edit.quarterTurns !== -1 && edit.quarterTurns !== 1) throw new RangeError('Invalid rotation');
+      // A multi-device selection (a group) turns as one body: positions swing about its centre as each yaw turns.
+      if (parts.length > 1) {
+        const cx = (Math.min(...parts.map(c => c.x)) + Math.max(...parts.map(c => c.x))) / 2;
+        const cy = (Math.min(...parts.map(c => c.y)) + Math.max(...parts.map(c => c.y))) / 2;
+        const swung = new Map(parts.map(c => {
+          const dx = c.x - cx, dy = c.y - cy;
+          return [c.id, edit.quarterTurns === 1 ? { x: Math.round(cx - dy), y: Math.round(cy + dx) } : { x: Math.round(cx + dy), y: Math.round(cy - dx) }] as const;
+        }));
+        const turned = project.components.map(c => ids.has(c.id) ? { ...c, ...swung.get(c.id)!, yawDeg: turn(c.yawDeg, edit.quarterTurns) } : c);
+        // Near an edge the turned group is shifted back onto the floor as one body (its shape is preserved).
+        const placed = turned.filter(c => ids.has(c.id));
+        const width = Math.max(...placed.map(c => c.x)) - Math.min(...placed.map(c => c.x));
+        const height = Math.max(...placed.map(c => c.y)) - Math.min(...placed.map(c => c.y));
+        if (width > 910 || height > 450) throw new Error('The rotated group would not fit on the floor');
+        const shiftX = Math.min(0, 910 - Math.max(...placed.map(c => c.x))) + Math.max(0, -Math.min(...placed.map(c => c.x)));
+        const shiftY = Math.min(0, 450 - Math.max(...placed.map(c => c.y))) + Math.max(0, -Math.min(...placed.map(c => c.y)));
+        return { ...project, components: turned.map(c => ids.has(c.id) ? { ...c, x: c.x + shiftX, y: c.y + shiftY } : c) };
+      }
       return { ...project, components: project.components.map(c => ids.has(c.id) ?
         { ...c, yawDeg: turn(c.yawDeg, edit.quarterTurns) } : c) };
     }
@@ -128,11 +162,11 @@ export function editWorkspace(project: ProjectFile, edit: WorkspaceEdit): Projec
     case 'duplicate': {
       const anchor = { x: Math.min(...parts.map(c => c.x)) + edit.offset.x,
         y: Math.min(...parts.map(c => c.y)) + edit.offset.y };
-      return insertFragment(project, makeFragment(project, edit.ids), anchor, edit.grid);
+      return insertFragment(project, makeFragment(project, selected), anchor, edit.grid);
     }
     case 'delete': {
       let result = project;
-      for (const id of edit.ids) {
+      for (const id of selected) {
         const next = removeComponent(result, id);
         if (!next) throw new Error('Selected device no longer exists: ' + id);
         result = next;

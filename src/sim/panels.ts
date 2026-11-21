@@ -2,6 +2,7 @@
  * Editing a plant like a bench: remove a device, or drop in a ready-made starter panel.
  * Pure functions over a `ProjectFile`; the orchestrator applies them (paused only) and resets runtime.
  */
+import { pruneGroups } from '../workspace/groups';
 import type { LadderDocument } from '../engineering/ladder';
 import { isPlcKind } from '../components/registry';
 import { pruneWireStyles } from '../components/wire-style';
@@ -31,6 +32,7 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     wires: project.wires.filter(w => !goneWires.has(w.id)),
   };
   next = pruneWireStyles(next);
+  next = pruneGroups(next);
   if (project.faults) {
     const faults = project.faults.filter(f => f.target !== id && !(f.kind === 'wire-open' && goneWires.has(f.target)));
     const { faults: _old, ...rest } = next;

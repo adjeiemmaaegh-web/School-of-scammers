@@ -1,4 +1,5 @@
 /** P0/P1 authoritative deterministic sandbox. Pure simulation: no DOM, timers or wall clock. */
+import { validateGroups } from '../workspace/groups';
 import { COMPONENTS, isPlcKind, terminalExists, type ComponentKind } from '../components/registry';
 import { solveNetAware, type Device } from '../engineering/electrical';
 import { executeLadder, type LadderDocument, type LadderResult } from '../engineering/ladder';
@@ -237,6 +238,7 @@ export function validateProject(raw: unknown): ProjectFile {
   const params = validateParams(p.params, components);
   const plantFaults = validatePlantFaults(p.plantFaults, { components });
   const wireStyles = validateWireStyles(p.wireStyles, wires);
+  const groups = validateGroups(p.groups, new Set(components.map(c => c.id)));
   if (p.scanMs !== undefined && !isValidScanMs(p.scanMs)) throw new Error('Invalid scan period (10-500 ms in steps of 10)');
   return {
     formatVersion: 1, components, wires, program: p.program,
@@ -250,6 +252,7 @@ export function validateProject(raw: unknown): ProjectFile {
     ...(params ? { params } : {}),
     ...(plantFaults ? { plantFaults } : {}),
     ...(wireStyles ? { wireStyles } : {}),
+    ...(groups ? { groups } : {}),
     // The default period is never stored, so existing projects keep their exact shape.
     ...(p.scanMs !== undefined && p.scanMs !== DEFAULT_SCAN_MS ? { scanMs: p.scanMs } : {}),
   };

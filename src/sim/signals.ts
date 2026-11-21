@@ -113,6 +113,8 @@ export type ProjectFile = {
   /** Device settings that differ from the default (a timer relay's delay), by component id then setting key. */
   params?: Record<string, Record<string, number>>;
   plantFaults?: Record<string,string>;
+  /** R22 named groups of devices (and nested groups); absent when nothing is grouped. */
+  groups?: import('../workspace/groups').Group[];
   /** Presentation only: colour and net label per wire id. Never read by the solver. */
   /** Simulated PLC scan period in ms (10-500, multiples of 10); absent means the 50 ms default. See sim/scan-config.ts. */
   scanMs?: number;

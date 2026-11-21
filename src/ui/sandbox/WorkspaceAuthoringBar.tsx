@@ -13,6 +13,10 @@ type Props = {
   onRemove: () => void; onRotate: (turns: -1 | 1) => void;
   onNudge: (dx: number, dy: number) => void;
   onAlign?: (mode: AlignMode) => void;
+  /** R22 grouping: turn the selection into a named group / dissolve the selected group. */
+  onGroup?: () => void;
+  onUngroup?: () => void;
+  groupedSelection?: boolean;
 };
 
 /** The toolbar only dispatches edits; the worker validates and owns project mutations. */
@@ -55,6 +59,12 @@ export function WorkspaceAuthoringBar(props: Props) {
         {ALIGN_MODES.map(m => <option key={m} value={m} disabled={m.startsWith('distribute') && props.selectedCount < 3}>{m.replace('-', ' ')}</option>)}
       </select>
     </label>}
+    {props.onGroup && <div className="workspace-groups" role="group" aria-label="Group the selection">
+      <button type="button" data-group disabled={!props.editable || props.selectedCount < 2} onClick={props.onGroup}
+        title={props.selectedCount < 2 ? 'Select two or more devices' : 'Group the selection: it then moves, rotates and deletes as one'}>Group</button>
+      <button type="button" data-ungroup disabled={!props.editable || !props.groupedSelection} onClick={props.onUngroup}
+        title="Dissolve the selected group (devices stay where they are)">Ungroup</button>
+    </div>}
     <div className="workspace-nudges" role="group" aria-label="Move selected equipment one grid step">
       <button type="button" disabled={!selected} onClick={() => props.onNudge(-props.grid, 0)} aria-label="Move selection left">←</button>
       <button type="button" disabled={!selected} onClick={() => props.onNudge(0, -props.grid)} aria-label="Move selection up">↑</button>

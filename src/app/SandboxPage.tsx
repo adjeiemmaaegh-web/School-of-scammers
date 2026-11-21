@@ -1,3 +1,4 @@
+import { expandSelection, rootGroupOf } from '../workspace/groups';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, isPlcKind, type ComponentKind } from '../components/registry';
@@ -539,7 +540,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     };
   }, []);
   const selectDevice=(id:string|null,additive=false)=>{
-    setSelectedDeviceIds(current=>id?additive?toggleOne(current,id):selectOne(id):emptySelection());
+    // R22: selecting any member of a group selects the whole group (and toggling one deselects the whole group).
+    const whole=(ids:string[])=>project?expandSelection(project,ids):ids;
+    setSelectedDeviceIds(current=>{
+      if(!id)return emptySelection();
+      if(!additive)return whole(selectOne(id));
+      const group=whole([id]);
+      return current.includes(id)?current.filter(s=>!group.includes(s)):[...current,...group.filter(g=>!current.includes(g))];
+    });
     if(id&&isPlcKind(project?.components.find(c=>c.id===id)?.kind??''))setSelectedPlcId(id);
   };
   const edit=(operation:WorkspaceEdit)=>{
@@ -822,6 +830,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           grid={grid} onGrid={setGrid} onUndo={undo} onRedo={redo} onCopy={copySelection}
           onPaste={pasteSelection} onDuplicate={duplicateSelection} onRemove={deleteSelection}
           onAlign={mode=>edit({kind:'align',ids:selectedDeviceIds,mode})}
+          onGroup={()=>edit({kind:'group',ids:[...selectedDeviceIds],name:'Group '+((project?.groups?.length??0)+1)})}
+          onUngroup={()=>edit({kind:'ungroup',ids:[...selectedDeviceIds]})}
+          groupedSelection={!!project?.groups&&selectedDeviceIds.some(id=>rootGroupOf(project.groups,id))}
           onRotate={rotateSelection} onNudge={moveSelection}/>
       </div>}
       <div className="p5-view-tools" role="toolbar" aria-label="Canvas views and active tools">
