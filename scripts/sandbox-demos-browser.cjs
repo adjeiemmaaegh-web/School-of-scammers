@@ -4,7 +4,11 @@ const assert = require('node:assert/strict');
 const puppeteer = require('puppeteer');
 const base = process.env.PLC_BASE_URL || 'http://127.0.0.1:4173';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const IDS = ['sorting-factory', 'machining-assembly', 'pneumatic-cell', 'multi-plc-factory', 'process-control', 'human-interaction'];
+// Exact device-card count of each demonstration: waiting for it (not a minimum) means the cards of the PREVIOUS demo can never satisfy the wait.
+const DEVICES = { 'sorting-factory': 11, 'machining-assembly': 10, 'pneumatic-cell': 5, 'multi-plc-factory': 11, 'process-control': 7, 'human-interaction': 10, 'reject-rework': 16 };
+// The reject/rework line spaces its parts 7 s apart (one part in the cell at a time), so its first part appears later than the others'.
+const SETTLE_MS = { 'reject-rework': 9000 };
+const IDS = ['sorting-factory', 'machining-assembly', 'pneumatic-cell', 'multi-plc-factory', 'process-control', 'human-interaction', 'reject-rework'];
 (async () => {
   const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage();
@@ -18,7 +22,7 @@ const IDS = ['sorting-factory', 'machining-assembly', 'pneumatic-cell', 'multi-p
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('[data-sandbox-demos]');
-    assert.equal(await page.evaluate(() => document.querySelectorAll('[data-demo-card]').length), 6, 'six demonstration cards');
+    assert.equal(await page.evaluate(() => document.querySelectorAll('[data-demo-card]').length), 7, 'seven demonstration cards');
     let n = 0;
     for (const id of IDS) {
       n++;
@@ -27,10 +31,10 @@ const IDS = ['sorting-factory', 'machining-assembly', 'pneumatic-cell', 'multi-p
       await page.$eval(`[data-demo-load="${id}"]`, el => el.scrollIntoView({ block: 'center' }));
       await page.click(`[data-demo-load="${id}"]`);
       if (n > 1) { await page.waitForFunction(i => /Confirm/.test(document.querySelector(`[data-demo-load="${i}"]`)?.textContent || ''), { timeout: 4000 }, id); await page.click(`[data-demo-load="${id}"]`); }
-      await page.waitForFunction(() => document.querySelectorAll('.sandbox-device').length >= 6, { timeout: 10000 });
+      await page.waitForFunction(count => document.querySelectorAll('.sandbox-device').length === count, { timeout: 10000 }, DEVICES[id]);
       assert.ok(await clickText('▶ Run'), 'run ' + id);
       await page.waitForFunction(() => /Running|Pause/.test(document.body.textContent), { timeout: 8000 });
-      await sleep(1500);
+      await sleep(SETTLE_MS[id] || 1500);
       const first = await snapshotText();
       await sleep(5000);
       const later = await snapshotText();

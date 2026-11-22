@@ -3,9 +3,9 @@ import { DEMOS } from '../src/plant/demos';
 import { createWorld, tick, validateProject } from '../src/sim/orchestrator';
 
 describe('demonstration catalogue', () => {
-  it('lists six demonstrations A-F with unique ids', () => {
-    expect(DEMOS.map(d => d.letter)).toEqual(['A', 'B', 'C', 'D', 'E', 'F']);
-    expect(new Set(DEMOS.map(d => d.id)).size).toBe(6);
+  it('lists seven demonstrations A-G with unique ids', () => {
+    expect(DEMOS.map(d => d.letter)).toEqual(['A', 'B', 'C', 'D', 'E', 'F', 'G']);
+    expect(new Set(DEMOS.map(d => d.id)).size).toBe(7);
   });
   for (const demo of DEMOS) {
     it(`${demo.letter}. ${demo.title}: validates, loads without error, round-trips as plain JSON and powers its PLCs`, () => {
