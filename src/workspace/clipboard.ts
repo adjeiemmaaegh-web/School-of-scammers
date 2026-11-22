@@ -23,7 +23,7 @@ export function makeFragment(project: ProjectFile, ids: readonly string[]): Work
     }]));
   // Groups copy whole: a group is kept only when every device it contains is in the selection.
   const groups = (project.groups ?? []).filter(g => leafDevices(project.groups!, g.id, project.components).every(id => chosen.has(id)))
-    .map(g => ({ id: g.id, name: g.name, members: [...g.members] }));
+    .map(g => ({ id: g.id, name: g.name, members: [...g.members], ...(g.ports ? { ports: g.ports.map(p => ({ ...p })) } : {}) }));
   return { version: 1, components, wires,
     ...(groups.length ? { groups } : {}),
     ...(Object.keys(params).length ? { params } : {}),

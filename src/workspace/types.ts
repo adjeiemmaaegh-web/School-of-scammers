@@ -27,6 +27,8 @@ export type WorkspaceEdit =
   | { kind: 'delete'; ids: string[] }
   | { kind: 'group'; ids: string[]; name: string }
   | { kind: 'ungroup'; ids: string[] }
+  | { kind: 'groupPort'; group: string; name: string; terminal: string | null }
+  | { kind: 'wirePort'; group: string; port: string; to: string }
   | { kind: 'paste'; fragment: WorkspaceFragment; at: XY; grid: GridStep };
 
 export type WorkspaceHistory = {

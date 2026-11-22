@@ -240,7 +240,7 @@ export function validateProject(raw: unknown): ProjectFile {
   const params = validateParams(p.params, components);
   const plantFaults = validatePlantFaults(p.plantFaults, { components });
   const wireStyles = validateWireStyles(p.wireStyles, wires);
-  const groups = validateGroups(p.groups, new Set(components.map(c => c.id)));
+  const groups = validateGroups(p.groups, new Set(components.map(c => c.id)), components);
   if (p.scanMs !== undefined && !isValidScanMs(p.scanMs)) throw new Error('Invalid scan period (10-500 ms in steps of 10)');
   return {
     formatVersion: 1, components, wires, program: p.program,

@@ -10,7 +10,7 @@ import type { PlacedComponent, ProjectFile, Wire, XY } from '../sim/signals';
 import { assertSelection } from './selection';
 import { makeFragment } from './clipboard';
 import { boundedGroupDelta, clampPlacement, MAX_POSITION, turn } from './geometry';
-import { createGroup, expandSelection, ungroup } from './groups';
+import { createGroup, expandSelection, setGroupPort, ungroup, wireToPort } from './groups';
 import { alignedPositions } from './align';
 import type { WorkspaceEdit, WorkspaceFragment } from './types';
 
@@ -98,6 +98,7 @@ function insertFragment(project: ProjectFile, fragment: WorkspaceFragment, at: X
   }
   const groups = [...(project.groups ?? []), ...(fragment.groups ?? []).map(g => ({
     id: groupMap.get(g.id)!, name: g.name, members: g.members.map(m => map.get(m) ?? groupMap.get(m)!),
+    ...(g.ports ? { ports: g.ports.map(p => ({ name: p.name, terminal: remapPin(p.terminal, map) })) } : {}),
   }))];
   let result: ProjectFile = {
     ...project, components: [...project.components, ...components], wires: [...project.wires, ...wires],
@@ -117,6 +118,8 @@ export function editWorkspace(project: ProjectFile, edit: WorkspaceEdit): Projec
   if (!edit || typeof edit !== 'object') throw new TypeError('Invalid workspace edit');
   if (edit.kind === 'paste') return insertFragment(project, edit.fragment, edit.at, edit.grid);
   if (edit.kind === 'group') { assertSelection(project.components, edit.ids); return createGroup(project, edit.ids, edit.name); }
+  if (edit.kind === 'groupPort') return setGroupPort(project, edit.group, edit.name, edit.terminal);
+  if (edit.kind === 'wirePort') return wireToPort(project, edit.group, edit.port, edit.to);
   if (edit.kind === 'ungroup') { assertSelection(project.components, edit.ids); return ungroup(project, edit.ids); }
   // Selecting any member of a group selects the whole group: every other edit acts on all of it.
   const selected = expandSelection(project, edit.ids);
