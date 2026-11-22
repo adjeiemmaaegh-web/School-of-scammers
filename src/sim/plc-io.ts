@@ -9,7 +9,7 @@
  *
  * Pure and deterministic like everything under src/sim.
  */
-import { IO_MODULE_POINTS, PLC16_INPUT_TERMINALS, PLC16_OUTPUT_TERMINALS, isIoModuleKind } from '../components/registry';
+import { IO_MODULE_ANALOG_INPUTS, IO_MODULE_ANALOG_OUTPUTS, IO_MODULE_POINTS, PLC16_INPUT_TERMINALS, PLC16_OUTPUT_TERMINALS, isIoModuleKind, type IoModuleKind } from '../components/registry';
 import type { PlacedComponent, ProjectFile } from './signals';
 
 /** terminal -> tag, for inputs and for outputs. */
@@ -42,11 +42,11 @@ export function pinLocation(plcId: string, pin: string): { owner: string; pin: s
   return at < 0 ? { owner: plcId, pin, module: false } : { owner: pin.slice(0, at), pin: pin.slice(at + 1), module: true };
 }
 /** Modules attached to one PLC, in slot order. Only modules still in the project count. */
-export function modulesOf(project: Partial<Pick<ProjectFile, 'components' | 'ioModules'>>, plcId: string): { id: string; kind: 'io-di8' | 'io-do8'; slot: number }[] {
-  const out: { id: string; kind: 'io-di8' | 'io-do8'; slot: number }[] = [];
+export function modulesOf(project: Partial<Pick<ProjectFile, 'components' | 'ioModules'>>, plcId: string): { id: string; kind: IoModuleKind; slot: number }[] {
+  const out: { id: string; kind: IoModuleKind; slot: number }[] = [];
   for (const [id, link] of Object.entries(project.ioModules ?? {})) {
     const c = project.components?.find(x => x.id === id);
-    if (c && link.plc === plcId && isIoModuleKind(c.kind)) out.push({ id, kind: c.kind as 'io-di8' | 'io-do8', slot: link.slot });
+    if (c && link.plc === plcId && isIoModuleKind(c.kind)) out.push({ id, kind: c.kind, slot: link.slot });
   }
   return out.sort((a, b) => a.slot - b.slot);
 }
@@ -55,11 +55,15 @@ const withModules = (map: PlcIoMap, project: Partial<Pick<ProjectFile, 'componen
   const mods = modulesOf(project, plc.id);
   if (!mods.length) return map;
   const inputs = { ...map.inputs }, outputs = { ...map.outputs };
-  for (const m of mods) for (let k = 0; k < IO_MODULE_POINTS; k++) {
-    if (m.kind === 'io-di8') inputs[`${m.id}${MODULE_PIN_SEPARATOR}I${k}`] = `M${m.slot}In${k}`;
-    else outputs[`${m.id}${MODULE_PIN_SEPARATOR}Q${k}`] = `M${m.slot}Out${k}`;
+  const analogInputs = { ...(map.analogInputs ?? {}) }, analogOutputs = { ...(map.analogOutputs ?? {}) };
+  for (const m of mods) {
+    const key = (pin: string) => `${m.id}${MODULE_PIN_SEPARATOR}${pin}`;
+    if (m.kind === 'io-di8') for (let k = 0; k < IO_MODULE_POINTS; k++) inputs[key(`I${k}`)] = `M${m.slot}In${k}`;
+    else if (m.kind === 'io-do8') for (let k = 0; k < IO_MODULE_POINTS; k++) outputs[key(`Q${k}`)] = `M${m.slot}Out${k}`;
+    else if (m.kind === 'io-ai4') for (let k = 0; k < IO_MODULE_ANALOG_INPUTS; k++) analogInputs[key(`AI${k}`)] = `M${m.slot}Ai${k}`;
+    else for (let k = 0; k < IO_MODULE_ANALOG_OUTPUTS; k++) analogOutputs[key(`AO${k}`)] = `M${m.slot}Ao${k}`;
   }
-  return { ...map, inputs, outputs };
+  return { ...map, inputs, outputs, ...(Object.keys(analogInputs).length ? { analogInputs } : {}), ...(Object.keys(analogOutputs).length ? { analogOutputs } : {}) };
 };
 
 /** The resolved map of one PLC: its saved names laid over the defaults for its kind, plus the channels of its expansion modules. */

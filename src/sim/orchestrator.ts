@@ -1,6 +1,6 @@
 /** P0/P1 authoritative deterministic sandbox. Pure simulation: no DOM, timers or wall clock. */
 import { validateGroups } from '../workspace/groups';
-import { COMPONENTS, isPlcKind, terminalExists, type ComponentKind } from '../components/registry';
+import { COMPONENTS, isIoModuleKind, isPlcKind, terminalExists, type ComponentKind } from '../components/registry';
 import { solveNetAware, type Device } from '../engineering/electrical';
 import { executeLadder, type LadderDocument, type LadderResult } from '../engineering/ladder';
 import { compileFbd, executeFbd, type FbdResult } from '../engineering/fbd';
@@ -267,8 +267,11 @@ function analogOutputsOf(w: WorldState): Record<string, number> {
     const io = ioOf(w.project, c);
     for (const [pin, tag] of Object.entries(io.analogOutputs ?? {})) {
       const runtime = w.plcs[c.id];
-      const raw = runtime?.powered ? runtime.tagValues[tag] : undefined;
-      out[`${c.id}.${pin}`] = typeof raw === 'number' && Number.isFinite(raw) && Math.abs(raw) <= 1_000_000 ? raw : 0;
+      // R13: an expansion AO module writes only while ITS OWN supply is present as well as the PLC's.
+      const at = pinLocation(c.id, pin);
+      const moduleLive = !at.module || (w.voltages[at.owner + '.L+'] !== undefined && w.voltages[at.owner + '.M'] !== undefined);
+      const raw = runtime?.powered && moduleLive ? runtime.tagValues[tag] : undefined;
+      out[`${at.owner}.${at.pin}`] = typeof raw === 'number' && Number.isFinite(raw) && Math.abs(raw) <= 1_000_000 ? raw : 0;
     }
   }
   return out;
@@ -318,7 +321,7 @@ function validateIoModules(raw: unknown, components: readonly PlacedComponent[])
   const used = new Set<string>();
   for (const [id, link] of Object.entries(raw as Record<string, unknown>)) {
     const mod = components.find(c => c.id === id);
-    if (!mod || (mod.kind !== 'io-di8' && mod.kind !== 'io-do8')) throw new Error(`Expansion module ${id}: not an expansion module in this project`);
+    if (!mod || !isIoModuleKind(mod.kind)) throw new Error(`Expansion module ${id}: not an expansion module in this project`);
     const l = link as { plc?: unknown; slot?: unknown } | null;
     const host = components.find(c => c.id === l?.plc);
     if (!host || host.kind !== 'plc16') throw new Error(`Expansion module ${id}: host must be a 16/16 PLC in this project`);
@@ -656,7 +659,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       const mod = world.project.components.find(c => c.id === cmd.module);
       const host = cmd.plc === null ? undefined : plcComponents(world.project).find(c => c.id === cmd.plc);
       const next = { ...(world.project.ioModules ?? {}) };
-      if (!mod || (mod.kind !== 'io-di8' && mod.kind !== 'io-do8')) world = setError(world, 'Unknown expansion module');
+      if (!mod || !isIoModuleKind(mod.kind)) world = setError(world, 'Unknown expansion module');
       else if (cmd.plc !== null && (!host || host.kind !== 'plc16')) world = setError(world, 'Expansion modules attach to a 16/16 PLC');
       else {
         delete next[mod.id];

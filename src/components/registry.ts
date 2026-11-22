@@ -1,7 +1,7 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
 import { EQUIPMENT } from '../plant/equipment';
 import type { EquipmentDef } from '../plant/world/equipment';
-export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive' | 'selector' | 'buzzer' | 'siren' | 'collector' | 'retro-photoeye' | 'laser-distance' | 'rfid-reader' | 'vision-sensor' | 'incremental-encoder' | 'compressor' | 'air-regulator' | 'safety-fence' | 'guard-door' | 'curved-conveyor' | 'transfer-unit' | 'process-station' | 'handrail' | 'platform' | 'stairs' | 'work-zone' | 'potentiometer' | 'selector-3pos' | 'seven-segment' | 'numeric-display' | 'operator-station' | 'indicator-panel' | 'io-di8' | 'io-do8' | 'transfer-pump' | 'merge-gate';
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive' | 'selector' | 'buzzer' | 'siren' | 'collector' | 'retro-photoeye' | 'laser-distance' | 'rfid-reader' | 'vision-sensor' | 'incremental-encoder' | 'compressor' | 'air-regulator' | 'safety-fence' | 'guard-door' | 'curved-conveyor' | 'transfer-unit' | 'process-station' | 'handrail' | 'platform' | 'stairs' | 'work-zone' | 'potentiometer' | 'selector-3pos' | 'seven-segment' | 'numeric-display' | 'operator-station' | 'indicator-panel' | 'io-di8' | 'io-do8' | 'io-ai4' | 'io-ao2' | 'transfer-pump' | 'merge-gate';
 export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' | 'three-phase' | 'air' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
@@ -18,13 +18,19 @@ const plc16Terminals = (): Terminal[] => [
   { name:'AO0',side:'right',y:164,role:'analog-output' },
   { name:'AO1',side:'right',y:175,role:'analog-output' },
 ];
-/** Expansion I/O modules (R13): eight digital points each, powered separately from the PLC they extend. */
+/** Expansion I/O modules (R13): digital 8-point DI/DO and analog 4-input AI / 2-output AO modules, powered separately from the PLC they extend. */
 export const IO_MODULE_POINTS = 8;
-export const isIoModuleKind = (kind: string): boolean => kind === 'io-di8' || kind === 'io-do8';
-function ioModuleTerminals(kind: 'io-di8' | 'io-do8'): Terminal[] {
-  const input = kind === 'io-di8';
-  return [{ name: 'L+', side: 'left', y: 8, role: 'supply' }, { name: 'M', side: 'left', y: 22, role: 'return' },
-    ...Array.from({ length: IO_MODULE_POINTS }, (_, i): Terminal => ({ name: `${input ? 'I' : 'Q'}${i}`, side: input ? 'left' : 'right', y: 36 + i * 12, role: input ? 'input' : 'output' }))];
+export type IoModuleKind = 'io-di8' | 'io-do8' | 'io-ai4' | 'io-ao2';
+export const IO_MODULE_ANALOG_INPUTS = 4, IO_MODULE_ANALOG_OUTPUTS = 2;
+export const isIoModuleKind = (kind: string): kind is IoModuleKind => kind === 'io-di8' || kind === 'io-do8' || kind === 'io-ai4' || kind === 'io-ao2';
+function ioModuleTerminals(kind: IoModuleKind): Terminal[] {
+  const power: Terminal[] = [{ name: 'L+', side: 'left', y: 8, role: 'supply' }, { name: 'M', side: 'left', y: 22, role: 'return' }];
+  const row = (count: number, prefix: string, side: 'left' | 'right', role: Terminal['role']): Terminal[] =>
+    Array.from({ length: count }, (_, i): Terminal => ({ name: `${prefix}${i}`, side, y: 36 + i * 12, role }));
+  if (kind === 'io-di8') return [...power, ...row(IO_MODULE_POINTS, 'I', 'left', 'input')];
+  if (kind === 'io-do8') return [...power, ...row(IO_MODULE_POINTS, 'Q', 'right', 'output')];
+  if (kind === 'io-ai4') return [...power, ...row(IO_MODULE_ANALOG_INPUTS, 'AI', 'left', 'analog-input')];
+  return [...power, ...row(IO_MODULE_ANALOG_OUTPUTS, 'AO', 'right', 'analog-output')];
 }
 const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
   stacklight: { kind: 'stacklight', label: 'Stack light (R/Y/G)', help: 'Three 24V signal lamps on one column: R, Y and G each to the common M-', terminals: [
@@ -46,6 +52,8 @@ const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
     { name: 'AIR', side: 'right', y: 124, role: 'air' }] },
   plc16: { kind: 'plc16', label: 'Virtual PLC 16/16', help: '24V PLC, 16 digital inputs and 16 high-side outputs with names you choose', terminals: plc16Terminals() },
   'io-di8': { kind: 'io-di8', label: 'Expansion DI8 module', help: 'Eight-point 24V digital-input expansion module: power L+/M, inputs I0-I7 read by the host PLC chosen in the inspector (R13)', terminals: ioModuleTerminals('io-di8') },
+  'io-ai4': { kind: 'io-ai4', label: 'Expansion AI4 module', help: 'Four-channel analog-input expansion module: power L+/M, inputs AI0-AI3 read by the host PLC chosen in the inspector (R13)', terminals: ioModuleTerminals('io-ai4') },
+  'io-ao2': { kind: 'io-ao2', label: 'Expansion AO2 module', help: 'Two-channel analog-output expansion module: power L+/M, outputs AO0-AO1 driven by REAL outputs of the host PLC (R13)', terminals: ioModuleTerminals('io-ao2') },
   'io-do8': { kind: 'io-do8', label: 'Expansion DO8 module', help: 'Eight-point 24V high-side digital-output expansion module: power L+/M, outputs Q0-Q7 driven by the host PLC chosen in the inspector (R13)', terminals: ioModuleTerminals('io-do8') },
   supply: { kind: 'supply', label: '24V supply', help: 'Educational DC source', terminals: [
     { name: 'P24', side: 'right', y: 45, role: 'supply' }, { name: 'M0', side: 'right', y: 92, role: 'return' }] },

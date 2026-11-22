@@ -3,7 +3,7 @@
 **Generated from the code (`UPDATE_DEVICE_CATALOG=1 npx vitest run tests/device-catalog-doc.test.ts`); do not edit by hand.** A unit test fails when this file is stale.
 Educational simplifications only: nothing here is a calibrated, certified or safety-rated model. See `DEVICE_CONTRACT.md` for how a device is built.
 
-84 placeable kinds; 49 have a plant (motion/sensing) model, 35 are electrical or legacy only.
+86 placeable kinds; 49 have a plant (motion/sensing) model, 37 are electrical or legacy only.
 
 | Kind | Label | Terminals | Plant model | Settings | Injectable faults |
 |---|---|---|---|---|---|
@@ -34,6 +34,8 @@ Educational simplifications only: nothing here is a calibrated, certified or saf
 | `incremental-encoder` | Incremental encoder (measuring wheel) | L+ M OUT_moving AN_count AN_speedMmS | yes | Resolution (1–20 pulses/mm, default 4); Wheel reach (20–300 mm, default 100); Aim angle (-180–180 degrees, default 0); Resolution (1–20 pulses/mm, default 4); Wheel reach (20–300 mm, default 100); Aim angle (-180–180 degrees, default 0) | encoder-dead; encoder-slip |
 | `indicator-panel` | Indicator panel (4 lamps + horn) | CMD_lamp1+ CMD_lamp2+ CMD_lamp3+ CMD_lamp4+ CMD_horn+ CMD_lampTest+ M- L+ M OUT_lit1 OUT_lit2 OUT_lit3 OUT_lit4 OUT_hornOn AN_litCount | yes | — | lamp1-burnt; lamp3-burnt; horn-dead |
 | `inductive-prox` | Inductive proximity sensor | L+ M OUT_present | yes | Sensing range (50–800 mm, default 200); Response delay (0–500 ms, default 40); Detection mode (0–1 0=area, 1=forward, default 0); Forward beam width (20–400 mm, default 100); Line of sight (0–3 0=off, 1=fixed, 2=fixed+bodies, 3=material, default 0); Target geometry (0–1 0=centre, 1=body volume, default 0); Virtual person sensing (0–1 0=off, 1=on, default 0); Transparent optical targets (0–1 0=legacy, 1=ignore glass, default 0); Sensing range (50–800 mm, default 200); Response delay (0–500 ms, default 40); Detection mode (0–1 0=area, 1=forward, default 0); Forward beam width (20–400 mm, default 100); Line of sight (0–3 0=off, 1=fixed, 2=fixed+bodies, 3=material, default 0); Target geometry (0–1 0=centre, 1=body volume, default 0); Virtual person sensing (0–1 0=off, 1=on, default 0); Transparent optical targets (0–1 0=legacy, 1=ignore glass, default 0) | sensor-stuck-on; sensor-stuck-off; dirty-lens; sensor-misaligned; sensor-intermittent |
+| `io-ai4` | Expansion AI4 module | L+ M AI0 AI1 AI2 AI3 | no | — | — |
+| `io-ao2` | Expansion AO2 module | L+ M AO0 AO1 | no | — | — |
 | `io-di8` | Expansion DI8 module | L+ M I0 I1 I2 I3 I4 I5 I6 I7 | no | — | — |
 | `io-do8` | Expansion DO8 module | L+ M Q0 Q1 Q2 Q3 Q4 Q5 Q6 Q7 | no | — | — |
 | `lamp` | 24V pilot lamp | L+ M- | no | — | — |

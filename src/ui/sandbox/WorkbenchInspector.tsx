@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { COMPONENTS } from '../../components/registry';
+import { COMPONENTS, isIoModuleKind } from '../../components/registry';
 import { modelLimitFor } from '../../components/model-limits';
 import { paramSpecsOf, paramValue, type ParamSpec } from '../../components/params';
 import type { PlacedComponent, ProjectFile, RenderSnapshot } from '../../sim/signals';
@@ -28,6 +28,13 @@ type Props = {
   /** Attach an expansion I/O module to a 16/16 PLC, or detach it with null (see Command `attachIoModule`). */
   onAttachModule?: (module: string, plc: string | null) => void;
 };
+
+/** The program tags an attached expansion module adds (see sim/plc-io.ts). */
+function moduleTags(kind: string, slot: number): string[] {
+  const n = kind === 'io-ai4' ? 4 : kind === 'io-ao2' ? 2 : 8;
+  const word = kind === 'io-di8' ? 'In' : kind === 'io-do8' ? 'Out' : kind === 'io-ai4' ? 'Ai' : 'Ao';
+  return Array.from({ length: n }, (_, k) => `M${slot}${word}${k}`);
+}
 
 /** Largest top-left coordinates that keep a device (170 x 130) on the 1080 x 580 floor. */
 const FLOOR_MAX_X = 910, FLOOR_MAX_Y = 450;
@@ -183,13 +190,13 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
       {paramSpecsOf(selectedDevice.kind).map(spec => <ParamField key={`${selectedDevice.id}-${spec.key}`} spec={spec} disabled={!editable}
         value={paramValue(project.params, selectedDevice.id, spec)} onCommit={n => onSetParam(selectedDevice.id, spec.key, n)} />)}
     </div>}
-    {(selectedDevice.kind === 'io-di8' || selectedDevice.kind === 'io-do8') && onAttachModule && <div className="sandbox-inspector-position" role="group" aria-label="Expansion module host">
+    {isIoModuleKind(selectedDevice.kind) && onAttachModule && <div className="sandbox-inspector-position" role="group" aria-label="Expansion module host">
       <label>Host PLC <select data-module-host value={project.ioModules?.[selectedDevice.id]?.plc ?? ''} disabled={!editable}
         onChange={e => onAttachModule(selectedDevice.id, e.target.value || null)}>
         <option value="">Not attached</option>
         {project.components.filter(c => c.kind === 'plc16').map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
       </select></label>
-      {project.ioModules?.[selectedDevice.id] && <p className="sandbox-help">Tags: {Array.from({ length: 8 }, (_, k) => `M${project.ioModules![selectedDevice.id]!.slot}${selectedDevice.kind === 'io-di8' ? 'In' : 'Out'}${k}`).join(', ')}</p>}
+      {project.ioModules?.[selectedDevice.id] && <p className="sandbox-help">Tags: {moduleTags(selectedDevice.kind, project.ioModules[selectedDevice.id]!.slot).join(', ')}</p>}
     </div>}
     {OPERATOR_KINDS.has(selectedDevice.kind) && onSetOperator && <div className="sandbox-inspector-position" role="group" aria-label="Operator controls (live)">
       {paramSpecsOf(selectedDevice.kind).filter(spec => OPERATOR_KEYS.has(spec.key)).map(spec =>
