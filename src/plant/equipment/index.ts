@@ -12,14 +12,14 @@ import {collector} from './collector';
 import {safetyFence,guardDoor,handrail,platform,stairs,workZone} from './infrastructure';
 import {retroPhotoeye,laserDistance,rfidReader,visionSensor,encoder} from './sensors-industrial';
 import {photoeye,inductiveProx,capacitiveProx,lightCurtain,weighCell} from './sensors';
-import {lift,scissorLift,rotaryActuator,pickAndPlace,palletizer} from './positioning';
+import {lift,scissorLift,rotaryActuator,pickAndPlace,gantry,palletizer} from './positioning';
 import {shelf,asrsCrane} from './storage';
 import {robotArm} from './robot';
 import {processTank,mixer,heater,proportionalValve,filler,capper,transferPump} from './process';
 const SOURCE_EQUIPMENT:readonly EquipmentDef[]=[
  beltConveyor,rollerConveyor,turntable,stopper,pusher,diverterGate,boxFeeder,
  photoeye,inductiveProx,capacitiveProx,lightCurtain,weighCell,
- lift,scissorLift,rotaryActuator,pickAndPlace,palletizer,
+ lift,scissorLift,rotaryActuator,pickAndPlace,gantry,palletizer,
  shelf,asrsCrane,robotArm,processTank,mixer,heater,proportionalValve,filler,capper,transferPump,
  collector,retroPhotoeye,laserDistance,rfidReader,visionSensor,encoder,safetyFence,guardDoor,curvedConveyor,transferUnit,mergeGate,processStation,handrail,platform,stairs,workZone,...OPERATOR_DEVICES,
 ];
