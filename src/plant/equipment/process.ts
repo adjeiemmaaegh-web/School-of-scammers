@@ -4,7 +4,7 @@
  */
 import type {EquipmentDef} from '../world/equipment';
 import {draw,flag,initial,numeric,param,spec} from '../world/equipment';
-import {q,clamp,vec,insideFootprint} from '../world/math';
+import {q,clamp,vec,insideFootprint,face} from '../world/math';
 import {PROCESS_TANK_SOLID_SIZE} from '../world/solid-geometry';
 
 export const processTank:EquipmentDef={
@@ -18,7 +18,7 @@ export const processTank:EquipmentDef={
   spec('drainMlS','Outlet flow','ml/s',50,5000,50,1300),
   spec('blockMaterialFlow','Block material flow','0=off, 1=on',0,1,1,0)],
  faults:['inlet-blocked','valve-stuck','leak'],
- fresh:()=>initial({}),
+ fresh:params=>({...initial({}),value:params.capacityMl??10000}),
  step:(s,w,c,dt,f,ctx)=>{
   const cap=param(ctx,'capacityMl',10000);
   const inlet=numeric(c,'inletPct',100,0,100)/100;
@@ -26,7 +26,7 @@ export const processTank:EquipmentDef={
   const drain=flag(c,'drain')&&f!=='valve-stuck'?param(ctx,'drainMlS',1300):0;
   const leak=f==='leak'?150:0;
   const level=clamp(s.levelMl+(fill-drain-leak)*dt/1000,0,cap);
-  return {world:w,state:{...s,levelMl:level,engaged:fill>0||drain>0,
+  return {world:w,state:{...s,value:cap,levelMl:level,engaged:fill>0||drain>0,
     done:level>=cap,stalled:f==='inlet-blocked'||f==='valve-stuck',faulted:!!f}};
  },
  read:(s,w,ctx)=>({levelMl:s.levelMl,high:s.levelMl>=param(ctx,'capacityMl',10000)*.75,
@@ -148,4 +148,65 @@ export const capper:EquipmentDef={
  read:(s,w,ctx)=>({bottlePresent:w.bodies.some(b=>b.shape==='cylinder'&&
    insideFootprint(b.pos,ctx.originMm,vec(200,200,0))),capped:s.done}),
  describe:(s,ctx)=>[draw(ctx,'capping head','box',vec(210,210,440),220,'#648a8b')],
+};
+
+/**
+ * R11 transfer pump with a pump curve. It moves liquid between the two nearest process tanks along its own axis: the SOURCE is
+ * the nearest tank behind it and the DESTINATION the nearest tank ahead (within `reachMm`). Volume is conserved exactly: whatever
+ * leaves the source enters the destination, limited by what the source holds and the destination can take.
+ *
+ * Curve: flow = maxFlow x speed x (1 - head / shutoffHead) x (1 - pipeLoss), head = how far the destination liquid surface stands above
+ * the source's (levels converted to height through `areaCm2`). At shut-off head the pump delivers nothing; a destination fuller than
+ * the source pushes back. Dry running (run commanded with an empty source) raises a dry-run condition and delivers nothing.
+ * Teaching model: no inertia, no pipe network beyond one loss factor, no temperature carried with the liquid.
+ */
+export const transferPump:EquipmentDef={
+ kind:'transfer-pump',label:'Transfer pump between tanks',footprint:vec(300,260,300),
+ commands:[{name:'run',kind:'bool'},{name:'speedPct',kind:'number',unit:'%'}],
+ signals:[{name:'flowMlS',kind:'number',unit:'ml/s'},{name:'running',kind:'bool'},{name:'dryRun',kind:'bool'},
+  {name:'blocked',kind:'bool'},{name:'headCm',kind:'number',unit:'cm'},{name:'connected',kind:'bool'}],
+ params:[spec('maxFlowMlS','Free-delivery flow','ml/s',50,5000,50,1000),
+  spec('shutoffHeadCm','Shut-off head','cm',10,500,10,100),
+  spec('areaCm2','Tank cross-section','cm2',50,5000,50,500),
+  spec('pipeLossPct','Pipe restriction','%',0,95,5,0),
+  spec('reachMm','Reach to tanks','mm',500,6000,100,3000)],
+ faults:['blocked-pipe','worn-impeller','dry-run-protection-off'],
+ fresh:()=>initial({}),
+ step:(s,w,c,dt,f,ctx)=>{
+  const idle={world:w,state:{...s,engaged:false,stalled:false,faulted:!!f,value:0}};
+  const fwd=face(ctx.yawDeg);
+  const reach=param(ctx,'reachMm',3000);
+  let from:{id:string;d:number}|null=null,to:{id:string;d:number}|null=null;
+  for(const p of ctx.peers??[]){
+   if(p.kind!=='process-tank')continue;
+   const dx=p.originMm.x-ctx.originMm.x,dy=p.originMm.y-ctx.originMm.y;
+   const along=dx*fwd.x+dy*fwd.y,across=Math.abs(dx*fwd.y-dy*fwd.x);
+   if(across>600||Math.abs(along)>reach||Math.abs(along)<1)continue;
+   if(along<0){if(!from||-along<from.d)from={id:p.id,d:-along};}
+   else if(!to||along<to.d)to={id:p.id,d:along};
+  }
+  const src=from?w.model[from.id]:undefined,dst=to?w.model[to.id]:undefined;
+  if(!src||!dst||!from||!to)return idle;
+  const running=flag(c,'run');
+  if(!running)return {world:w,state:{...s,engaged:false,stalled:false,faulted:!!f,value:0,done:false}};
+  const speed=numeric(c,'speedPct',100,0,100)/100;
+  const area=param(ctx,'areaCm2',500),shut=param(ctx,'shutoffHeadCm',100);
+  // 1 ml = 1 cm3, so height(cm) = level(ml) / area(cm2)
+  const head=dst.levelMl/area-src.levelMl/area;
+  const loss=param(ctx,'pipeLossPct',0)/100;
+  const worn=f==='worn-impeller'?.5:1;
+  const curve=Math.max(0,1-Math.max(0,head)/shut);
+  const dryRun=src.levelMl<=0;
+  const rate=f==='blocked-pipe'||dryRun?0:param(ctx,'maxFlowMlS',1000)*speed*curve*(1-loss)*worn;
+  const moved=Math.min(rate*dt/1000,src.levelMl);
+  // A process tank publishes its own capacity in `value`, so the pump never overfills a tank it cannot see the settings of.
+  const room=Math.max(0,(dst.value>0?dst.value:dst.levelMl)-dst.levelMl);
+  const flow=Math.min(moved,room);
+  const model={...w.model,[from.id]:{...src,levelMl:q(src.levelMl-flow)},[to.id]:{...dst,levelMl:q(dst.levelMl+flow)}};
+  return {world:{...w,model},state:{...s,engaged:flow>0,value:flow*1000/dt,stalled:dryRun||f==='blocked-pipe'||(rate>0&&flow<=0),faulted:!!f,done:false,
+    elapsedMs:q(head*100)}};
+ },
+ read:(s,w,ctx)=>({flowMlS:q(s.value),running:s.engaged,dryRun:s.stalled&&!s.faulted,blocked:s.stalled&&s.faulted,headCm:q(s.elapsedMs/100),connected:true}),
+ describe:(s,ctx)=>[draw(ctx,'casing','cylinder',vec(260,260,260),130,s.engaged?'#3f8fb0':'#6d8794'),
+  draw(ctx,'pipe','box',vec(520,80,80),120,'#8aa0aa')],
 };

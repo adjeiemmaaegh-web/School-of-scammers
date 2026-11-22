@@ -6,6 +6,8 @@ export type SceneOccluder={id:string;originMm:Vec3;yawDeg:0|90|180|270;sizeMm:Ve
 export type EquipmentContext={id:string;originMm:Vec3;yawDeg:0|90|180|270;params:Record<string,number>;
  /** Worker-provided opaque structural solids; absent in legacy direct tests and render-only contexts. */
  occluders?:readonly SceneOccluder[];
+ /** Every other placed device (id, kind, origin), so a pipe/transfer device can find its neighbours; absent in render-only contexts. */
+ peers?:readonly {id:string;kind:string;originMm:Vec3}[];
 };
 export type EquipmentDef={
  kind:string;label:string;footprint:Vec3;
@@ -18,8 +20,8 @@ export type EquipmentDef={
  read:(state:EquipmentState,world:World,ctx:EquipmentContext)=>Record<string,EquipmentSignal>;
  describe:(state:EquipmentState,ctx:EquipmentContext)=>EquipmentDrawing[];
 };
-export const ctxOf=(item:EquipmentPlacement,occluders?:readonly SceneOccluder[]):EquipmentContext=>({
- id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,params:item.params,occluders,
+export const ctxOf=(item:EquipmentPlacement,occluders?:readonly SceneOccluder[],peers?:EquipmentContext['peers']):EquipmentContext=>({
+ id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,params:item.params,occluders,...(peers?{peers}:{}),
 });
 export const flag=(command:EquipmentCommand,key:string):boolean=>command[key]===true;
 export const numeric=(command:EquipmentCommand,key:string,fallback:number,min:number,max:number):number=>{

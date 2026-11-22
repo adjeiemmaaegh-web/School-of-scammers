@@ -70,9 +70,10 @@ export function stepScene(previous:SceneRuntime,placements:readonly EquipmentPla
   .filter(item=>STATIC_SOLID_KINDS.includes(item.kind))
   .map(item=>({id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,
    sizeMm:library[item.kind].footprint}));
+ const peers=placements.map(item=>({id:item.id,kind:item.kind,originMm:item.originMm}));
  for(let i=0;i<scanMs/SUBSTEP_MS;i++){
   for(const item of placements){
-   const def=library[item.kind],ctx=ctxOf(item,occluders);
+   const def=library[item.kind],ctx=ctxOf(item,occluders,peers);
    const state=world.model[item.id]??def.fresh(item.params);
    const command=inputs[item.id]??{};
    for(const channel of def.commands){
