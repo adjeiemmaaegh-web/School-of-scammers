@@ -31,6 +31,8 @@ export const PARAM_SPECS: Partial<Record<ComponentKind, readonly ParamSpec[]>> =
     { key: 'loadKg', label: 'Load mass', unit: 'kg', min: 0, max: 300, step: 1, default: 0 },
     { key: 'vertical', label: 'Load direction', unit: '0=horizontal, 1=vertical (against gravity)', min: 0, max: 1, step: 1, default: 0 },
   ],
+  // R06 pressure sensor: the contact closes at or above this pressure (default = the compressor's pressure-switch default).
+  'pressure-sensor': [{ key: 'setpointBar', label: 'Contact closes at', unit: 'bar', min: 0.5, max: 10, step: 0.5, default: 4 }],
   'air-regulator': [{ key: 'setpointBar', label: 'Outlet pressure limit', unit: 'bar', min: 1, max: 8, step: 0.5, default: 4 }],
   ...Object.fromEntries(EQUIPMENT.map(def=>[def.kind,def.params])),
 };

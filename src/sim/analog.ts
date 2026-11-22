@@ -46,6 +46,7 @@ export function sampleAnalogInputs(
   vessels: Readonly<Record<string, { levelMl: number }>>,
   plcId: string, io: PlcIoMap, powered: boolean, openWireIds: ReadonlySet<string> = new Set(),
   plant?: SceneRuntime, isPlantSourcePowered: (id: string) => boolean = () => false,
+  airBar: Readonly<Record<string, number>> = {},
 ): { values: Record<string, number>; points: AnalogPoint[] } {
   const values: Record<string, number> = {};
   const points: AnalogPoint[] = [];
@@ -65,13 +66,17 @@ export function sampleAnalogInputs(
     const model = part && PLANT_EQUIPMENT[part.kind];
     const channel = model?.signals.find(ch => ch.kind === 'number' && signal === 'AN_' + ch.name);
     const processSensor = !!source && !!channel && !!plant && isPlantSourcePowered(id);
-    const connected = legacyTank || processSensor;
+    // R06: an air pressure sensor's analog output is the working pressure at its AIR port.
+    const airSensor = !!source && part?.kind === 'pressure-sensor' && signal === 'AN_pressureBar' && isPlantSourcePowered(id);
+    const connected = legacyTank || processSensor || airSensor;
     let value = 0;
     if (channelPowered && legacyTank) {
       const reading = vessels[id]?.levelMl ?? 0;
       if (!Number.isFinite(reading) || reading < 0 || reading > 1000)
         throw new RangeError('Invalid tank numeric signal');
       value = reading;
+    } else if (channelPowered && airSensor) {
+      value = airBar[id] ?? 0;
     } else if (channelPowered && processSensor) {
       const reading = plant!.signals[id]?.[channel!.name];
       if (typeof reading !== 'number' || !Number.isFinite(reading) || Math.abs(reading) > 1_000_000_000)
@@ -79,7 +84,7 @@ export function sampleAnalogInputs(
       value = reading;
     }
     values[tag] = value;
-    points.push({ terminal: pin, tag, value, unit: connected ? legacyTank ? 'ml' : channel?.unit ?? '' : '',
+    points.push({ terminal: pin, tag, value, unit: connected ? legacyTank ? 'ml' : airSensor ? 'bar' : channel?.unit ?? '' : '',
       connected, source: connected ? source : null });
   }
   return { values, points };

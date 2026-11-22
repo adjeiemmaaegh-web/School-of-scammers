@@ -37,6 +37,7 @@ import { DEFAULT_SCAN_MS, isValidScanMs, scanMsOf } from './scan-config';
 import { airWireError, solveAir } from '../plant/air';
 import { clearedAlarm } from '../plant/cylinder';
 import { analogWireError, sampleAnalogInputs } from './analog';
+import { airSensorReadings } from './air-sensors';
 import { OPERATOR_KEYS, OPERATOR_KINDS, withOperatorValues } from './operator-values';
 import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
 import {firstNewCarrierSuperposition,carrierSuperpositionError} from '../workspace/carrier-clearance';
@@ -931,6 +932,10 @@ function buildCircuit(world: WorldState): Device[] {
     if (c.kind === 'photoeye') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
       a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'),
       closed: effectiveSensor(world.project, c, eyeActive(world, c)) });
+    // R06: the pressure sensor's contact closes while the pressure at its AIR port is at or above its setpoint.
+    if (c.kind === 'pressure-sensor') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
+      a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT_atPressure'),
+      closed: (airSensorReadings(world.project, world.air)[c.id] ?? 0) >= paramValue(world.project.params, c.id, paramSpecsOf('pressure-sensor')[0]) });
     if (c.kind === 'levelprobe') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
       a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'),
       closed: effectiveSensor(world.project, c, probeHigh(world, c)) });
@@ -992,7 +997,8 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       const analogPoints = io.analogInputs && !world.running
         ? sampleAnalogInputs(world.project, world.vessels, c.id, io, rt?.powered ?? false,
           new Set(faultsOf(world.project).filter(f => f.kind === 'wire-open').map(f => f.target)),
-          world.plantWorld, id => world.voltages[id + '.L+'] !== undefined && world.voltages[id + '.M'] !== undefined).points
+          world.plantWorld, id => world.voltages[id + '.L+'] !== undefined && world.voltages[id + '.M'] !== undefined,
+          airSensorReadings(world.project, world.air)).points
         : rt?.analogInputs ?? [];
       return [c.id, c.id === legacyPrimaryId(world.project)
         ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,

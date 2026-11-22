@@ -12,7 +12,7 @@
 import type { PlacedComponent, Wire } from '../sim/signals';
 
 export const AIR_PINS: Readonly<Record<string, readonly string[]>> = {
-  compressor: ['AIR'], 'air-regulator': ['AIR_IN', 'AIR_OUT'], cylinder: ['AIR'],
+  compressor: ['AIR'], 'air-regulator': ['AIR_IN', 'AIR_OUT'], cylinder: ['AIR'], 'pressure-sensor': ['AIR'],
 };
 /** How fast a moving cylinder drains its supply, and how fast a leak bleeds the receiver (bar per second). */
 export const AIR_DRAW_BAR_PER_S = 0.25;
