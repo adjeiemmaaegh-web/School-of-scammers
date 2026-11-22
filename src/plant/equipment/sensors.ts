@@ -17,6 +17,8 @@ const optical=(kind:string,label:string,predicate:(b:Body)=>boolean):EquipmentDe
   // 0 preserves old saved-project area sensing; 1 enables a forward zone.
   spec('beamMode','Detection mode','0=area, 1=forward',0,1,1,0),
   spec('beamWidthMm','Forward beam width','mm',20,400,10,100),
+  // R21: continuous aim of a forward beam, independent of the quarter-turn placement yaw; 0 keeps every saved project unchanged.
+  spec('aimDeg','Beam aim (forward mode)','degrees',-180,180,5,0),
   // Legacy forward detection stays unchanged. Explicit opt-in enables a
   // bounded LOS check against shelves and process tanks in the worker.
   spec('occlusionMode','Line of sight','0=off, 1=fixed, 2=fixed+bodies, 3=material',0,3,1,0),

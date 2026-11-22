@@ -18,8 +18,12 @@ export type OpticalZone={
  rangeMm:number;
  beamWidthMm:number;
  heightMm:1200;
- yawDeg:0|90|180|270;
+ /** Beam heading: the placement yaw plus the continuous aim angle (R21), so it is no longer restricted to quarter turns. */
+ yawDeg:number;
 };
+/** Unit heading of a beam. Quarter turns keep the exact original vectors; any other angle uses cos/sin. */
+export const beamDirection=(yawDeg:number):Vec3=>Number.isInteger(yawDeg/90)?face((((yawDeg%360)+360)%360) as 0|90|180|270):
+ {x:Math.cos(yawDeg*Math.PI/180),y:Math.sin(yawDeg*Math.PI/180),z:0};
 export const isDirectionalOpticalKind=(kind:string):boolean=>
  kind==='geometry-photoeye'||kind==='inductive-prox'||kind==='capacitive-prox';
 
@@ -37,7 +41,7 @@ export function opticalZoneOf(kind:string,ctx:EquipmentContext,fault:string|null
   heightMm:1200,
   // Training fault shifts a directional head by a full quarter-turn.
   // The read-only beam display uses this same descriptor as the worker.
-  yawDeg:fault==='sensor-misaligned'?(((ctx.yawDeg+90)%360) as 0|90|180|270):ctx.yawDeg,
+  yawDeg:(fault==='sensor-misaligned'?(ctx.yawDeg+90)%360:ctx.yawDeg)+(directional?(ctx.params.aimDeg??0):0),
  };
 }
 /** Body-centre detection matches the existing bounded P3 teaching physics.
@@ -51,7 +55,7 @@ export function opticalZoneContains(
  if(Math.abs(position.z-ctx.originMm.z)>zone.heightMm/2)return false;
  if(zone.shape==='area')
   return Math.abs(dx)<=zone.rangeMm/2&&Math.abs(dy)<=zone.rangeMm/2;
- const direction=face(zone.yawDeg);
+ const direction=beamDirection(zone.yawDeg);
  const longitudinal=dx*direction.x+dy*direction.y;
  const transverse=-dx*direction.y+dy*direction.x;
  return longitudinal>=0&&longitudinal<=zone.rangeMm&&
@@ -68,7 +72,8 @@ export function opticalZoneIntersectsBody(
  body:Body,ctx:EquipmentContext,zone:OpticalZone,
 ):boolean{
  if(zone.shape!=='forward')return opticalZoneContains(body.pos,ctx,zone);
- const direction=face(zone.yawDeg);
+
+ const direction=beamDirection(zone.yawDeg);
  const dx=body.pos.x-ctx.originMm.x,dy=body.pos.y-ctx.originMm.y;
  const long=dx*direction.x+dy*direction.y;
  const lateral=-dx*direction.y+dy*direction.x;
