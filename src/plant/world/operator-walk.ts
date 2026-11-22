@@ -1,13 +1,13 @@
 /**
  * R24 simulated human movement. The classroom operator (an explicit, ephemeral training actor, never a camera inference) walks
  * toward a goal at walking speed, one 10 ms substep at a time, and is physically stopped by what stops a person: fence panels,
- * closed guard doors, handrails, shelves and tanks. Platforms and stairs (R20) give the floor a height: the operator can only
+ * closed guard doors, handrails, shelves, tanks, production stations and every stationary machine (robot, palletizer, crane, mixer, heater...). Platforms and stairs (R20) give the floor a height: the operator can only
  * change level where the floor rises gradually (a stair), never by stepping off an edge, so a handrailed platform is reached
  * only through its stairs. Sensing is position dependent because every sensor reads the operator's actual position and
  * height. Pure and deterministic; educational, not a safety function.
  */
 import type {EquipmentPlacement,World} from './types';
-import {staticSolidSize} from './solid-geometry';
+import {STATIC_SOLID_KINDS,staticSolidSize} from './solid-geometry';
 import {q} from './math';
 
 export const WALK_SPEED_MM_S=1200, OPERATOR_RADIUS_MM=200, MAX_SLOPE=0.9;
@@ -34,7 +34,11 @@ export function personObstacles(items:readonly EquipmentPlacement[],world:World)
   if(PERSON_BLOCKERS.has(item.kind)){
    if(item.kind==='guard-door'&&!(world.model[item.id]?.engaged??true))continue;       // fully open: walk through
    out.push(rectOf(item,lengthOf(item,item.kind==='guard-door'?800:1000),widthOf(item,50)));
-  }else if(item.params.blockMaterialFlow===1||item.kind==='shelf'||item.kind==='process-tank'){
+  }else if(item.kind==='process-station'){
+   // A production station is a machine frame: a person cannot walk through it (its footprint is the station's own, unrotated).
+   out.push({cx:item.originMm.x,cy:item.originMm.y,hx:(item.params.lengthMm??400)/2,hy:(item.params.widthMm??400)/2});
+  }else if(item.params.blockMaterialFlow===1||item.kind==='shelf'||item.kind==='process-tank'||STATIC_SOLID_KINDS.includes(item.kind)){
+   // R24: every stationary machine (robot, palletizer, crane, mixer, heater, filler, capper, valve...) stops a person as well.
    const size=staticSolidSize(item.kind);
    if(size)out.push(rectOf(item,size.x,size.y));
   }
