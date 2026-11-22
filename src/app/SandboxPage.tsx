@@ -560,6 +560,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const rotateSelection=(quarterTurns:-1|1)=>{
     if(selectedDeviceIds.length)edit({kind:'rotate',ids:[...selectedDeviceIds],quarterTurns});
   };
+  const rotateFreeSelection=(deltaDeg:number)=>{
+    if(selectedDeviceIds.length)edit({kind:'rotateFree',ids:[...selectedDeviceIds],deltaDeg});
+  };
   const duplicateSelection=()=>{
     if(selectedDeviceIds.length)edit({kind:'duplicate',ids:[...selectedDeviceIds],offset:{x:25,y:25},grid});
   };
@@ -833,7 +836,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onGroup={()=>edit({kind:'group',ids:[...selectedDeviceIds],name:'Group '+((project?.groups?.length??0)+1)})}
           onUngroup={()=>edit({kind:'ungroup',ids:[...selectedDeviceIds]})}
           groupedSelection={!!project?.groups&&selectedDeviceIds.some(id=>rootGroupOf(project.groups,id))}
-          onRotate={rotateSelection} onNudge={moveSelection}/>
+          onRotate={rotateSelection} onRotateFree={rotateFreeSelection} onNudge={moveSelection}/>
       </div>}
       <div className="p5-view-tools" role="toolbar" aria-label="Canvas views and active tools">
         <div className="p5-view-row">

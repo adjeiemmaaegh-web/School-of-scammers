@@ -17,6 +17,8 @@ export type XY = { x: number; y: number };
 import type { SfcDocument } from '../engineering/sfc';
 export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean;
  yawDeg?: 0 | 90 | 180 | 270;
+ /** R22 continuous rotation (degrees, 5 degree steps, 5..355) added on top of the quarter-turn yaw. Only kinds whose behaviour does not depend on orientation take it (see workspace/geometry.ts); physics never sees it. */
+ freeYawDeg?: number;
  /** Optional P9 saved factory elevation in millimetres; legacy devices remain at zero. */
  elevationMm?: number;
 };

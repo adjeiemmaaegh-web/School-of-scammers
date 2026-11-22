@@ -11,6 +11,8 @@ type Props = {
   onUndo: () => void; onRedo: () => void;
   onCopy: () => void; onPaste: () => void; onDuplicate: () => void;
   onRemove: () => void; onRotate: (turns: -1 | 1) => void;
+  /** R22 continuous rotation by a multiple of 5 degrees (only devices whose behaviour does not depend on orientation turn freely). */
+  onRotateFree?: (deltaDeg: number) => void;
   onNudge: (dx: number, dy: number) => void;
   onAlign?: (mode: AlignMode) => void;
   /** R22 grouping: turn the selection into a named group / dissolve the selected group. */
@@ -40,6 +42,12 @@ export function WorkspaceAuthoringBar(props: Props) {
       onClick={() => props.onRotate(-1)} title="Rotate supported equipment left by 90° (orientation-locked machines stay fixed)">↶ 90°</button>
     <button type="button" className="btn ghost small" disabled={!selected}
       onClick={() => props.onRotate(1)} title="Rotate supported equipment right by 90° (orientation-locked machines stay fixed)">↷ 90°</button>
+    {props.onRotateFree && <>
+      <button type="button" className="btn ghost small" data-rotate-free="-15" disabled={!selected}
+        onClick={() => props.onRotateFree!(-15)} title="Turn the selection left by 15° (free rotation: electrical and control devices only; conveyors and other physical equipment turn in 90° steps)">↶ 15°</button>
+      <button type="button" className="btn ghost small" data-rotate-free="15" disabled={!selected}
+        onClick={() => props.onRotateFree!(15)} title="Turn the selection right by 15° (free rotation: electrical and control devices only; conveyors and other physical equipment turn in 90° steps)">↷ 15°</button>
+    </>}
     <button type="button" className="btn ghost small" data-delete-selection disabled={!selected}
       onClick={props.onRemove} title="Delete selected devices, dependent wires and faults">Delete</button>
     <label className="workspace-grid-label">Snap

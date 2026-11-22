@@ -4,6 +4,7 @@
  * while paused; rejected edits never change the world or project history.
  */
 import { isPlcKind } from '../components/registry';
+import { PLANT_EQUIPMENT } from '../plant/equipment';
 import { removeComponent, MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES } from '../sim/panels';
 import { MAX_PLCS, plcComponents, withProgramOf } from '../sim/plcs';
 import type { PlacedComponent, ProjectFile, Wire, XY } from '../sim/signals';
@@ -20,6 +21,8 @@ const NONREPEATABLE = new Set(['reversebutton', 'forwardcontactor', 'reversecont
  * Tier 1 conveyors and turntables have orientation-aware carry/footprints; later
  * robot and process models stay locked until their dynamics support rotation.
  */
+/** Kinds that may take a continuous rotation: orientable AND with no plant physics that reads their yaw (those stay quarter-turn only). */
+export const isFreeRotation = (kind: string): boolean => ROTATABLE.has(kind) && !Object.hasOwn(PLANT_EQUIPMENT, kind);
 export const ROTATABLE = new Set([
   'plc', 'plc16', 'supply', 'start', 'stop', 'estop', 'reversebutton',
   'contactor', 'forwardcontactor', 'reversecontactor', 'relay', 'timerelay',
@@ -156,6 +159,34 @@ export function editWorkspace(project: ProjectFile, edit: WorkspaceEdit): Projec
       }
       return { ...project, components: project.components.map(c => ids.has(c.id) ?
         { ...c, yawDeg: turn(c.yawDeg, edit.quarterTurns) } : c) };
+    }
+    case 'rotateFree': {
+      const bad = parts.filter(c => !isFreeRotation(c.kind));
+      if (bad.length) throw new Error(`These devices only turn in quarter turns (their physics depends on orientation): ${[...new Set(bad.map(c => c.kind))].join(', ')}`);
+      const d = edit.deltaDeg;
+      if (!Number.isInteger(d) || d === 0 || d % 5 !== 0 || Math.abs(d) > 180) throw new RangeError('Free rotation is a non-zero multiple of 5 degrees, up to 180');
+      const a = d * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a);
+      const swing = (c: PlacedComponent, cx: number, cy: number) => {
+        const dx = c.x - cx, dy = c.y - cy;
+        return { x: Math.round(cx + dx * cos - dy * sin), y: Math.round(cy + dx * sin + dy * cos) };
+      };
+      const turnOne = (c: PlacedComponent) => {
+        const next = (((c.freeYawDeg ?? 0) + d) % 360 + 360) % 360;
+        const { freeYawDeg: _drop, ...rest } = c;
+        return next === 0 ? rest : { ...rest, freeYawDeg: next };
+      };
+      if (parts.length === 1) return { ...project, components: project.components.map(c => ids.has(c.id) ? turnOne(c) : c) };
+      // A group turns as one body about its centre, exactly like the quarter turn: positions swing as each device turns.
+      const cx = (Math.min(...parts.map(c => c.x)) + Math.max(...parts.map(c => c.x))) / 2;
+      const cy = (Math.min(...parts.map(c => c.y)) + Math.max(...parts.map(c => c.y))) / 2;
+      const turned = project.components.map(c => ids.has(c.id) ? { ...turnOne(c), ...swing(c, cx, cy) } : c);
+      const placed = turned.filter(c => ids.has(c.id));
+      const width = Math.max(...placed.map(c => c.x)) - Math.min(...placed.map(c => c.x));
+      const height = Math.max(...placed.map(c => c.y)) - Math.min(...placed.map(c => c.y));
+      if (width > 910 || height > 450) throw new Error('The rotated group would not fit on the floor');
+      const shiftX = Math.min(0, 910 - Math.max(...placed.map(c => c.x))) + Math.max(0, -Math.min(...placed.map(c => c.x)));
+      const shiftY = Math.min(0, 450 - Math.max(...placed.map(c => c.y))) + Math.max(0, -Math.min(...placed.map(c => c.y)));
+      return { ...project, components: turned.map(c => ids.has(c.id) ? { ...c, x: c.x + shiftX, y: c.y + shiftY } : c) };
     }
     case 'align': {
       const targets = alignedPositions(parts, edit.mode);

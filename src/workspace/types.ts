@@ -22,6 +22,7 @@ export type WorkspaceFragment = {
 export type WorkspaceEdit =
   | { kind: 'translate'; ids: string[]; delta: XY; grid: GridStep }
   | { kind: 'rotate'; ids: string[]; quarterTurns: -1 | 1 }
+  | { kind: 'rotateFree'; ids: string[]; deltaDeg: number }
   | { kind: 'duplicate'; ids: string[]; offset: XY; grid: GridStep }
   | { kind: 'align'; ids: string[]; mode: AlignMode }
   | { kind: 'delete'; ids: string[] }

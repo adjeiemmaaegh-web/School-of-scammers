@@ -19,7 +19,7 @@ import { isP3Equipment } from '../sim/p3-plant-bridge';
 import { PlantWorld3D } from './PlantWorld3D';
 import { PLANT_EQUIPMENT } from '../plant/equipment';
 import { footprintOf } from '../workspace/floor-plan';
-import { clampPlacement } from '../workspace/geometry';
+import { clampPlacement, effectiveYaw } from '../workspace/geometry';
 import type { GridStep } from '../workspace/types';
 import { WorkcellCameraRig } from './WorkcellCameraRig';
 import { frameIndustrialPlant,initialNavigationPose,initialOrbitFraming,presetCameraPosition, type CameraPose, type ViewPreset, type WorkcellCameraMode } from './workcell-camera';
@@ -308,7 +308,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   const showDeviceTerminals = !galleryScene || selected;
   // P3 equipment uses the real worker-owned 3D shapes, not duplicated large
   // placeholder housings. Its outline is only a selection/drag affordance.
-  return <group position={[x, y, z]} rotation={[0, -(c.yawDeg ?? 0) * Math.PI / 180, 0]}>
+  return <group position={[x, y, z]} rotation={[0, -effectiveYaw(c) * Math.PI / 180, 0]}>
     <mesh position={[0, plant ? 0.02 : 0.035, 0]}
       onPointerDown={e => onPress(e, c.id)}
       onPointerMove={onMoveDrag} onPointerUp={onEndDrag}

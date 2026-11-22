@@ -39,7 +39,7 @@ import { clearedAlarm } from '../plant/cylinder';
 import { analogWireError, sampleAnalogInputs } from './analog';
 import { airSensorReadings } from './air-sensors';
 import { OPERATOR_KEYS, OPERATOR_KINDS, withOperatorValues } from './operator-values';
-import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
+import { editWorkspace as applyWorkspaceEdit, isFreeRotation } from '../workspace/editor';
 import {firstNewCarrierSuperposition,carrierSuperpositionError} from '../workspace/carrier-clearance';
 import { freshProjectPlant, stepProjectPlant, sensorImage, validatePlantFaults } from './p3-plant-bridge';
 import { makePlantSceneProject } from './p3-scene-import';
@@ -186,6 +186,9 @@ export function validateProject(raw: unknown): ProjectFile {
     }
     if (entry.yawDeg !== undefined && !([0, 90, 180, 270] as unknown[]).includes(entry.yawDeg))
       throw new Error('Device orientation must be a quarter turn');
+    if (entry.freeYawDeg !== undefined && (!isFreeRotation(entry.kind) || !Number.isInteger(entry.freeYawDeg) ||
+        entry.freeYawDeg < 5 || entry.freeYawDeg > 355 || entry.freeYawDeg % 5 !== 0))
+      throw new Error('Invalid free rotation (5 to 355 degrees in 5 degree steps, on devices that may turn freely)');
     if (entry.elevationMm !== undefined &&
         (!Object.hasOwn(PLANT_EQUIPMENT, entry.kind) ||
          !Number.isSafeInteger(entry.elevationMm) ||
@@ -194,6 +197,7 @@ export function validateProject(raw: unknown): ProjectFile {
     ids.add(entry.id);
     components.push({ id: entry.id, kind: entry.kind as ComponentKind, x: entry.x, y: entry.y,
       pressed: entry.pressed === true, ...(entry.yawDeg === undefined ? {} : { yawDeg: entry.yawDeg }),
+      ...(entry.freeYawDeg === undefined ? {} : { freeYawDeg: entry.freeYawDeg }),
       ...(entry.elevationMm === undefined ? {} : { elevationMm: entry.elevationMm }) });
   }
   // One of each protective branch device per educational circuit: state is
