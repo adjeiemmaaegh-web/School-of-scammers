@@ -1,6 +1,6 @@
 /** P3 Tier 2 sensor geometry, response time and seeded load-cell noise. */
 import type {EquipmentDef,EquipmentContext} from '../world/equipment';
-import {draw,initial,param,spec} from '../world/equipment';
+import {draw,flag,initial,param,spec} from '../world/equipment';
 import type {Body,World} from '../world/types';
 import {insideFootprint,q,vec} from '../world/math';
 import {nextSeed} from '../world/seed';
@@ -60,19 +60,33 @@ export const photoeye=optical('geometry-photoeye','Geometry photoeye',()=>true);
 export const inductiveProx=optical('inductive-prox','Inductive proximity sensor',
  b=>b.tags.material==='metal'||b.tags.metal===true);
 export const capacitiveProx=optical('capacitive-prox','Capacitive proximity sensor',()=>true);
+/**
+ * Light curtain with MUTING (R20). `mute` (command) deliberately ignores the curtain so material can pass, as a muting
+ * arrangement does while a pallet is on its way through, but only for `maxMuteMs`: a mute held longer expires, the curtain is live
+ * again and `muteTimeout` is raised until the mute is released (a stuck mute must never leave the opening unprotected).
+ * Educational model of the principle; not a rated safety function and not a two-sensor muting sequence.
+ */
 export const lightCurtain:EquipmentDef={
  kind:'light-curtain',label:'Height-classifying light curtain',footprint:vec(100,450,1100),
- commands:[],signals:[{name:'blocked',kind:'bool'},{name:'tall',kind:'bool'}],
- params:[spec('heightMm','Threshold height','mm',100,1500,50,500)],
+ commands:[{name:'mute',kind:'bool'}],
+ signals:[{name:'blocked',kind:'bool'},{name:'tall',kind:'bool'},{name:'muted',kind:'bool'},{name:'muteTimeout',kind:'bool'}],
+ params:[spec('heightMm','Threshold height','mm',100,1500,50,500),
+  spec('maxMuteMs','Maximum mute time','ms',500,60000,500,10000)],
  faults:['beam-broken','alignment-error'],
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
-  const visible=bodiesNear(w,ctx,500),blocked=visible.length>0&&f!=='beam-broken';
+  const visible=bodiesNear(w,ctx,500);
+  // elapsedMs counts how long the mute has been held; a released mute resets it and clears the timeout.
+  const asked=flag(c,'mute');
+  const heldMs=asked?s.elapsedMs+dt:0;
+  const expired=asked&&heldMs>param(ctx,'maxMuteMs',10000);
+  const muted=asked&&!expired;
+  const blocked=!muted&&visible.length>0&&f!=='beam-broken';
   const tall=blocked&&visible.some(b=>b.size.z>=param(ctx,'heightMm',500))&&f!=='alignment-error';
-  return {world:w,state:{...s,engaged:blocked,done:tall,faulted:!!f}};
+  return {world:w,state:{...s,elapsedMs:q(heldMs),engaged:blocked,done:tall,stalled:expired,lastCommand:muted,faulted:!!f}};
  },
- read:s=>({blocked:s.engaged,tall:s.done}),
- describe:(s,ctx)=>[draw(ctx,'curtain','box',vec(80,430,1000),500,s.engaged?'#8fbad6':'#577f98')],
+ read:s=>({blocked:s.engaged,tall:s.done,muted:s.lastCommand,muteTimeout:s.stalled}),
+ describe:(s,ctx)=>[draw(ctx,'curtain','box',vec(80,430,1000),500,s.lastCommand?'#c9b45a':s.engaged?'#8fbad6':'#577f98')],
 };
 export const weighCell:EquipmentDef={
  kind:'weigh-cell',label:'Numeric weighing platform',footprint:vec(350,350,100),
