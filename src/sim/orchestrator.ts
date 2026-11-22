@@ -5,6 +5,7 @@ import { solveNetAware, type Device } from '../engineering/electrical';
 import { executeLadder, type LadderDocument, type LadderResult } from '../engineering/ladder';
 import { compileFbd, executeFbd, type FbdResult } from '../engineering/fbd';
 import { executeStructuredText, type STResult, type STValue } from '../engineering/structured-text';
+import { compileSfcToSt } from '../engineering/sfc';
 import { compileSandboxST, DEFAULT_ST_SOURCE, validateSandboxProgram } from '../program/p2-contract';
 import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from '../program/scan-trace';
 import { fbdReadings, instructionBreakpointHit, ladderReadings, validateInstructionBreakpoint } from '../program/instruction-breakpoint';
@@ -786,7 +787,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       // Removing a broken conductor is a legitimate repair, and a dangling fault would make the
       // exported project fail validation.
       world = withFaults(world, faultsOf(world.project).filter(f => !(f.kind === 'wire-open' && f.target === cmd.id)));
-    } else if (cmd.k === 'loadProgram' || cmd.k === 'loadST' || cmd.k === 'loadFBD' || cmd.k === 'activateLanguage') {
+    } else if (cmd.k === 'loadProgram' || cmd.k === 'loadST' || cmd.k === 'loadSFC' || cmd.k === 'loadFBD' || cmd.k === 'activateLanguage') {
       // `plc` selects the target controller; omitted means the first PLC, exactly as with one PLC.
       if (cmd.plc !== undefined && !plcComponents(world.project).some(c => c.id === cmd.plc)) {
         world = setError(world, 'Unknown PLC');
@@ -798,6 +799,14 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         try{compileFbd(cmd.document,namesFor(world.project,cmd.plc));
           world=createWorld(withProgramOf(world.project,cmd.plc,{language:'fbd',fbd:cmd.document}));}
         catch(error){world=setError(world,error instanceof Error?error.message:'Invalid FBD graph');}
+      } else if (cmd.k === 'loadSFC') {
+        // R07: a chart compiles to Structured Text; the chart travels in the source header so it can be re-opened.
+        try {
+          const names = namesFor(world.project, cmd.plc);
+          const source = compileSfcToSt(cmd.document, names);
+          compileSandboxST(source, names);
+          world = createWorld(withProgramOf(world.project, cmd.plc, { language: 'st', stSource: source }));
+        } catch (error) { world = setError(world, error instanceof Error ? `SFC: ${error.message}` : 'Invalid SFC chart'); }
       } else if (cmd.k === 'loadST') {
         try {
           compileSandboxST(cmd.source, namesFor(world.project, cmd.plc));

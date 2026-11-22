@@ -14,6 +14,7 @@ import type { SceneRuntime } from '../plant/world/runner';
 import type { AnalogPoint } from './analog';
 
 export type XY = { x: number; y: number };
+import type { SfcDocument } from '../engineering/sfc';
 export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean;
  yawDeg?: 0 | 90 | 180 | 270;
  /** Optional P9 saved factory elevation in millimetres; legacy devices remain at zero. */
@@ -242,6 +243,7 @@ export type Command =
   | { k: 'configureIo'; plc: string; io: { inputs: Record<string, string>; outputs: Record<string, string> } }
   | { k: 'loadProgram'; program: LadderDocument; plc?: string }
   | { k: 'loadST'; source: string; plc?: string }
+  | { k: 'loadSFC'; document: SfcDocument; plc?: string }
   | { k: 'loadFBD'; document: FbdDocument; plc?: string }
   | { k: 'activateLanguage'; language: 'ladder' | 'st' | 'fbd'; plc?: string }
   | { k: 'breakAtScan'; scan: number | null }
