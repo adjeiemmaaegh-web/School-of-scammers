@@ -62,3 +62,36 @@ describe('R25 rework station operation', () => {
     expect(broken.world.bodies[0].tags.defect).toBe(true);
   });
 });
+
+describe('R16 finish operation completes the stage chain', () => {
+  const finish = P('fin', 'process-station', 0, { operation: 6, cycleMs: 600 });
+  it('turns a machined or assembled part into a finished one after the cycle, with a trace', () => {
+    for (const stage of ['machined', 'assembled']) {
+      const w = part(freshWorld(), { stage, trace: 'M:m' });
+      const early = run([belt, finish], w, { fin: { run: true } }, 5);
+      expect(early.world.bodies[0].tags.stage).toBe(stage);                           // not before the cycle ends
+      const done = run([belt, finish], w, { fin: { run: true } }, 20);
+      expect(done.world.bodies[0].tags.stage).toBe('finished');
+      expect(done.world.bodies[0].tags.finishedBy).toBe('fin');
+      expect(done.world.bodies[0].tags.trace).toBe('M:m>F:fin');
+      expect(done.signals.fin.cycleDone).toBe(true); expect(done.world.model.fin.count).toBe(1);
+    }
+  });
+  it('leaves a raw part and a defective part alone, and does nothing without the run command', () => {
+    expect(run([belt, finish], part(freshWorld(), { stage: 'raw' }), { fin: { run: true } }, 30).world.bodies[0].tags.stage).toBe('raw');
+    expect(run([belt, finish], part(freshWorld(), { stage: 'machined', defect: true }), { fin: { run: true } }, 30).world.bodies[0].tags.stage).toBe('machined');
+    expect(run([belt, finish], part(freshWorld(), { stage: 'machined' }), {}, 30).world.bodies[0].tags.stage).toBe('machined');
+  });
+  it('a reworked part can then be finished: machine -> inspect fail -> rework -> finish', () => {
+    const reworked = run([belt, rework], part(freshWorld(), bad), { rw: { run: true } }, 30).world;
+    expect(reworked.bodies[0].tags.defect).toBe(false);
+    const done = run([belt, finish], reworked, { fin: { run: true } }, 20);
+    expect(done.world.bodies[0].tags.stage).toBe('finished');
+    expect(done.world.bodies[0].tags.trace).toBe('M:m>I:in>R:rw>F:fin');
+  });
+  it('a finished part is not worked on again', () => {
+    const w = part(freshWorld(), { stage: 'finished', finishedBy: 'other' });
+    const r = run([belt, finish], w, { fin: { run: true } }, 30);
+    expect(r.world.model.fin.count).toBe(0);
+  });
+});

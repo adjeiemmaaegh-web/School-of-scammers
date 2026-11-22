@@ -17,7 +17,7 @@ import {nextSeed} from '../world/seed';
 import {insideFootprint,q,vec} from '../world/math';
 import type {Body,World} from '../world/types';
 
-export const STATION_OPS=['machine','join','assemble','inspect','rework'] as const;
+export const STATION_OPS=['machine','join','assemble','inspect','rework','finish'] as const;
 const TRACE_MAX=96;
 const stageOf=(b:Body):string=>typeof b.tags.stage==='string'?b.tags.stage:'raw';
 const addTrace=(b:Body,code:string,stationId:string):string=>{
@@ -32,7 +32,7 @@ export const processStation:EquipmentDef={
  signals:[{name:'busy',kind:'bool'},{name:'partPresent',kind:'bool'},{name:'cycleDone',kind:'bool'},{name:'fail',kind:'bool'},
   {name:'toolWorn',kind:'bool'},{name:'count',kind:'number',unit:'parts'},{name:'toolWear',kind:'number',unit:'cycles'},
   {name:'progress',kind:'number',unit:'fraction'}],
- params:[spec('operation','Operation','1=machine, 2=join, 3=assemble, 4=inspect, 5=rework',1,5,1,1),
+ params:[spec('operation','Operation','1=machine, 2=join, 3=assemble, 4=inspect, 5=rework, 6=finish',1,6,1,1),
   spec('cycleMs','Cycle time','ms',200,30000,50,2000),
   spec('lengthMm','Station length','mm',100,1000,50,400),spec('widthMm','Station width','mm',100,1000,50,400),
   spec('toolLifeCycles','Tool life','cycles (0 = unlimited)',0,500,1,0),
@@ -45,7 +45,7 @@ export const processStation:EquipmentDef={
   const inside=(b:Body)=>insideFootprint(b.pos,ctx.originMm,footprint)&&Math.abs(b.pos.z-(ctx.originMm.z+120))<200&&atRest(b)&&b.supportedBy!==null;
   const present=w.bodies.filter(inside);
   // The part being worked is the first (lowest id) body that fits the operation's input stage.
-  const wanted=(b:Body)=>op===1?stageOf(b)==='raw':op===4?b.tags.inspected!==true:op===5?b.tags.defect===true:stageOf(b)==='machined';
+  const wanted=(b:Body)=>op===1?stageOf(b)==='raw':op===4?b.tags.inspected!==true:op===5?b.tags.defect===true:op===6?(stageOf(b)==='machined'||stageOf(b)==='assembled')&&b.tags.defect!==true:stageOf(b)==='machined';
   const main=present.find(wanted);
   const second=op===2?present.find(b=>b.id!==main?.id&&stageOf(b)==='machined'):
    op===3?present.find(b=>b.id!==main?.id&&b.tags.category==='component'):undefined;
@@ -57,7 +57,7 @@ export const processStation:EquipmentDef={
   const activeBodyId=canRun?main!.id:null;
   const base:typeof s={...s,value:wearNow,engaged:canRun,activeBodyId,elapsedMs,progress:canRun?q(Math.min(1,elapsedMs/cycleMs)):0,stalled:broken,faulted:!!f};
   // cycleDone stays true while a part this station has finished is still standing in it (a PLC samples levels, not pulses).
-  const finishedHere=(b:Body)=>op===1?b.tags.machinedBy===ctx.id:op===4?b.tags.inspectedBy===ctx.id:op===5?b.tags.reworkedBy===ctx.id:b.tags.assembledBy===ctx.id;
+  const finishedHere=(b:Body)=>op===1?b.tags.machinedBy===ctx.id:op===4?b.tags.inspectedBy===ctx.id:op===5?b.tags.reworkedBy===ctx.id:op===6?b.tags.finishedBy===ctx.id:b.tags.assembledBy===ctx.id;
   if(!canRun||elapsedMs<cycleMs)return {state:{...base,done:present.some(finishedHere)},world:w};
   // Cycle complete: transform the part(s).
   const life=param(ctx,'toolLifeCycles',0);
@@ -67,7 +67,7 @@ export const processStation:EquipmentDef={
   const makesDefect=op<=3&&rng.unit*100<defectChance;
   let world:World={...w,rngState:rng.state};
   let failed=false;
-  const code=op===1?'M':op===2?'J':op===3?'A':op===5?'R':'I';
+  const code=op===1?'M':op===2?'J':op===3?'A':op===5?'R':op===6?'F':'I';
   world={...world,bodies:world.bodies.map(b=>{
    if(b.id!==main!.id)return b;
    const tags:Body['tags']={...b.tags,trace:addTrace(b,code,ctx.id)};
@@ -76,13 +76,15 @@ export const processStation:EquipmentDef={
     tags.parts=(typeof tags.parts==='number'?tags.parts:1)+1;}
    // Rework (R25) removes the defect, forgets the old verdict (so the part can be inspected again) and keeps the trace.
    if(op===5){tags.defect=false;tags.reworked=true;tags.reworkedBy=ctx.id;delete tags.inspected;delete tags.inspectedBy;delete tags.inspectResult;delete tags.rejected;}
+   // Finish (R16) is the last stage of the chain raw -> machined -> assembled -> finished; a defective part cannot be finished.
+   if(op===6){tags.stage='finished';tags.finishedBy=ctx.id;}
    if(op===4){tags.inspected=true;tags.inspectedBy=ctx.id;failed=tags.defect===true;tags.inspectResult=failed?'fail':'pass';
     if(failed)tags.rejected=true;}
    return {...b,tags,massKg:q(b.massKg+(op===2||op===3?second!.massKg:0))};
   })};
   if(second)world=despawnBody(world,ctx.id,second.id);
   world=addEvent(world,{kind:'process',source:ctx.id,bodyId:main!.id,
-   detail:(op===1?'Machined':op===2?'Joined':op===3?'Assembled':op===5?'Reworked':failed?'Inspection FAILED':'Inspected OK')+' '+main!.id+
+   detail:(op===1?'Machined':op===2?'Joined':op===3?'Assembled':op===5?'Reworked':op===6?'Finished':failed?'Inspection FAILED':'Inspected OK')+' '+main!.id+
     (second?' with '+second.id:'')+(makesDefect?' (defect)':'')});
   if(op===1)wearNow+=1;
   return {state:{...base,value:wearNow,count:s.count+1,elapsedMs:0,done:true,progress:1,phase:op===4?(failed?1:0):s.phase,activeBodyId:null},world};
