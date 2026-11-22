@@ -114,6 +114,8 @@ export type ProjectFile = {
   /** Tag names of the configurable (16/16) controllers, by PLC id. Omitted when every name is the default. */
   /** Expansion I/O modules (R13): module component id -> the PLC16 that reads/drives its channels and the slot (1..4) that names its tags. */
   ioModules?: Record<string, { plc: string; slot: number }>;
+  /** Learner-authored composite shapes (R02), at most 8; feeders and collectors address them by index after the catalogue. */
+  customShapes?: import('../plant/world/custom-shapes').CustomShapeDef[];
   plcIo?: Record<string, { inputs: Record<string, string>; outputs: Record<string, string> }>;
   /** Device settings that differ from the default (a timer relay's delay), by component id then setting key. */
   params?: Record<string, Record<string, number>>;
@@ -242,6 +244,8 @@ export type Command =
   /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
   /** Rename the tags of a configurable (16/16) PLC. Refused if it would break that PLC's program. Paused only. */
   | { k: 'attachIoModule'; module: string; plc: string | null }
+  | { k: 'defineShape'; shape: import('../plant/world/custom-shapes').CustomShapeDef }
+  | { k: 'removeShape'; id: string }
   | { k: 'configureIo'; plc: string; io: { inputs: Record<string, string>; outputs: Record<string, string> } }
   | { k: 'loadProgram'; program: LadderDocument; plc?: string }
   | { k: 'loadST'; source: string; plc?: string }

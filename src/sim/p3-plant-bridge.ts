@@ -10,6 +10,7 @@ import {freshRuntime,stepScene} from '../plant/world/runner';
 import {freshWorld} from '../plant/world/bodies';
 import {drainEvents} from '../plant/world/events';
 import {PLANT_EQUIPMENT} from '../plant/equipment';
+import {composeShape} from '../plant/world/custom-shapes';
 import {paramSpecsOf,paramValue} from '../components/params';
 
 export const isP3Equipment=(kind:string):boolean=>Object.hasOwn(PLANT_EQUIPMENT,kind);
@@ -62,6 +63,8 @@ export function defaultUnwiredPlantNumber(
  return 0;
 }
 
+/** The project's learner-authored shapes as spawnable materials (empty for every project that has none). */
+export const customMaterialsOf=(project:Pick<ProjectFile,'customShapes'>)=>(project.customShapes??[]).map(composeShape);
 export type PlantTick={runtime:SceneRuntime;events:WorldEvent[]};
 export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
  energizedLoads:readonly string[],dtMs:number,
@@ -108,7 +111,7 @@ export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
  if(typeof options.controllerPowered==='boolean')for(const item of placements)
   if(item.kind==='belt-conveyor')inputs[item.id]={...inputs[item.id],
    controllerPowered:options.controllerPowered};
- const updated=stepScene(previous,placements,PLANT_EQUIPMENT,inputs,project.plantFaults??{},dtMs);
+ const updated=stepScene(previous,placements,PLANT_EQUIPMENT,inputs,project.plantFaults??{},dtMs,customMaterialsOf(project));
  const drained=drainEvents(updated.world);
  return {runtime:{world:drained.world,signals:updated.signals},events:drained.events};
 }

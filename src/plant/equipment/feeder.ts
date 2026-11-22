@@ -3,7 +3,7 @@ import type {EquipmentDef} from '../world/equipment';
 import {draw,flag,initial,param,spec} from '../world/equipment';
 import {spawnBody} from '../world/bodies';
 import {nextSeed} from '../world/seed';
-import {MATERIALS,materialByIndex,materialSpawn} from '../world/materials';
+import {MATERIALS,MATERIAL_INDEX_MAX,materialByIndex,materialSpawn} from '../world/materials';
 import {q,vec} from '../world/math';
 export const boxFeeder:EquipmentDef={
  kind:'box-feeder',label:'Seeded box feeder',footprint:vec(220,240,320),
@@ -14,7 +14,7 @@ export const boxFeeder:EquipmentDef={
   spec('massKg','Nominal mass','kg',1,100,1,8),
   spec('shapeMode','Body form','0=original box, 1=cylinder bottle',0,1,1,0),
   // R26/R02: choose a catalogue material (0 keeps the original random cardboard/metal box), cap the production run, and mix sizes.
-  spec('materialId','Material','0=original, 1-'+MATERIALS.length+'=catalogue',0,MATERIALS.length,1,0),
+  spec('materialId','Material','0=original, 1-'+MATERIALS.length+'=catalogue, then your own shapes',0,MATERIAL_INDEX_MAX,1,0),
   spec('quantity','Production quantity','0=unlimited',0,1000,1,0),
   spec('variationPct','Size and weight variation','percent',0,50,5,0),
   // R04: 1 gives every body a sequential numeric RFID tag (count + 1) that an RFID reader can read; 0 leaves bodies untagged.
@@ -38,7 +38,7 @@ export const boxFeeder:EquipmentDef={
   const due=available&&(enabled&&elapsedMs>=param(ctx,'rateMs',1250)||pulse);
   // A magazine cannot discharge onto an occupied exit: if a body is already standing where the new one would appear, the
   // feeder waits (and keeps its timer) instead of stacking bodies on top of each other, which would lock them together.
-  const cat=materialByIndex(param(ctx,'materialId',0));
+  const cat=materialByIndex(param(ctx,'materialId',0),ctx.materials);
   const length=param(ctx,'boxLengthMm',160);
   const nominal=cat?cat.sizeMm:param(ctx,'shapeMode',0)===1?vec(90,90,190):vec(length,Math.max(70,length*.8),Math.max(50,length*.6));
   const pad=cat&&param(ctx,'variationPct',0)>0?1+param(ctx,'variationPct',0)/100:1;
@@ -57,7 +57,7 @@ export const boxFeeder:EquipmentDef={
    const material=rng.unit>.5?'metal':'cardboard';
    const before=w.spawnedCount;
    const bottle=param(ctx,'shapeMode',0)===1;
-   const catalogue=materialByIndex(param(ctx,'materialId',0));
+   const catalogue=materialByIndex(param(ctx,'materialId',0),ctx.materials);
    if(catalogue){
     // Seeded variation gives mixed-size, mixed-weight loads without any wall-clock randomness.
     const pct=param(ctx,'variationPct',0);

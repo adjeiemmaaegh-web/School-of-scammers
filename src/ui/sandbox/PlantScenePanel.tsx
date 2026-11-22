@@ -12,8 +12,10 @@ import {SceneCommissioningPanel} from './SceneCommissioningPanel';
 import {PLANT_EQUIPMENT} from '../../plant/equipment';
 import {SCENE_CATEGORIES,SCENE_METADATA,searchSceneIds,
  type SceneCategory} from '../../plant/scenes/metadata';
+import {MATERIALS,MAX_CUSTOM_SHAPES} from '../../plant/world/materials';
 import './plant-scene.css';
 
+const SHAPE_EXAMPLE=JSON.stringify({id:'my-bracket',label:'My bracket',massKg:3,blocks:[{x:0,y:0,z:0,w:100,d:60,h:20},{x:0,y:0,z:20,w:20,d:60,h:80}]},null,2);
 type Props={project:ProjectFile|null;snapshot:RenderSnapshot|null;editable:boolean;
  onCommands:(commands:Command[])=>void};
 
@@ -53,6 +55,13 @@ export function PlantScenePanel({project,snapshot,editable,onCommands}:Props){
   if(demo)onCommands([{k:'loadProject',project:demo.build()}]);
   setPendingDemo(null);
  };
+ // R02 custom shapes: a JSON block list (millimetres, corner origin) is validated by the worker like any other edit.
+ const [shapeText,setShapeText]=useState(SHAPE_EXAMPLE);
+ const [shapeNote,setShapeNote]=useState<string|null>(null);
+ const defineShape=()=>{
+  try{onCommands([{k:'defineShape',shape:JSON.parse(shapeText)}]);setShapeNote(null);}
+  catch{setShapeNote('That is not valid JSON.');}
+ };
  const [opX,setOpX]=useState('0');
  const [opY,setOpY]=useState('-2000');
  const operator=snapshot?.plantWorld.world.trainingOperator;
@@ -68,6 +77,18 @@ export function PlantScenePanel({project,snapshot,editable,onCommands}:Props){
     <button type="button" className="btn primary small" data-operator-walk disabled={!operator} onClick={()=>onCommands([{k:'walkOperator',xMm:mm(opX),yMm:mm(opY)}])}>Walk to here</button>
     <button type="button" className="btn ghost small" data-operator-remove disabled={!operator} onClick={()=>onCommands([{k:'setTrainingOperator',enabled:false,xMm:0,yMm:0,feetMm:0}])}>Remove operator</button>
    </div>
+  </details>
+  <details className="sandbox-plant-scenes panel" data-custom-shapes>
+   <summary>Custom shapes · {project?.customShapes?.length??0} of {MAX_CUSTOM_SHAPES} defined</summary>
+   <p className="sandbox-help">Describe your own workpiece as up to 8 touching blocks (millimetres) and use it by number: a feeder's <em>Material</em> or a collector's <em>Accepted material</em> setting {MATERIALS.length+1} is your first shape, {MATERIALS.length+2} the second, and so on. Pause the simulation to change shapes. This is a text definition, not a drawing tool.</p>
+   <ol data-shape-list>{(project?.customShapes??[]).map((shape,i)=><li key={shape.id}>
+    <strong>{MATERIALS.length+i+1}</strong> {shape.label} <code>{shape.id}</code> · {shape.blocks.length} block{shape.blocks.length===1?'':'s'} · {shape.massKg} kg
+    <button type="button" className="btn ghost small" disabled={!editable} data-shape-remove={shape.id}
+     onClick={()=>onCommands([{k:'removeShape',id:shape.id}])}>Remove</button></li>)}</ol>
+   <label>Shape definition (JSON)<textarea data-shape-json rows={9} value={shapeText} spellCheck={false}
+    onChange={e=>setShapeText(e.target.value)}/></label>
+   {shapeNote&&<p role="alert">{shapeNote}</p>}
+   <button type="button" className="btn primary small" disabled={!editable} data-shape-define onClick={defineShape}>Define or replace shape</button>
   </details>
   <details className="sandbox-plant-scenes panel" data-sandbox-demos>
    <summary>Demonstrations · {DEMOS.length} complete, wired and programmed example factories</summary>

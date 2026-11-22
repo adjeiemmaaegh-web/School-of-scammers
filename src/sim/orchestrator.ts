@@ -38,6 +38,8 @@ import { airWireError, solveAir } from '../plant/air';
 import { clearedAlarm } from '../plant/cylinder';
 import { analogWireError, sampleAnalogInputs } from './analog';
 import { airSensorReadings } from './air-sensors';
+import { shapeErrors, type CustomShapeDef } from '../plant/world/custom-shapes';
+import { MATERIALS, MAX_CUSTOM_SHAPES } from '../plant/world/materials';
 import { OPERATOR_KEYS, OPERATOR_KINDS, withOperatorValues } from './operator-values';
 import { editWorkspace as applyWorkspaceEdit, isFreeRotation } from '../workspace/editor';
 import {firstNewCarrierSuperposition,carrierSuperpositionError} from '../workspace/carrier-clearance';
@@ -246,6 +248,7 @@ export function validateProject(raw: unknown): ProjectFile {
   const plantFaults = validatePlantFaults(p.plantFaults, { components });
   const wireStyles = validateWireStyles(p.wireStyles, wires);
   const groups = validateGroups(p.groups, new Set(components.map(c => c.id)), components);
+  const customShapes = validateCustomShapes(p.customShapes, components, params);
   if (p.scanMs !== undefined && !isValidScanMs(p.scanMs)) throw new Error('Invalid scan period (10-500 ms in steps of 10)');
   return {
     formatVersion: 1, components, wires, program: p.program,
@@ -261,6 +264,7 @@ export function validateProject(raw: unknown): ProjectFile {
     ...(plantFaults ? { plantFaults } : {}),
     ...(wireStyles ? { wireStyles } : {}),
     ...(groups ? { groups } : {}),
+    ...(customShapes ? { customShapes } : {}),
     // The default period is never stored, so existing projects keep their exact shape.
     ...(p.scanMs !== undefined && p.scanMs !== DEFAULT_SCAN_MS ? { scanMs: p.scanMs } : {}),
   };
@@ -317,6 +321,25 @@ function validatePlcIo(raw: unknown, components: readonly PlacedComponent[]): Pr
     out[id] = { inputs: { ...m.inputs }, outputs: { ...m.outputs } };
   }
   return Object.keys(out).length ? out : undefined;
+}
+/** R02: at most MAX_CUSTOM_SHAPES valid, uniquely named shapes; a device setting may only name a custom shape that exists. */
+function validateCustomShapes(raw: unknown, components: readonly PlacedComponent[], params: ProjectFile['params']): ProjectFile['customShapes'] | undefined {
+  const list = raw === undefined ? [] : raw;
+  if (!Array.isArray(list) || list.length > MAX_CUSTOM_SHAPES) throw new Error(`Invalid custom shapes (at most ${MAX_CUSTOM_SHAPES})`);
+  const ids = new Set<string>();
+  for (const shape of list as CustomShapeDef[]) {
+    const errors = shapeErrors(shape);
+    if (errors.length) throw new Error(`Custom shape ${String((shape as { id?: unknown })?.id)}: ${errors.join('; ')}`);
+    if (ids.has(shape.id)) throw new Error(`Custom shape ${shape.id} is defined twice`);
+    ids.add(shape.id);
+  }
+  for (const c of components) {
+    const key = c.kind === 'box-feeder' ? 'materialId' : c.kind === 'collector' ? 'acceptMaterial' : null;
+    const index = key ? params?.[c.id]?.[key] : undefined;
+    if (index !== undefined && index > MATERIALS.length && index - MATERIALS.length > list.length)
+      throw new Error(`${c.id}: material ${index} is a custom shape that is not defined in this project`);
+  }
+  return list.length ? (list as CustomShapeDef[]).map(s => JSON.parse(JSON.stringify(s)) as CustomShapeDef) : undefined;
 }
 /** R13: each module is attached to one existing PLC16 with a free slot 1..MAX; nothing else may appear. */
 function validateIoModules(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['ioModules'] | undefined {
@@ -468,6 +491,35 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (!ok(cmd.xMm) || !ok(cmd.yMm)) world = setError(world, 'Invalid walking target');
       else if (!world.plantWorld.world.trainingOperator) world = setError(world, 'Place the simulated operator first');
       else world = { ...world, plantWorld: { ...world.plantWorld, world: { ...world.plantWorld.world, operatorGoal: { x: cmd.xMm, y: cmd.yMm } } }, lastError: null };
+    }
+    else if (cmd.k === 'defineShape' || cmd.k === 'removeShape') {
+      // R02: define, replace or remove a learner-authored shape while paused.
+      if (world.running) world = setError(world, 'Pause before changing custom shapes');
+      else try {
+        const current = world.project.customShapes ?? [];
+        let next: CustomShapeDef[];
+        if (cmd.k === 'defineShape') {
+          const at = current.findIndex(s => s.id === cmd.shape.id);
+          next = at < 0 ? [...current, cmd.shape] : current.map((s, i) => (i === at ? cmd.shape : s));
+        } else {
+          const at = current.findIndex(s => s.id === cmd.id);
+          if (at < 0) throw new Error(`No custom shape ${cmd.id}`);
+          // Shapes are addressed by position, so removing one must not shift a shape that a device still uses.
+          const first = MATERIALS.length + at + 1;
+          const user = world.project.components.find(c => {
+            const key = c.kind === 'box-feeder' ? 'materialId' : c.kind === 'collector' ? 'acceptMaterial' : null;
+            const index = key ? world.project.params?.[c.id]?.[key] : undefined;
+            return index !== undefined && index >= first;
+          });
+          if (user) throw new Error(`${user.id} still uses ${cmd.id} or a shape after it; change that device setting first`);
+          next = current.filter((_, i) => i !== at);
+        }
+        const { customShapes: _old, ...rest } = world.project;
+        const candidate = { ...rest, ...(next.length ? { customShapes: next } : {}) } as ProjectFile;
+        validateCustomShapes(candidate.customShapes, candidate.components, candidate.params);
+        world = createWorld(candidate);
+        commandEvents.push({ tick: world.tick, kind: 'edit', detail: cmd.k === 'defineShape' ? `Defined custom shape ${cmd.shape.id}` : `Removed custom shape ${cmd.id}` });
+      } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Invalid custom shape'); }
     }
     else if (cmd.k === 'setPlantFault') {
       if (world.running) world = setError(world, 'Pause before changing a plant equipment fault');

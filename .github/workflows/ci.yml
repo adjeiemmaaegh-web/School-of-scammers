@@ -50,8 +50,10 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-factory-scale-browser.cjs
       - name: R12 operator devices - selector switch, buzzer and siren built from an empty floor, fault consequence, reload
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-operator-devices-browser.cjs
-      - name: Sandbox six demonstration projects load and run browser acceptance
+      - name: Sandbox seven demonstration projects load and run browser acceptance
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-demos-browser.cjs
+      - name: R02 custom shapes - define, list, reject invalid, remove from the sandbox panel
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r02-shapes-browser.cjs
       - name: R22 grouping - group, whole-group selection, rotate about the centre, ungroup, undo, reload
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r22-groups-browser.cjs
       - name: R12 live operator controls - hold START on the station and watch the process respond

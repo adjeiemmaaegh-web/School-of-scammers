@@ -3,6 +3,7 @@
  * Equipment reads previous settled body/plant state; commands are the mapped PLC
  * output image. No setTimeout, renderer state, Date.now or Math.random.
  */
+import type {MaterialSpec} from './materials';
 import {advanceOperator} from './operator-walk';
 import type {EquipmentDef,SceneOccluder} from './equipment';
 import {ctxOf} from './equipment';
@@ -58,7 +59,8 @@ export const samplePlant=(world:World,placements:readonly EquipmentPlacement[],l
  return signals;
 };
 export function stepScene(previous:SceneRuntime,placements:readonly EquipmentPlacement[],
- library:EquipmentLibrary,inputs:WorldInputs={},faults:Readonly<Record<string,string|null>>={},scanMs:number=SCAN_MS):SceneRuntime{
+ library:EquipmentLibrary,inputs:WorldInputs={},faults:Readonly<Record<string,string|null>>={},scanMs:number=SCAN_MS,
+ materials:readonly MaterialSpec[]=[]):SceneRuntime{
  if(!Number.isSafeInteger(scanMs)||scanMs<SUBSTEP_MS||scanMs%SUBSTEP_MS!==0)
   throw new RangeError('A scan must be a whole number of '+SUBSTEP_MS+' ms plant substeps');
  validatePlacements(placements,library);
@@ -73,7 +75,7 @@ export function stepScene(previous:SceneRuntime,placements:readonly EquipmentPla
  const peers=placements.map(item=>({id:item.id,kind:item.kind,originMm:item.originMm}));
  for(let i=0;i<scanMs/SUBSTEP_MS;i++){
   for(const item of placements){
-   const def=library[item.kind],ctx=ctxOf(item,occluders,peers);
+   const def=library[item.kind],ctx=ctxOf(item,occluders,peers,materials);
    const state=world.model[item.id]??def.fresh(item.params);
    const command=inputs[item.id]??{};
    for(const channel of def.commands){

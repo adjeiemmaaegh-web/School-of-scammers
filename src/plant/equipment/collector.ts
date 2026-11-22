@@ -3,7 +3,7 @@ import type {EquipmentDef} from '../world/equipment';
 import {draw,flag,initial,param,spec} from '../world/equipment';
 import {despawnBody} from '../world/bodies';
 import {addEvent} from '../world/events';
-import {materialByIndex,MATERIALS} from '../world/materials';
+import {materialByIndex,MATERIALS,MATERIAL_INDEX_MAX} from '../world/materials';
 import {insideFootprint,q,vec} from '../world/math';
 import type {Body,World} from '../world/types';
 
@@ -13,12 +13,12 @@ export const collector:EquipmentDef={
  signals:[{name:'full',kind:'bool'},{name:'count',kind:'number',unit:'bodies'},{name:'weightKg',kind:'number',unit:'kg'}],
  params:[spec('capacity','Capacity','bodies',1,500,1,50),
   // 0 accepts anything; 1-N accepts only that catalogue material (a reject bin takes the others elsewhere).
-  spec('acceptMaterial','Accepted material','0=any, 1-'+MATERIALS.length+'=catalogue',0,MATERIALS.length,1,0)],
+  spec('acceptMaterial','Accepted material','0=any, 1-'+MATERIALS.length+'=catalogue, then your own shapes',0,MATERIAL_INDEX_MAX,1,0)],
  faults:['collector-jammed'],
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
   const capacity=param(ctx,'capacity',50);
-  const want=materialByIndex(param(ctx,'acceptMaterial',0));
+  const want=materialByIndex(param(ctx,'acceptMaterial',0),ctx.materials);
   const open=flag(c,'enable')&&f!=='collector-jammed';
   let world:World=w,count=s.count,mass=s.value;
   if(open)for(const body of w.bodies){

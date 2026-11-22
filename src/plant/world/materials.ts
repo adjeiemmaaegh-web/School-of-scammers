@@ -53,8 +53,12 @@ export const MATERIALS:readonly MaterialSpec[]=[
 export const MATERIAL_IDS:readonly string[]=MATERIALS.map(x=>x.id);
 export const materialById=(id:string):MaterialSpec|undefined=>MATERIALS.find(x=>x.id===id);
 /** 1-based index used by saved-project settings; 0 means "legacy random cardboard/metal". */
-export const materialByIndex=(index:number):MaterialSpec|undefined=>
- Number.isInteger(index)&&index>=1&&index<=MATERIALS.length?MATERIALS[index-1]:undefined;
+export const materialByIndex=(index:number,custom:readonly MaterialSpec[]=[]):MaterialSpec|undefined=>
+ !Number.isInteger(index)||index<1?undefined:index<=MATERIALS.length?MATERIALS[index-1]:custom[index-MATERIALS.length-1];
+/** Learner-authored shapes (R02) take the indices after the catalogue, so a project can hold this many on top of the catalogue's. */
+export const MAX_CUSTOM_SHAPES=8;
+/** Highest valid 1-based material index of a device setting: the catalogue plus the room reserved for custom shapes. */
+export const MATERIAL_INDEX_MAX=MATERIALS.length+MAX_CUSTOM_SHAPES;
 
 /** The body tags a material contributes: the existing sensor tags plus friction, category and processing stage. */
 export function materialTags(spec:MaterialSpec):Record<string,string|number|boolean>{
