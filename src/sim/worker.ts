@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import { createWorld, renderSnapshot, tick } from './orchestrator';
+import type { RunRequest } from './assessment-handler';
 import type { SimEvent, WorkerRequest, WorkerResponse, WorkerTiming } from './signals';
 import { createTimingWindow, freshClock, isTimeScale, pumpClock, scanMsOf, scanTiming, type ClockState } from './scan-config';
 
@@ -58,8 +59,16 @@ function postTiming(force = false): void {
     timing: scanTiming(scanMsOf(world.project), timeScale, mean, max, clock.droppedScans, behind) };
   ctx.postMessage(timing);
 }
-ctx.onmessage = (event: MessageEvent<WorkerRequest>) => {
-  const data = event.data;
+/** P12 assessment requests: this same worker file runs as a FRESH instance for an assessment (isolated from the live sandbox world), and
+ * the scene matrices load lazily so they never weigh on the sandbox's critical path. */
+const isAssessment = (kind: unknown): boolean => typeof kind === 'string' && kind.startsWith('run-');
+ctx.onmessage = (event: MessageEvent<WorkerRequest | RunRequest>) => {
+  if (isAssessment((event.data as { kind?: unknown } | null)?.kind)) {
+    const req = event.data as RunRequest;
+    void import('./assessment-handler').then(m => { const reply = m.handleAssessment(req); if (reply) ctx.postMessage(reply); });
+    return;
+  }
+  const data = event.data as WorkerRequest;
   if (data?.kind === 'timeScale') {
     if (isTimeScale(data.scale)) { timeScale = data.scale; clock = { ...clock, owedModelMs: 0 }; behind = false; postTiming(true); }
     return;
