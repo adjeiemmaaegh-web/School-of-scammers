@@ -25,7 +25,7 @@ const tipIfFastStop=(body:Body,vx:number,vy:number):boolean=>{
 const frictionOf=(b:Body):number=>typeof b.tags.frictionMu==='number'?b.tags.frictionMu:.4;
 const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','lift','scissor-lift',
  'pick-and-place','palletizer','asrs-crane','curved-conveyor','transfer-unit']);
-const BLOCKERS=new Set(['stopper','diverter-gate','safety-fence','guard-door']);
+const BLOCKERS=new Set(['stopper','merge-gate','diverter-gate','safety-fence','guard-door']);
 const clampVelocity=(value:number,target:number,dtMs:number,accel=3500):number=>
  q(value+clamp(target-value,-accel*dtMs/1000,accel*dtMs/1000));
 const baseHeight=(item:EquipmentPlacement,state:EquipmentState):number=>

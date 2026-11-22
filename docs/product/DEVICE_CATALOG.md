@@ -3,7 +3,7 @@
 **Generated from the code (`UPDATE_DEVICE_CATALOG=1 npx vitest run tests/device-catalog-doc.test.ts`); do not edit by hand.** A unit test fails when this file is stale.
 Educational simplifications only: nothing here is a calibrated, certified or safety-rated model. See `DEVICE_CONTRACT.md` for how a device is built.
 
-83 placeable kinds; 48 have a plant (motion/sensing) model, 35 are electrical or legacy only.
+84 placeable kinds; 49 have a plant (motion/sensing) model, 35 are electrical or legacy only.
 
 | Kind | Label | Terminals | Plant model | Settings | Injectable faults |
 |---|---|---|---|---|---|
@@ -41,6 +41,7 @@ Educational simplifications only: nothing here is a calibrated, certified or saf
 | `levelprobe` | High-level switch | L+ M OUT | no | — | Sensor output stuck |
 | `lift` | Two-level elevator | CMD_up+ CMD_down+ M- L+ M OUT_bottom OUT_top OUT_moving AN_positionMm SET_height | yes | Travel height (200–2500 mm, default 1000); Travel speed (30–450 mm/s, default 180); Travel height (200–2500 mm, default 1000); Travel speed (30–450 mm/s, default 180) | lift-stuck; limit-switch-dead; lift-slow |
 | `light-curtain` | Height-classifying light curtain | L+ M OUT_blocked OUT_tall | yes | Threshold height (100–1500 mm, default 500); Threshold height (100–1500 mm, default 500) | beam-broken; alignment-error |
+| `merge-gate` | Priority merge gate | CMD_bypass+ M- L+ M OUT_blocking OUT_zoneOccupied AN_released | yes | Zone ahead of gate (-1500–1500 mm, default 200); Zone to the left of gate (-1500–1500 mm, default -300); Zone size (100–1200 mm, default 400); Gap kept clear (0–5000 ms, default 600); Zone ahead of gate (-1500–1500 mm, default 200); Zone to the left of gate (-1500–1500 mm, default -300); Zone size (100–1200 mm, default 400); Gap kept clear (0–5000 ms, default 600) | stuck-closed; stuck-open |
 | `mixer` | Process agitator | CMD_run+ M- L+ M OUT_running OUT_mixed | yes | Mix time (500–120000 ms, default 12000); Opaque material-flow obstacle (0–1 0=off, 1=on, default 0); Mix time (500–120000 ms, default 12000); Opaque material-flow obstacle (0–1 0=off, 1=on, default 0) | motor-stalled; impeller-slipping |
 | `motor` | 24V motor | L+ M- | no | — | Motor winding open |
 | `numeric-display` | Numeric display / bar meter | L+ M OUT_over AN_shown AN_fraction SET_value | yes | Decimal places (0–3 digits, default 1); Full scale (1–10000 units, default 100); Decimal places (0–3 digits, default 1); Full scale (1–10000 units, default 100) | display-frozen; display-off |

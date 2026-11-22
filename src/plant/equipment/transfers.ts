@@ -1,7 +1,7 @@
 /** R03/R15 conveyor family: a curved belt and powered directional transfer units (pop-up wheel, chain transfer). */
 import type {EquipmentDef} from '../world/equipment';
 import {draw,flag,initial,numeric,param,spec} from '../world/equipment';
-import {q,vec} from '../world/math';
+import {q,vec,face,insideFootprint} from '../world/math';
 import {arcOf} from '../world/arc';
 
 export const curvedConveyor:EquipmentDef={
@@ -56,4 +56,39 @@ export const transferUnit:EquipmentDef={
  },
  read:(s,w,ctx)=>({moving:s.engaged,transferring:s.done,jam:w.bodies.some(b=>b.supportedBy===ctx.id&&b.tags.jammed===true)}),
  describe:(s,ctx)=>[draw(ctx,'frame','box',vec(param(ctx,'lengthMm',400),param(ctx,'widthMm',300),120),60,s.done?'#c77a2b':s.engaged?'#397fa0':'#5f7380')],
+};
+
+/**
+ * R03/R15 merge gate: priority merging of a minor lane onto a main lane with no PLC. It blocks the minor lane (the physics treats it as
+ * an extended stopper) while ANY body is inside a watch zone on the main lane, and opens only after that zone has stayed clear for
+ * `clearMs`, which leaves a real gap for the minor-lane part to enter. Place it on the minor lane just before the merge point.
+ *
+ * The zone is a square of `zoneMm` whose centre is `zoneForwardMm` ahead of the gate and `zoneLeftMm` to its left (negative = right),
+ * measured in the gate's own frame (forward = its heading). A stuck-closed gate blocks permanently, a stuck-open gate never blocks.
+ * `bypass` (command) opens it regardless, for a PLC that takes over.
+ */
+export const mergeGate:EquipmentDef={
+ kind:'merge-gate',label:'Priority merge gate',footprint:vec(90,220,180),
+ commands:[{name:'bypass',kind:'bool'}],
+ signals:[{name:'blocking',kind:'bool'},{name:'zoneOccupied',kind:'bool'},{name:'released',kind:'number',unit:'parts'}],
+ params:[spec('zoneForwardMm','Zone ahead of gate','mm',-1500,1500,10,200),
+  spec('zoneLeftMm','Zone to the left of gate','mm',-1500,1500,10,-300),
+  spec('zoneMm','Zone size','mm',100,1200,10,400),
+  spec('clearMs','Gap kept clear','ms',0,5000,50,600)],
+ faults:['stuck-closed','stuck-open'],
+ fresh:()=>initial({}),
+ step:(s,w,c,dt,f,ctx)=>{
+  const fwd=face(ctx.yawDeg),left={x:-fwd.y,y:fwd.x};
+  const fwdMm=param(ctx,'zoneForwardMm',200),leftMm=param(ctx,'zoneLeftMm',-300),size=param(ctx,'zoneMm',400);
+  const centre=vec(ctx.originMm.x+fwd.x*fwdMm+left.x*leftMm,ctx.originMm.y+fwd.y*fwdMm+left.y*leftMm,0);
+  const occupied=w.bodies.some(b=>b.supportedBy!==null&&insideFootprint(b.pos,centre,vec(size,size,0)));
+  // clearMs of continuous vacancy are needed before the gate opens; `elapsedMs` counts the vacancy.
+  const clear=occupied?0:Math.min(param(ctx,'clearMs',600),s.elapsedMs+dt);
+  const wantsBlock=!flag(c,'bypass')&&(occupied||clear<param(ctx,'clearMs',600));
+  const blocking=f==='stuck-closed'?true:f==='stuck-open'?false:wantsBlock;
+  const released=s.engaged&&!blocking?s.count+1:s.count;
+  return {world:w,state:{...s,elapsedMs:q(clear),engaged:blocking,progress:blocking?1:0,count:released,stalled:occupied,faulted:!!f}};
+ },
+ read:s=>({blocking:s.engaged,zoneOccupied:s.stalled,released:s.count}),
+ describe:(s,ctx)=>[draw(ctx,'gate','box',vec(80,220,s.engaged?160:30),s.engaged?80:15,s.engaged?'#c0583f':'#5a9a6b')],
 };
