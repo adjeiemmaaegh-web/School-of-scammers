@@ -6,6 +6,7 @@
  * a "closed" interlock contact that wiring or a PLC can use to gate machines (a safety-TRAINING interlock). Educational
  * only: none of this is a safety function, a rated interlock or a certified guard.
  */
+import {guardWalls} from '../world/guard-walls';
 import type {EquipmentDef} from '../world/equipment';
 import {draw,flag,initial,param,spec} from '../world/equipment';
 import {q,vec} from '../world/math';
@@ -20,6 +21,24 @@ export const safetyFence:EquipmentDef={
  step:(s,w)=>({world:w,state:{...s,engaged:true}}),
  read:()=>({}),
  describe:(s,ctx)=>[draw(ctx,'fence','box',vec(param(ctx,'lengthMm',1000),Math.max(30,param(ctx,'widthMm',50)),1500),750,'#c9a227')],
+};
+
+/**
+ * R20 machine guard cage: four walls around a machine with one OPEN side (a conveyor passes through it, or a guard door is fitted
+ * there). Solid to conveyed material and to the walking operator like a fence, but one device with a settable size, wall
+ * thickness and opening. Educational; not a rated guarding arrangement.
+ */
+export const machineGuard:EquipmentDef={
+ kind:'machine-guard',label:'Machine guard cage',footprint:vec(1500,1500,1800),
+ commands:[],signals:[],
+ params:[spec('sizeMm','Cage size','mm',600,3000,100,1500),spec('thicknessMm','Wall thickness','mm',40,200,20,60),
+  spec('openSide','Open side','0=closed, 1=+x, 2=+y, 3=-x, 4=-y (turns with the placement)',0,4,1,1)],
+ faults:[],
+ fresh:()=>({...initial({}),engaged:true}),
+ step:(s,w)=>({world:w,state:{...s,engaged:true}}),
+ read:()=>({}),
+ describe:(s,ctx)=>guardWalls({originMm:ctx.originMm,yawDeg:ctx.yawDeg,params:ctx.params}).map((wall,i)=>
+  draw({...ctx,originMm:{x:wall.cx,y:wall.cy,z:ctx.originMm.z}},'wall'+i,'box',{x:wall.w,y:wall.d,z:1500},750,'#c9a227')),
 };
 
 /** An interlocked guard door: solid until fully open; publishes `closed` (interlock contact) and `open`. */

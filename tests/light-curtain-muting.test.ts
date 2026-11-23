@@ -58,4 +58,45 @@ describe('R20 light curtain muting', () => {
     expect(sig(r, 'blocked')).toBe(false);
     expect(COMPONENTS['light-curtain'].terminals.some(t => t.name === 'CMD_mute+')).toBe(true);
   });
+  describe('two-sensor muting sequence', () => {
+    const seq = (m1: (i: number) => boolean, m2: (i: number) => boolean, scans: number, item = curtain()) =>
+      run(i => ({ m1: m1(i), m2: m2(i) }), scans, item);
+    it('m1 then m2 (overlapping) mutes the curtain while either is active, and ends when both are released', () => {
+      const during = seq(i => i >= 2 && i < 20, i => i >= 6 && i < 24, 10);
+      expect(sig(during, 'muted')).toBe(true); expect(sig(during, 'sequenceOk')).toBe(true); expect(sig(during, 'blocked')).toBe(false);
+      const stillM2 = seq(i => i >= 2 && i < 8, i => i >= 6 && i < 30, 15);
+      expect(sig(stillM2, 'muted')).toBe(true);                                      // m1 gone, m2 still active: still muting
+      const after = seq(i => i >= 2 && i < 8, i => i >= 6 && i < 12, 16);
+      expect(sig(after, 'muted')).toBe(false); expect(sig(after, 'blocked')).toBe(true);
+    });
+    it('the wrong order (m2 first) never mutes: that is what a person walking in looks like', () => {
+      const r = seq(i => i >= 6 && i < 20, i => i >= 2 && i < 20, 12);
+      expect(sig(r, 'muted')).toBe(false); expect(sig(r, 'blocked')).toBe(true);
+    });
+    it('m2 arriving after m1 has been released is not a valid pass, and m1 alone never mutes', () => {
+      const gap = seq(i => i >= 2 && i < 5, i => i >= 8 && i < 20, 12);
+      expect(sig(gap, 'muted')).toBe(false);
+      const only = seq(i => i >= 2, () => false, 10);
+      expect(sig(only, 'muted')).toBe(false);
+    });
+    it('m2 arriving in the very scan m1 is released is not an overlapping pass', () => {
+      const r = seq(i => i >= 2 && i < 6, i => i >= 6 && i < 20, 10);
+      expect(sig(r, 'muted')).toBe(false); expect(sig(r, 'blocked')).toBe(true);
+    });
+    it('m2 too late (past the window) does not start a mute; inside the window it does', () => {
+      const item = curtain({ sequenceMs: 500 });
+      const late = seq(i => i >= 2, i => i >= 20, 24, item);                           // m2 comes 900 ms after m1 with a 500 ms window
+      expect(sig(late, 'muted')).toBe(false);
+      const inside = seq(i => i >= 2, i => i >= 8, 12, curtain({ sequenceMs: 500 }));   // 300 ms after
+      expect(sig(inside, 'muted')).toBe(true);
+    });
+    it('a sequence mute is still limited by the maximum mute time', () => {
+      const r = seq(i => i >= 2, i => i >= 4, 40, curtain({ maxMuteMs: 500 }));
+      expect(sig(r, 'muted')).toBe(false); expect(sig(r, 'muteTimeout')).toBe(true); expect(sig(r, 'blocked')).toBe(true);
+    });
+    it('a new valid pass works again after the first one ended', () => {
+      const r = seq(i => (i >= 2 && i < 8) || (i >= 20 && i < 30), i => (i >= 5 && i < 10) || (i >= 23 && i < 32), 26);
+      expect(sig(r, 'muted')).toBe(true);
+    });
+  });
 });

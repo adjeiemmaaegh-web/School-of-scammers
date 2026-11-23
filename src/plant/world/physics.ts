@@ -4,6 +4,7 @@
  */
 import type {Body,EquipmentPlacement,EquipmentState,World,Vec3} from './types';
 import {G_MM_S2} from './types';
+import {guardWalls} from './guard-walls';
 import {clamp,face,insideFootprint,q,vec} from './math';
 import {addEvent} from './events';
 import {newlyContactsStaticSolid,staticSolidSize} from './solid-geometry';
@@ -25,7 +26,7 @@ const tipIfFastStop=(body:Body,vx:number,vy:number):boolean=>{
 const frictionOf=(b:Body):number=>typeof b.tags.frictionMu==='number'?b.tags.frictionMu:.4;
 const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','index-table','lift','scissor-lift',
  'pick-and-place','palletizer','asrs-crane','curved-conveyor','transfer-unit']);
-const BLOCKERS=new Set(['stopper','merge-gate','diverter-gate','safety-fence','guard-door']);
+const BLOCKERS=new Set(['stopper','merge-gate','machine-guard','diverter-gate','safety-fence','guard-door']);
 const clampVelocity=(value:number,target:number,dtMs:number,accel=3500):number=>
  q(value+clamp(target-value,-accel*dtMs/1000,accel*dtMs/1000));
 const baseHeight=(item:EquipmentPlacement,state:EquipmentState):number=>
@@ -181,10 +182,12 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    body.pos.z=q(surfaceHeight(carrier,state,body.pos));
    // A locked gate or extended stopper obstructs travel rather than teleporting cargo.
    const proposed=vec(body.vel.x*dtMs/1000,body.vel.y*dtMs/1000,0);
+   const ahead={x:body.pos.x+proposed.x,y:body.pos.y+proposed.y,z:body.pos.z};
    const blockingGate=blockers.find(item=>world.model[item.id]?.engaged&&
-    insideFootprint({x:body.pos.x+proposed.x,y:body.pos.y+proposed.y,z:body.pos.z},
-     item.originMm,worldFootprint(item,Math.max(50,item.params.lengthMm??80),
-      Math.max(50,item.params.widthMm??200))));
+    // A machine guard cage is four walls (R20); every other blocker is one rectangle, exactly as before.
+    (item.kind==='machine-guard'?guardWalls(item).some(wall=>insideFootprint(ahead,vec(wall.cx,wall.cy,item.originMm.z),vec(wall.w,wall.d,0))):
+     insideFootprint(ahead,item.originMm,worldFootprint(item,Math.max(50,item.params.lengthMm??80),
+      Math.max(50,item.params.widthMm??200)))));
    const blocked=!!blockingGate;
    const moved={...body,pos:vec(body.pos.x+proposed.x,body.pos.y+proposed.y,body.pos.z)};
    const solidBlocked=newlyContactsStaticSolid(body,moved,solids);

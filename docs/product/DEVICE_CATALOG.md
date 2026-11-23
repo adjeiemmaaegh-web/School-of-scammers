@@ -3,7 +3,7 @@
 **Generated from the code (`UPDATE_DEVICE_CATALOG=1 npx vitest run tests/device-catalog-doc.test.ts`); do not edit by hand.** A unit test fails when this file is stale.
 Educational simplifications only: nothing here is a calibrated, certified or safety-rated model. See `DEVICE_CONTRACT.md` for how a device is built.
 
-89 placeable kinds; 51 have a plant (motion/sensing) model, 38 are electrical or legacy only.
+90 placeable kinds; 52 have a plant (motion/sensing) model, 38 are electrical or legacy only.
 
 | Kind | Label | Terminals | Plant model | Settings | Injectable faults |
 |---|---|---|---|---|---|
@@ -44,7 +44,8 @@ Educational simplifications only: nothing here is a calibrated, certified or saf
 | `laser-distance` | Laser displacement sensor | L+ M OUT_present AN_distanceMm | yes | Measuring range (50–1500 mm, default 500); Aim angle (-180–180 degrees, default 0); Beam height above origin (0–1500 mm, default 150); Measuring range (50–1500 mm, default 500); Aim angle (-180–180 degrees, default 0); Beam height above origin (0–1500 mm, default 150) | sensor-stuck-off; dirty-lens; sensor-misaligned |
 | `levelprobe` | High-level switch | L+ M OUT | no | — | Sensor output stuck |
 | `lift` | Two-level elevator | CMD_up+ CMD_down+ M- L+ M OUT_bottom OUT_top OUT_moving AN_positionMm SET_height | yes | Travel height (200–2500 mm, default 1000); Travel speed (30–450 mm/s, default 180); Travel height (200–2500 mm, default 1000); Travel speed (30–450 mm/s, default 180) | lift-stuck; limit-switch-dead; lift-slow |
-| `light-curtain` | Height-classifying light curtain | CMD_mute+ M- L+ M OUT_blocked OUT_tall OUT_muted OUT_muteTimeout | yes | Threshold height (100–1500 mm, default 500); Maximum mute time (500–60000 ms, default 10000); Threshold height (100–1500 mm, default 500); Maximum mute time (500–60000 ms, default 10000) | beam-broken; alignment-error |
+| `light-curtain` | Height-classifying light curtain | CMD_mute+ CMD_m1+ CMD_m2+ M- L+ M OUT_blocked OUT_tall OUT_muted OUT_muteTimeout OUT_sequenceOk | yes | Threshold height (100–1500 mm, default 500); Maximum mute time (500–60000 ms, default 10000); Muting sensor window (200–10000 ms, default 2000); Threshold height (100–1500 mm, default 500); Maximum mute time (500–60000 ms, default 10000); Muting sensor window (200–10000 ms, default 2000) | beam-broken; alignment-error |
+| `machine-guard` | Machine guard cage | — | yes | Cage size (600–3000 mm, default 1500); Wall thickness (40–200 mm, default 60); Open side (0–4 0=closed, 1=+x, 2=+y, 3=-x, 4=-y (turns with the placement), default 1); Cage size (600–3000 mm, default 1500); Wall thickness (40–200 mm, default 60); Open side (0–4 0=closed, 1=+x, 2=+y, 3=-x, 4=-y (turns with the placement), default 1) | — |
 | `merge-gate` | Priority merge gate | CMD_bypass+ M- L+ M OUT_blocking OUT_zoneOccupied AN_released | yes | Zone ahead of gate (-1500–1500 mm, default 200); Zone to the left of gate (-1500–1500 mm, default -300); Zone size (100–1200 mm, default 400); Gap kept clear (0–5000 ms, default 600); Zone ahead of gate (-1500–1500 mm, default 200); Zone to the left of gate (-1500–1500 mm, default -300); Zone size (100–1200 mm, default 400); Gap kept clear (0–5000 ms, default 600) | stuck-closed; stuck-open |
 | `mixer` | Process agitator | CMD_run+ M- L+ M OUT_running OUT_mixed | yes | Mix time (500–120000 ms, default 12000); Opaque material-flow obstacle (0–1 0=off, 1=on, default 0); Mix time (500–120000 ms, default 12000); Opaque material-flow obstacle (0–1 0=off, 1=on, default 0) | motor-stalled; impeller-slipping |
 | `motor` | 24V motor | L+ M- | no | — | Motor winding open |

@@ -68,24 +68,36 @@ export const capacitiveProx=optical('capacitive-prox','Capacitive proximity sens
  */
 export const lightCurtain:EquipmentDef={
  kind:'light-curtain',label:'Height-classifying light curtain',footprint:vec(100,450,1100),
- commands:[{name:'mute',kind:'bool'}],
- signals:[{name:'blocked',kind:'bool'},{name:'tall',kind:'bool'},{name:'muted',kind:'bool'},{name:'muteTimeout',kind:'bool'}],
+ commands:[{name:'mute',kind:'bool'},{name:'m1',kind:'bool'},{name:'m2',kind:'bool'}],
+ signals:[{name:'blocked',kind:'bool'},{name:'tall',kind:'bool'},{name:'muted',kind:'bool'},{name:'muteTimeout',kind:'bool'},{name:'sequenceOk',kind:'bool'}],
  params:[spec('heightMm','Threshold height','mm',100,1500,50,500),
-  spec('maxMuteMs','Maximum mute time','ms',500,60000,500,10000)],
+  spec('maxMuteMs','Maximum mute time','ms',500,60000,500,10000),
+  spec('sequenceMs','Muting sensor window','ms',200,10000,100,2000)],
  faults:['beam-broken','alignment-error'],
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
   const visible=bodiesNear(w,ctx,500);
-  // elapsedMs counts how long the mute has been held; a released mute resets it and clears the timeout.
-  const asked=flag(c,'mute');
+  // TWO-SENSOR MUTING: m1 then m2 within the window starts a mute that lasts while either is still active. m2 first, or m2 too late,
+  // is not a valid sequence and does not mute, which is how a person (who would break them in the wrong order) is told from a pallet.
+  const m1=flag(c,'m1'),m2=flag(c,'m2');
+  let phase=s.phase??0,seq=s.progress;
+  // A sequence is armed by a fresh rising edge of m1 (count remembers the previous m1): holding m1 after a timeout must not re-arm it.
+  if(phase===0&&m1&&s.count===0&&!m2){phase=1;seq=0;}
+  else if(phase===1){
+   if(m2&&m1){phase=2;}
+   else if(m2){phase=0;seq=0;}                                                   // m1 was released before m2: not a pass
+   else{seq=seq+dt;if(seq>param(ctx,'sequenceMs',2000)||!m1){phase=0;seq=0;}}
+  }else if(phase===2&&!m1&&!m2){phase=0;seq=0;}
+  // elapsedMs counts how long a mute (commanded, or from a valid sequence) has been held; a release resets it and clears the timeout.
+  const asked=flag(c,'mute')||phase===2;
   const heldMs=asked?s.elapsedMs+dt:0;
   const expired=asked&&heldMs>param(ctx,'maxMuteMs',10000);
   const muted=asked&&!expired;
   const blocked=!muted&&visible.length>0&&f!=='beam-broken';
   const tall=blocked&&visible.some(b=>b.size.z>=param(ctx,'heightMm',500))&&f!=='alignment-error';
-  return {world:w,state:{...s,elapsedMs:q(heldMs),engaged:blocked,done:tall,stalled:expired,lastCommand:muted,faulted:!!f}};
+  return {world:w,state:{...s,elapsedMs:q(heldMs),engaged:blocked,done:tall,stalled:expired,lastCommand:muted,phase,progress:q(seq),count:m1?1:0,faulted:!!f}};
  },
- read:s=>({blocked:s.engaged,tall:s.done,muted:s.lastCommand,muteTimeout:s.stalled}),
+ read:s=>({blocked:s.engaged,tall:s.done,muted:s.lastCommand,muteTimeout:s.stalled,sequenceOk:(s.phase??0)===2}),
  describe:(s,ctx)=>[draw(ctx,'curtain','box',vec(80,430,1000),500,s.lastCommand?'#c9b45a':s.engaged?'#8fbad6':'#577f98')],
 };
 export const weighCell:EquipmentDef={

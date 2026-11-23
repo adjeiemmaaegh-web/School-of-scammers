@@ -8,6 +8,7 @@
  */
 import type {EquipmentPlacement,World} from './types';
 import {STATIC_SOLID_KINDS,staticSolidSize} from './solid-geometry';
+import {guardWalls} from './guard-walls';
 import {q} from './math';
 
 export const WALK_SPEED_MM_S=1200, OPERATOR_RADIUS_MM=200, MAX_SLOPE=0.9;
@@ -31,7 +32,9 @@ const widthOf=(item:EquipmentPlacement,fallback:number)=>item.params.widthMm??fa
 export function personObstacles(items:readonly EquipmentPlacement[],world:World):Rect[]{
  const out:Rect[]=[];
  for(const item of items){
-  if(PERSON_BLOCKERS.has(item.kind)){
+  if(item.kind==='machine-guard'){
+   for(const wall of guardWalls(item))out.push({cx:wall.cx,cy:wall.cy,hx:wall.w/2,hy:wall.d/2});   // the cage walls (the open side lets a person in)
+  }else if(PERSON_BLOCKERS.has(item.kind)){
    if(item.kind==='guard-door'&&!(world.model[item.id]?.engaged??true))continue;       // fully open: walk through
    out.push(rectOf(item,lengthOf(item,item.kind==='guard-door'?800:1000),widthOf(item,50)));
   }else if(item.kind==='process-station'){
