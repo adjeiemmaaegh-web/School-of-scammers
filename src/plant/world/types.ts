@@ -10,7 +10,8 @@ export type BodyShape='box'|'cylinder';
  * and `z` is the part's bottom above the body's bottom. A body with parts collides, rests on others and is sensed PART BY
  * PART, so an L-bracket has a notch, a pallet has gaps between stringers and a bottle has a narrow neck.
  */
-export type BodyPart={dx:number;dy:number;z:number;sx:number;sy:number;sz:number;shape?:BodyShape};
+/** One solid block of a composite body. `sx`/`sy`/`sz` are the AABB used for collision and sensing; a sphere is collided as its bounding cube. `visual` (R02) is the true size and turn of a rotated block, drawn exactly while collisions use its bounding box. */
+export type BodyPart={dx:number;dy:number;z:number;sx:number;sy:number;sz:number;shape?:BodyShape|'sphere';visual?:{w:number;d:number;yawDeg:number}};
 export type Body={
  id:string;shape:BodyShape;size:Vec3;massKg:number;pos:Vec3;
  yawDeg:0|90|180|270;vel:Vec3;supportedBy:string|null;
@@ -55,6 +56,8 @@ export type EquipmentState={
 };
 export type EquipmentPlacement={
  id:string;kind:string;originMm:Vec3;yawDeg:0|90|180|270;params:Record<string,number>;
+ /** R21/R22 free heading in degrees (5..355), added to the quarter-turn `yawDeg`. Only straight belt and roller conveyors take it: their carry direction, surface and drawing follow the true angle. */
+ headingDeg?:number;
 };
 export type EquipmentCommand=Readonly<Record<string,boolean|number>>;
 export type WorldInputs=Readonly<Record<string,EquipmentCommand>>;

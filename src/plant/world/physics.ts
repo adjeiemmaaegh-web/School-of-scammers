@@ -23,7 +23,13 @@ const tipIfFastStop=(body:Body,vx:number,vy:number):boolean=>{
  Object.assign(body,tipOver(body,dir));
  return true;
 };
-const frictionOf=(b:Body):number=>typeof b.tags.frictionMu==='number'?b.tags.frictionMu:.4;
+const frictionOf=(b:Body):number=>{
+ // R01 rolling: a body tagged `rolling` (a cylinder lying on its side, a ball) loses speed to rolling resistance, far lower than sliding friction.
+ if(b.tags.rolling===true)return typeof b.tags.rollingMu==='number'?b.tags.rollingMu:.03;
+ return typeof b.tags.frictionMu==='number'?b.tags.frictionMu:.4;
+};
+/** Restitution of a body for collisions between bodies (0..0.95; absent = perfectly inelastic, the original behaviour). */
+const restitutionOf=(b:Body):number=>typeof b.tags.restitution==='number'?Math.max(0,Math.min(.95,b.tags.restitution)):0;
 const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','index-table','lift','scissor-lift',
  'pick-and-place','palletizer','asrs-crane','curved-conveyor','transfer-unit']);
 const BLOCKERS=new Set(['stopper','merge-gate','machine-guard','diverter-gate','safety-fence','guard-door']);
@@ -33,11 +39,18 @@ const baseHeight=(item:EquipmentPlacement,state:EquipmentState):number=>
  item.kind==='lift'||item.kind==='scissor-lift'?Math.max(0,state.positionMm):item.originMm.z+120;
 /** Degrees of incline of a belt (0 for everything else): the belt rises toward its heading end. */
 const inclineOf=(item:EquipmentPlacement):number=>item.kind==='belt-conveyor'?(item.params.inclineDeg??0):0;
+/** Unit vector of an angle in degrees: exact for quarter turns, true cos/sin otherwise (R21/R22 free heading). */
+const unitOf=(deg:number):{x:number;y:number}=>{
+ const n=((deg%360)+360)%360;
+ return Number.isInteger(n/90)?face(n):{x:Math.cos(n*Math.PI/180),y:Math.sin(n*Math.PI/180)};
+};
+/** The direction a carrier points: its quarter-turn yaw plus its free heading. */
+const headingOf=(item:EquipmentPlacement):{x:number;y:number}=>unitOf(item.yawDeg+(item.headingDeg??0));
 /** Height of the carrying surface under a point: flat for most equipment, a ramp for an inclined belt. */
 const surfaceHeight=(item:EquipmentPlacement,state:EquipmentState,pos:Vec3):number=>{
  const base=baseHeight(item,state),deg=inclineOf(item);
  if(!deg)return base;
- const length=item.params.lengthMm??600,dir=face(item.yawDeg);
+ const length=item.params.lengthMm??600,dir=headingOf(item);
  const along=clamp((pos.x-item.originMm.x)*dir.x+(pos.y-item.originMm.y)*dir.y+length/2,0,length);
  return base+along*Math.tan(deg*Math.PI/180);
 };
@@ -46,6 +59,11 @@ const worldFootprint=(item:EquipmentPlacement,length:number,width:number):Vec3=>
  item.yawDeg===90||item.yawDeg===270?vec(width,length,0):vec(length,width,0);
 /** Whether a point is on a carrier's surface: the true quarter-annulus for a curved belt, the footprint rectangle for the rest. */
 const onSurface=(item:EquipmentPlacement,pos:Vec3):boolean=>item.kind==='curved-conveyor'?arcContains(item,pos):
+ // A belt with a free heading is a true rotated rectangle: the point is on it when it is within half the length along the belt and half the width across it.
+ item.headingDeg?(()=>{
+  const d=headingOf(item),dx=pos.x-item.originMm.x,dy=pos.y-item.originMm.y;
+  return Math.abs(dx*d.x+dy*d.y)<=(item.params.lengthMm??600)/2&&Math.abs(-dx*d.y+dy*d.x)<=(item.params.widthMm??300)/2;
+ })():
  // An indexing table's default size is 800 x 800 (the equipment's own defaults); a part riding round it must stay on its surface.
  item.kind==='index-table'?insideFootprint(pos,item.originMm,vec(item.params.lengthMm??800,item.params.widthMm??800,0)):
  insideFootprint(pos,item.originMm,worldFootprint(item,item.params.lengthMm??600,item.params.widthMm??300));
@@ -140,7 +158,7 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
      ? (carrier.yawDeg+90)%360 : carrier.yawDeg;
    // A curved belt carries along the tangent of its arc; a powered transfer unit that is transferring turns the load
    // sideways (90 degrees chain, 45 degrees pop-up wheels) relative to its own heading.
-   let direction:{x:number;y:number}=carrier.kind==='curved-conveyor'?arcTangent(carrier,body.pos):face(travelYaw);
+   let direction:{x:number;y:number}=carrier.kind==='curved-conveyor'?arcTangent(carrier,body.pos):carrier.headingDeg?unitOf(travelYaw+carrier.headingDeg):face(travelYaw);
    if(carrier.kind==='transfer-unit'&&state.done){
     const turn=(carrier.params.side===1?-1:1)*(carrier.params.transferAngleDeg??90)*Math.PI/180,c=Math.cos(turn),sn=Math.sin(turn);
     direction={x:direction.x*c-direction.y*sn,y:direction.x*sn+direction.y*c};
@@ -274,9 +292,15 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
       const other=idx<cur?next[idx]:sorted[idx];
       if(other&&!other.supportedBy&&other.pos.z===body.pos.z&&!(other.tags.palletized)){
        const m1=body.massKg,m2=other.massKg,common={x:(m1*body.vel.x+m2*other.vel.x)/(m1+m2),y:(m1*body.vel.y+m2*other.vel.y)/(m1+m2)};
-       const pushed={...other,vel:vec(q(common.x),q(common.y),0)};
+       // Collision with restitution e (the lower of the two bodies' values; 0 = they move on together, the original rule): momentum is
+       // conserved and the closing speed is reversed by e, so e = 1 swaps velocities of equal masses and 0 < e < 1 bounces them apart.
+       const e=Math.min(restitutionOf(body),restitutionOf(other));
+       const rel={x:body.vel.x-other.vel.x,y:body.vel.y-other.vel.y};
+       const v1={x:common.x-(e?m2/(m1+m2)*e*rel.x:0),y:common.y-(e?m2/(m1+m2)*e*rel.y:0)};
+       const v2={x:common.x+(e?m1/(m1+m2)*e*rel.x:0),y:common.y+(e?m1/(m1+m2)*e*rel.y:0)};
+       const pushed={...other,vel:vec(q(v2.x),q(v2.y),0)};
        if(idx<cur)next[idx]=pushed;else sorted[idx]=pushed;
-       body.vel.x=q(common.x);body.vel.y=q(common.y);
+       body.vel.x=q(v1.x);body.vel.y=q(v1.y);
        changed=addEvent(changed,{kind:'contact',source:body.id,bodyId:other.id,detail:'Sliding body pushed '+other.id});
       }else{body.vel.x=0;body.vel.y=0;}
       moveX=0;moveY=0;

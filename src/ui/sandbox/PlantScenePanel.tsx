@@ -13,6 +13,7 @@ import {PLANT_EQUIPMENT} from '../../plant/equipment';
 import {SCENE_CATEGORIES,SCENE_METADATA,searchSceneIds,
  type SceneCategory} from '../../plant/scenes/metadata';
 import {MATERIALS,MAX_CUSTOM_SHAPES} from '../../plant/world/materials';
+import {ShapeEditor} from './ShapeEditor';
 import './plant-scene.css';
 
 const SHAPE_EXAMPLE=JSON.stringify({id:'my-bracket',label:'My bracket',massKg:3,blocks:[{x:0,y:0,z:0,w:100,d:60,h:20},{x:0,y:0,z:20,w:20,d:60,h:80}]},null,2);
@@ -80,13 +81,16 @@ export function PlantScenePanel({project,snapshot,editable,onCommands}:Props){
   </details>
   <details className="sandbox-plant-scenes panel" data-custom-shapes>
    <summary>Custom shapes · {project?.customShapes?.length??0} of {MAX_CUSTOM_SHAPES} defined</summary>
-   <p className="sandbox-help">Describe your own workpiece as up to 8 touching blocks (millimetres) and use it by number: a feeder's <em>Material</em> or a collector's <em>Accepted material</em> setting {MATERIALS.length+1} is your first shape, {MATERIALS.length+2} the second, and so on. Pause the simulation to change shapes. This is a text definition, not a drawing tool.</p>
+   <p className="sandbox-help">Describe your own workpiece as up to 8 touching blocks (millimetres) and use it by number: a feeder's <em>Material</em> or a collector's <em>Accepted material</em> setting {MATERIALS.length+1} is your first shape, {MATERIALS.length+2} the second, and so on. Pause the simulation to change shapes. Draw it below: the blocks are listed and drawn as you edit them.</p>
    <ol data-shape-list>{(project?.customShapes??[]).map((shape,i)=><li key={shape.id}>
     <strong>{MATERIALS.length+i+1}</strong> {shape.label} <code>{shape.id}</code> · {shape.blocks.length} block{shape.blocks.length===1?'':'s'} · {shape.massKg} kg
     <button type="button" className="btn ghost small" disabled={!editable} data-shape-remove={shape.id}
      onClick={()=>onCommands([{k:'removeShape',id:shape.id}])}>Remove</button></li>)}</ol>
-   <label>Shape definition (JSON)<textarea data-shape-json rows={9} value={shapeText} spellCheck={false}
-    onChange={e=>setShapeText(e.target.value)}/></label>
+   <ShapeEditor text={shapeText} onChange={setShapeText} disabled={!editable}/>
+   <details><summary>Advanced: the definition as JSON</summary>
+    <label>Shape definition (JSON)<textarea data-shape-json rows={9} value={shapeText} spellCheck={false}
+     onChange={e=>setShapeText(e.target.value)}/></label>
+   </details>
    {shapeNote&&<p role="alert">{shapeNote}</p>}
    <button type="button" className="btn primary small" disabled={!editable} data-shape-define onClick={defineShape}>Define or replace shape</button>
   </details>

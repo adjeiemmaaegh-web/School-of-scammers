@@ -25,14 +25,14 @@ export function partBoxes(b:Body):PartBox[]{
   return partsOf(b).map(p=>{
    const round=(p.shape??'box')==='cylinder';
    const hx=round?Math.max(p.sx,p.sy)/2:(ac*p.sx+as*p.sy)/2,hy=round?hx:(as*p.sx+ac*p.sy)/2;
-   return {center:{x:b.pos.x+c*p.dx-s*p.dy,y:b.pos.y+s*p.dx+c*p.dy,z:b.pos.z+p.z+p.sz/2},half:{x:hx,y:hy,z:p.sz/2},shape:p.shape??'box'};
+   return {center:{x:b.pos.x+c*p.dx-s*p.dy,y:b.pos.y+s*p.dx+c*p.dy,z:b.pos.z+p.z+p.sz/2},half:{x:hx,y:hy,z:p.sz/2},shape:p.shape==='sphere'?'box':p.shape??'box'};
   });
  }
  const quarter=b.yawDeg===90||b.yawDeg===270;
  return partsOf(b).map(p=>{
   const [rx,ry]=rotate(p.dx,p.dy,b.yawDeg);
   return {center:{x:b.pos.x+rx,y:b.pos.y+ry,z:b.pos.z+p.z+p.sz/2},
-   half:{x:(quarter?p.sy:p.sx)/2,y:(quarter?p.sx:p.sy)/2,z:p.sz/2},shape:p.shape??'box'};
+   half:{x:(quarter?p.sy:p.sx)/2,y:(quarter?p.sx:p.sy)/2,z:p.sz/2},shape:p.shape==='sphere'?'box':p.shape??'box'};
  });
 }
 const TOL=1e-8;
@@ -86,7 +86,7 @@ const GRAV=9810;
 export function centreOfMassHeight(b:Body):number{
  let volume=0,moment=0;
  for(const p of partsOf(b)){
-  const v=p.sx*p.sy*p.sz*((p.shape??'box')==='cylinder'?Math.PI/4:1);
+  const v=p.sx*p.sy*p.sz*((p.shape??'box')==='cylinder'?Math.PI/4:p.shape==='sphere'?Math.PI/6:1);
   volume+=v;moment+=v*(p.z+p.sz/2);
  }
  return volume>0?moment/volume:b.size.z/2;

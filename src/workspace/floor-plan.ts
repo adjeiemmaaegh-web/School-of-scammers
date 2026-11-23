@@ -32,12 +32,17 @@ export function footprintOf(
   const depth = model ? finiteMm(settings.widthMm ?? model.footprint.y) / 10 : 57;
   const yawDeg = item.yawDeg ?? 0;
   const quarterTurn = yawDeg === 90 || yawDeg === 270;
+  // A freely headed belt occupies the axis-aligned bounds of its rotated rectangle on the plan.
+  const free = item.freeYawDeg ?? 0;
+  const theta = ((yawDeg + free) % 360) * Math.PI / 180, cs = Math.abs(Math.cos(theta)), sn = Math.abs(Math.sin(theta));
+  const boundsW = free ? cs * length + sn * depth : quarterTurn ? depth : length;
+  const boundsD = free ? sn * length + cs * depth : quarterTurn ? length : depth;
   return {
     id: item.id, kind: item.kind,
     x: item.x + DEVICE_WIDTH / 2,
     y: item.y + DEVICE_DEPTH / 2,
-    width: quarterTurn ? depth : length,
-    depth: quarterTurn ? length : depth,
+    width: boundsW,
+    depth: boundsD,
     yawDeg,
     isPlant: Boolean(model),
     isCarrier: CARRIERS.has(item.kind),

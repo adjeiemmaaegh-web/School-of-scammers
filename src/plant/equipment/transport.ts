@@ -140,7 +140,9 @@ export const beltConveyor:EquipmentDef={
   // This is a bounded lane-occupancy teaching sensor, NOT an inferred force
   // or machine-safe collision/overfill device.
   const count=monitored?w.bodies.filter(body=>body.supportedBy===ctx.id&&
-   insideFootprint(body.pos,ctx.originMm,size)).length:0;
+   (ctx.headingDeg?(()=>{const a=((ctx.yawDeg+ctx.headingDeg)*Math.PI/180),c=Math.cos(a),sn=Math.sin(a),dx=body.pos.x-ctx.originMm.x,dy=body.pos.y-ctx.originMm.y;
+     return Math.abs(dx*c+dy*sn)<=length/2&&Math.abs(-dx*sn+dy*c)<=width/2;})():
+     insideFootprint(body.pos,ctx.originMm,size))).length:0;
   return {moving:s.engaged,
    jam:s.stalled||w.bodies.some(b=>b.supportedBy===ctx.id&&b.tags.jammed===true),
    restartRequired:s.restartPending===true,

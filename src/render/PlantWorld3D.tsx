@@ -33,8 +33,10 @@ function PhysicalBody({body}:{body:Body}){
   body.tags.marked===true?'#bd9758':'#c9ad79';
  // Composite bodies draw every part at its own offset, so the picture is the same shape the physics collides with.
  if(body.parts&&body.parts.length>0)return <group position={bodyPosition(body)} rotation={[0,-((body.visualYawDeg??body.yawDeg)+(body.headingDeg??0))*Math.PI/180,0]}>
-   {body.parts.map((part,index)=><mesh key={index} position={[metres(part.dx),metres(part.z+part.sz/2-body.size.z/2),metres(part.dy)]}>
-     {(part.shape??'box')==='box'?<boxGeometry args={boxSize({x:part.sx,y:part.sy,z:part.sz})}/>:
+   {body.parts.map((part,index)=><mesh key={index} position={[metres(part.dx),metres(part.z+part.sz/2-body.size.z/2),metres(part.dy)]}
+     rotation={[0,part.visual?-part.visual.yawDeg*Math.PI/180:0,0]}>
+     {part.shape==='sphere'?<sphereGeometry args={[metres(part.sx/2),18,12]}/>:
+      (part.shape??'box')==='box'?<boxGeometry args={boxSize(part.visual?{x:part.visual.w,y:part.visual.d,z:part.sz}:{x:part.sx,y:part.sy,z:part.sz})}/>:
       <cylinderGeometry args={[metres(part.sx/2),metres(part.sx/2),metres(part.sz),14]}/>}
      <meshStandardMaterial color={body.tags.transparent===true?'#9fc6d4':colour} roughness={0.78} metalness={body.tags.metal===true?.48:.05}
        transparent={body.tags.transparent===true} opacity={body.tags.transparent===true?.7:1}/>

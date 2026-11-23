@@ -22,7 +22,9 @@ const NONREPEATABLE = new Set(['reversebutton', 'forwardcontactor', 'reversecont
  * robot and process models stay locked until their dynamics support rotation.
  */
 /** Kinds that may take a continuous rotation: orientable AND with no plant physics that reads their yaw (those stay quarter-turn only). */
-export const isFreeRotation = (kind: string): boolean => ROTATABLE.has(kind) && !Object.hasOwn(PLANT_EQUIPMENT, kind);
+/** Straight belt and roller conveyors also turn freely: their carry direction and surface follow the true angle (R21/R22). */
+const FREE_PHYSICAL = new Set(['belt-conveyor', 'roller-conveyor']);
+export const isFreeRotation = (kind: string): boolean => FREE_PHYSICAL.has(kind) || (ROTATABLE.has(kind) && !Object.hasOwn(PLANT_EQUIPMENT, kind));
 export const ROTATABLE = new Set([
   'plc', 'plc16', 'supply', 'start', 'stop', 'estop', 'reversebutton',
   'contactor', 'forwardcontactor', 'reversecontactor', 'relay', 'timerelay',

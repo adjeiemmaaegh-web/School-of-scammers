@@ -9,15 +9,25 @@ import {vec} from './math';
 import {MATERIALS} from './materials';
 import type {MaterialCategory,MaterialSpec} from './materials';
 
-export type ShapeBlock={x:number;y:number;z:number;w:number;d:number;h:number;shape?:BodyShape};
+/** A solid block in the learner's coordinates. `yawDeg` turns it about its own centre (R02, any angle); `shape` is a box, a cylinder or a sphere (width = depth = height = the diameter). */
+export type ShapeBlock={x:number;y:number;z:number;w:number;d:number;h:number;shape?:BodyShape|'sphere';yawDeg?:number};
 export type CustomShapeDef={
  id:string;label:string;blocks:readonly ShapeBlock[];massKg:number;frictionMu?:number;
  category?:MaterialCategory;optical?:'opaque'|'transparent'|'reflective';conductive?:boolean;
  /** Bounciness on the floor, 0 (dead) to 0.95; omitted = does not bounce (R01). */
  restitution?:number;
+ /** A round part that rolls (a ball, a cylinder on its side): it loses speed to rolling resistance instead of sliding friction (R01). */
+ rolling?:boolean;
 };
 export const MAX_SHAPE_BLOCKS=8;
 const finite=(...n:number[]):boolean=>n.every(Number.isFinite);
+/** The axis-aligned box a block occupies: itself, or the bounds of the rotated rectangle when the block is turned about its own centre. */
+const boxOf=(b:ShapeBlock):{x:number;y:number;z:number;w:number;d:number;h:number}=>{
+ if(!b.yawDeg)return b;
+ const t=b.yawDeg*Math.PI/180,c=Math.abs(Math.cos(t)),s=Math.abs(Math.sin(t));
+ const w=c*b.w+s*b.d,d=s*b.w+c*b.d,cx=b.x+b.w/2,cy=b.y+b.d/2;
+ return {x:cx-w/2,y:cy-d/2,z:b.z,w,d,h:b.h};
+};
 
 /** Every reason the definition cannot be used (empty when valid). */
 export function shapeErrors(def:CustomShapeDef):string[]{
@@ -31,10 +41,15 @@ export function shapeErrors(def:CustomShapeDef):string[]{
   def.blocks.forEach((b,i)=>{
    if(!b||!finite(b.x,b.y,b.z,b.w,b.d,b.h)||b.w<=0||b.d<=0||b.h<=0||b.w>5000||b.d>5000||b.h>5000||Math.abs(b.x)>5000||Math.abs(b.y)>5000||Math.abs(b.z)>5000)
     errors.push('block '+(i+1)+' has a non-finite, non-positive or oversized dimension');
+   else{
+    if(b.shape!==undefined&&!['box','cylinder','sphere'].includes(b.shape))errors.push('block '+(i+1)+': shape must be box, cylinder or sphere');
+    if(b.yawDeg!==undefined&&(!finite(b.yawDeg)||Math.abs(b.yawDeg)>360))errors.push('block '+(i+1)+': turn must be a number of degrees from -360 to 360');
+    if(b.shape==='sphere'&&(Math.abs(b.w-b.d)>1e-6||Math.abs(b.w-b.h)>1e-6))errors.push('block '+(i+1)+': a sphere needs equal width, depth and height (its diameter)');
+   }
   });
-  if(!errors.length&&!connected(def.blocks))errors.push('blocks must touch or overlap so the part is one solid piece');
+  if(!errors.length&&!connected(def.blocks.map(boxOf)))errors.push('blocks must touch or overlap so the part is one solid piece');
   if(!errors.length){
-   const [lo,hi]=extent(def.blocks);
+   const [lo,hi]=extent(def.blocks.map(boxOf));
    if(hi[0]-lo[0]>5000||hi[1]-lo[1]>5000||hi[2]-lo[2]>5000)errors.push('the overall envelope exceeds 5000 mm');
   }
  }
@@ -61,11 +76,18 @@ function connected(blocks:readonly ShapeBlock[]):boolean{
 export function composeShape(def:CustomShapeDef):MaterialSpec{
  const errors=shapeErrors(def);
  if(errors.length)throw new RangeError('Invalid custom shape: '+errors.join('; '));
- const [lo,hi]=extent(def.blocks);
+ const boxes=def.blocks.map(boxOf);
+ const [lo,hi]=extent(boxes);
  const cx=(lo[0]+hi[0])/2,cy=(lo[1]+hi[1])/2;
- const parts:BodyPart[]=def.blocks.map(b=>({dx:b.x+b.w/2-cx,dy:b.y+b.d/2-cy,z:b.z-lo[2],sx:b.w,sy:b.d,sz:b.h,...(b.shape==='cylinder'?{shape:'cylinder' as const}:{})}));
+ // Collision and sensing use each block's bounding box (a turned block's bounds, a sphere's cube); drawing keeps the true turn.
+ const parts:BodyPart[]=def.blocks.map((b,i)=>{
+  const a=boxes[i];
+  return {dx:a.x+a.w/2-cx,dy:a.y+a.d/2-cy,z:a.z-lo[2],sx:a.w,sy:a.d,sz:a.h,
+   ...(b.shape==='cylinder'||b.shape==='sphere'?{shape:b.shape}:{}),
+   ...(b.yawDeg&&b.shape!=='sphere'&&b.shape!=='cylinder'?{visual:{w:b.w,d:b.d,yawDeg:b.yawDeg}}:{})};
+ });
  return {id:def.id,label:def.label,category:def.category??'workpiece',shape:'box',sizeMm:vec(hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2]),
   massKg:def.massKg,frictionMu:def.frictionMu??.4,conductive:def.conductive??false,optical:def.optical??'opaque',stage:'raw',
-  ...(def.restitution?{extraTags:{restitution:def.restitution}}:{}),
-  ...(parts.length>1?{parts}:{})};
+  ...(def.restitution||def.rolling?{extraTags:{...(def.restitution?{restitution:def.restitution}:{}),...(def.rolling?{rolling:true}:{})}}:{}),
+  ...(parts.length>1||parts[0].shape||parts[0].visual?{parts}:{})};
 }

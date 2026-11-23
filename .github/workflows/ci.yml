@@ -52,8 +52,10 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-operator-devices-browser.cjs
       - name: Sandbox seven demonstration projects load and run browser acceptance
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-demos-browser.cjs
-      - name: R02 custom shapes - define, list, reject invalid, remove from the sandbox panel
+      - name: R02 custom shapes - drawn editor (views, add, remove, shape and turn), define, reject invalid, remove
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r02-shapes-browser.cjs
+      - name: R21/R22 free rotation - turn a belt by 15 degree steps from the toolbar, back to its exact saved shape
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r22-free-rotation-browser.cjs
       - name: R22 grouping - group, whole-group selection, rotate about the centre, ungroup, undo, reload
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r22-groups-browser.cjs
       - name: R12 live operator controls - hold START on the station and watch the process respond
