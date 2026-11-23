@@ -13,6 +13,8 @@ export type ShapeBlock={x:number;y:number;z:number;w:number;d:number;h:number;sh
 export type CustomShapeDef={
  id:string;label:string;blocks:readonly ShapeBlock[];massKg:number;frictionMu?:number;
  category?:MaterialCategory;optical?:'opaque'|'transparent'|'reflective';conductive?:boolean;
+ /** Bounciness on the floor, 0 (dead) to 0.95; omitted = does not bounce (R01). */
+ restitution?:number;
 };
 export const MAX_SHAPE_BLOCKS=8;
 const finite=(...n:number[]):boolean=>n.every(Number.isFinite);
@@ -38,6 +40,7 @@ export function shapeErrors(def:CustomShapeDef):string[]{
  }
  if(!finite(def.massKg)||def.massKg<0.01||def.massKg>5000)errors.push('mass must be 0.01-5000 kg');
  if(def.frictionMu!==undefined&&(!finite(def.frictionMu)||def.frictionMu<0.05||def.frictionMu>1))errors.push('friction must be 0.05-1');
+ if(def.restitution!==undefined&&(!finite(def.restitution)||def.restitution<0||def.restitution>0.95))errors.push('restitution must be 0-0.95');
  return errors;
 }
 const extent=(blocks:readonly ShapeBlock[]):[number[],number[]]=>[
@@ -63,5 +66,6 @@ export function composeShape(def:CustomShapeDef):MaterialSpec{
  const parts:BodyPart[]=def.blocks.map(b=>({dx:b.x+b.w/2-cx,dy:b.y+b.d/2-cy,z:b.z-lo[2],sx:b.w,sy:b.d,sz:b.h,...(b.shape==='cylinder'?{shape:'cylinder' as const}:{})}));
  return {id:def.id,label:def.label,category:def.category??'workpiece',shape:'box',sizeMm:vec(hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2]),
   massKg:def.massKg,frictionMu:def.frictionMu??.4,conductive:def.conductive??false,optical:def.optical??'opaque',stage:'raw',
+  ...(def.restitution?{extraTags:{restitution:def.restitution}}:{}),
   ...(parts.length>1?{parts}:{})};
 }

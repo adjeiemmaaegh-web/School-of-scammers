@@ -280,8 +280,18 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
      }
     }
    }
+   const impactVz=body.vel.z;
    body.pos=qPosition({...body.pos,x:body.pos.x+moveX,y:body.pos.y+moveY,z:Math.max(0,body.pos.z+body.vel.z*dtMs/1000)});
-   if(body.pos.z===0)body.vel.z=0;
+   if(body.pos.z===0){
+    // Opt-in restitution (tag `restitution`, 0..0.95): a body landing on the floor harder than a resting body's gravity step rebounds with e x its impact
+    // speed, so a dropped part bounces to about e squared of its drop height and settles; bodies without the tag stop dead as before.
+    const e=typeof body.tags.restitution==='number'?Math.max(0,Math.min(.95,body.tags.restitution)):0;
+    // A body at rest meets the floor at one gravity step per substep, so only a landing faster than twice that counts as an impact,
+    // and a rebound slower than one step is a rest (otherwise it would micro-bounce forever).
+    const step=G_MM_S2*dtMs/1000;
+    const rebound=e>0&&impactVz<-2*step?q(-impactVz*e):0;
+    body.vel.z=rebound>step?rebound:0;
+   }
   }
   // Simple vertical stack: a body can rest on another with 60% overlap and
   // approximate centre-of-mass support; otherwise it falls, never floats.
