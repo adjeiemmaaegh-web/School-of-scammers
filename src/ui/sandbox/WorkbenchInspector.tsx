@@ -29,6 +29,8 @@ type Props = {
   onAttachModule?: (module: string, plc: string | null) => void;
   /** Give one expansion-module channel your own tag name, or null to restore the default (see Command `renameModuleTag`). */
   onRenameModuleTag?: (module: string, tag: string, name: string | null) => void;
+  /** Connect a belt to a drive's shaft (travel per revolution in mm), or disconnect it with null (see Command `setMechanicalLink`). */
+  onSetMechanicalLink?: (drive: string, target: string, mmPerRev: number | null) => void;
 };
 
 /** The program tags an attached expansion module adds (see sim/plc-io.ts). */
@@ -91,7 +93,7 @@ function ParamField({ spec, value, disabled, onCommit }: { spec: ParamSpec; valu
 /** Read-only contextual view of the worker snapshot. Actions emit existing Commands. */
 export function WorkbenchInspector({
   project, snapshot, selectedDevice, selectedTerminal, editable,
-  onTerminal, onCancelWire, onMove, onMoveTo, onOperate, onClearSelection, onSetParam, onSetOperator, onAttachModule, onRenameModuleTag,
+  onTerminal, onCancelWire, onMove, onMoveTo, onOperate, onClearSelection, onSetParam, onSetOperator, onAttachModule, onRenameModuleTag, onSetMechanicalLink,
 }: Props) {
   const hasLatchBranch = project.program.rungs.some(rung =>
     rung.elements.some(element => element.type === 'branch'));
@@ -209,6 +211,22 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
             onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
         </label>)}
       </div>}
+    </div>}
+    {['belt-conveyor', 'roller-conveyor', 'curved-conveyor'].includes(selectedDevice.kind) && onSetMechanicalLink && project.components.some(c => c.kind === 'drive') && <div className="sandbox-inspector-position" role="group" aria-label="Mechanical connection to a drive">
+      {(() => {
+        const link = project.mechanicalLinks?.find(l => l.target === selectedDevice.id);
+        return <>
+          <label>Driven by <select data-mechanical-drive value={link?.drive ?? ''} disabled={!editable}
+            onChange={e => onSetMechanicalLink(e.target.value || (link?.drive ?? ''), selectedDevice.id, e.target.value ? (link?.mmPerRev ?? 100) : null)}>
+            <option value="">Own command (not driven)</option>
+            {project.components.filter(c => c.kind === 'drive').map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
+          </select></label>
+          {link && <label>Travel per revolution (mm) <input type="number" data-mechanical-ratio min={10} max={2000} step={10} disabled={!editable}
+            defaultValue={link.mmPerRev} key={`${link.drive}-${link.mmPerRev}`}
+            onBlur={e => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== link.mmPerRev) onSetMechanicalLink(link.drive, selectedDevice.id, v); }} /></label>}
+          {link && <p className="sandbox-help">Belt speed = drive rpm / 60 x {link.mmPerRev} mm. Its own run command is ignored while it is driven.</p>}
+        </>;
+      })()}
     </div>}
     {OPERATOR_KINDS.has(selectedDevice.kind) && onSetOperator && <div className="sandbox-inspector-position" role="group" aria-label="Operator controls (live)">
       {paramSpecsOf(selectedDevice.kind).filter(spec => OPERATOR_KEYS.has(spec.key)).map(spec =>

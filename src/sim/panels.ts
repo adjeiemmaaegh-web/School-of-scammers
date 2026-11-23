@@ -44,6 +44,12 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     delete kept[id];
     next = Object.keys(kept).length ? { ...rest, params: kept } : rest;
   }
+  // R14/R28: removing a drive or the belt it turns drops that mechanical connection.
+  if (project.mechanicalLinks?.some(l => l.drive === id || l.target === id)) {
+    const { mechanicalLinks: _links, ...rest } = next;
+    const kept = project.mechanicalLinks.filter(l => l.drive !== id && l.target !== id);
+    next = kept.length ? { ...rest, mechanicalLinks: kept } : rest;
+  }
   // R13: removing a module drops its link; removing a PLC16 drops the links of the modules it hosted (they stay as unattached devices).
   if (project.ioModules && (project.ioModules[id] || Object.values(project.ioModules).some(l => l.plc === id))) {
     const { ioModules: _old, ...rest } = next;

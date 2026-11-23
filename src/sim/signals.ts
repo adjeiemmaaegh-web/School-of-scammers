@@ -116,6 +116,8 @@ export type ProjectFile = {
   ioModules?: Record<string, { plc: string; slot: number; names?: Record<string, string> }>;
   /** Learner-authored composite shapes (R02), at most 8; feeders and collectors address them by index after the catalogue. */
   customShapes?: import('../plant/world/custom-shapes').CustomShapeDef[];
+  /** Mechanical connections (R14/R28): a `drive` device's shaft turns a belt; belt speed = rpm / 60 x mmPerRev. One drive per belt. */
+  mechanicalLinks?: { drive: string; target: string; mmPerRev: number }[];
   plcIo?: Record<string, { inputs: Record<string, string>; outputs: Record<string, string> }>;
   /** Device settings that differ from the default (a timer relay's delay), by component id then setting key. */
   params?: Record<string, Record<string, number>>;
@@ -245,6 +247,7 @@ export type Command =
   /** Rename the tags of a configurable (16/16) PLC. Refused if it would break that PLC's program. Paused only. */
   | { k: 'attachIoModule'; module: string; plc: string | null }
   | { k: 'renameModuleTag'; module: string; tag: string; name: string | null }
+  | { k: 'setMechanicalLink'; drive: string; target: string; mmPerRev: number | null }
   | { k: 'defineShape'; shape: import('../plant/world/custom-shapes').CustomShapeDef }
   | { k: 'removeShape'; id: string }
   | { k: 'configureIo'; plc: string; io: { inputs: Record<string, string>; outputs: Record<string, string> } }

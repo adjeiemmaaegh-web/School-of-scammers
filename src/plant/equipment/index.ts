@@ -5,6 +5,7 @@ import {STATIC_SOLID_KINDS} from '../world/solid-geometry';
 import {beltConveyor,rollerConveyor,turntable,indexTable} from './transport';
 import {curvedConveyor,transferUnit,mergeGate} from './transfers';
 import {OPERATOR_DEVICES} from './operator';
+import {drive} from './drives';
 import {processStation} from './stations';
 import {stopper,pusher,diverterGate} from './actuators';
 import {boxFeeder} from './feeder';
@@ -15,12 +16,12 @@ import {photoeye,inductiveProx,capacitiveProx,lightCurtain,weighCell} from './se
 import {lift,scissorLift,rotaryActuator,pickAndPlace,gantry,palletizer} from './positioning';
 import {shelf,asrsCrane} from './storage';
 import {robotArm} from './robot';
-import {processTank,mixer,heater,proportionalValve,filler,capper,transferPump} from './process';
+import {processTank,mixer,heater,proportionalValve,filler,capper,transferPump,transferValve} from './process';
 const SOURCE_EQUIPMENT:readonly EquipmentDef[]=[
- beltConveyor,rollerConveyor,turntable,indexTable,stopper,pusher,diverterGate,boxFeeder,
+ beltConveyor,rollerConveyor,turntable,indexTable,drive,stopper,pusher,diverterGate,boxFeeder,
  photoeye,inductiveProx,capacitiveProx,lightCurtain,weighCell,
  lift,scissorLift,rotaryActuator,pickAndPlace,gantry,palletizer,
- shelf,asrsCrane,robotArm,processTank,mixer,heater,proportionalValve,filler,capper,transferPump,
+ shelf,asrsCrane,robotArm,processTank,mixer,heater,proportionalValve,filler,capper,transferPump,transferValve,
  collector,retroPhotoeye,laserDistance,rfidReader,visionSensor,encoder,safetyFence,guardDoor,machineGuard,curvedConveyor,transferUnit,mergeGate,processStation,handrail,platform,stairs,workZone,...OPERATOR_DEVICES,
 ];
 /** Opt-in static collision is a shared *registered* equipment capability.

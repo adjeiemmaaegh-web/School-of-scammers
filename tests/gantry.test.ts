@@ -97,4 +97,33 @@ describe('R27 three-axis gantry', () => {
     const slow = run(setup({ speedMmS: 200 }), () => ({ xTargetMm: 0, yTargetMm: 0, zTargetMm: 800 }), 20);
     expect(sig(fast, 'zMm') as number).toBeGreaterThan((sig(slow, 'zMm') as number) * 3);
   });
+  describe('collision with equipment', () => {
+    const withMachine = (kind: string, x: number, y = 0, gantry: Record<string, number> = {}) => {
+      const items = [table, P('g', 'gantry', 0, 0, gantry), P('m', kind, x, y)];
+      return { items, r: freshRuntime(freshWorld(), items, PLANT_EQUIPMENT) };
+    };
+    const go = (s: ReturnType<typeof withMachine>, x: number, y = 0) => run(s, () => ({ xTargetMm: x, yTargetMm: y, zTargetMm: 0 }), 300);
+    it('a route through a machine taller than the gripper is stopped short of it and reports a collision', () => {
+      const r = go(withMachine('robot-arm', 700), 1400);
+      expect(sig(r, 'xMm') as number).toBeLessThan(700 - 450);                 // stopped before the arm\'s envelope
+      expect(sig(r, 'xMm') as number).toBeGreaterThan(100);                    // but it did travel up to it
+      expect(sig(r, 'collision')).toBe(true); expect(sig(r, 'inPosition')).toBe(false);
+    });
+    it('the same move succeeds when the machine is out of the way, lower than the safe height, or the safe height clears it', () => {
+      expect(sig(go(withMachine('robot-arm', 700, 1500), 1400), 'xMm')).toBe(1400);                         // 1.5 m to the side
+      expect(sig(go(withMachine('capper', 700, 0, { safeZMm: 600 }), 1400), 'xMm')).toBe(1400);            // 500 mm tall, gripper at 600
+      expect(sig(go(withMachine('robot-arm', 700, 0, { safeZMm: 1900, riseMm: 2000 }), 1400), 'xMm')).toBe(1400);   // 1800 mm tall, gripper at 1900
+      const free = go(withMachine('robot-arm', 700, 1500), 1400);
+      expect(sig(free, 'collision')).toBe(false);
+    });
+    it('the collision clears when the gripper is sent somewhere it can reach', () => {
+      const s = withMachine('robot-arm', 700);
+      const r = run(s, i => i < 150 ? { xTargetMm: 1400, yTargetMm: 0, zTargetMm: 0 } : { xTargetMm: 100, yTargetMm: 0, zTargetMm: 0 }, 300);
+      expect(sig(r, 'collision')).toBe(false); expect(sig(r, 'xMm')).toBe(100);
+    });
+    it('a machine does not stop the gantry from going straight up or down beside it', () => {
+      const r = run(withMachine('robot-arm', 700), () => ({ xTargetMm: 0, yTargetMm: 0, zTargetMm: 600 }), 80);
+      expect(sig(r, 'zMm')).toBe(600); expect(sig(r, 'collision')).toBe(false);
+    });
+  });
 });

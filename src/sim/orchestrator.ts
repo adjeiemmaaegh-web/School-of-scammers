@@ -258,6 +258,7 @@ export function validateProject(raw: unknown): ProjectFile {
   const wireStyles = validateWireStyles(p.wireStyles, wires);
   const groups = validateGroups(p.groups, new Set(components.map(c => c.id)), components);
   const customShapes = validateCustomShapes(p.customShapes, components, params);
+  const mechanicalLinks = validateMechanicalLinks(p.mechanicalLinks, components);
   if (p.scanMs !== undefined && !isValidScanMs(p.scanMs)) throw new Error('Invalid scan period (10-500 ms in steps of 10)');
   return {
     formatVersion: 1, components, wires, program: p.program,
@@ -274,6 +275,7 @@ export function validateProject(raw: unknown): ProjectFile {
     ...(wireStyles ? { wireStyles } : {}),
     ...(groups ? { groups } : {}),
     ...(customShapes ? { customShapes } : {}),
+    ...(mechanicalLinks ? { mechanicalLinks } : {}),
     // The default period is never stored, so existing projects keep their exact shape.
     ...(p.scanMs !== undefined && p.scanMs !== DEFAULT_SCAN_MS ? { scanMs: p.scanMs } : {}),
   };
@@ -330,6 +332,23 @@ function validatePlcIo(raw: unknown, components: readonly PlacedComponent[]): Pr
     out[id] = { inputs: { ...m.inputs }, outputs: { ...m.outputs } };
   }
   return Object.keys(out).length ? out : undefined;
+}
+/** R14/R28 mechanical links: each is a real `drive` turning a belt-type conveyor, a belt has at most one drive, and the ratio is bounded. */
+const LINKABLE = new Set(['belt-conveyor', 'roller-conveyor', 'curved-conveyor']);
+function validateMechanicalLinks(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['mechanicalLinks'] | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw) || raw.length > 16) throw new Error('Invalid mechanical links (at most 16)');
+  const targets = new Set<string>(), out: NonNullable<ProjectFile['mechanicalLinks']> = [];
+  for (const l of raw as { drive?: unknown; target?: unknown; mmPerRev?: unknown }[]) {
+    const drive = components.find(c => c.id === l?.drive), target = components.find(c => c.id === l?.target);
+    if (!drive || drive.kind !== 'drive') throw new Error(`Mechanical link: ${String(l?.drive)} is not a drive in this project`);
+    if (!target || !LINKABLE.has(target.kind)) throw new Error(`Mechanical link: ${String(l?.target)} is not a belt, roller or curved conveyor`);
+    if (!Number.isFinite(l.mmPerRev) || (l.mmPerRev as number) < 10 || (l.mmPerRev as number) > 2000) throw new Error('Mechanical link: travel per revolution must be 10 to 2000 mm');
+    if (targets.has(target.id)) throw new Error(`Mechanical link: ${target.id} already has a drive`);
+    targets.add(target.id);
+    out.push({ drive: drive.id, target: target.id, mmPerRev: l.mmPerRev as number });
+  }
+  return out.length ? out : undefined;
 }
 /** R02: at most MAX_CUSTOM_SHAPES valid, uniquely named shapes; a device setting may only name a custom shape that exists. */
 function validateCustomShapes(raw: unknown, components: readonly PlacedComponent[], params: ProjectFile['params']): ProjectFile['customShapes'] | undefined {
@@ -503,6 +522,18 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       if (!ok(cmd.xMm) || !ok(cmd.yMm)) world = setError(world, 'Invalid walking target');
       else if (!world.plantWorld.world.trainingOperator) world = setError(world, 'Place the simulated operator first');
       else world = { ...world, plantWorld: { ...world.plantWorld, world: { ...world.plantWorld.world, operatorGoal: { x: cmd.xMm, y: cmd.yMm } } }, lastError: null };
+    }
+    else if (cmd.k === 'setMechanicalLink') {
+      // R14/R28: connect a drive's shaft to a belt (or change the ratio, or with null remove the connection) while paused.
+      if (world.running) world = setError(world, 'Pause before changing mechanical connections');
+      else try {
+        const rest = (world.project.mechanicalLinks ?? []).filter(l => l.target !== cmd.target);
+        const next = cmd.mmPerRev === null ? rest : [...rest, { drive: cmd.drive, target: cmd.target, mmPerRev: cmd.mmPerRev }];
+        const checked = validateMechanicalLinks(next, world.project.components);
+        const { mechanicalLinks: _old, ...base } = world.project;
+        world = createWorld(checked ? { ...base, mechanicalLinks: checked } : base);
+        commandEvents.push({ tick: world.tick, kind: 'edit', detail: cmd.mmPerRev === null ? `Disconnected ${cmd.target} from its drive` : `${cmd.target} is driven by ${cmd.drive}` });
+      } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Invalid mechanical link'); }
     }
     else if (cmd.k === 'defineShape' || cmd.k === 'removeShape') {
       // R02: define, replace or remove a learner-authored shape while paused.

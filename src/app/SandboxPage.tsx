@@ -1280,6 +1280,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onSetOperator={(id, key, value) => send([{ k: 'setOperator', id, key, value }])}
           onAttachModule={(module, plc) => send([{ k: 'attachIoModule', module, plc }])}
           onRenameModuleTag={(module, tag, name) => send([{ k: 'renameModuleTag', module, tag, name }])}
+          onSetMechanicalLink={(drive, target, mmPerRev) => send([{ k: 'setMechanicalLink', drive, target, mmPerRev }])}
           onOperate={id => send([{ k: 'operateToggle', id }])}
           onClearSelection={() => setSelectedDeviceId(null)} />
         </div>}

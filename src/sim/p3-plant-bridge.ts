@@ -60,6 +60,7 @@ export function defaultUnwiredPlantNumber(
  if(name==='setpointC')return Math.max(params.ambientC??20,
   Math.min(80,params.maxC??120));
  if(name==='openingPct')return 0;
+ if(name==='speedPct')return 100;
  return 0;
 }
 
@@ -105,6 +106,12 @@ export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
    return [[ch.name,ch.kind==='bool'?set.has(item.id+'-CMD_'+ch.name):
     defaultUnwiredPlantNumber(item.kind,ch.name,item.params)]];
   }));
+ }
+ // R14/R28 mechanical links: a belt turned by a drive takes its run state and speed from the drive's shaft (previous settled scan),
+ // overriding its own electrical command; a drive that is stopped or tripped stops the belt.
+ for(const link of project.mechanicalLinks??[]){
+  const rpm=previous.world.model[link.drive]?.value??0;
+  inputs[link.target]={...inputs[link.target],run:rpm>0.5,speed:Math.max(0,Math.min(1000,rpm/60*link.mmPerRev))};
  }
  // P19: only the real solved PLC netlist provides controller supply status;
  // no program tag or UI input can spoof the equipment's supply evidence.

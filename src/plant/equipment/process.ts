@@ -252,3 +252,52 @@ export const transferPump:EquipmentDef={
  describe:(s,ctx)=>[draw(ctx,'casing','cylinder',vec(260,260,260),130,s.engaged?'#3f8fb0':'#6d8794'),
   draw(ctx,'pipe','box',vec(520,80,80),120,'#8aa0aa')],
 };
+
+/**
+ * R11 in-line valve for tank networks: a gravity transfer valve between the two nearest process tanks along its own axis (one behind
+ * it, one ahead, within `reachMm`). Liquid flows from the HIGHER liquid surface to the lower one, whichever side that is:
+ * flow = maxFlow x opening x sqrt(head / refHead), where head is the surface-height difference (levels converted through `areaCm2`)
+ * and opening is the commanded `openingPct` (0 when unwired: the valve is closed). It stops when the surfaces are level, when the
+ * higher tank is empty or the lower one full, and conserves volume and carries temperature like the transfer pump. Several valves and
+ * pumps around one tank make a branching network. Teaching model: head-driven, no pipe inertia, no pressure solved across loops.
+ */
+export const transferValve:EquipmentDef={
+ kind:'transfer-valve',label:'Gravity transfer valve between tanks',footprint:vec(260,200,260),
+ commands:[{name:'openingPct',kind:'number',unit:'%'}],
+ signals:[{name:'flowMlS',kind:'number',unit:'ml/s'},{name:'open',kind:'bool'},{name:'headCm',kind:'number',unit:'cm'},{name:'connected',kind:'bool'}],
+ params:[spec('maxFlowMlS','Flow at full opening and reference head','ml/s',50,5000,50,800),
+  spec('refHeadCm','Reference head','cm',5,300,5,50),spec('areaCm2','Tank cross-section','cm2',50,5000,50,500),
+  spec('reachMm','Reach to tanks','mm',500,6000,100,3000)],
+ faults:['valve-stuck','blocked-pipe'],
+ fresh:()=>initial({}),
+ step:(s,w,c,dt,f,ctx)=>{
+  const fwd=face(ctx.yawDeg),reach=param(ctx,'reachMm',3000);
+  let behind:{id:string;d:number}|null=null,ahead:{id:string;d:number}|null=null;
+  for(const p of ctx.peers??[]){
+   if(p.kind!=='process-tank')continue;
+   const dx=p.originMm.x-ctx.originMm.x,dy=p.originMm.y-ctx.originMm.y;
+   const along=dx*fwd.x+dy*fwd.y,across=Math.abs(dx*fwd.y-dy*fwd.x);
+   if(across>600||Math.abs(along)>reach||Math.abs(along)<1)continue;
+   if(along<0){if(!behind||-along<behind.d)behind={id:p.id,d:-along};}
+   else if(!ahead||along<ahead.d)ahead={id:p.id,d:along};
+  }
+  const a=behind?w.model[behind.id]:undefined,b=ahead?w.model[ahead.id]:undefined;
+  // A stuck valve keeps the opening it had; otherwise it follows the command (closed when unwired).
+  const opening=f==='valve-stuck'?s.value:numeric(c,'openingPct',0,0,100);
+  if(!a||!b||!behind||!ahead)return {world:w,state:{...s,value:opening,engaged:false,faulted:!!f}};
+  const area=param(ctx,'areaCm2',500);
+  const headCm=(a.levelMl-b.levelMl)/area;                                   // positive: behind is higher
+  const from=headCm>=0?{id:behind.id,t:a}:{id:ahead.id,t:b},to=headCm>=0?{id:ahead.id,t:b}:{id:behind.id,t:a};
+  const rate=f==='blocked-pipe'?0:param(ctx,'maxFlowMlS',800)*opening/100*Math.sqrt(Math.abs(headCm)/param(ctx,'refHeadCm',50));
+  const room=Math.max(0,(to.t.value>0?to.t.value:to.t.levelMl)-to.t.levelMl);
+  // Never move more than levels the surfaces: half the difference at most per step (no overshoot past level).
+  const levelling=Math.abs(a.levelMl-b.levelMl)/2;
+  const flow=Math.min(rate*dt/1000,from.t.levelMl,room,levelling);
+  const mixedC=to.t.levelMl+flow>0?(to.t.temperatureC*to.t.levelMl+from.t.temperatureC*flow)/(to.t.levelMl+flow):to.t.temperatureC;
+  const model=flow>0?{...w.model,[from.id]:{...from.t,levelMl:q(from.t.levelMl-flow)},[to.id]:{...to.t,levelMl:q(to.t.levelMl+flow),temperatureC:q(mixedC)}}:w.model;
+  return {world:flow>0?{...w,model}:w,state:{...s,value:opening,engaged:flow>0,progress:q(headCm),elapsedMs:q(flow*1000/dt),faulted:!!f,stalled:rate>0&&flow<=0}};
+ },
+ read:s=>({flowMlS:q(s.elapsedMs),open:s.value>0,headCm:q(s.progress),connected:true}),
+ describe:(s,ctx)=>[draw(ctx,'body','cylinder',vec(220,220,200),100,s.engaged?'#3f8fb0':s.value>0?'#6d9aa8':'#6d7d87'),
+  draw(ctx,'pipe','box',vec(520,70,70),110,'#8aa0aa')],
+};
