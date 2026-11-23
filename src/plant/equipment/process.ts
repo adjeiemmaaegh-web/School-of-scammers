@@ -12,11 +12,13 @@ export const processTank:EquipmentDef={
  commands:[{name:'fill',kind:'bool'},{name:'drain',kind:'bool'},
   {name:'inletPct',kind:'number',unit:'%'}],
  signals:[{name:'levelMl',kind:'number',unit:'ml'},{name:'high',kind:'bool'},
-  {name:'empty',kind:'bool'},{name:'full',kind:'bool'}],
+  {name:'empty',kind:'bool'},{name:'full',kind:'bool'},{name:'temperatureC',kind:'number',unit:'C'}],
  params:[spec('capacityMl','Tank volume','ml',1000,100000,100,10000),
   spec('fillMlS','Inlet flow','ml/s',50,5000,50,1000),
   spec('drainMlS','Outlet flow','ml/s',50,5000,50,1300),
-  spec('blockMaterialFlow','Block material flow','0=off, 1=on',0,1,1,0)],
+  spec('blockMaterialFlow','Block material flow','0=off, 1=on',0,1,1,0),
+  // R11: how fast the liquid cools toward the 20 C room (0 = insulated: the legacy behaviour, nothing changes).
+  spec('coolingTauMs','Cooling time constant (0 = insulated)','ms',0,3600000,10000,0)],
  faults:['inlet-blocked','valve-stuck','leak'],
  fresh:params=>({...initial({}),value:params.capacityMl??10000}),
  step:(s,w,c,dt,f,ctx)=>{
@@ -26,11 +28,16 @@ export const processTank:EquipmentDef={
   const drain=flag(c,'drain')&&f!=='valve-stuck'?param(ctx,'drainMlS',1300):0;
   const leak=f==='leak'?150:0;
   const level=clamp(s.levelMl+(fill-drain-leak)*dt/1000,0,cap);
-  return {world:w,state:{...s,value:cap,levelMl:level,engaged:fill>0||drain>0,
+  // Fresh liquid arrives at room temperature; the tank then cools toward the room only if its time constant is set.
+  const room=20,inflow=Math.max(0,(level-s.levelMl)+(drain+leak)*dt/1000);
+  const mixed=level>0&&inflow>0?(s.temperatureC*Math.max(0,level-inflow)+room*Math.min(level,inflow))/level:s.temperatureC;
+  const tau=param(ctx,'coolingTauMs',0);
+  const temperatureC=tau>0&&level>0?q(mixed+(room-mixed)*dt/tau):q(mixed);
+  return {world:w,state:{...s,value:cap,temperatureC,levelMl:level,engaged:fill>0||drain>0,
     done:level>=cap,stalled:f==='inlet-blocked'||f==='valve-stuck',faulted:!!f}};
  },
  read:(s,w,ctx)=>({levelMl:s.levelMl,high:s.levelMl>=param(ctx,'capacityMl',10000)*.75,
-  empty:s.levelMl<=0,full:s.levelMl>=param(ctx,'capacityMl',10000)}),
+  empty:s.levelMl<=0,full:s.levelMl>=param(ctx,'capacityMl',10000),temperatureC:s.temperatureC}),
  describe:(s,ctx)=>[draw(ctx,'vessel','cylinder',vec(650,650,1300),650,'#7396ab'),
   draw(ctx,'contents','cylinder',vec(620,620,Math.max(10,s.levelMl/param(ctx,'capacityMl',10000)*1200)),
     Math.max(5,s.levelMl/param(ctx,'capacityMl',10000)*600),'#388da8')],
@@ -53,28 +60,61 @@ export const mixer:EquipmentDef={
  describe:(s,ctx)=>[draw(ctx,'agitator','cylinder',vec(250,250,600),300,
    s.engaged?'#4d9bad':'#778c9e')],
 };
+/**
+ * First-order process heater. By default it is a stand-alone model (its own temperature relaxing toward the setpoint, the legacy
+ * behaviour). With `coupling` = 1 (R11) it is an element that heats the LIQUID of the nearest process tank within `reachMm`: the
+ * tank's temperature rises by power x time / (liquid mass x 4.186 J/g/K), so the same heater warms a half-full tank twice as fast,
+ * an empty tank cannot be heated (`dryFire`), the element switches off at the setpoint (and always at the limit `maxC`), and the
+ * heater reports the liquid temperature. Teaching model: uniform liquid temperature, no vessel wall or element mass.
+ */
 export const heater:EquipmentDef={
- kind:'heater',label:'First-order process heater',footprint:vec(320,320,350),
+ kind:'heater',label:'Process heater (first-order, or heating a tank)',footprint:vec(320,320,350),
  commands:[{name:'enable',kind:'bool'},{name:'setpointC',kind:'number',unit:'C'}],
  signals:[{name:'temperatureC',kind:'number',unit:'C'},
-  {name:'atSetpoint',kind:'bool'},{name:'hot',kind:'bool'}],
+  {name:'atSetpoint',kind:'bool'},{name:'hot',kind:'bool'},{name:'dryFire',kind:'bool'}],
  params:[spec('ambientC','Ambient','C',0,40,1,20),spec('maxC','Limit','C',40,200,5,120),
-  spec('tauMs','Thermal time constant','ms',1000,120000,100,20000)],
+  spec('tauMs','Thermal time constant','ms',1000,120000,100,20000),
+  spec('coupling','Heats a tank','0=stand-alone, 1=heats the nearest tank',0,1,1,0),
+  spec('powerW','Element power','W',100,20000,100,2000),
+  spec('reachMm','Reach to the tank','mm',200,3000,100,800)],
  faults:['element-open','thermostat-stuck','heat-loss'],
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
   const enabled=flag(c,'enable')&&f!=='element-open';
   const ambient=param(ctx,'ambientC',20),max=param(ctx,'maxC',120);
   const set=numeric(c,'setpointC',80,ambient,max);
+  if(param(ctx,'coupling',0)===1){
+   let tank:{id:string;d:number}|null=null;
+   for(const p of ctx.peers??[]){
+    if(p.kind!=='process-tank')continue;
+    const d=Math.hypot(p.originMm.x-ctx.originMm.x,p.originMm.y-ctx.originMm.y);
+    if(d<=param(ctx,'reachMm',800)&&(!tank||d<tank.d))tank={id:p.id,d};
+   }
+   const t=tank?w.model[tank.id]:undefined;
+   if(tank&&t){
+    // The thermostat cuts the element at the setpoint; a stuck thermostat only stops at the hard limit.
+    const wanted=f==='thermostat-stuck'?max:set;
+    const on=enabled&&t.temperatureC<wanted;                  // the setpoint is already clamped to the limit
+    const grams=t.levelMl;                                              // 1 ml of liquid = 1 g
+    const dry=on&&grams<=0;
+    const loss=f==='heat-loss'?.4:1;                                    // a fouled element delivers less of its power
+    const dT=on&&grams>0?param(ctx,'powerW',2000)*loss*dt/1000/(grams*4.186):0;
+    const temperatureC=q(Math.min(max,t.temperatureC+dT));
+    const model=dT>0?{...w.model,[tank.id]:{...t,temperatureC}}:w.model;
+    return {world:dT>0?{...w,model}:w,state:{...s,temperatureC,engaged:on&&!dry,done:Math.abs(temperatureC-set)<1,stalled:dry,faulted:!!f}};
+   }
+   // No tank in reach: nothing to heat.
+   return {world:w,state:{...s,engaged:false,stalled:false,faulted:!!f}};
+  }
   const target=enabled?f==='thermostat-stuck'?max:set:ambient;
   const tau=param(ctx,'tauMs',20000)*(f==='heat-loss'?3:1);
   const temperatureC=clamp(s.temperatureC+(target-s.temperatureC)*dt/tau,ambient,max);
   return {world:w,state:{...s,temperatureC,engaged:enabled,
     done:Math.abs(temperatureC-set)<1,faulted:!!f}};
  },
- read:s=>({temperatureC:s.temperatureC,atSetpoint:s.done,hot:s.temperatureC>=60}),
+ read:s=>({temperatureC:s.temperatureC,atSetpoint:s.done,hot:s.temperatureC>=60,dryFire:s.stalled}),
  describe:(s,ctx)=>[draw(ctx,'element','box',vec(310,290,330),165,
-   s.engaged?'#c77f47':'#6e818a')],
+   s.stalled?'#b24a3a':s.engaged?'#c77f47':'#6e818a')],
 };
 export const proportionalValve:EquipmentDef={
  kind:'proportional-valve',label:'Variable opening process valve',footprint:vec(240,260,350),
@@ -202,7 +242,9 @@ export const transferPump:EquipmentDef={
   // A process tank publishes its own capacity in `value`, so the pump never overfills a tank it cannot see the settings of.
   const room=Math.max(0,(dst.value>0?dst.value:dst.levelMl)-dst.levelMl);
   const flow=Math.min(moved,room);
-  const model={...w.model,[from.id]:{...src,levelMl:q(src.levelMl-flow)},[to.id]:{...dst,levelMl:q(dst.levelMl+flow)}};
+  // The liquid carries its temperature: the destination becomes the volume-weighted mix of what it held and what arrived.
+  const mixedC=dst.levelMl+flow>0?(dst.temperatureC*dst.levelMl+src.temperatureC*flow)/(dst.levelMl+flow):dst.temperatureC;
+  const model={...w.model,[from.id]:{...src,levelMl:q(src.levelMl-flow)},[to.id]:{...dst,levelMl:q(dst.levelMl+flow),temperatureC:q(mixedC)}};
   return {world:{...w,model},state:{...s,engaged:flow>0,value:flow*1000/dt,stalled:dryRun||f==='blocked-pipe'||(rate>0&&flow<=0),faulted:!!f,done:false,
     elapsedMs:q(head*100)}};
  },
