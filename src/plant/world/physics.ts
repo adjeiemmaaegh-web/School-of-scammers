@@ -23,7 +23,7 @@ const tipIfFastStop=(body:Body,vx:number,vy:number):boolean=>{
  return true;
 };
 const frictionOf=(b:Body):number=>typeof b.tags.frictionMu==='number'?b.tags.frictionMu:.4;
-const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','lift','scissor-lift',
+const CARRIERS=new Set(['belt-conveyor','roller-conveyor','turntable','index-table','lift','scissor-lift',
  'pick-and-place','palletizer','asrs-crane','curved-conveyor','transfer-unit']);
 const BLOCKERS=new Set(['stopper','merge-gate','diverter-gate','safety-fence','guard-door']);
 const clampVelocity=(value:number,target:number,dtMs:number,accel=3500):number=>
@@ -45,6 +45,8 @@ const worldFootprint=(item:EquipmentPlacement,length:number,width:number):Vec3=>
  item.yawDeg===90||item.yawDeg===270?vec(width,length,0):vec(length,width,0);
 /** Whether a point is on a carrier's surface: the true quarter-annulus for a curved belt, the footprint rectangle for the rest. */
 const onSurface=(item:EquipmentPlacement,pos:Vec3):boolean=>item.kind==='curved-conveyor'?arcContains(item,pos):
+ // An indexing table's default size is 800 x 800 (the equipment's own defaults); a part riding round it must stay on its surface.
+ item.kind==='index-table'?insideFootprint(pos,item.originMm,vec(item.params.lengthMm??800,item.params.widthMm??800,0)):
  insideFootprint(pos,item.originMm,worldFootprint(item,item.params.lengthMm??600,item.params.widthMm??300));
 function chooseCarrier(body:Body,items:readonly EquipmentPlacement[],states:World['model']):EquipmentPlacement|undefined{
  return items.find(item=>CARRIERS.has(item.kind)&&onSurface(item,body.pos)&&

@@ -22,7 +22,7 @@ const families: Record<Exclude<DeviceFamily,'all'>,readonly string[]> = {
   sensors:['photoeye','levelprobe','geometry-photoeye','inductive-prox',
     'capacitive-prox','light-curtain','weigh-cell','retro-photoeye','pressure-sensor','laser-distance','rfid-reader','vision-sensor','incremental-encoder'],
   drives:['motor','revmotor'],
-  handling:['conveyor','diverter','belt-conveyor','roller-conveyor','turntable','curved-conveyor','transfer-unit','merge-gate','process-station','handrail','platform','stairs','work-zone','potentiometer','selector-3pos','seven-segment','numeric-display','operator-station','indicator-panel',
+  handling:['conveyor','diverter','belt-conveyor','roller-conveyor','turntable','curved-conveyor','transfer-unit','merge-gate','index-table','process-station','handrail','platform','stairs','work-zone','potentiometer','selector-3pos','seven-segment','numeric-display','operator-station','indicator-panel',
     'stopper','pusher','diverter-gate','box-feeder','collector','safety-fence','guard-door','palletizer','shelf','asrs-crane'],
   motion:['cylinder','compressor','air-regulator','lift','scissor-lift','rotary-actuator','pick-and-place','gantry','robot-arm'],
   process:['tank','pump','drainvalve','process-tank','transfer-pump','mixer','heater',

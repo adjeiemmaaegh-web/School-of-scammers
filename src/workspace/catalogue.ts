@@ -7,7 +7,7 @@ export const CATEGORIES: readonly WorkspaceCategory[] = [
   'Motors & actuators', 'Conveyance', 'Process', 'Indicators',
 ];
 export const CATEGORY_BY_KIND: Record<ComponentKind, WorkspaceCategory> = {
-  plc: 'Controllers & I/O', plc16: 'Controllers & I/O', 'io-di8': 'Controllers & I/O', 'io-do8': 'Controllers & I/O', 'io-ai4': 'Controllers & I/O', 'io-ao2': 'Controllers & I/O', 'transfer-pump': 'Process', 'pressure-sensor': 'Sensors', 'merge-gate': 'Conveyance', gantry: 'Motors & actuators',
+  plc: 'Controllers & I/O', plc16: 'Controllers & I/O', 'io-di8': 'Controllers & I/O', 'io-do8': 'Controllers & I/O', 'io-ai4': 'Controllers & I/O', 'io-ao2': 'Controllers & I/O', 'transfer-pump': 'Process', 'pressure-sensor': 'Sensors', 'merge-gate': 'Conveyance', gantry: 'Motors & actuators', 'index-table': 'Conveyance',
   supply: 'Power & protection', breaker: 'Power & protection',
   overload: 'Power & protection', estop: 'Power & protection',
   start: 'Control gear', stop: 'Control gear', reversebutton: 'Control gear', selector: 'Control gear',

@@ -2,7 +2,7 @@
 import type {EquipmentDef} from '../world/equipment';
 import {spec} from '../world/equipment';
 import {STATIC_SOLID_KINDS} from '../world/solid-geometry';
-import {beltConveyor,rollerConveyor,turntable} from './transport';
+import {beltConveyor,rollerConveyor,turntable,indexTable} from './transport';
 import {curvedConveyor,transferUnit,mergeGate} from './transfers';
 import {OPERATOR_DEVICES} from './operator';
 import {processStation} from './stations';
@@ -17,7 +17,7 @@ import {shelf,asrsCrane} from './storage';
 import {robotArm} from './robot';
 import {processTank,mixer,heater,proportionalValve,filler,capper,transferPump} from './process';
 const SOURCE_EQUIPMENT:readonly EquipmentDef[]=[
- beltConveyor,rollerConveyor,turntable,stopper,pusher,diverterGate,boxFeeder,
+ beltConveyor,rollerConveyor,turntable,indexTable,stopper,pusher,diverterGate,boxFeeder,
  photoeye,inductiveProx,capacitiveProx,lightCurtain,weighCell,
  lift,scissorLift,rotaryActuator,pickAndPlace,gantry,palletizer,
  shelf,asrsCrane,robotArm,processTank,mixer,heater,proportionalValve,filler,capper,transferPump,

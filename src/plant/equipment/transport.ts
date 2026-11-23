@@ -226,3 +226,53 @@ export const turntable:EquipmentDef={
     (s.phase-(s.done?1:0)+s.progress+4)%4)*90)%360)}),
  describe:(s,ctx)=>[draw(ctx,'table','cylinder',vec(380,380,110),55,s.done?'#70a89a':'#66859a')],
 };
+
+/**
+ * R05/R18 indexing table: a rotary fixture with `stations` equally spaced positions. Each RISING edge of `index` turns it one
+ * position (360/stations degrees) over `indexMs`; parts standing on it ride round, rotating about the centre, and stop at the next
+ * position, where a process station, sensor or pusher placed beside it can work on them. A held command does not repeat and an
+ * edge during a move is ignored (a PLC must wait for `inPosition`). The table carries nothing by itself: parts arrive from and
+ * leave to other equipment (a belt in, a pusher out). Footprint is the square of side `lengthMm` for contact purposes.
+ */
+export const indexTable:EquipmentDef={
+ kind:'index-table',label:'Indexing table',footprint:vec(800,800,150),
+ commands:[{name:'index',kind:'bool'}],
+ signals:[{name:'inPosition',kind:'bool'},{name:'busy',kind:'bool'},{name:'position',kind:'number',unit:'index'},{name:'angleDeg',kind:'number',unit:'deg'}],
+ params:[spec('stations','Positions','count',2,8,1,4),spec('indexMs','Time per position','ms',200,8000,50,1500),
+  spec('lengthMm','Table size','mm',300,1400,50,800),spec('widthMm','Table width','mm',300,1400,50,800)],
+ faults:['table-stuck','index-slow'],
+ fresh:()=>initial({}),
+ step:(s,w,c,dt,f,ctx)=>{
+  const stations=param(ctx,'stations',4),indexMs=param(ctx,'indexMs',1500),stepDeg=360/stations;
+  const asked=flag(c,'index'),rising=asked&&!s.lastCommand;
+  const moving=s.elapsedMs>0;
+  const start=rising&&!moving&&f!=='table-stuck';
+  const rate=f==='index-slow'?.35:1;
+  let elapsed=s.elapsedMs;
+  if(f==='table-stuck')elapsed=moving?s.elapsedMs:0;
+  else if(start||moving)elapsed=Math.min(indexMs,(start?0:s.elapsedMs)+dt*rate);
+  const finished=(start||moving)&&f!=='table-stuck'&&elapsed>=indexMs;
+  const progress=finished?0:q(elapsed/indexMs);
+  const delta=(start||moving)&&f!=='table-stuck'?(finished?1:progress)-(moving?s.progress:0):0;
+  const angle=delta*stepDeg*Math.PI/180,cs=Math.cos(angle),sn=Math.sin(angle);
+  const bodies=delta>0?w.bodies.map(b=>{
+   if(b.supportedBy!==ctx.id)return b;
+   const ox=b.pos.x-ctx.originMm.x,oy=b.pos.y-ctx.originMm.y;
+   return {...b,pos:vec(ctx.originMm.x+ox*cs-oy*sn,ctx.originMm.y+ox*sn+oy*cs,b.pos.z),
+    visualYawDeg:q(((b.visualYawDeg??b.yawDeg)+delta*stepDeg)%360)};
+  }):w.bodies;
+  return {world:bodies===w.bodies?w:{...w,bodies},state:{...s,elapsedMs:finished?0:q(elapsed),progress,
+   count:finished?s.count+1:s.count,lastCommand:asked,done:!(start||moving)||finished,
+   engaged:false,speedMmS:0,stalled:f==='table-stuck'&&rising,faulted:!!f}};
+ },
+ read:(s,w,ctx)=>{
+  const n=param(ctx,'stations',4);
+  return {inPosition:s.elapsedMs===0,busy:s.elapsedMs>0,position:s.count%n,
+   angleDeg:q((((s.count%n)+s.progress)*360/n)%360)};
+ },
+ describe:(s,ctx)=>{
+  const n=param(ctx,'stations',4),deg=(((s.count%n)+s.progress)*360/n),r=param(ctx,'lengthMm',800)*.42,a=deg*Math.PI/180;
+  return [draw(ctx,'table','cylinder',vec(param(ctx,'lengthMm',800)*.95,param(ctx,'lengthMm',800)*.95,110),55,s.elapsedMs>0?'#c2862a':'#66859a'),
+   draw({...ctx,originMm:vec(ctx.originMm.x+r*Math.cos(a),ctx.originMm.y+r*Math.sin(a),ctx.originMm.z)},'marker','box',vec(50,50,40),115,'#e8d36a')];
+ },
+};
