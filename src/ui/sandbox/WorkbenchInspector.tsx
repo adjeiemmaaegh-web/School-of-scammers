@@ -27,6 +27,8 @@ type Props = {
   onSetOperator?: (id: string, key: string, value: number) => void;
   /** Attach an expansion I/O module to a 16/16 PLC, or detach it with null (see Command `attachIoModule`). */
   onAttachModule?: (module: string, plc: string | null) => void;
+  /** Give one expansion-module channel your own tag name, or null to restore the default (see Command `renameModuleTag`). */
+  onRenameModuleTag?: (module: string, tag: string, name: string | null) => void;
 };
 
 /** The program tags an attached expansion module adds (see sim/plc-io.ts). */
@@ -89,7 +91,7 @@ function ParamField({ spec, value, disabled, onCommit }: { spec: ParamSpec; valu
 /** Read-only contextual view of the worker snapshot. Actions emit existing Commands. */
 export function WorkbenchInspector({
   project, snapshot, selectedDevice, selectedTerminal, editable,
-  onTerminal, onCancelWire, onMove, onMoveTo, onOperate, onClearSelection, onSetParam, onSetOperator, onAttachModule,
+  onTerminal, onCancelWire, onMove, onMoveTo, onOperate, onClearSelection, onSetParam, onSetOperator, onAttachModule, onRenameModuleTag,
 }: Props) {
   const hasLatchBranch = project.program.rungs.some(rung =>
     rung.elements.some(element => element.type === 'branch'));
@@ -196,7 +198,17 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
         <option value="">Not attached</option>
         {project.components.filter(c => c.kind === 'plc16').map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
       </select></label>
-      {project.ioModules?.[selectedDevice.id] && <p className="sandbox-help">Tags: {moduleTags(selectedDevice.kind, project.ioModules[selectedDevice.id]!.slot).join(', ')}</p>}
+      {project.ioModules?.[selectedDevice.id] && <div data-module-tags>
+        <p className="sandbox-help">Channel tags (type a new name and press Enter or leave the field; empty restores the default):</p>
+        {moduleTags(selectedDevice.kind, project.ioModules[selectedDevice.id]!.slot).map(tag => <label key={tag} className="sandbox-module-tag">
+          <code>{tag}</code>
+          <input type="text" data-module-tag={tag} disabled={!editable || !onRenameModuleTag} maxLength={24}
+            defaultValue={project.ioModules![selectedDevice.id]!.names?.[tag] ?? tag}
+            key={`${tag}-${project.ioModules![selectedDevice.id]!.names?.[tag] ?? tag}`}
+            onBlur={e => { const v = e.target.value.trim(); const cur = project.ioModules![selectedDevice.id]!.names?.[tag] ?? tag; if (v !== cur) onRenameModuleTag?.(selectedDevice.id, tag, v === '' || v === tag ? null : v); }}
+            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+        </label>)}
+      </div>}
     </div>}
     {OPERATOR_KINDS.has(selectedDevice.kind) && onSetOperator && <div className="sandbox-inspector-position" role="group" aria-label="Operator controls (live)">
       {paramSpecsOf(selectedDevice.kind).filter(spec => OPERATOR_KEYS.has(spec.key)).map(spec =>

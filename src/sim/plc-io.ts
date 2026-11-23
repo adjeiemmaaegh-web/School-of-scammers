@@ -42,11 +42,11 @@ export function pinLocation(plcId: string, pin: string): { owner: string; pin: s
   return at < 0 ? { owner: plcId, pin, module: false } : { owner: pin.slice(0, at), pin: pin.slice(at + 1), module: true };
 }
 /** Modules attached to one PLC, in slot order. Only modules still in the project count. */
-export function modulesOf(project: Partial<Pick<ProjectFile, 'components' | 'ioModules'>>, plcId: string): { id: string; kind: IoModuleKind; slot: number }[] {
-  const out: { id: string; kind: IoModuleKind; slot: number }[] = [];
+export function modulesOf(project: Partial<Pick<ProjectFile, 'components' | 'ioModules'>>, plcId: string): { id: string; kind: IoModuleKind; slot: number; names?: Record<string, string> }[] {
+  const out: { id: string; kind: IoModuleKind; slot: number; names?: Record<string, string> }[] = [];
   for (const [id, link] of Object.entries(project.ioModules ?? {})) {
     const c = project.components?.find(x => x.id === id);
-    if (c && link.plc === plcId && isIoModuleKind(c.kind)) out.push({ id, kind: c.kind, slot: link.slot });
+    if (c && link.plc === plcId && isIoModuleKind(c.kind)) out.push({ id, kind: c.kind, slot: link.slot, ...(link.names ? { names: link.names } : {}) });
   }
   return out.sort((a, b) => a.slot - b.slot);
 }
@@ -58,10 +58,12 @@ const withModules = (map: PlcIoMap, project: Partial<Pick<ProjectFile, 'componen
   const analogInputs = { ...(map.analogInputs ?? {}) }, analogOutputs = { ...(map.analogOutputs ?? {}) };
   for (const m of mods) {
     const key = (pin: string) => `${m.id}${MODULE_PIN_SEPARATOR}${pin}`;
-    if (m.kind === 'io-di8') for (let k = 0; k < IO_MODULE_POINTS; k++) inputs[key(`I${k}`)] = `M${m.slot}In${k}`;
-    else if (m.kind === 'io-do8') for (let k = 0; k < IO_MODULE_POINTS; k++) outputs[key(`Q${k}`)] = `M${m.slot}Out${k}`;
-    else if (m.kind === 'io-ai4') for (let k = 0; k < IO_MODULE_ANALOG_INPUTS; k++) analogInputs[key(`AI${k}`)] = `M${m.slot}Ai${k}`;
-    else for (let k = 0; k < IO_MODULE_ANALOG_OUTPUTS; k++) analogOutputs[key(`AO${k}`)] = `M${m.slot}Ao${k}`;
+    // R13: a learner's own name for a channel replaces its slot-numbered default (`M1In0`).
+    const rename = (tag: string): string => m.names?.[tag] ?? tag;
+    if (m.kind === 'io-di8') for (let k = 0; k < IO_MODULE_POINTS; k++) inputs[key(`I${k}`)] = rename(`M${m.slot}In${k}`);
+    else if (m.kind === 'io-do8') for (let k = 0; k < IO_MODULE_POINTS; k++) outputs[key(`Q${k}`)] = rename(`M${m.slot}Out${k}`);
+    else if (m.kind === 'io-ai4') for (let k = 0; k < IO_MODULE_ANALOG_INPUTS; k++) analogInputs[key(`AI${k}`)] = rename(`M${m.slot}Ai${k}`);
+    else for (let k = 0; k < IO_MODULE_ANALOG_OUTPUTS; k++) analogOutputs[key(`AO${k}`)] = rename(`M${m.slot}Ao${k}`);
   }
   return { ...map, inputs, outputs, ...(Object.keys(analogInputs).length ? { analogInputs } : {}), ...(Object.keys(analogOutputs).length ? { analogOutputs } : {}) };
 };
@@ -120,3 +122,22 @@ export const namesOf = (io: PlcIoMap): IoNames => ({
 });
 /** What the classic controller always accepted. */
 export const LEGACY_NAMES: IoNames = namesOf(LEGACY_IO);
+
+/** Tag names a valid module channel name may take (the same rule as renaming a PLC channel); empty when fine. */
+export function moduleNameError(name: string, io: PlcIoMap, exceptTag?: string): string | null {
+  if (!TAG.test(name) || RESERVED.has(name.toUpperCase())) return `"${name}" is not a valid tag name (letters, digits and _ , starting with a letter, up to 24, not a reserved word)`;
+  const taken = new Set([...Object.values(io.inputs), ...Object.values(io.outputs), ...Object.values(io.analogInputs ?? {}), ...Object.values(io.analogOutputs ?? {})]
+    .filter(t => t !== exceptTag).map(t => t.toUpperCase()));
+  return taken.has(name.toUpperCase()) ? `Tag ${name} is already used on this controller` : null;
+}
+/** Plain-language diagnostics for the expansion modules of a project: unattached, or attached but without supply. */
+export function moduleDiagnostics(project: Pick<ProjectFile, 'components' | 'ioModules'>, powered: (moduleId: string) => boolean): string[] {
+  const out: string[] = [];
+  for (const c of project.components) {
+    if (!isIoModuleKind(c.kind)) continue;
+    const link = project.ioModules?.[c.id];
+    if (!link) out.push(`Expansion module ${c.id} is not attached to a PLC (choose its host in the inspector)`);
+    else if (!powered(c.id)) out.push(`Expansion module ${c.id} (slot ${link.slot} of ${link.plc}) is not powered: its channels read false and its outputs cannot drive anything`);
+  }
+  return out;
+}

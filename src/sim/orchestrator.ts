@@ -6,6 +6,7 @@ import { executeLadder, type LadderDocument, type LadderResult } from '../engine
 import { compileFbd, executeFbd, type FbdResult } from '../engineering/fbd';
 import { executeStructuredText, type STResult, type STValue } from '../engineering/structured-text';
 import { compileSfcToSt } from '../engineering/sfc';
+import { compileIlToSt } from '../engineering/il';
 import { compileSandboxST, DEFAULT_ST_SOURCE, validateSandboxProgram } from '../program/p2-contract';
 import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from '../program/scan-trace';
 import { fbdReadings, instructionBreakpointHit, ladderReadings, validateInstructionBreakpoint } from '../program/instruction-breakpoint';
@@ -16,7 +17,7 @@ import {
   MAX_PLCS, blankProgram, defaultProgramFor, extraPlcs, freshPlcRuntime, legacyPrimaryId, namesFor, plcComponents, plcView,
   primaryPlcId, programOf, runtimePlcs, scanPlc, withProgramOf,
 } from './plcs';
-import { LEGACY_IO, MAX_IO_MODULES_PER_PLC, defaultIo, ioOf, isConfigurableIo, modulesOf, pinLocation, validateIoMap } from './plc-io';
+import { LEGACY_IO, MAX_IO_MODULES_PER_PLC, defaultIo, ioOf, isConfigurableIo, moduleDiagnostics, moduleNameError, modulesOf, pinLocation, validateIoMap } from './plc-io';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { measureContinuity } from '../electrical/continuity';
@@ -225,6 +226,14 @@ export function validateProject(raw: unknown): ProjectFile {
   }
   const plcIo = validatePlcIo(p.plcIo, components);
   const ioModules = validateIoModules(p.ioModules, components);
+  for (const plcC of components.filter(c => c.kind === 'plc16')) {
+    const seen = new Set<string>();
+    const io = ioOf({ components, plcIo, ioModules } as ProjectFile, plcC);
+    for (const tag of [...Object.values(io.inputs), ...Object.values(io.outputs), ...Object.values(io.analogInputs ?? {}), ...Object.values(io.analogOutputs ?? {})]) {
+      if (seen.has(tag.toUpperCase())) throw new Error(`PLC ${plcC.id}: tag ${tag} is used twice (check expansion module channel names)`);
+      seen.add(tag.toUpperCase());
+    }
+  }
   const names = namesFor({ components, plcIo, ioModules } as ProjectFile, undefined);
   const programErrors = validateSandboxProgram(p.program, names);
   if (programErrors.length) throw new Error(programErrors.join('; '));
@@ -357,7 +366,10 @@ function validateIoModules(raw: unknown, components: readonly PlacedComponent[])
     const key = `${host.id}#${l?.slot}`;
     if (used.has(key)) throw new Error(`Expansion module ${id}: slot ${l?.slot} of ${host.id} is already used`);
     used.add(key);
-    out[id] = { plc: host.id, slot: l?.slot as number };
+    const names = (l as { names?: unknown })?.names;
+    if (names !== undefined && (!names || typeof names !== 'object' || Array.isArray(names) || Object.values(names).some(n => typeof n !== 'string')))
+      throw new Error(`Expansion module ${id}: invalid channel names`);
+    out[id] = { plc: host.id, slot: l?.slot as number, ...(names && Object.keys(names).length ? { names: { ...(names as Record<string, string>) } } : {}) };
   }
   return Object.keys(out).length ? out : undefined;
 }
@@ -711,6 +723,38 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         }
       }
     }
+    else if (cmd.k === 'renameModuleTag') {
+      // R13: give one expansion-module channel your own tag name (null restores the default); refused if it would break a program.
+      const link = world.project.ioModules?.[cmd.module];
+      const host = link ? plcComponents(world.project).find(c => c.id === link.plc) : undefined;
+      if (!link || !host) world = setError(world, 'Attach the module to a PLC before renaming its channels');
+      else {
+        const current = ioOf(world.project, host);
+        const all = [...Object.values(current.inputs), ...Object.values(current.outputs), ...Object.values(current.analogInputs ?? {}), ...Object.values(current.analogOutputs ?? {})];
+        const shown = link.names?.[cmd.tag] ?? cmd.tag;
+        const isChannel = (() => { const m = /^M(\d)(In|Out|Ai|Ao)(\d)$/.exec(cmd.tag); return !!m && Number(m[1]) === link.slot; })();
+        const problem0 = !isChannel || !all.includes(shown) ? `${cmd.tag} is not a channel of ${cmd.module}` : cmd.name !== null ? moduleNameError(cmd.name, current, shown) : null;
+        if (problem0) world = setError(world, problem0);
+        else {
+          const names = { ...(link.names ?? {}) };
+          if (cmd.name === null || cmd.name === cmd.tag) delete names[cmd.tag]; else names[cmd.tag] = cmd.name;
+          const nextLink = { plc: link.plc, slot: link.slot, ...(Object.keys(names).length ? { names } : {}) };
+          const candidate: ProjectFile = { ...world.project, ioModules: { ...(world.project.ioModules ?? {}), [cmd.module]: nextLink } };
+          let problem: string | null = null;
+          for (const plc of plcComponents(candidate)) {
+            const cfg = programOf(candidate, plc.id), nm = namesFor(candidate, plc.id);
+            try {
+              if (cfg.language === 'st') compileSandboxST(cfg.stSource, nm);
+              else if (cfg.language === 'fbd') compileFbd(cfg.fbd, nm);
+              else { const issues = validateSandboxProgram(cfg.program, nm); if (issues.length) problem = issues.join('; '); }
+            } catch (error) { problem = error instanceof Error ? error.message : 'Program no longer compiles'; }
+            if (problem) { problem = `${plc.id}: ${problem}`; break; }
+          }
+          if (problem) world = setError(world, `Renaming would break a program: ${problem}`);
+          else { world = createWorld(candidate); commandEvents.push({ tick: world.tick, kind: 'edit', detail: cmd.name ? `Renamed ${cmd.tag} to ${cmd.name}` : `Restored ${cmd.tag}` }); }
+        }
+      }
+    }
     else if (cmd.k === 'attachIoModule') {
       // R13: attach / detach an expansion module while paused (it adds channels the programs may use).
       const mod = world.project.components.find(c => c.id === cmd.module);
@@ -847,7 +891,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       // Removing a broken conductor is a legitimate repair, and a dangling fault would make the
       // exported project fail validation.
       world = withFaults(world, faultsOf(world.project).filter(f => !(f.kind === 'wire-open' && f.target === cmd.id)));
-    } else if (cmd.k === 'loadProgram' || cmd.k === 'loadST' || cmd.k === 'loadSFC' || cmd.k === 'loadFBD' || cmd.k === 'activateLanguage') {
+    } else if (cmd.k === 'loadProgram' || cmd.k === 'loadST' || cmd.k === 'loadSFC' || cmd.k === 'loadIL' || cmd.k === 'loadFBD' || cmd.k === 'activateLanguage') {
       // `plc` selects the target controller; omitted means the first PLC, exactly as with one PLC.
       if (cmd.plc !== undefined && !plcComponents(world.project).some(c => c.id === cmd.plc)) {
         world = setError(world, 'Unknown PLC');
@@ -859,6 +903,14 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         try{compileFbd(cmd.document,namesFor(world.project,cmd.plc));
           world=createWorld(withProgramOf(world.project,cmd.plc,{language:'fbd',fbd:cmd.document}));}
         catch(error){world=setError(world,error instanceof Error?error.message:'Invalid FBD graph');}
+      } else if (cmd.k === 'loadIL') {
+        // R07: Instruction List compiles to Structured Text; the IL text travels in the source header so it can be re-opened.
+        try {
+          const names = namesFor(world.project, cmd.plc);
+          const source = compileIlToSt(cmd.source, names);
+          compileSandboxST(source, names);
+          world = createWorld(withProgramOf(world.project, cmd.plc, { language: 'st', stSource: source }));
+        } catch (error) { world = setError(world, error instanceof Error ? `IL: ${error.message}` : 'Invalid IL program'); }
       } else if (cmd.k === 'loadSFC') {
         // R07: a chart compiles to Structured Text; the chart travels in the source header so it can be re-opened.
         try {
@@ -1272,7 +1324,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtO
       ...(opposingDrives ? ['Both direction terminals energized: reversible motor inhibited'] : []),
       ...Object.entries(nextThreePhase).flatMap(([id, state]) => state.motor.diagnostics.map(msg => id + ': ' + msg)),
       ...(!powered && plc ? ['PLC is not powered (wire L+ and M to the 24V supply)'] : []),
-      ...unpoweredExtras.map(id => `PLC ${id} is not powered (wire L+ and M to a 24V supply)`)],
+      ...unpoweredExtras.map(id => `PLC ${id} is not powered (wire L+ and M to a 24V supply)`),
+      ...moduleDiagnostics(w.project, id => circuit.reads24(terminal(id, 'L+'), terminal(id, 'M')))],
     breakpointHit,
     running: change.forceStep || !!breakpointHit ? false : w.running,
   };
