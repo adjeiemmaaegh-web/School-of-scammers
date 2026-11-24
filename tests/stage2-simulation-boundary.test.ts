@@ -85,6 +85,16 @@ describe('Stage 2 worker ingress: deterministic bounded command queue', () => {
     expect(mailbox.enqueue(accepted([{ k: 'pause' }], 3))).toBeNull();
   });
 
+  it('does not accumulate queue bytes for empty requests without an acknowledgement ID', () => {
+    const mailbox = new WorkerMailbox();
+    const empty = accepted([]);
+    for (let n = 0; n < 10_000; n++) expect(mailbox.enqueue(empty)).toBeNull();
+    expect(mailbox.hasPending).toBe(false);
+    expect(mailbox.pendingBytes).toBe(0);
+    expect(mailbox.enqueue(accepted([{ k: 'step' }], 0))).toBeNull();
+    expect(mailbox.take().requestIds).toEqual([0]);
+  });
+
   it('bounds empty acknowledgement-only messages and queued bytes as well as commands', () => {
     const mailbox = new WorkerMailbox();
     for (let n = 0; n < MAX_WORKER_PENDING_REQUESTS; n++)

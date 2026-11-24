@@ -8,10 +8,13 @@
  */
 import { createWorld, renderSnapshot, tick } from './orchestrator';
 import type { Command, ProjectFile, RenderSnapshot, SimEvent, WorldState } from './signals';
+import { parseWorkerIngress } from './worker-mailbox';
 
 export const MAX_REPLAY_FRAMES = 512;
 export const MAX_REPLAY_EXTRA_SCANS = 5_000;
 export const MAX_REPLAY_COMMANDS = 4_096;
+/** Bound cumulative serialized command data, not just the number of commands. */
+export const MAX_REPLAY_COMMAND_BYTES = 8_000_000;
 export const MAX_REPLAY_CHECKPOINTS = 64;
 /** Retain bounded diagnostic events even when one frame advances thousands of scans. */
 export const MAX_REPLAY_EVENTS_PER_CHECKPOINT = 512;
@@ -29,7 +32,7 @@ export type ReplayCheckpoint = {
   /** Snapshot retained only at requested checkpoints; never persisted to a project. */
   readonly snapshot: RenderSnapshot;
   readonly events: readonly SimEvent[];
-  /** Count of older events intentionally discarded after the retained-event limit. */
+  /** Count of subsequent events omitted after the retained-event limit. */
   readonly droppedEvents: number;
 };
 export type ReplayResult = {
@@ -39,21 +42,28 @@ export type ReplayResult = {
 };
 
 function validateFrames(frames: readonly ReplayFrame[]): void {
+  if (!Array.isArray(frames)) throw new TypeError('Malformed replay script');
   if (frames.length > MAX_REPLAY_FRAMES)
     throw new RangeError('Replay exceeds its frame limit');
-  let commands = 0, scans = 0, checkpoints = 0;
+  let commands = 0, scans = 0, checkpoints = 0, bytes = 0;
+  const checkpointNames = new Set<string>();
   for (const frame of frames) {
-    if (!frame || typeof frame !== 'object' || (frame.commands && !Array.isArray(frame.commands)))
+    if (!frame || typeof frame !== 'object' || Array.isArray(frame) ||
+        (frame.commands !== undefined && !Array.isArray(frame.commands)))
       throw new TypeError('Malformed replay frame');
-    const length = frame.commands?.length ?? 0;
-    if (length > 128) throw new RangeError('Too many commands in a replay frame');
-    commands += length;
+    const parsed = parseWorkerIngress({ kind: 'commands', commands: frame.commands ?? [] });
+    if (!parsed.ok) throw new TypeError(parsed.error);
+    commands += parsed.packet.commands.length;
+    bytes += parsed.packet.bytes;
+    if (bytes > MAX_REPLAY_COMMAND_BYTES) throw new RangeError('Replay exceeds its command byte budget');
     if (frame.extraScans !== undefined && (!Number.isSafeInteger(frame.extraScans) || frame.extraScans < 0))
       throw new RangeError('Invalid replay scan count');
     scans += frame.extraScans ?? 0;
     if (frame.checkpoint !== undefined) {
       if (typeof frame.checkpoint !== 'string' || frame.checkpoint.length < 1 ||
           frame.checkpoint.length > 64) throw new RangeError('Invalid replay checkpoint name');
+      if (checkpointNames.has(frame.checkpoint)) throw new TypeError('Duplicate replay checkpoint name');
+      checkpointNames.add(frame.checkpoint);
       checkpoints++;
     }
   }

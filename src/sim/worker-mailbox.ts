@@ -82,6 +82,9 @@ export class WorkerMailbox {
   get pendingBytes(): number { return this.bytes; }
 
   enqueue(packet: WorkerCommandPacket): string | null {
+    // An empty unacknowledged request has no work to drain. Do not charge
+    // invisible queue bytes that could otherwise accumulate while paused.
+    if (packet.commands.length === 0 && packet.requestId === undefined) return null;
     if (this.commands.length + packet.commands.length > MAX_WORKER_PENDING_COMMANDS ||
         this.bytes + packet.bytes > MAX_WORKER_PENDING_BYTES ||
         this.requestIds.length + (packet.requestId === undefined ? 0 : 1) > MAX_WORKER_PENDING_REQUESTS)

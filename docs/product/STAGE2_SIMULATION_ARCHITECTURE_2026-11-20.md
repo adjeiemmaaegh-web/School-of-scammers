@@ -97,3 +97,11 @@ These changes do not rewrite `tick()`, alter existing 50 ms / 10 ms scheduling, 
 - PR review and owner approval precede any merge; deployment and hardware connections are out of scope.
 
 **Release status:** NO-GO / NOT ACCEPTED. This is a source-development handoff only.
+
+## 2026-11-25 integration and replay boundary continuation
+
+- Reconciled the already-merged Stage 1 source tree into this branch and retargeted PR #94 to main.
+- R3.6: empty no-ACK mailbox packets are now true no-ops, so a paused worker cannot silently accumulate undrainable queue bytes.
+- R3.7: replay validates command batches using the existing ingress shape and UTF-8 limits, adds an explicit 8,000,000-byte aggregate command budget and rejects ambiguous duplicate checkpoint names before simulation starts. The replay uses the existing tick path and does not change project format or golden digests.
+- Added an authored no-op queue regression and deterministic lamp/two-panel replay, malformed-input and aggregate-budget specifications. Exact-head CI is required; these tests have not yet been executed locally.
+- The remaining legacy state-storage, source-backed channel range/power attribution, broader replay/mutation matrix and profiling work are still open. This continuation is not full Stage 2 acceptance or release authorization.
