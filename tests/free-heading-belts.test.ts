@@ -7,6 +7,7 @@ import { editWorkspace, isFreeRotation } from '../src/workspace/editor';
 import { plantPlacements } from '../src/sim/p3-plant-bridge';
 import { createWorld, tick, validateProject } from '../src/sim/orchestrator';
 import { vec } from '../src/plant/world/math';
+import { arcContains, arcExit, arcOf } from '../src/plant/world/arc';
 import type { EquipmentPlacement } from '../src/plant/world/types';
 import type { PlacedComponent, ProjectFile } from '../src/sim/signals';
 
@@ -79,6 +80,28 @@ describe('R21/R22 conveyors with a free heading', () => {
     expect(ctxOf(B('b', 0, 0, 45)).headingDeg).toBe(45);
     expect(ctxOf(B('b', 0, 0)).headingDeg).toBeUndefined();
   });
+  it('a transfer unit with a free heading carries along its turned axis and pushes sideways relative to it', () => {
+    const unit = (heading: number, transfer: boolean) => run([B('u', 0, 0, heading, { transferAngleDeg: 90, lengthMm: 600 }, 0, 'transfer-unit')], [{ x: 0, y: 0, carrier: 'u' }], 20, { u: { transfer } }).world.bodies[0].vel;
+    const along = unit(45, false);
+    expect(along.x).toBeGreaterThan(150); expect(along.y).toBeGreaterThan(150); expect(Math.abs(along.x - along.y)).toBeLessThan(20);
+    const sideways = unit(45, true);                                                    // 45 + 90 = 135 degrees: up-left
+    expect(sideways.x).toBeLessThan(-150); expect(sideways.y).toBeGreaterThan(150);
+  });
+  it('a curved belt with a free heading is the same arc turned: its centre, exit and carry follow the angle', () => {
+    const C = (headingDeg?: number): EquipmentPlacement => ({ id: 'c', kind: 'curved-conveyor', originMm: vec(0, 0, 0), yawDeg: 0, params: { radiusMm: 600, widthMm: 300, speedMmS: 400 }, ...(headingDeg ? { headingDeg } : {}) });
+    const flat = C(), turned = C(30);
+    const a0 = arcOf(flat), a1 = arcOf(turned);
+    expect(Math.hypot(a1.cx, a1.cy)).toBeCloseTo(Math.hypot(a0.cx, a0.cy), 6);                 // the arc swings about the item origin
+    expect(Math.atan2(a1.cy, a1.cx) - Math.atan2(a0.cy, a0.cx)).toBeCloseTo(30 * Math.PI / 180, 6);
+    expect(arcExit(turned).headingDeg).toBe(arcExit(flat).headingDeg + 30);
+    const entry = (a: typeof flat) => { const arc = arcOf(a); const t = (a.yawDeg + (a.headingDeg ?? 0)) * Math.PI / 180; return { x: arc.cx + 600 * Math.sin(t), y: arc.cy - 600 * Math.cos(t), z: 0 }; };
+    expect(arcContains(turned, entry(turned))).toBe(true);
+    expect(arcContains(flat, entry(turned))).toBe(false);                                      // the turned entry is off the unturned belt
+    const r = run([turned], [{ x: entry(turned).x, y: entry(turned).y, carrier: 'c' }], 30);
+    const v = r.world.bodies[0].vel;
+    expect(Math.hypot(v.x, v.y)).toBeGreaterThan(300);                                         // carried along the turned arc
+    expect(r.world.bodies[0].supportedBy).toBe('c');
+  });
   it('roller conveyors turn freely too, and a heading on any other device is refused by the plant', () => {
     const r = run([B('r', 0, 0, 30, {}, 0, 'roller-conveyor')], [{ x: 0, y: 0, carrier: 'r' }], 20);
     expect(r.world.bodies[0].vel.y).toBeGreaterThan(40);
@@ -106,9 +129,10 @@ describe('R21/R22 editing a freely headed belt', () => {
   const comp = (id: string, kind: string, x: number, y: number, extra: Partial<PlacedComponent> = {}) => ({ id, kind, x, y, pressed: false, ...extra } as PlacedComponent);
   const project = (components: PlacedComponent[]): ProjectFile => ({
     formatVersion: 1, program: { id: 'p', version: '1', rungs: [{ id: 'r', elements: [{ type: 'contact', tag: 'Start' }], coil: 'Run' }] } as never, components, wires: [] });
-  it('belts and rollers may turn freely; stations, tanks and turntables still may not', () => {
+  it('belts, rollers, stations, transfer units and curved belts may turn freely; tanks and turntables still may not', () => {
     expect(isFreeRotation('belt-conveyor')).toBe(true); expect(isFreeRotation('roller-conveyor')).toBe(true);
-    for (const k of ['process-station', 'process-tank', 'turntable', 'curved-conveyor', 'transfer-unit']) expect(isFreeRotation(k)).toBe(false);
+    for (const k of ['process-tank', 'turntable']) expect(isFreeRotation(k)).toBe(false);
+    for (const k of ['process-station', 'transfer-unit', 'curved-conveyor']) expect(isFreeRotation(k)).toBe(true);
   });
   it('rotateFree turns a belt, the project keeps it, and the plant placement carries the heading', () => {
     let p = project([comp('b', 'belt-conveyor', 300, 100)]);
@@ -120,10 +144,15 @@ describe('R21/R22 editing a freely headed belt', () => {
     const w = tick(createWorld(), [{ k: 'loadProject', project: p }, { k: 'editWorkspace', edit: { kind: 'rotateFree', ids: ['b'], deltaDeg: 15 } }]).world;
     expect(w.lastError).toBeNull(); expect(w.project.components[0].freeYawDeg).toBe(60);
   });
-  it('a selection with a belt and a lamp turns together, but one holding a station is refused naming it', () => {
+  it('a selection with a belt and a lamp turns together, but one holding a turntable is refused naming it', () => {
     const ok = editWorkspace(project([comp('b', 'belt-conveyor', 300, 100), comp('l', 'lamp', 500, 100)]), { kind: 'rotateFree', ids: ['b', 'l'], deltaDeg: 30 });
     expect(ok.components.every(c => c.freeYawDeg === 30)).toBe(true);
-    expect(() => editWorkspace(project([comp('b', 'belt-conveyor', 300, 100), comp('s', 'process-station', 500, 100)]), { kind: 'rotateFree', ids: ['b', 's'], deltaDeg: 30 })).toThrow(/process-station/);
+    expect(() => editWorkspace(project([comp('b', 'belt-conveyor', 300, 100), comp('s', 'turntable', 500, 100)]), { kind: 'rotateFree', ids: ['b', 's'], deltaDeg: 30 })).toThrow(/turntable/);
+  });
+  it('the plant placement carries the heading for every kind that takes one, and for no other', () => {
+    for (const kind of ['belt-conveyor', 'roller-conveyor', 'process-station', 'transfer-unit', 'curved-conveyor'])
+      expect(plantPlacements(project([comp('x', kind, 300, 100, { freeYawDeg: 25 })]))[0].headingDeg, kind).toBe(25);
+    expect(plantPlacements(project([comp('x', 'lamp', 300, 100, { freeYawDeg: 25 })])).length).toBe(0);            // not plant equipment at all
   });
   it('the plan footprint is the bounding box of the turned rectangle', () => {
     const flat = footprintOf(comp('b', 'belt-conveyor', 300, 100), { b: { lengthMm: 1200, widthMm: 300 } });

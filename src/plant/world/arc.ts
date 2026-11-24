@@ -17,7 +17,8 @@ export function arcOf(item:EquipmentPlacement):Arc{
  // Local bounding box: x in [sx, sx+R+w/2]; y spans [sy-w/2, sy+R] (left) or [sy-R, sy+w/2] (right).
  const sx=-(R+w/2)/2,sy=-sign*(R-w/2)/2;
  const lcx=sx,lcy=sy+sign*R;                                       // centre of the turn, local
- const yaw=item.yawDeg*Math.PI/180,c=Math.round(Math.cos(yaw)*1e9)/1e9,s=Math.round(Math.sin(yaw)*1e9)/1e9;
+ // The belt's angle is its quarter-turn yaw plus any free heading (R21/R22): the arc itself is already true geometry.
+ const yaw=(item.yawDeg+(item.headingDeg??0))*Math.PI/180,c=Math.round(Math.cos(yaw)*1e9)/1e9,s=Math.round(Math.sin(yaw)*1e9)/1e9;
  return {cx:item.originMm.x+c*lcx-s*lcy,cy:item.originMm.y+s*lcx+c*lcy,radius:R,halfWidth:w/2,sign,yawRad:yaw};
 }
 /** True when the point lies on the belt surface (inside the annulus and inside the quarter that the bounding box selects). */
@@ -42,5 +43,5 @@ export function arcExit(item:EquipmentPlacement):{x:number;y:number;headingDeg:n
  const c=Math.cos(a.yawRad),s=Math.sin(a.yawRad);
  // local exit point: on the +x side of C at radius R (angle 0 relative to C); heading is +/-y in local frame
  const lx=a.radius,ly=0;
- return {x:a.cx+c*lx-s*ly,y:a.cy+s*lx+c*ly,headingDeg:(item.yawDeg+a.sign*90+360)%360};
+ return {x:a.cx+c*lx-s*ly,y:a.cy+s*lx+c*ly,headingDeg:(item.yawDeg+(item.headingDeg??0)+a.sign*90+360)%360};
 }

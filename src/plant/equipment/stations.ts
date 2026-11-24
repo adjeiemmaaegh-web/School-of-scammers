@@ -14,11 +14,18 @@ import {draw,flag,initial,param,spec} from '../world/equipment';
 import {despawnBody} from '../world/bodies';
 import {addEvent} from '../world/events';
 import {nextSeed} from '../world/seed';
-import {insideFootprint,q,vec} from '../world/math';
+import {q,vec} from '../world/math';
 import type {Body,World} from '../world/types';
 
 export const STATION_OPS=['machine','join','assemble','inspect','rework','finish'] as const;
 const TRACE_MAX=96;
+/** Whether a point is inside the station's frame. A station placed with a free heading (R21/R22) is a true rotated rectangle about its centre; any other station keeps its original axis-aligned frame, so every saved project is unchanged. */
+const inFrame=(pos:{x:number;y:number},ctx:{originMm:{x:number;y:number};headingDeg?:number;yawDeg:number;params:Record<string,number>}):boolean=>{
+ const length=ctx.params.lengthMm??400,width=ctx.params.widthMm??400,dx=pos.x-ctx.originMm.x,dy=pos.y-ctx.originMm.y;
+ if(!ctx.headingDeg)return Math.abs(dx)<=length/2&&Math.abs(dy)<=width/2;
+ const a=(ctx.yawDeg+ctx.headingDeg)*Math.PI/180,c=Math.cos(a),sn=Math.sin(a);
+ return Math.abs(dx*c+dy*sn)<=length/2&&Math.abs(-dx*sn+dy*c)<=width/2;
+};
 const stageOf=(b:Body):string=>typeof b.tags.stage==='string'?b.tags.stage:'raw';
 const addTrace=(b:Body,code:string,stationId:string):string=>{
  const next=(typeof b.tags.trace==='string'&&b.tags.trace?b.tags.trace+'>':'')+code+':'+stationId;
@@ -41,8 +48,7 @@ export const processStation:EquipmentDef={
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
   const op=param(ctx,'operation',1),cycleMs=param(ctx,'cycleMs',2000);
-  const footprint=vec(param(ctx,'lengthMm',400),param(ctx,'widthMm',400),0);
-  const inside=(b:Body)=>insideFootprint(b.pos,ctx.originMm,footprint)&&Math.abs(b.pos.z-(ctx.originMm.z+120))<200&&atRest(b)&&b.supportedBy!==null;
+  const inside=(b:Body)=>inFrame(b.pos,ctx)&&Math.abs(b.pos.z-(ctx.originMm.z+120))<200&&atRest(b)&&b.supportedBy!==null;
   const present=w.bodies.filter(inside);
   // The part being worked is the first (lowest id) body that fits the operation's input stage.
   const wanted=(b:Body)=>op===1?stageOf(b)==='raw':op===4?b.tags.inspected!==true:op===5?b.tags.defect===true:op===6?(stageOf(b)==='machined'||stageOf(b)==='assembled')&&b.tags.defect!==true:stageOf(b)==='machined';
@@ -89,7 +95,7 @@ export const processStation:EquipmentDef={
   if(op===1)wearNow+=1;
   return {state:{...base,value:wearNow,count:s.count+1,elapsedMs:0,done:true,progress:1,phase:op===4?(failed?1:0):s.phase,activeBodyId:null},world};
  },
- read:(s,w,ctx)=>({busy:s.engaged,partPresent:w.bodies.some(b=>insideFootprint(b.pos,ctx.originMm,vec(param(ctx,'lengthMm',400),param(ctx,'widthMm',400),0))&&
+ read:(s,w,ctx)=>({busy:s.engaged,partPresent:w.bodies.some(b=>inFrame(b.pos,ctx)&&
    Math.abs(b.pos.z-(ctx.originMm.z+120))<200&&Math.hypot(b.vel.x,b.vel.y)<5&&b.supportedBy!==null),
   cycleDone:s.done,fail:s.phase===1,toolWorn:param(ctx,'toolLifeCycles',0)>0&&s.value>=param(ctx,'toolLifeCycles',0),
   count:s.count,toolWear:s.value,progress:s.progress}),

@@ -23,7 +23,7 @@ const NONREPEATABLE = new Set(['reversebutton', 'forwardcontactor', 'reversecont
  */
 /** Kinds that may take a continuous rotation: orientable AND with no plant physics that reads their yaw (those stay quarter-turn only). */
 /** Straight belt and roller conveyors also turn freely: their carry direction and surface follow the true angle (R21/R22). */
-const FREE_PHYSICAL = new Set(['belt-conveyor', 'roller-conveyor']);
+const FREE_PHYSICAL = new Set(['belt-conveyor', 'roller-conveyor', 'process-station', 'transfer-unit', 'curved-conveyor']);
 export const isFreeRotation = (kind: string): boolean => FREE_PHYSICAL.has(kind) || (ROTATABLE.has(kind) && !Object.hasOwn(PLANT_EQUIPMENT, kind));
 export const ROTATABLE = new Set([
   'plc', 'plc16', 'supply', 'start', 'stop', 'estop', 'reversebutton',

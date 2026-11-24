@@ -15,7 +15,7 @@ const free = (p: ProjectFile, ids: string[], deltaDeg: number) => editWorkspace(
 describe('R22 continuous rotation of placed devices', () => {
   it('only orientable devices without orientation-dependent physics may turn freely', () => {
     for (const k of ['lamp', 'plc16', 'start', 'relay', 'motor', 'stacklight']) expect(isFreeRotation(k)).toBe(true);
-    for (const k of ['curved-conveyor', 'transfer-unit', 'turntable', 'geometry-photoeye', 'process-tank', 'cylinder', 'process-station']) expect(isFreeRotation(k)).toBe(false);
+    for (const k of ['turntable', 'index-table', 'geometry-photoeye', 'process-tank', 'cylinder']) expect(isFreeRotation(k)).toBe(false);
   });
   it('a single device accumulates the angle on top of its quarter-turn yaw, and four-plus steps wrap to nothing', () => {
     let p = project([comp('l', 'lamp', 100, 100, { yawDeg: 90 })]);

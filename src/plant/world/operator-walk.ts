@@ -39,7 +39,10 @@ export function personObstacles(items:readonly EquipmentPlacement[],world:World)
    out.push(rectOf(item,lengthOf(item,item.kind==='guard-door'?800:1000),widthOf(item,50)));
   }else if(item.kind==='process-station'){
    // A production station is a machine frame: a person cannot walk through it (its footprint is the station's own, unrotated).
-   out.push({cx:item.originMm.x,cy:item.originMm.y,hx:(item.params.lengthMm??400)/2,hy:(item.params.widthMm??400)/2});
+   const L=item.params.lengthMm??400,W=item.params.widthMm??400;
+   // A station turned to a free heading blocks the bounding box of its rotated frame (conservative for a person).
+   const t=((item.yawDeg+(item.headingDeg??0))%360)*Math.PI/180,c=Math.abs(Math.cos(t)),sn=Math.abs(Math.sin(t));
+   out.push(item.headingDeg?{cx:item.originMm.x,cy:item.originMm.y,hx:(c*L+sn*W)/2,hy:(sn*L+c*W)/2}:{cx:item.originMm.x,cy:item.originMm.y,hx:L/2,hy:W/2});
   }else if(item.params.blockMaterialFlow===1||item.kind==='shelf'||item.kind==='process-tank'||STATIC_SOLID_KINDS.includes(item.kind)){
    // R24: every stationary machine (robot, palletizer, crane, mixer, heater, filler, capper, valve...) stops a person as well.
    const size=staticSolidSize(item.kind);
