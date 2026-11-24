@@ -1,0 +1,78 @@
+/*
+ * Stage 1 workbench: view-only resizers for the existing 3D engineering layout.
+ * The worker, scene geometry and stored project never receive panel-size events.
+ * A visible grip and a focusable separator let mouse/pen/touch and keyboard
+ * users adjust panels without opening the Tools settings menu.
+ */
+@media (min-width:768px) and (min-height:720px) {
+  .efo-ux2-shell .sandbox-palette,
+  .efo-ux2-shell .p5-engineering-dock { position:relative; }
+  .efo-ux2-shell .stage1-resize-handle {
+    position:absolute;
+    box-sizing:border-box;
+    z-index:21;
+    touch-action:none;
+    user-select:none;
+    border:1px solid #7390a6;
+    background:color-mix(in srgb,var(--accent) 30%,var(--surface));
+    opacity:.82;
+    transition:opacity 120ms ease,background 120ms ease;
+  }
+  .efo-ux2-shell .stage1-resize-handle:hover,
+  .efo-ux2-shell .stage1-resize-handle:focus-visible,
+  .efo-ux2-shell .stage1-resize-handle:active {
+    opacity:1;
+    background:var(--accent);
+    outline:2px solid var(--surface);
+    outline-offset:-2px;
+  }
+  .efo-ux2-shell .stage1-resize-handle--library,
+  .efo-ux2-shell .stage1-resize-handle--inspector {
+    width:10px;
+    height:82px;
+    top:50%;
+    transform:translateY(-50%);
+    border-radius:7px;
+    cursor:col-resize;
+  }
+  .efo-ux2-shell .stage1-resize-handle--library { right:0; }
+  .efo-ux2-shell .stage1-resize-handle--inspector { left:0; }
+  .efo-ux2-shell .stage1-resize-handle--dock {
+    left:50%;
+    top:0;
+    transform:translateX(-50%);
+    width:94px;
+    height:11px;
+    border-radius:0 0 8px 8px;
+    cursor:row-resize;
+  }
+  /* Keep the list scroll region independent of the viewport; no wheel-chain
+     into the document or the 3D camera when the equipment list reaches its end. */
+  .efo-ux2-shell .sandbox-library-components .sandbox-palette-list {
+    overscroll-behavior:contain;
+    touch-action:pan-y;
+    scroll-padding:8px;
+  }
+  .efo-ux2-shell .sandbox-library-components .sandbox-palette-list:focus-visible {
+    outline:2px solid var(--accent);
+    outline-offset:-2px;
+  }
+  main.efo-workspace-focused .stage1-resize-handle { display:none!important; }
+}
+@media (min-width:1100px) and (min-height:720px) {
+  .efo-ux2-shell .p5-inspector-slot { position:relative; }
+}
+/* Tablets below 1100px show the inspector as an overlay; its inline size
+ * does not control the grid, so only the library and dock have resize grips. */
+@media (min-width:768px) and (max-width:1099px) and (min-height:720px) {
+  .efo-ux2-shell .stage1-resize-handle--inspector { display:none; }
+  .efo-ux2-shell .p5-layout:not(.p5-no-library),
+  .efo-ux2-shell .p5-layout.p5-no-inspector:not(.p5-no-library) {
+    grid-template-columns:clamp(160px,min(var(--ux2-palette-size,190px),31vw),260px) minmax(0,1fr);
+  }
+}
+/* Short desktop-height windows retain their intentionally scrollable layout;
+ * do not show nonfunctional grips where the compact CSS ignores sizes. */
+@media (max-width:767px), (max-height:719px) {
+  .efo-ux2-shell .stage1-resize-handle { display:none; }
+}
