@@ -62,17 +62,15 @@ ctx.onmessage = (event: MessageEvent<unknown>) => {
     return;
   }
   const packet = parsed.packet;
-  // A standalone Pause must not be rejected by a saturated edit queue.
-  // It halts without advancing the plant. Drop pending edits and acknowledge
-  // their callers with an explicit cancellation, so no stale edits are applied
-  // by a later clock interval. This is educational model control, NOT an
-  // industrial safety-stop or real hardware emergency stop.
+  // Pause bypasses queue capacity, not FIFO ordering. Apply previously
+  // accepted controls before Pause in the same tick dispatch: dropping a
+  // queued E-stop reset or button release silently changes the circuit.
+  // The final Pause prevents clock advancement except an explicit queued Step.
+  // This is virtual model control, not a physical safety stop.
   if (world.running && packet.commands.length === 1 && packet.commands[0].k === 'pause') {
-    const dropped = mailbox.take();
-    if (dropped.requestIds.length) {
-      reject('Queued simulation commands cancelled by priority Pause', undefined, dropped.requestIds);
-    }
-    dispatch(packet.commands, packet.requestId);
+    const batch = mailbox.takeWithPause(packet.requestId);
+    dispatch(batch.commands, batch.requestIds.length === 1 ? batch.requestIds[0] : undefined,
+      batch.requestIds.length > 1 ? batch.requestIds : undefined);
     return;
   }
   // During Run the single 50 ms clock owns scans. A received command only

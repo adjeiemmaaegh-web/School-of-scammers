@@ -95,6 +95,15 @@ export class WorkerMailbox {
     return null;
   }
 
+  /** A priority Pause is appended after every accepted command, including
+   * unacknowledged physical button changes, without consuming queue capacity. */
+  takeWithPause(requestId?: number): { commands: Command[]; requestIds: number[] } {
+    const batch = this.take();
+    batch.commands.push({ k: 'pause' });
+    if (requestId !== undefined) batch.requestIds.push(requestId);
+    return batch;
+  }
+
   take(): { commands: Command[]; requestIds: number[] } {
     const commands = this.commands, requestIds = this.requestIds;
     this.commands = [];

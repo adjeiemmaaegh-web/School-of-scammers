@@ -85,6 +85,22 @@ describe('Stage 2 worker ingress: deterministic bounded command queue', () => {
     expect(mailbox.enqueue(accepted([{ k: 'pause' }], 3))).toBeNull();
   });
 
+  it('priority Pause preserves all accepted controls, even without request IDs and at capacity', () => {
+    const mailbox = new WorkerMailbox();
+    const reset: Command = { k: 'operate', id: 'estop-3', pressed: false };
+    const release: Command = { k: 'operate', id: 'start-5', pressed: false };
+    expect(mailbox.enqueue(accepted([reset]))).toBeNull();
+    expect(mailbox.enqueue(accepted([release], 0))).toBeNull();
+    const fillers = Array.from({ length: MAX_WORKER_PENDING_COMMANDS - 2 }, (): Command => ({ k: 'run' }));
+    for (let i = 0; i < fillers.length; i += MAX_WORKER_COMMANDS_PER_PACKET)
+      expect(mailbox.enqueue(accepted(fillers.slice(i, i + MAX_WORKER_COMMANDS_PER_PACKET)))).toBeNull();
+    const batch = mailbox.takeWithPause(19);
+    expect(batch.commands).toEqual([reset, release, ...fillers, { k: 'pause' }]);
+    expect(batch.requestIds).toEqual([0, 19]);
+    expect(mailbox.hasPending).toBe(false);
+    expect(mailbox.pendingBytes).toBe(0);
+  });
+
   it('does not accumulate queue bytes for empty requests without an acknowledgement ID', () => {
     const mailbox = new WorkerMailbox();
     const empty = accepted([]);
