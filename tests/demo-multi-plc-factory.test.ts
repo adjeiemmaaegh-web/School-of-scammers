@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+// Heavy deterministic runs: allow for a busy machine (they timed out at the 5 s default while a browser suite ran alongside).
+vi.setConfig({ testTimeout: 30_000 });
 import { createWorld, renderSnapshot, tick } from '../src/sim/orchestrator';
 import { FACTORY_PARTS, multiPlcFactoryDemo } from '../src/plant/demos/multi-plc-factory';
 import type { WorldState } from '../src/sim/signals';

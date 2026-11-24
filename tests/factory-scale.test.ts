@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+// Heavy deterministic runs: allow for a busy machine (they timed out at the 5 s default while a browser suite ran alongside).
+vi.setConfig({ testTimeout: 30_000 });
 import { freshWorld, spawnBody, conserved } from '../src/plant/world/bodies';
 import { freshRuntime, stepScene } from '../src/plant/world/runner';
 import { PLANT_EQUIPMENT } from '../src/plant/equipment';
