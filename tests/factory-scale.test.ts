@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 // Heavy deterministic runs: allow for a busy machine (they timed out at the 5 s default while a browser suite ran alongside).
 vi.setConfig({ testTimeout: 30_000 });
+// The real-time guard (a scan must cost less than its 50 ms period) is measured on normal runs. The coverage job instruments
+// every line, which slows scans by an unrelated factor, so it sets PLC_COVERAGE_RUN and the bound is relaxed there only.
+const coverageRun = !!(globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.PLC_COVERAGE_RUN;
+const SCAN_BUDGET_MS = coverageRun ? 250 : 50;
 import { freshWorld, spawnBody, conserved } from '../src/plant/world/bodies';
 import { freshRuntime, stepScene } from '../src/plant/world/runner';
 import { PLANT_EQUIPMENT } from '../src/plant/equipment';
@@ -47,7 +51,7 @@ describe('R10 factory scale: caps raised and profiled', () => {
     expect(a.r.world.timeMs).toBe(20 * 50);
     profile.plantMaxMsPerScan = Math.round(a.msPerScan * 100) / 100;
     // Resource guard: a scan must cost well under its 50 ms period or the simulator cannot keep real time at x1.
-    expect(a.msPerScan).toBeLessThan(50);
+    expect(a.msPerScan).toBeLessThan(SCAN_BUDGET_MS);
   });
   it('plant cost grows gently with size (no runaway): 4x the bodies costs far less than 40x', () => {
     const small = run(50, 60, 20), big = run(MAX_SCENE_EQUIPMENT, MAX_BODIES, 20);
@@ -126,7 +130,7 @@ describe('R10 the electrical project at the component cap', () => {
     profile.project250MsPerScan = Math.round(ms * 100) / 100;
     const lit = Object.entries(renderSnapshot(w).deviceOn).filter(([id, on]) => id.startsWith('l') && on).length;
     expect(lit).toBe(MAX_COMPONENTS - 1);
-    expect(ms).toBeLessThan(50);
+    expect(ms).toBeLessThan(SCAN_BUDGET_MS);
   });
   it('one component more than the cap is refused by the engine', () => {
     let w = tick(createWorld(), bigProject()).world;
