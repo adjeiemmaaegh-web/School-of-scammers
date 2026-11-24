@@ -81,3 +81,48 @@ describe('free heading: turntables and indexing tables', () => {
     expect(v.x).toBeCloseTo(v.y, 0);
   });
 });
+
+describe('free heading: machine-guard cage', () => {
+  const cage = (heading?: number, openSide = 0): EquipmentPlacement => E('g', 'machine-guard', 0, 0, { sizeMm: 1000, openSide }, heading);
+  it('wall rectangles swing round the centre and carry the heading', async () => {
+    const { guardWalls, insideWall } = await import('../src/plant/world/guard-walls');
+    const walls = guardWalls(cage(90));
+    expect(walls).toHaveLength(4);
+    expect(walls.every(w => w.a === 90)).toBe(true);
+    const top = walls.find(w => Math.abs(w.cx) < 1e-6 && w.cy > 400)!;     // the +x wall of an unturned cage is now on +y, running along x
+    expect(top.cy).toBeCloseTo(470, 3);
+    expect(insideWall(top, 480, 470)).toBe(true);
+    expect(insideWall(top, 0, 520)).toBe(false);
+    const w45 = guardWalls(cage(45))[0];
+    expect(Math.hypot(w45.cx, w45.cy)).toBeCloseTo(470, 3);                // centres stay on the same circle
+    expect(guardWalls(cage(undefined))[0].a).toBeUndefined();              // unturned cages are exactly as before
+  });
+  it('a part on an axis belt meets the turned cage at its corner, not at the unturned wall position', () => {
+    const x = carried([BELT(), cage(45, 0)], -1100, 0, 160).world.bodies[0].pos.x;
+    expect(x).toBeLessThan(-600); expect(x).toBeGreaterThan(-760);
+  });
+  it('a part on a belt along the turned axis is stopped by a closed cage and enters through the turned opening', () => {
+    const run = (item: EquipmentPlacement) => carried([BELT(45), item], -565, -565, 160).world.bodies[0].pos.x;
+    const stopped = run(cage(45, 0));                                      // closed: held at the turned wall face, 500 mm out along the belt (x = -354)
+    expect(stopped).toBeLessThan(-300); expect(stopped).toBeGreaterThan(-400);
+    const inside = run(cage(45, 3));                                       // opening on -x turned to face the belt
+    expect(inside).toBeGreaterThan(0); expect(inside).toBeLessThan(400);   // through the opening, stopped by the far turned wall
+  });
+  it('a walking person is kept out by a turned wall and walks into the turned opening', () => {
+    const walk = (item: EquipmentPlacement, from: { x: number; y: number }) => {
+      const items = [item];
+      const w: World = { ...freshWorld(), operatorGoal: { x: 0, y: 0 },
+        trainingOperator: { id: 'training-operator', shape: 'cylinder', size: vec(400, 400, 1800), massKg: 75, pos: vec(from.x, from.y, 0), yawDeg: 0, vel: vec(), supportedBy: null, tags: { material: 'person', training: true } } };
+      let r = freshRuntime(w, items, PLANT_EQUIPMENT);
+      for (let i = 0; i < 300; i++) r = stepScene(r, items, PLANT_EQUIPMENT, {});
+      return r.world.trainingOperator!.pos;
+    };
+    const corner = walk(cage(45, 0), { x: -1500, y: 0 });                    // head on into a corner of the turned cage
+    expect(corner.x).toBeLessThan(-850);                                     // an unturned wall would have stopped the person near x = -700
+    const from = { x: -1061, y: -1061 };                                   // on the opening's axis (225 degrees) of a cage turned 45
+    const closed = walk(cage(45, 0), from);
+    expect(Math.hypot(closed.x, closed.y)).toBeGreaterThan(500);
+    const open = walk(cage(45, 3), from);
+    expect(Math.hypot(open.x, open.y)).toBeLessThan(10);
+  });
+});

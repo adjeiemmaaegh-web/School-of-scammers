@@ -37,8 +37,8 @@ export const machineGuard:EquipmentDef={
  fresh:()=>({...initial({}),engaged:true}),
  step:(s,w)=>({world:w,state:{...s,engaged:true}}),
  read:()=>({}),
- describe:(s,ctx)=>guardWalls({originMm:ctx.originMm,yawDeg:ctx.yawDeg,params:ctx.params}).map((wall,i)=>
-  draw({...ctx,originMm:{x:wall.cx,y:wall.cy,z:ctx.originMm.z}},'wall'+i,'box',{x:wall.w,y:wall.d,z:1500},750,'#c9a227')),
+ describe:(s,ctx)=>guardWalls({originMm:ctx.originMm,yawDeg:ctx.yawDeg,params:ctx.params,headingDeg:ctx.headingDeg}).map((wall,i)=>
+  draw({...ctx,yawDeg:0,originMm:{x:wall.cx,y:wall.cy,z:ctx.originMm.z}},'wall'+i,'box',{x:wall.w,y:wall.d,z:1500},750,'#c9a227')),
 };
 
 /** An interlocked guard door: solid until fully open; publishes `closed` (interlock contact) and `open`. */

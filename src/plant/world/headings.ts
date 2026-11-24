@@ -5,5 +5,5 @@
  */
 export const FREE_HEADING_KINDS: ReadonlySet<string> = new Set([
   'belt-conveyor', 'roller-conveyor', 'curved-conveyor', 'transfer-unit', 'turntable', 'index-table', 'process-station',
-  'stopper', 'merge-gate', 'diverter-gate', 'safety-fence', 'guard-door',
+  'stopper', 'merge-gate', 'diverter-gate', 'safety-fence', 'guard-door', 'machine-guard',
 ]);

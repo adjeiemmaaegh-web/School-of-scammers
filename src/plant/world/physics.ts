@@ -4,7 +4,7 @@
  */
 import type {Body,EquipmentPlacement,EquipmentState,World,Vec3} from './types';
 import {G_MM_S2} from './types';
-import {guardWalls} from './guard-walls';
+import {guardWalls,insideWall} from './guard-walls';
 import {clamp,face,insideFootprint,q,vec} from './math';
 import {addEvent} from './events';
 import {newlyContactsStaticSolid,staticSolidSize} from './solid-geometry';
@@ -205,7 +205,7 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    const ahead={x:body.pos.x+proposed.x,y:body.pos.y+proposed.y,z:body.pos.z};
    const blockingGate=blockers.find(item=>world.model[item.id]?.engaged&&
     // A machine guard cage is four walls (R20); every other blocker is one rectangle, exactly as before.
-    (item.kind==='machine-guard'?guardWalls(item).some(wall=>insideFootprint(ahead,vec(wall.cx,wall.cy,item.originMm.z),vec(wall.w,wall.d,0))):
+    (item.kind==='machine-guard'?guardWalls(item).some(wall=>wall.a?insideWall(wall,ahead.x,ahead.y):insideFootprint(ahead,vec(wall.cx,wall.cy,item.originMm.z),vec(wall.w,wall.d,0))):
      (item.headingDeg?inRotatedRect(ahead,item,Math.max(50,item.params.lengthMm??80),Math.max(50,item.params.widthMm??200)):
       insideFootprint(ahead,item.originMm,worldFootprint(item,Math.max(50,item.params.lengthMm??80),
        Math.max(50,item.params.widthMm??200))))));
