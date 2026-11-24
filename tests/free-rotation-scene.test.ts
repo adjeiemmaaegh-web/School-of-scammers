@@ -15,7 +15,7 @@ const free = (p: ProjectFile, ids: string[], deltaDeg: number) => editWorkspace(
 describe('R22 continuous rotation of placed devices', () => {
   it('only orientable devices without orientation-dependent physics may turn freely', () => {
     for (const k of ['lamp', 'plc16', 'start', 'relay', 'motor', 'stacklight']) expect(isFreeRotation(k)).toBe(true);
-    for (const k of ['turntable', 'index-table', 'geometry-photoeye', 'process-tank', 'cylinder']) expect(isFreeRotation(k)).toBe(false);
+    for (const k of ['geometry-photoeye', 'process-tank', 'cylinder', 'robot-arm']) expect(isFreeRotation(k)).toBe(false);
   });
   it('a single device accumulates the angle on top of its quarter-turn yaw, and four-plus steps wrap to nothing', () => {
     let p = project([comp('l', 'lamp', 100, 100, { yawDeg: 90 })]);
@@ -34,8 +34,8 @@ describe('R22 continuous rotation of placed devices', () => {
     expect(get(p, 'b').freeYawDeg).toBeUndefined();
   });
   it('refuses physical equipment and says which', () => {
-    const p = project([comp('l', 'lamp', 100, 100), comp('b', 'turntable', 300, 100)]);
-    expect(() => free(p, ['l', 'b'], 15)).toThrow(/turntable/);
+    const p = project([comp('l', 'lamp', 100, 100), comp('b', 'robot-arm', 300, 100)]);
+    expect(() => free(p, ['l', 'b'], 15)).toThrow(/robot-arm/);
     expect(() => free(project([comp('t', 'process-tank', 100, 100)]), ['t'], 15)).toThrow(/quarter turns/);
   });
   it('refuses a bad angle: zero, not a multiple of 5, too large, fractional', () => {
@@ -76,7 +76,7 @@ describe('R22 continuous rotation of placed devices', () => {
     const ok = free(project([comp('l', 'lamp', 100, 100)]), ['l'], 35);
     expect(() => validateProject(ok)).not.toThrow();
     expect(validateProject(JSON.parse(JSON.stringify(ok))).components[0].freeYawDeg).toBe(35);
-    for (const bad of [{ kind: 'turntable', freeYawDeg: 15 }, { kind: 'lamp', freeYawDeg: 17 }, { kind: 'lamp', freeYawDeg: 360 }, { kind: 'lamp', freeYawDeg: 0 }, { kind: 'lamp', freeYawDeg: 2.5 }])
+    for (const bad of [{ kind: 'robot-arm', freeYawDeg: 15 }, { kind: 'lamp', freeYawDeg: 17 }, { kind: 'lamp', freeYawDeg: 360 }, { kind: 'lamp', freeYawDeg: 0 }, { kind: 'lamp', freeYawDeg: 2.5 }])
       expect(() => validateProject(project([comp('x', bad.kind, 100, 100, { freeYawDeg: bad.freeYawDeg })]))).toThrow();
   });
   it('the worker command path commits it and keeps the project loadable', () => {

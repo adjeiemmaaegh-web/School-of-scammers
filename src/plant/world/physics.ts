@@ -44,6 +44,11 @@ const unitOf=(deg:number):{x:number;y:number}=>{
  const n=((deg%360)+360)%360;
  return Number.isInteger(n/90)?face(n):{x:Math.cos(n*Math.PI/180),y:Math.sin(n*Math.PI/180)};
 };
+/** Whether a point is inside a rectangle of the given length and width turned about the item's centre by its yaw plus free heading. */
+const inRotatedRect=(pos:Vec3,item:EquipmentPlacement,length:number,width:number):boolean=>{
+ const d=unitOf(item.yawDeg+(item.headingDeg??0)),dx=pos.x-item.originMm.x,dy=pos.y-item.originMm.y;
+ return Math.abs(dx*d.x+dy*d.y)<=length/2&&Math.abs(-dx*d.y+dy*d.x)<=width/2;
+};
 /** The direction a carrier points: its quarter-turn yaw plus its free heading. */
 const headingOf=(item:EquipmentPlacement):{x:number;y:number}=>unitOf(item.yawDeg+(item.headingDeg??0));
 /** Height of the carrying surface under a point: flat for most equipment, a ramp for an inclined belt. */
@@ -59,11 +64,8 @@ const worldFootprint=(item:EquipmentPlacement,length:number,width:number):Vec3=>
  item.yawDeg===90||item.yawDeg===270?vec(width,length,0):vec(length,width,0);
 /** Whether a point is on a carrier's surface: the true quarter-annulus for a curved belt, the footprint rectangle for the rest. */
 const onSurface=(item:EquipmentPlacement,pos:Vec3):boolean=>item.kind==='curved-conveyor'?arcContains(item,pos):
- // A belt with a free heading is a true rotated rectangle: the point is on it when it is within half the length along the belt and half the width across it.
- item.headingDeg?(()=>{
-  const d=headingOf(item),dx=pos.x-item.originMm.x,dy=pos.y-item.originMm.y;
-  return Math.abs(dx*d.x+dy*d.y)<=(item.params.lengthMm??600)/2&&Math.abs(-dx*d.y+dy*d.x)<=(item.params.widthMm??300)/2;
- })():
+ // A conveyor, table or unit with a free heading is a true rotated rectangle about its centre (the indexing table's own default size is 800 x 800).
+ item.headingDeg?inRotatedRect(pos,item,item.params.lengthMm??(item.kind==='index-table'?800:600),item.params.widthMm??(item.kind==='index-table'?800:300)):
  // An indexing table's default size is 800 x 800 (the equipment's own defaults); a part riding round it must stay on its surface.
  item.kind==='index-table'?insideFootprint(pos,item.originMm,vec(item.params.lengthMm??800,item.params.widthMm??800,0)):
  insideFootprint(pos,item.originMm,worldFootprint(item,item.params.lengthMm??600,item.params.widthMm??300));
@@ -204,8 +206,9 @@ export function advanceBodies(world:World,items:readonly EquipmentPlacement[],dt
    const blockingGate=blockers.find(item=>world.model[item.id]?.engaged&&
     // A machine guard cage is four walls (R20); every other blocker is one rectangle, exactly as before.
     (item.kind==='machine-guard'?guardWalls(item).some(wall=>insideFootprint(ahead,vec(wall.cx,wall.cy,item.originMm.z),vec(wall.w,wall.d,0))):
-     insideFootprint(ahead,item.originMm,worldFootprint(item,Math.max(50,item.params.lengthMm??80),
-      Math.max(50,item.params.widthMm??200)))));
+     (item.headingDeg?inRotatedRect(ahead,item,Math.max(50,item.params.lengthMm??80),Math.max(50,item.params.widthMm??200)):
+      insideFootprint(ahead,item.originMm,worldFootprint(item,Math.max(50,item.params.lengthMm??80),
+       Math.max(50,item.params.widthMm??200))))));
    const blocked=!!blockingGate;
    const moved={...body,pos:vec(body.pos.x+proposed.x,body.pos.y+proposed.y,body.pos.z)};
    const solidBlocked=newlyContactsStaticSolid(body,moved,solids);

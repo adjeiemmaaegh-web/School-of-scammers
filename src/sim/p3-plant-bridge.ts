@@ -8,6 +8,7 @@ import type {EquipmentPlacement,LiveSignal,WorldEvent} from '../plant/world/type
 import type {SceneRuntime} from '../plant/world/runner';
 import {freshRuntime,stepScene} from '../plant/world/runner';
 import {freshWorld} from '../plant/world/bodies';
+import {FREE_HEADING_KINDS} from '../plant/world/headings';
 import {drainEvents} from '../plant/world/events';
 import {PLANT_EQUIPMENT} from '../plant/equipment';
 import {composeShape} from '../plant/world/custom-shapes';
@@ -22,7 +23,7 @@ export function plantPlacements(project:Pick<ProjectFile,'components'|'params'>)
  return project.components.filter(c=>isP3Equipment(c.kind)).map(c=>({
   id:c.id,kind:c.kind,originMm:{...coordinate(c.x,c.y),z:c.elevationMm??0},
   yawDeg:c.yawDeg ?? 0, // Persisted quarter-turn placement drives plant physics and 3D equally
-  ...(c.freeYawDeg&&(c.kind==='belt-conveyor'||c.kind==='roller-conveyor'||c.kind==='process-station'||c.kind==='transfer-unit'||c.kind==='curved-conveyor')?{headingDeg:c.freeYawDeg}:{}),
+  ...(c.freeYawDeg&&FREE_HEADING_KINDS.has(c.kind)?{headingDeg:c.freeYawDeg}:{}),
   params:Object.fromEntries(paramSpecsOf(c.kind).map(spec=>
    [spec.key,paramValue(project.params,c.id,spec)])),
  }));

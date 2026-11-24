@@ -273,7 +273,7 @@ export const indexTable:EquipmentDef={
    angleDeg:q((((s.count%n)+s.progress)*360/n)%360)};
  },
  describe:(s,ctx)=>{
-  const n=param(ctx,'stations',4),deg=(((s.count%n)+s.progress)*360/n),r=param(ctx,'lengthMm',800)*.42,a=deg*Math.PI/180;
+  const n=param(ctx,'stations',4),deg=(((s.count%n)+s.progress)*360/n),r=param(ctx,'lengthMm',800)*.42,a=(deg+ctx.yawDeg+(ctx.headingDeg??0))*Math.PI/180;
   return [draw(ctx,'table','cylinder',vec(param(ctx,'lengthMm',800)*.95,param(ctx,'lengthMm',800)*.95,110),55,s.elapsedMs>0?'#c2862a':'#66859a'),
    draw({...ctx,originMm:vec(ctx.originMm.x+r*Math.cos(a),ctx.originMm.y+r*Math.sin(a),ctx.originMm.z)},'marker','box',vec(50,50,40),115,'#e8d36a')];
  },

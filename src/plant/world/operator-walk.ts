@@ -16,6 +16,11 @@ export const WALK_SPEED_MM_S=1200, OPERATOR_RADIUS_MM=200, MAX_SLOPE=0.9;
 const PERSON_BLOCKERS=new Set(['safety-fence','guard-door','handrail']);
 type Rect={cx:number;cy:number;hx:number;hy:number};
 const rectOf=(item:EquipmentPlacement,length:number,width:number):Rect=>{
+ // A fence or door with a free heading blocks the bounding box of its turned rectangle (conservative for a person).
+ if(item.headingDeg){
+  const t=((item.yawDeg+item.headingDeg)%360)*Math.PI/180,c=Math.abs(Math.cos(t)),s=Math.abs(Math.sin(t));
+  return {cx:item.originMm.x,cy:item.originMm.y,hx:(c*length+s*width)/2,hy:(s*length+c*width)/2};
+ }
  const quarter=item.yawDeg===90||item.yawDeg===270;
  return {cx:item.originMm.x,cy:item.originMm.y,hx:(quarter?width:length)/2,hy:(quarter?length:width)/2};
 };

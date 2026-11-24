@@ -5,6 +5,7 @@
  */
 import { isPlcKind } from '../components/registry';
 import { PLANT_EQUIPMENT } from '../plant/equipment';
+import { FREE_HEADING_KINDS } from '../plant/world/headings';
 import { removeComponent, MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES } from '../sim/panels';
 import { MAX_PLCS, plcComponents, withProgramOf } from '../sim/plcs';
 import type { PlacedComponent, ProjectFile, Wire, XY } from '../sim/signals';
@@ -23,7 +24,7 @@ const NONREPEATABLE = new Set(['reversebutton', 'forwardcontactor', 'reversecont
  */
 /** Kinds that may take a continuous rotation: orientable AND with no plant physics that reads their yaw (those stay quarter-turn only). */
 /** Straight belt and roller conveyors also turn freely: their carry direction and surface follow the true angle (R21/R22). */
-const FREE_PHYSICAL = new Set(['belt-conveyor', 'roller-conveyor', 'process-station', 'transfer-unit', 'curved-conveyor']);
+const FREE_PHYSICAL = FREE_HEADING_KINDS;
 export const isFreeRotation = (kind: string): boolean => FREE_PHYSICAL.has(kind) || (ROTATABLE.has(kind) && !Object.hasOwn(PLANT_EQUIPMENT, kind));
 export const ROTATABLE = new Set([
   'plc', 'plc16', 'supply', 'start', 'stop', 'estop', 'reversebutton',

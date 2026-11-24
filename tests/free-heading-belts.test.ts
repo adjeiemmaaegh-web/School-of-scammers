@@ -105,7 +105,7 @@ describe('R21/R22 conveyors with a free heading', () => {
   it('roller conveyors turn freely too, and a heading on any other device is refused by the plant', () => {
     const r = run([B('r', 0, 0, 30, {}, 0, 'roller-conveyor')], [{ x: 0, y: 0, carrier: 'r' }], 20);
     expect(r.world.bodies[0].vel.y).toBeGreaterThan(40);
-    const bad: EquipmentPlacement = { id: 's', kind: 'stopper', originMm: vec(0, 0, 0), yawDeg: 0, params: {}, headingDeg: 30 };
+    const bad: EquipmentPlacement = { id: 's', kind: 'robot-arm', originMm: vec(0, 0, 0), yawDeg: 0, params: {}, headingDeg: 30 };
     expect(() => freshRuntime(freshWorld(), [bad], PLANT_EQUIPMENT)).toThrow(/free heading/);
     const range: EquipmentPlacement = { ...B('b', 0, 0), headingDeg: 400 };
     expect(() => freshRuntime(freshWorld(), [range], PLANT_EQUIPMENT)).toThrow(/free heading/);
@@ -129,10 +129,10 @@ describe('R21/R22 editing a freely headed belt', () => {
   const comp = (id: string, kind: string, x: number, y: number, extra: Partial<PlacedComponent> = {}) => ({ id, kind, x, y, pressed: false, ...extra } as PlacedComponent);
   const project = (components: PlacedComponent[]): ProjectFile => ({
     formatVersion: 1, program: { id: 'p', version: '1', rungs: [{ id: 'r', elements: [{ type: 'contact', tag: 'Start' }], coil: 'Run' }] } as never, components, wires: [] });
-  it('belts, rollers, stations, transfer units and curved belts may turn freely; tanks and turntables still may not', () => {
+  it('belts, rollers, stations, transfer units, curved belts, tables, stoppers, gates, fences and doors may turn freely; tanks, robots and palletizers may not', () => {
     expect(isFreeRotation('belt-conveyor')).toBe(true); expect(isFreeRotation('roller-conveyor')).toBe(true);
-    for (const k of ['process-tank', 'turntable']) expect(isFreeRotation(k)).toBe(false);
-    for (const k of ['process-station', 'transfer-unit', 'curved-conveyor']) expect(isFreeRotation(k)).toBe(true);
+    for (const k of ['process-tank', 'robot-arm', 'palletizer', 'pusher', 'platform', 'stairs']) expect(isFreeRotation(k)).toBe(false);
+    for (const k of ['process-station', 'transfer-unit', 'curved-conveyor', 'turntable', 'index-table', 'stopper', 'safety-fence', 'guard-door', 'diverter-gate', 'merge-gate']) expect(isFreeRotation(k)).toBe(true);
   });
   it('rotateFree turns a belt, the project keeps it, and the plant placement carries the heading', () => {
     let p = project([comp('b', 'belt-conveyor', 300, 100)]);
@@ -144,13 +144,13 @@ describe('R21/R22 editing a freely headed belt', () => {
     const w = tick(createWorld(), [{ k: 'loadProject', project: p }, { k: 'editWorkspace', edit: { kind: 'rotateFree', ids: ['b'], deltaDeg: 15 } }]).world;
     expect(w.lastError).toBeNull(); expect(w.project.components[0].freeYawDeg).toBe(60);
   });
-  it('a selection with a belt and a lamp turns together, but one holding a turntable is refused naming it', () => {
+  it('a selection with a belt and a lamp turns together, but one holding a robot arm is refused naming it', () => {
     const ok = editWorkspace(project([comp('b', 'belt-conveyor', 300, 100), comp('l', 'lamp', 500, 100)]), { kind: 'rotateFree', ids: ['b', 'l'], deltaDeg: 30 });
     expect(ok.components.every(c => c.freeYawDeg === 30)).toBe(true);
-    expect(() => editWorkspace(project([comp('b', 'belt-conveyor', 300, 100), comp('s', 'turntable', 500, 100)]), { kind: 'rotateFree', ids: ['b', 's'], deltaDeg: 30 })).toThrow(/turntable/);
+    expect(() => editWorkspace(project([comp('b', 'belt-conveyor', 300, 100), comp('s', 'robot-arm', 500, 100)]), { kind: 'rotateFree', ids: ['b', 's'], deltaDeg: 30 })).toThrow(/robot-arm/);
   });
   it('the plant placement carries the heading for every kind that takes one, and for no other', () => {
-    for (const kind of ['belt-conveyor', 'roller-conveyor', 'process-station', 'transfer-unit', 'curved-conveyor'])
+    for (const kind of ['belt-conveyor', 'roller-conveyor', 'process-station', 'transfer-unit', 'curved-conveyor', 'turntable', 'index-table', 'stopper', 'merge-gate', 'diverter-gate', 'safety-fence', 'guard-door'])
       expect(plantPlacements(project([comp('x', kind, 300, 100, { freeYawDeg: 25 })]))[0].headingDeg, kind).toBe(25);
     expect(plantPlacements(project([comp('x', 'lamp', 300, 100, { freeYawDeg: 25 })])).length).toBe(0);            // not plant equipment at all
   });

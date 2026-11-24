@@ -3,6 +3,7 @@
  * Equipment reads previous settled body/plant state; commands are the mapped PLC
  * output image. No setTimeout, renderer state, Date.now or Math.random.
  */
+import {FREE_HEADING_KINDS} from './headings';
 import type {MaterialSpec} from './materials';
 import {advanceOperator} from './operator-walk';
 import type {EquipmentDef,SceneOccluder} from './equipment';
@@ -22,8 +23,8 @@ export const validatePlacements=(placements:readonly EquipmentPlacement[],librar
   if(!p||!p.id||!/^[a-z][a-z0-9-]{0,39}$/.test(p.id)||ids.has(p.id)||!library[p.kind])
    throw new Error('Unknown/duplicate plant equipment');
   ids.add(p.id);
-  if(p.headingDeg!==undefined&&(!Number.isFinite(p.headingDeg)||p.headingDeg<0||p.headingDeg>=360||(p.kind!=='belt-conveyor'&&p.kind!=='roller-conveyor'&&p.kind!=='process-station'&&p.kind!=='transfer-unit'&&p.kind!=='curved-conveyor')))
-   throw new RangeError('Invalid free heading (only conveyors, transfer units and production stations take one)');
+  if(p.headingDeg!==undefined&&(!Number.isFinite(p.headingDeg)||p.headingDeg<0||p.headingDeg>=360||!FREE_HEADING_KINDS.has(p.kind)))
+   throw new RangeError('Invalid free heading (only conveyors, transfer units, turntables, stations, stoppers, gates, fences and doors take one)');
   if(![0,90,180,270].includes(p.yawDeg)||!p.originMm||
    Object.values(p.originMm).some(v=>typeof v!=='number'||!Number.isFinite(v)||Math.abs(v)>100000))
    throw new RangeError('Invalid equipment location/orientation');
