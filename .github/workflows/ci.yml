@@ -260,6 +260,9 @@ jobs:
         run: npm install --no-save --no-audit --no-fund playwright@1.64.1
       - name: Firefox and Linux WebKit browser smoke - DC, PLC workcell and mobile
         # One step: a background preview server is not guaranteed to outlive a step inside a container job.
+        # HOME=/root: the job runs as root but GitHub mounts $HOME owned by pwuser, and Firefox refuses to start then.
+        env:
+          HOME: /root
         run: |
           npx vite preview --host 127.0.0.1 --port 4174 > /tmp/plc-firefox-preview.log 2>&1 &
           node -e "const go=async()=>{for(let i=0;i<40;i++){try{if((await fetch('http://127.0.0.1:4174/')).ok)return}catch{}await new Promise(r=>setTimeout(r,1000))}process.exit(1)};go()"
