@@ -3,6 +3,7 @@ import {freshWorld,spawnBody,despawnBody,conserved} from '../src/plant/world/bod
 import {freshRuntime,stepScene} from '../src/plant/world/runner';
 import {PLANT_EQUIPMENT} from '../src/plant/equipment';
 import type {EquipmentPlacement,World} from '../src/plant/world/types';
+import {MAX_BODIES} from '../src/plant/world/types';
 const p=(id:string,kind:string,x:number,y=0,params:Record<string,number>={}):EquipmentPlacement=>
  ({id,kind,originMm:{x,y,z:0},yawDeg:0,params});
 const step=(items:EquipmentPlacement[],n:number,command:Record<string,Record<string,boolean|number>>={})=>{
@@ -42,9 +43,9 @@ describe('P3 deterministic shared physics and accounting',()=>{
   expect(r.world.bodies).toHaveLength(1);
   expect(r.world.bodies[0].tags.jammed).toBe(true);
   expect(conserved(r.world)).toBe(true);
-  for(let i=0;i<70;i++)w=spawnBody(w,'test',{size:{x:30,y:30,z:30},massKg:1,pos:{x:i*40,y:500,z:0}});
-  expect(w.bodies).toHaveLength(60);
-  expect(w.spawnedCount).toBe(60);
+  for(let i=0;i<MAX_BODIES+10;i++)w=spawnBody(w,'test',{size:{x:30,y:30,z:30},massKg:1,pos:{x:(i%50)*40,y:500+Math.floor(i/50)*40,z:0}});
+  expect(w.bodies).toHaveLength(MAX_BODIES);
+  expect(w.spawnedCount).toBe(MAX_BODIES);
   expect(w.events.some(e=>e.kind==='limit')||w.droppedEventCount>0).toBe(true);
   expect(conserved(despawnBody(w,'test','b1'))).toBe(true);
  });

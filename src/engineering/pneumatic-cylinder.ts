@@ -2,13 +2,23 @@
  * Not a pressure/force design tool or a safety-rated machine controller.
  */
 export type PneumaticFault='none'|'no-air'|'extend-solenoid-open'|'retract-solenoid-open'|'extend-sensor-stuck'|'retract-sensor-stuck'|'rod-jammed';
+import {circuitMotion} from './pneumatic-circuit';
+import type {CircuitReadout,PneumaticCircuit} from './pneumatic-circuit';
 export type CylinderCommand='neutral'|'extend'|'retract';
 export type PneumaticState={
  timeMs:number; position:number; command:CylinderCommand; fault:PneumaticFault;
  extendCoil:boolean; retractCoil:boolean; extendLimit:boolean; retractLimit:boolean;
  pressureBar:number; alarm:string|null; travelMs:number; events:readonly string[];
+ /** Present only for a cylinder driven through a PneumaticCircuit (R06). */
+ circuit?:CircuitReadout;
 };
-export type PneumaticInput={command:CylinderCommand; airOn:boolean; guardClosed:boolean; emergencyStop:boolean; fault:PneumaticFault; resetAlarm?:boolean};
+export type PneumaticInput={command:CylinderCommand; airOn:boolean; guardClosed:boolean; emergencyStop:boolean; fault:PneumaticFault; resetAlarm?:boolean;
+ /** Working pressure at the cylinder port in bar. Absent keeps the original constant 6 bar supply (legacy behaviour). */
+ supplyBar?:number;
+ /** R06: valve type, restrictors, line loss, leakage and load. Absent keeps the legacy fixed-speed behaviour exactly. */
+ circuit?:PneumaticCircuit};
+/** Below this working pressure the rod does not move at all; above it, stroke speed scales with pressure (6 bar = nominal). */
+export const MIN_WORK_BAR=1.5, NOMINAL_BAR=6;
 export type PneumaticTrace={timeMs:number;position:number;command:CylinderCommand;extendCoil:boolean;retractCoil:boolean;extended:boolean;retracted:boolean;pressureBar:number;alarm:string};
 export const DEFAULT_PNEUMATIC_INPUT:PneumaticInput={command:'neutral',airOn:true,guardClosed:true,emergencyStop:false,fault:'none'};
 export const PNEUMATIC_FAULTS:readonly PneumaticFault[]=['none','no-air','extend-solenoid-open','retract-solenoid-open','extend-sensor-stuck','retract-sensor-stuck','rod-jammed'];
@@ -22,16 +32,25 @@ export function stepPneumatic(state:PneumaticState,input:PneumaticInput,deltaMs=
  if(!state||!Number.isFinite(state.position)||state.position<0||state.position>1||!Number.isSafeInteger(state.timeMs)||state.timeMs<0||!Number.isSafeInteger(state.travelMs)||state.travelMs<0)throw new TypeError('Invalid cylinder state');
  if(!Number.isSafeInteger(deltaMs)||deltaMs<10||deltaMs>1000)throw new RangeError('PLC step must be 10..1000 ms');
  const safe=input.guardClosed&&!input.emergencyStop;
- const pressure=input.airOn&&input.fault!=='no-air'?6:0;
+ const pressure=input.airOn&&input.fault!=='no-air'?(input.supplyBar??NOMINAL_BAR):0;
+ const canMove=pressure>=MIN_WORK_BAR;
+ // Stroke speed is proportional to working pressure (capped at 1.5x nominal): a half-pressure cylinder takes twice as long.
+ const speed=input.supplyBar===undefined?1:Math.min(1.5,pressure/NOMINAL_BAR);
  let command:CylinderCommand=safe?input.command:'neutral';
  const extendCoil=command==='extend'&&input.fault!=='extend-solenoid-open';
  const retractCoil=command==='retract'&&input.fault!=='retract-solenoid-open';
  if(extendCoil&&retractCoil)throw Error('Valve interlock violation');
  // Spring-centred 5/3 valve holds the position when de-energized; no motion without air.
  let position=state.position;
- if(pressure>0&&input.fault!=='rod-jammed'){
-  if(extendCoil)position=limit(position+deltaMs/1200);
-  else if(retractCoil)position=limit(position-deltaMs/1000);
+ if(canMove&&input.fault!=='rod-jammed'){
+  if(extendCoil)position=limit(position+deltaMs*speed/1200);
+  else if(retractCoil)position=limit(position-deltaMs*speed/1000);
+ }
+ let circuitReadout:CircuitReadout|undefined,overload=false;
+ if(input.circuit){
+  // Circuit model: the valve, restrictors, losses and load decide the motion (spring return works without air).
+  const result=circuitMotion(state.position,input.circuit,{extend:extendCoil,retract:retractCoil},pressure,deltaMs,MIN_WORK_BAR,input.fault==='rod-jammed');
+  position=result.position;circuitReadout=result.readout;overload=result.stalled&&canMove;
  }
  position=Math.round(position*1000000)/1000000;
  const extendLimit=input.fault==='extend-sensor-stuck'?false:position>=0.999999;
@@ -43,8 +62,10 @@ export function stepPneumatic(state:PneumaticState,input:PneumaticInput,deltaMs=
  let alarm=state.alarm;
  if(input.resetAlarm&&command==='neutral'&&safe)alarm=null;
  if(!safe)alarm='INTERLOCK OPEN — VALVE DE-ENERGIZED';
+ else if(overload&&command!=='neutral')alarm='OVERLOAD: LOAD EXCEEDS CYLINDER FORCE';
  else if(timeout)alarm='CYLINDER TRAVEL TIMEOUT';
  else if(!alarm&&pressure===0&&command!=='neutral')alarm='AIR PRESSURE UNAVAILABLE';
+ else if(!alarm&&pressure>0&&!canMove&&command!=='neutral')alarm='LOW AIR PRESSURE';
  const events=[...state.events];
  const event=(text:string)=>{events.push((state.timeMs+deltaMs)+' ms: '+text);};
  if(state.command!==command)event('Valve command '+command);
@@ -52,7 +73,7 @@ export function stepPneumatic(state:PneumaticState,input:PneumaticInput,deltaMs=
  if(!state.retractLimit&&retractLimit)event('RETRACTED limit reached');
  if(alarm!==state.alarm&&alarm)event(alarm);
  if(alarm===null&&state.alarm!==null)event('Alarm reset');
- return {timeMs:state.timeMs+deltaMs,position,command,fault:input.fault,extendCoil,retractCoil,extendLimit,retractLimit,pressureBar:pressure,alarm,travelMs,events:events.slice(-300)};
+ return {timeMs:state.timeMs+deltaMs,position,command,fault:input.fault,extendCoil,retractCoil,extendLimit,retractLimit,pressureBar:pressure,alarm,travelMs,events:events.slice(-300),...(circuitReadout?{circuit:circuitReadout}:{})};
 }
 export function pneumaticSample(s:PneumaticState):PneumaticTrace{return {timeMs:s.timeMs,position:s.position,command:s.command,extendCoil:s.extendCoil,retractCoil:s.retractCoil,extended:s.extendLimit,retracted:s.retractLimit,pressureBar:s.pressureBar,alarm:s.alarm??''};}
 export function pneumaticCsv(rows:readonly PneumaticTrace[]):string{

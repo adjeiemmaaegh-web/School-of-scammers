@@ -1,3 +1,4 @@
+import { expandSelection, rootGroupOf } from '../workspace/groups';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { COMPONENTS, componentKinds, isPlcKind, type ComponentKind } from '../components/registry';
@@ -22,14 +23,15 @@ import { AppHeader } from '../ui/AppHeader';
 import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
 import {DEVICE_FAMILIES,matchesFamily,supportedFamilies,type DeviceFamily} from '../ui/sandbox/workspace-catalog';
 import { ScenarioPanel } from '../ui/sandbox/ScenarioPanel';
-import { perDeviceLive } from '../sim/device-state';
+import { perDeviceLive, plantStatusText } from '../sim/device-state';
+import { isP3Equipment } from '../sim/p3-plant-bridge';
 import { plcComponents, programOf } from '../sim/plcs';
 import { vesselsOf } from '../sim/stations';
 import { appendEvidence, evidenceFromCommand } from '../exercises/evidence';
 import { scenarioStorageKey, type ScenarioRequest, type ScenarioSession } from '../exercises/session';
 import { getScenario } from '../exercises/catalogue';
 import type { AttemptResult, EvidenceEvent, RubricResult } from '../platform/types';
-import type { Command, ProjectFile, RenderSnapshot, WorkerResponse } from '../sim/signals';
+import type { Command, ProjectFile, RenderSnapshot, WorkerResponse, WorkerTiming } from '../sim/signals';
 import { validateProject } from '../sim/orchestrator';
 import { readSandboxProject, persistSandboxProject, sandboxRecoveryKey } from '../platform/sandbox-project-storage';
 import './sandbox.css';
@@ -40,6 +42,7 @@ import './ux4-canvas-focus.css';
 import './ux6-workbench.css';
 import './ux7-reference-layout.css';
 import './stage1-workspace.css';
+import { DEFAULT_SCAN_MS, SCAN_PRESETS_MS, TIME_SCALES, scanMsOf, type ScanTiming } from '../sim/scan-config';
 
 // Loaded on demand so opening the simulator does not download the project dialog, lessons, checklist or report builder.
 const ProjectLibraryPanel = lazy(() => import('../ui/sandbox/ProjectLibraryPanel').then(m => ({ default: m.ProjectLibraryPanel })));
@@ -110,6 +113,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     return { ...rest, def };
   }, [request]);
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
+  // Pacing only (never saved in a project): how fast model time runs, and the worker's measured scan cost.
+  const [timeScale, setTimeScale] = useState(1);
+  const [timing, setTiming] = useState<ScanTiming | null>(null);
   const [project, setProject] = useState<ProjectFile | null>(null);
   // Undo for destructive edits (remove / add panel): the project as it was before each one that took effect.
   const projectRef = useRef<ProjectFile | null>(null);
@@ -230,7 +236,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     const id=requestId.current++;
     const editKinds = new Set(['place','move','wire','unwire','remove','addPanel','configureIo',
       'setParam','loadProgram','loadST','activateLanguage','clear','loadProject',
-      'editWorkspace','setWireStyle','injectFault','injectSeededFault','clearFault','revealFault','repair','loadPlantScene']);
+      'editWorkspace','setWireStyle','setScanPeriod','injectFault','injectSeededFault','clearFault','revealFault','repair','loadPlantScene']);
     if(commands.some(c=>editKinds.has(c.k))){
       historyRequests.current.set(id,historyMode);
       setHistoryPending(true);
@@ -241,6 +247,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     const engine = new Worker(new URL('../sim/worker.ts', import.meta.url), { type: 'module' });
     worker.current = engine;
     engine.onmessage = (ev: MessageEvent<WorkerResponse>) => {
+      const timingMessage = ev.data as unknown as WorkerTiming | undefined;
+      if (timingMessage?.kind === 'timing') { setTiming(timingMessage.timing); return; }
       if (ev.data?.kind !== 'snapshot') return;
       setSnapshot(ev.data.snapshot);
       // The initial Worker snapshot is blank; never autosave it over a project
@@ -587,7 +595,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
     };
   }, []);
   const selectDevice=(id:string|null,additive=false)=>{
-    setSelectedDeviceIds(current=>id?additive?toggleOne(current,id):selectOne(id):emptySelection());
+    // R22: selecting any member of a group selects the whole group (and toggling one deselects the whole group).
+    const whole=(ids:string[])=>project?expandSelection(project,ids):ids;
+    setSelectedDeviceIds(current=>{
+      if(!id)return emptySelection();
+      if(!additive)return whole(selectOne(id));
+      const group=whole([id]);
+      return current.includes(id)?current.filter(s=>!group.includes(s)):[...current,...group.filter(g=>!current.includes(g))];
+    });
     if(id&&isPlcKind(project?.components.find(c=>c.id===id)?.kind??''))setSelectedPlcId(id);
   };
   const edit=(operation:WorkspaceEdit)=>{
@@ -599,6 +614,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   };
   const rotateSelection=(quarterTurns:-1|1)=>{
     if(selectedDeviceIds.length)edit({kind:'rotate',ids:[...selectedDeviceIds],quarterTurns});
+  };
+  const rotateFreeSelection=(deltaDeg:number)=>{
+    if(selectedDeviceIds.length)edit({kind:'rotateFree',ids:[...selectedDeviceIds],deltaDeg});
   };
   const duplicateSelection=()=>{
     if(selectedDeviceIds.length)edit({kind:'duplicate',ids:[...selectedDeviceIds],offset:{x:25,y:25},grid});
@@ -866,6 +884,16 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         <button className="btn ghost small" onClick={() => send([{ k: 'step' }])} disabled={!editable}>Step scan</button>
         <button className="btn primary small" onClick={() => send([{ k: snapshot?.running ? 'pause' : 'run' }])}>
           {snapshot?.running ? 'Pause' : '▶ Run'}</button>
+        <label className="sandbox-time-control" title="How fast model time passes. PLC logic and machine behaviour are identical at every speed.">Speed
+          <select data-time-scale aria-label="Simulation speed" value={timeScale}
+            onChange={e => { const scale = Number(e.target.value); setTimeScale(scale); worker.current?.postMessage({ kind: 'timeScale', scale }); }}>
+            {TIME_SCALES.map(s => <option key={s} value={s}>{s === 1 ? '1× normal' : s < 1 ? `${s}× slow` : `${s}× fast`}</option>)}
+          </select></label>
+        <label className="sandbox-time-control" title="Simulated PLC scan period (pause to change). Timers and physics advance by this much per scan.">Scan period
+          <select data-scan-period aria-label="PLC scan period" disabled={!editable} value={scanMsOf(project ?? {})}
+            onChange={e => send([{ k: 'setScanPeriod', ms: Number(e.target.value) }])}>
+            {[...new Set([...SCAN_PRESETS_MS, scanMsOf(project ?? {})])].sort((a, b) => a - b).map(ms => <option key={ms} value={ms}>{ms} ms</option>)}
+          </select></label>
         <span className="sandbox-scan" aria-live="off">Scan {snapshot?.tick ?? 0}</span>
       </div>
       {!scenario && <div className="workspace-editing-strip" aria-label="Workspace tools"
@@ -878,7 +906,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           grid={grid} onGrid={setGrid} onUndo={undo} onRedo={redo} onCopy={copySelection}
           onPaste={pasteSelection} onDuplicate={duplicateSelection} onRemove={deleteSelection}
           onAlign={mode=>edit({kind:'align',ids:selectedDeviceIds,mode})}
-          onRotate={rotateSelection} onNudge={moveSelection}/>
+          onGroup={()=>edit({kind:'group',ids:[...selectedDeviceIds],name:'Group '+((project?.groups?.length??0)+1)})}
+          onUngroup={()=>edit({kind:'ungroup',ids:[...selectedDeviceIds]})}
+          groupedSelection={!!project?.groups&&selectedDeviceIds.some(id=>rootGroupOf(project.groups,id))}
+          onRotate={rotateSelection} onRotateFree={rotateFreeSelection} onNudge={moveSelection}/>
       </div>}
       <div className="p5-view-tools" role="toolbar" aria-label="Canvas views and active tools">
         <div className="p5-view-row">
@@ -987,14 +1018,14 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
               {!scenario ? <span className={`ux2-equipment-illustration kind-${kind}`} aria-hidden="true">
                 <EquipmentThumbnail kind={kind} />
               </span> : <span className={`sandbox-device-glyph kind-${kind}`} aria-hidden="true">
-                {kind === 'plc' ? 'PLC' : kind === 'plc16' ? '16/16' : kind === 'relay' ? 'RLY' : kind === 'timerelay' ? 'TDR' : kind === 'cylinder' ? 'CYL' : kind === 'stacklight' ? 'STK' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
+                {kind === 'plc' ? 'PLC' : kind === 'plc16' ? '16/16' : kind === 'relay' ? 'RLY' : kind === 'timerelay' ? 'TDR' : kind === 'cylinder' ? 'CYL' : kind === 'compressor' ? 'CMP' : kind === 'air-regulator' ? 'REG' : kind === 'stacklight' ? 'STK' : kind === 'supply' ? '24V' : kind === 'motor' ? 'M' :
                   kind === 'conveyor' ? 'BELT' : kind === 'photoeye' ? 'EYE' :
                   kind === 'diverter' ? 'DIV' : kind === 'tank' ? 'TANK' :
                   kind === 'pump' ? 'PUMP' : kind === 'levelprobe' ? 'LVL' :
                   kind === 'drainvalve' ? 'VAL' : kind === 'estop' ? 'E-STOP' : kind === 'breaker' ? 'CB' :
                   kind === 'overload' ? 'OL' : kind === 'reversebutton' ? 'REV' :
                   kind === 'forwardcontactor' ? 'KF' : kind === 'reversecontactor' ? 'KR' :
-                  kind === 'revmotor' ? 'M↔' : kind === 'lamp' ? 'LED' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
+                  kind === 'revmotor' ? 'M↔' : kind === 'selector' ? 'SEL' : kind === 'buzzer' ? 'BZR' : kind === 'siren' ? 'SIR' : kind === 'lamp' ? 'LED' : kind === 'contactor' ? 'K' : kind === 'start' ? 'I' : 'O'}
               </span>}
               <span className={scenario ? undefined : 'ux2-equipment-name'}><strong>{COMPONENTS[kind].label}</strong><small>{COMPONENTS[kind].help}</small></span>
               <span className={`sandbox-add-device${scenario ? '' : ' ux2-add-device'}`} aria-hidden="true">+</span>
@@ -1101,7 +1132,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                   c.kind === 'revmotor' ? snapshot?.motorDirection !== 'stopped' :
                   c.kind === 'forwardcontactor' ? snapshot?.forwardContactorOn :
                   c.kind === 'reversecontactor' ? snapshot?.reverseContactorOn :
-                  c.kind === 'reversebutton' ? c.pressed :
+                  c.kind === 'reversebutton' || c.kind === 'selector' ? c.pressed :
                   c.kind === 'estop' ? !c.pressed :
                   c.kind === 'levelprobe' ? snapshot?.io.TankHigh :
                   c.kind === 'photoeye' ? snapshot?.io.Photoeye :
@@ -1114,7 +1145,9 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                       c.kind === 'contactor' || c.kind === 'relay' ? (live ? 'COIL ON' : 'COIL OFF') :
                       c.kind === 'timerelay' ? (() => { const t = snapshot?.timers[c.id]; return !t || t.elapsedMs === 0 ? 'COIL OFF' : t.done ? 'CONTACTS ON' : `TIMING ${Math.round(t.elapsedMs / t.delayMs * 100)}%`; })() :
                       c.kind === 'stacklight' ? (['R', 'Y', 'G'].filter(l => snapshot?.deviceOn[`${c.id}-${l}`]).join(' · ') || 'ALL OFF') :
-                      c.kind === 'cylinder' ? (() => { const r = snapshot?.cylinders[c.id]; const base = !r || r.retractLimit ? 'RETRACTED' : r.extendLimit ? 'EXTENDED' : `MOVING ${Math.round(r.position * 100)}%`; return r?.alarm ? `${base} · ${r.alarm}` : base; })() :
+                      c.kind === 'cylinder' ? (() => { const r = snapshot?.cylinders[c.id]; const base = !r || r.retractLimit ? 'RETRACTED' : r.extendLimit ? 'EXTENDED' : `MOVING ${Math.round(r.position * 100)}%`; const bar = snapshot?.air ? ` · ${(snapshot.air.working[c.id] ?? 0).toFixed(1)} bar` : ''; return r?.alarm ? `${base}${bar} · ${r.alarm}` : `${base}${bar}`; })() :
+                      c.kind === 'compressor' ? (() => { const a = snapshot?.air?.receivers[c.id]; return a ? `${a.pressureBar.toFixed(1)} bar${a.pumping ? ' · PUMPING' : ''}` : 'NO DATA'; })() :
+                      c.kind === 'air-regulator' ? `OUT ${(snapshot?.air?.working[c.id] ?? 0).toFixed(1)} bar` :
                       isPlcKind(c.kind) ? (live ? 'POWER OK' : 'NO POWER') :
                       c.kind === 'conveyor' ? (live ? 'BELT MOVING' : 'BELT STOPPED') :
                       c.kind === 'photoeye' ? (live ? 'MARK DETECTED' : 'NO MARK') :
@@ -1130,14 +1163,17 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
                         (live ? 'CLOSED' : 'OPEN') :
                       c.kind === 'reversebutton' ? (c.pressed ? 'PRESSED' : 'RELEASED') :
                       c.kind === 'estop' ? (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') :
+                      c.kind === 'selector' ? (c.pressed ? 'POSITION 2 · CLOSED' : 'POSITION 1 · OPEN') :
+                      c.kind === 'buzzer' || c.kind === 'siren' ? (live ? 'SOUNDING' : 'SILENT') :
                       c.kind === 'lamp' ? (live ? 'ILLUMINATED' : 'OFF') :
-                      c.kind === 'supply' ? '24V DC' : c.pressed ? 'PRESSED' : 'RELEASED'}</span>
+                      c.kind === 'supply' ? '24V DC' : plantStatusText(snapshot?.plantWorld.signals[c.id]) ?? (isP3Equipment(c.kind) ? 'IDLE' : c.pressed ? 'PRESSED' : 'RELEASED')}</span>
                   </div>
                   <div className="sandbox-patch-actions">
-                    {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') && <button
+                    {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton' || c.kind === 'selector') && <button
                       className={`sandbox-operate ${c.pressed ? 'pressed' : ''}`}
                       onClick={() => send([{ k: 'operateToggle', id: c.id }])}>
                         {c.kind === 'estop' ? (c.pressed ? 'Reset E-stop (training)' : 'Press E-stop (training)') :
+                          c.kind === 'selector' ? (c.pressed ? 'Turn to position 1' : 'Turn to position 2') :
                           c.pressed ? 'Release' : 'Press'}</button>}
                     {(c.kind === 'breaker' || c.kind === 'overload') && <button
                       type="button" className="sandbox-operate"
@@ -1353,6 +1389,10 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           onMove={id => setMoveTarget(id)}
           onMoveTo={(id, at) => move(id, at)}
           onSetParam={(id, key, value) => send([{ k: 'setParam', id, key, value }])}
+          onSetOperator={(id, key, value) => send([{ k: 'setOperator', id, key, value }])}
+          onAttachModule={(module, plc) => send([{ k: 'attachIoModule', module, plc }])}
+          onRenameModuleTag={(module, tag, name) => send([{ k: 'renameModuleTag', module, tag, name }])}
+          onSetMechanicalLink={(drive, target, mmPerRev) => send([{ k: 'setMechanicalLink', drive, target, mmPerRev }])}
           onOperate={id => send([{ k: 'operateToggle', id }])}
           onClearSelection={() => setSelectedDeviceId(null)} />
           {!scenario&&<div className="stage1-resize-handle stage1-resize-handle--inspector"
@@ -1368,7 +1408,11 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       <div className="p5-simulation-status" role="status" aria-label="Authoritative simulation state">
         <strong data-p5-sim-state>{snapshot?.running?'Running':snapshot?.breakpointHit?'Breakpoint':'Paused / editing'}</strong>
         <span>Scan <b>{snapshot?.tick??0}</b></span>
-        <span>Model time <b>{((snapshot?.tick??0)*50/1000).toFixed(2)} s</b> · nominal 50 ms scans</span>
+        <span data-scan-diagnostics>Model time <b>{((snapshot?.tick??0)*scanMsOf(project ?? {})/1000).toFixed(2)} s</b> · {scanMsOf(project ?? {})} ms scans
+          {timeScale !== 1 && <> · ×{timeScale}</>}</span>
+        {snapshot?.running && timing && <span data-scan-load className={timing.behind ? 'p5-status-warning' : undefined}
+          title="Wall-clock cost of the simulation as a share of real time at the current speed and scan period">
+          Simulator load <b>{timing.loadPercent}%</b>{timing.behind && <> · cannot keep up at this speed ({timing.droppedScans} scans dropped)</>}</span>}
         <span>{project?.components.length??0} devices · {project?.wires.length??0} wires</span>
         {selectedTerminal&&<span>Wiring from <code>{selectedTerminal}</code></span>}
         {(clientError||snapshot?.lastError)&&<span className="p5-status-warning">Action error — inspect message above</span>}

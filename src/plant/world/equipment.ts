@@ -1,11 +1,18 @@
 /** Typed, DOM-free equipment plug-in interface used by the integrator. */
 import type {ParamSpec} from '../../components/params';
+import type {MaterialSpec} from './materials';
 import type {EquipmentCommand,EquipmentDrawing,EquipmentPlacement,EquipmentSignal,EquipmentState,Vec3,World} from './types';
 export type Channel={name:string;kind:'bool'|'number';unit?:string};
 export type SceneOccluder={id:string;originMm:Vec3;yawDeg:0|90|180|270;sizeMm:Vec3};
 export type EquipmentContext={id:string;originMm:Vec3;yawDeg:0|90|180|270;params:Record<string,number>;
+ /** Free heading added to `yawDeg` for drawing and rotated footprints (R21/R22); absent for every unrotated device. */
+ headingDeg?:number;
  /** Worker-provided opaque structural solids; absent in legacy direct tests and render-only contexts. */
  occluders?:readonly SceneOccluder[];
+ /** Every other placed device (id, kind, origin), so a pipe/transfer device can find its neighbours; absent in render-only contexts. */
+ peers?:readonly {id:string;kind:string;originMm:Vec3}[];
+ /** The project's learner-authored shapes as materials, indexed after the catalogue (R02). */
+ materials?:readonly MaterialSpec[];
 };
 export type EquipmentDef={
  kind:string;label:string;footprint:Vec3;
@@ -18,8 +25,8 @@ export type EquipmentDef={
  read:(state:EquipmentState,world:World,ctx:EquipmentContext)=>Record<string,EquipmentSignal>;
  describe:(state:EquipmentState,ctx:EquipmentContext)=>EquipmentDrawing[];
 };
-export const ctxOf=(item:EquipmentPlacement,occluders?:readonly SceneOccluder[]):EquipmentContext=>({
- id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,params:item.params,occluders,
+export const ctxOf=(item:EquipmentPlacement,occluders?:readonly SceneOccluder[],peers?:EquipmentContext['peers'],materials?:readonly MaterialSpec[]):EquipmentContext=>({
+ id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,params:item.params,...(item.headingDeg?{headingDeg:item.headingDeg}:{}),occluders,...(peers?{peers}:{}),...(materials&&materials.length?{materials}:{}),
 });
 export const flag=(command:EquipmentCommand,key:string):boolean=>command[key]===true;
 export const numeric=(command:EquipmentCommand,key:string,fallback:number,min:number,max:number):number=>{
@@ -39,5 +46,5 @@ export const initial=(params:Record<string,number>):EquipmentState=>({
 export const draw=(ctx:EquipmentContext,part:string,shape:EquipmentDrawing['shape'],
  size:Vec3,z=0,colour='#618aa0'):EquipmentDrawing=>({
  part,shape,pos:{...ctx.originMm,z:ctx.originMm.z+z},
- size,yawDeg:ctx.yawDeg,colour,
+ size,yawDeg:ctx.yawDeg+(ctx.headingDeg??0),colour,
 });

@@ -1,4 +1,4 @@
-/** Generated from executable scene catalogue and component-kind registry on 2026-11-19.
+/** Reconciled with the University Recovery component-kind registry on 2026-11-26.
  * Each item is searchable without pulling the simulation engine into the Guide landing chunk.
  * Guarded by tests/steady-guide-reference.test.ts against both authoritative registries.
  */
@@ -57,7 +57,45 @@ export const GUIDE_EQUIPMENT_KINDS=[
   "filler",
   "capper",
   "three-phase-supply",
-  "star-delta-drive"
+  "star-delta-drive",
+  "selector",
+  "buzzer",
+  "siren",
+  "collector",
+  "retro-photoeye",
+  "laser-distance",
+  "rfid-reader",
+  "vision-sensor",
+  "incremental-encoder",
+  "compressor",
+  "air-regulator",
+  "safety-fence",
+  "guard-door",
+  "curved-conveyor",
+  "transfer-unit",
+  "process-station",
+  "handrail",
+  "platform",
+  "stairs",
+  "work-zone",
+  "potentiometer",
+  "selector-3pos",
+  "seven-segment",
+  "numeric-display",
+  "operator-station",
+  "indicator-panel",
+  "io-di8",
+  "io-do8",
+  "io-ai4",
+  "io-ao2",
+  "transfer-pump",
+  "merge-gate",
+  "pressure-sensor",
+  "gantry",
+  "index-table",
+  "machine-guard",
+  "drive",
+  "transfer-valve"
 ] as const;
 export const GUIDE_SCENES=[
   {
@@ -171,7 +209,7 @@ export type GuideSceneId=(typeof GUIDE_SCENES)[number]['id'];
 export const findGuideScene=(id:string)=>GUIDE_SCENES.find(scene=>scene.id===id);
 export const GUIDE_GLOSSARY=[
 {term:'PLC',meaning:'Programmable logic controller; reads wired input conditions and updates commanded outputs each scan.'},
-{term:'Scan',meaning:'A deterministic PLC evaluation cycle; the training simulator uses a fixed 50 ms scan.'},
+{term:'Scan',meaning:'A deterministic PLC evaluation cycle; the training simulator defaults to 50 ms and supports selectable scan periods.'},
 {term:'P24',meaning:'The positive 24 V terminal of a virtual DC supply.'},
 {term:'M0',meaning:'The return terminal of a virtual 24 V supply.'},
 {term:'L+ / M',meaning:'Power and return terminals on a virtual PLC or powered sensor.'},

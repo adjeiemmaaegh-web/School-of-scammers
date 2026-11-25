@@ -4,7 +4,7 @@
  */
 import { Vector3 } from 'three';
 import { COMPONENTS } from '../components/registry';
-import { rotateFloorOffset } from '../workspace/geometry';
+import { effectiveYaw, rotateFloorOffset } from '../workspace/geometry';
 import type { PlacedComponent, ProjectFile, XY } from '../sim/signals';
 
 export const WORKSPACE_WIDTH = 1080;
@@ -36,6 +36,6 @@ export function terminalPoint(project: ProjectFile, fullId: string): Vector3 | n
   const t = c && COMPONENTS[c.kind].terminals.find(t => t.name === fullId.slice(dot + 1));
   if (!c || !t) return null;
   const [x, , z] = worldPosition(c);
-  const offset = rotateFloorOffset({ x: t.side === 'left' ? -0.64 : 0.64, z: (t.y - 65) / 120 }, c.yawDeg ?? 0);
+  const offset = rotateFloorOffset({ x: t.side === 'left' ? -0.64 : 0.64, z: (t.y - 65) / 120 }, effectiveYaw(c));
   return new Vector3(x + offset.x, 0.35, z + offset.z);
 }

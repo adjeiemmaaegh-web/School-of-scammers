@@ -5,13 +5,24 @@
  */
 export type Vec3={x:number;y:number;z:number};
 export type BodyShape='box'|'cylinder';
+/**
+ * One solid part of a composite body, in the body's own frame: (dx, dy) is the part centre's offset from the body's (x, y)
+ * and `z` is the part's bottom above the body's bottom. A body with parts collides, rests on others and is sensed PART BY
+ * PART, so an L-bracket has a notch, a pallet has gaps between stringers and a bottle has a narrow neck.
+ */
+/** One solid block of a composite body. `sx`/`sy`/`sz` are the AABB used for collision and sensing; a sphere is collided as its bounding cube. `visual` (R02) is the true size and turn of a rotated block, drawn exactly while collisions use its bounding box. */
+export type BodyPart={dx:number;dy:number;z:number;sx:number;sy:number;sz:number;shape?:BodyShape|'sphere';visual?:{w:number;d:number;yawDeg:number}};
 export type Body={
  id:string;shape:BodyShape;size:Vec3;massKg:number;pos:Vec3;
  yawDeg:0|90|180|270;vel:Vec3;supportedBy:string|null;
  /** Worker-owned smooth quarter-turn payload orientation. Only visual yaw;
   * collision broad phase remains conservative until discrete index completion. */
  visualYawDeg?:number;
+ /** Free rotation about the vertical axis in degrees [0,360), applied on top of the quarter-turn `yawDeg`. Absent for an unrotated body. Contact, support and sensing use the conservative axis-aligned bounds of each rotated part. */
+ headingDeg?:number;
  tags:Record<string,string|number|boolean>;
+ /** Optional composite geometry (see BodyPart). `size` stays the overall envelope used by broad-phase checks. */
+ parts?:readonly BodyPart[];
 };
 export type WorldEvent={atMs:number;kind:'spawn'|'despawn'|'jam'|'contact'|'motion'|'fault'|'limit'|'process';source:string;bodyId?:string;detail:string};
 export type World={
@@ -21,6 +32,8 @@ export type World={
  /** Explicit transient classroom operator used only for opt-in worker sensing.
   * It is never a camera inference, real human detector or physical collision body. */
  trainingOperator?:Body;
+ /** Where the training operator is walking to (R24); absent when standing still. */
+ operatorGoal?:{x:number;y:number};
 };
 export type EquipmentState={
  positionMm:number;speedMmS:number;progress:number;count:number;
@@ -43,6 +56,8 @@ export type EquipmentState={
 };
 export type EquipmentPlacement={
  id:string;kind:string;originMm:Vec3;yawDeg:0|90|180|270;params:Record<string,number>;
+ /** R21/R22 free heading in degrees (5..355), added to the quarter-turn `yawDeg`. Only straight belt and roller conveyors take it: their carry direction, surface and drawing follow the true angle. */
+ headingDeg?:number;
 };
 export type EquipmentCommand=Readonly<Record<string,boolean|number>>;
 export type WorldInputs=Readonly<Record<string,EquipmentCommand>>;
@@ -50,7 +65,10 @@ export type EquipmentSignal=boolean|number;
 export type LiveSignal=Record<string,EquipmentSignal>;
 export type EquipmentDrawing={
  part:string;shape:BodyShape;pos:Vec3;size:Vec3;yawDeg:number;colour:string;
+ /** Optional tilt about the drawing's own width axis (inclined conveyors): positive raises the heading end. */
+ pitchDeg?:number;
 };
-export const MAX_BODIES=60, MAX_WORLD_EVENTS=80, MAX_SCENE_EQUIPMENT=60;
+/** Factory scale (R10): raised from 60 bodies / 60 plant devices; see tests/factory-scale.test.ts for the profiled budgets. */
+export const MAX_BODIES=240, MAX_WORLD_EVENTS=80, MAX_SCENE_EQUIPMENT=200;
 export const QUANTUM=1e-6, SUBSTEP_MS=10, SCAN_MS=50;
 export const G_MM_S2=9810;

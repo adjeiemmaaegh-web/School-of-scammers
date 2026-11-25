@@ -23,7 +23,7 @@ const base=process.env.PLC_BASE_URL||'http://127.0.0.1:4173';
   await page.click('.sg-actions button');
   assert.equal(await page.$eval('.sg-actions button',x=>x.getAttribute('aria-pressed')),'true');
   await go('/guide/equipment');
-  assert.equal(await page.$$eval('[data-steady-equipment-index] .sg-card',a=>a.length),54);
+  assert.equal(await page.$$eval('[data-steady-equipment-index] .sg-card',a=>a.length),92);
   await go('/guide/equipment/photoeye');
   assert.match(await page.$eval('[data-steady-equipment-detail] h2',x=>x.textContent),/photoeye/i);
   assert.ok((await page.$$eval('.sg-terminal',a=>a.map(x=>x.textContent))).some(x=>x.includes('OUT')));
@@ -110,6 +110,6 @@ const base=process.env.PLC_BASE_URL||'http://127.0.0.1:4173';
   const sizes=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
   assert.ok(sizes.scroll<=sizes.client+2,'No horizontal overflow on 390px: '+JSON.stringify(sizes));
   assert.deepEqual(errors,[]);
-  console.log('STEADY GUIDE BROWSER PASS: 54 devices, 21 scenes, real screenshot, topic completion, search, read-only keys and 390px');
+  console.log('STEADY GUIDE BROWSER PASS: 92 devices, 21 scenes, real screenshot, topic completion, search, read-only keys and 390px');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

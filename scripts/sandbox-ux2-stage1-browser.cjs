@@ -7,6 +7,8 @@
  * This file is not a passing QA report until executed on the exact commit.
  */
 const assert=require('node:assert/strict');
+// The registered kind count comes from the generated device catalogue (a unit test keeps it current), not a hard-coded number.
+const REGISTERED_KINDS=Number(/^(\d+) placeable kinds/m.exec(require('node:fs').readFileSync(require('node:path').join(__dirname,'..','docs','product','DEVICE_CATALOG.md'),'utf8'))[1]);
 const fs=require('node:fs');
 const puppeteer=require('puppeteer');
 
@@ -201,7 +203,7 @@ const viewports=[
           scrollY,scrollWidth:document.documentElement.scrollWidth};
       });
       assert.equal(data.selected,'true');
-      assert.equal(data.buttons,54,'UX9 must preserve all registered equipment');
+      assert.equal(data.buttons,REGISTERED_KINDS,'UX9 must preserve all registered equipment');
       assert.ok(data.panel.height>=220&&data.search.height>=25&&data.list.height>=160,
         'UX9 short viewport collapsed Components: '+JSON.stringify({vp,data}));
       assert.ok(data.first.top>=data.list.top&&data.first.bottom<=data.list.bottom+2,

@@ -19,6 +19,8 @@ export type ElectricalContext = {
   cylinder?: CylinderState;
   threePhase?: StarterPanelState;
   plantSignals?: Record<string,boolean|number>;
+  /** Compressor receiver is at or above its pressure-switch point (read from the previous scan, like every other state). */
+  airOk?: boolean;
 };
 
 const t = (id: string, pin: string) => `${id}.${pin}`;
@@ -63,6 +65,11 @@ const DEFS: Partial<Record<PlacedComponent['kind'], Def>> = {
     ];
   },
   // Three signal lamps on one column, each its own load to the common return.
+  // Compressor: a motor coil plus a pressure-switch contact that closes at its set pressure.
+  compressor: (c, ctx) => [load(c.id, t(c.id, 'A1'), t(c.id, 'A2')), sw(`${c.id}-PS`, t(c.id, 'PS_A'), t(c.id, 'PS_B'), ctx.airOk === true)],
+  // Audible indicators are plain 24 V loads: they sound exactly when their own two terminals are energised.
+  buzzer: c => [load(c.id, t(c.id, 'L+'), t(c.id, 'M-'))],
+  siren: c => [load(c.id, t(c.id, 'L+'), t(c.id, 'M-'))],
   stacklight: c => ['R', 'Y', 'G'].map(lamp => load(`${c.id}-${lamp}`, t(c.id, lamp), t(c.id, 'M-'))),
   // Two solenoid coils to a common return, and two limit switches that close when the rod is at that end.
   cylinder: (c, ctx) => {

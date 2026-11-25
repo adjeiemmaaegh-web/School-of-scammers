@@ -5,9 +5,10 @@
  * (`deviceOn` for a timer relay means "contacts transferred", which the circuit reads one scan later).
  */
 import { paramSpecsOf, paramValue } from '../../components/params';
-import { engineFault, freshCylinder, stepCylinder, type CylinderState } from '../../plant/cylinder';
+import { circuitFromSettings, engineFault, freshCylinder, stepCylinder, type CylinderState } from '../../plant/cylinder';
 import { freshTank, stepTank, type TankProcess } from '../../plant/tank-process';
-import { faultsOf } from '../faults';
+import { faultsOf, hasFault } from '../faults';
+import { AIR_DRAW_BAR_PER_S, freshReceiver, solveAir, stepReceiver, type Receiver } from '../../plant/air';
 import { vesselsOf } from '../stations';
 import type { PlacedComponent, SimEvent, WorldState } from '../signals';
 
@@ -15,6 +16,8 @@ export type EquipmentStep = {
   nextTimers: Record<string, number>;
   nextCylinders: Record<string, CylinderState>;
   nextVessels: Record<string, TankProcess>;
+  /** Receiver tanks after this scan (empty unless the project has a compressor). */
+  nextAir: Record<string, Receiver>;
 };
 
 export function stepEquipmentState(
@@ -36,11 +39,26 @@ export function stepEquipmentState(
   }
   // Every tank is its own vessel: the pumps, drain valves and level switches mounted beside it.
   // Every pneumatic cylinder moves from its two solenoid coils, as solved from the wiring.
+  // Pneumatic mode (R06) exists only when the project has a compressor: cylinders then get the pressure that actually reaches
+  // their AIR port through the air lines and regulators. Without one, air stays "available" exactly as before.
+  const compressors = w.project.components.filter(x => x.kind === 'compressor');
+  const pneumatic = compressors.length > 0;
+  const setpoints = Object.fromEntries(w.project.components.filter(x => x.kind === 'air-regulator')
+    .map(r => [r.id, paramValue(w.project.params, r.id, paramSpecsOf('air-regulator')[0])]));
+  const air = pneumatic ? solveAir(w.project.components, w.project.wires.filter(x => !hasFault(w.project, 'wire-open', x.id)), w.air, setpoints) : null;
+  const draw: Record<string, number> = {};
   const nextCylinders: Record<string, CylinderState> = {};
   for (const c of w.project.components.filter(x => x.kind === 'cylinder')) {
     const fault = engineFault(faultsOf(w.project).find(f => f.target === c.id && f.kind.startsWith('cylinder-'))?.kind);
-    const step = stepCylinder(w.cylinders[c.id] ?? freshCylinder(), energizedLoads.includes(`${c.id}-E`), energizedLoads.includes(`${c.id}-R`), dtMs, fault);
+    const prior = w.cylinders[c.id] ?? freshCylinder();
+    const step = stepCylinder(prior, energizedLoads.includes(`${c.id}-E`), energizedLoads.includes(`${c.id}-R`), dtMs, fault, air ? air.pressureAt(`${c.id}.AIR`) : undefined,
+      circuitFromSettings(Object.fromEntries(paramSpecsOf('cylinder').map(spec => [spec.key, paramValue(w.project.params, c.id, spec)]))));
     nextCylinders[c.id] = step.state;
+    // A moving rod drains the receivers that feed it (shared equally between them).
+    if (air && Math.abs(step.state.position - prior.position) > 1e-9) {
+      const suppliers = air.suppliersOf(`${c.id}.AIR`);
+      for (const id of suppliers) draw[id] = (draw[id] ?? 0) + AIR_DRAW_BAR_PER_S / suppliers.length;
+    }
     for (const detail of step.events) events.push({ tick: w.tick + 1, kind: 'cylinder', detail: `${c.id}: ${detail}` });
   }
   const nextVessels: Record<string, TankProcess> = {};
@@ -51,5 +69,18 @@ export function stepEquipmentState(
     nextVessels[vessel.tank.id] = change.tank;
     for (const detail of change.events) events.push({ tick: w.tick + 1, kind: 'tank', detail });
   }
-  return { nextTimers, nextCylinders, nextVessels };
+  const nextAir: Record<string, Receiver> = {};
+  for (const c of compressors) {
+    const settings = {
+      cutInBar: paramValue(w.project.params, c.id, paramSpecsOf('compressor')[0]),
+      cutOutBar: paramValue(w.project.params, c.id, paramSpecsOf('compressor')[1]),
+      fillBarPerS: paramValue(w.project.params, c.id, paramSpecsOf('compressor')[2]),
+    };
+    const next = stepReceiver(w.air[c.id] ?? freshReceiver(), energizedLoads.includes(c.id), hasFault(w.project, 'compressor-motor-fault', c.id),
+      hasFault(w.project, 'air-leak', c.id), draw[c.id] ?? 0, settings, dtMs);
+    if (next.pumping !== (w.air[c.id]?.pumping === true))
+      events.push({ tick: w.tick + 1, kind: 'air', detail: `${c.id}: pump ${next.pumping ? 'started' : 'stopped'} at ${next.pressureBar.toFixed(1)} bar` });
+    nextAir[c.id] = next;
+  }
+  return { nextTimers, nextCylinders, nextVessels, nextAir };
 }

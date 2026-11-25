@@ -7,6 +7,13 @@ export type STType='BOOL'|'INT'|'DINT'|'REAL'|'LREAL';
 export type FbType='TON'|'TOF'|'TP'|'CTU'|'CTD'|'R_TRIG'|'F_TRIG'|'PID';
 /** The engine's fixed scan period; timer function blocks advance by this each scan (the simulator scan is 50 ms). */
 export const ST_SCAN_MS=50;
+/** Capacity (R08): declarations per program and statements executed per scan. Both are hard, measurable budgets (raised from 128 and 400). */
+export const ST_MAX_DECLARATIONS=512;
+/** Source size guard (raised from 12,000): bounds compile time and project size. */
+export const ST_MAX_SOURCE_CHARS=64000;
+/** Token guard (raised from 3,000), sized so a program at the statement budget still compiles. */
+export const ST_MAX_TOKENS=40000;
+export const ST_MAX_STATEMENTS_PER_SCAN=5000;
 const FB_SPEC:Readonly<Record<FbType,{inputs:readonly string[];outputs:readonly {name:string;type:STType}[];hidden:readonly string[];hiddenReal?:readonly string[]}>>={
  TON:{inputs:['IN','PT'],outputs:[{name:'Q',type:'BOOL'},{name:'ET',type:'DINT'}],hidden:[]},
  TOF:{inputs:['IN','PT'],outputs:[{name:'Q',type:'BOOL'},{name:'ET',type:'DINT'}],hidden:[]},
@@ -23,28 +30,32 @@ const isFbType=(name:string):name is FbType=>Object.prototype.hasOwnProperty.cal
 const fbKey=(instance:string,member:string)=>`${instance}__${member}`.toUpperCase();
 export type STDeclaration={name:string;type:STType;scope:'input'|'output'|'local';initial:STValue};
 type Token={value:string;offset:number};
-type Expression={kind:'literal';value:STValue}|{kind:'read';name:string}|{kind:'unary';op:string;inner:Expression}|{kind:'binary';op:string;left:Expression;right:Expression}|{kind:'call';name:'ABS'|'MIN'|'MAX'|'LIMIT';args:Expression[]};
-type Statement={kind:'assign';name:string;expr:Expression}|{kind:'fb';instance:string;type:FbType;args:Record<string,Expression>}|{kind:'if';branches:{when:Expression;body:Statement[]}[];otherwise:Statement[]}|{kind:'case';selector:Expression;arms:{value:STValue;body:Statement[]}[];otherwise:Statement[]}|{kind:'for';counter:string;from:Expression;to:Expression;step:Expression;body:Statement[]}|{kind:'while';condition:Expression;body:Statement[]};
+type Expression={kind:'literal';value:STValue}|{kind:'read';name:string}|{kind:'unary';op:string;inner:Expression}|{kind:'binary';op:string;left:Expression;right:Expression}|{kind:'call';name:'ABS'|'MIN'|'MAX'|'LIMIT'|'SQRT'|'SIN'|'COS'|'TAN'|'ATAN'|'LN'|'LOG'|'EXP'|'TRUNC'|'SCALE';args:Expression[]}|{kind:'index';name:string;low:number;high:number;index:Expression};
+type Statement={kind:'assign';name:string;expr:Expression}|{kind:'fb';instance:string;type:FbType;args:Record<string,Expression>}|{kind:'if';branches:{when:Expression;body:Statement[]}[];otherwise:Statement[]}|{kind:'case';selector:Expression;arms:{value:STValue;body:Statement[]}[];otherwise:Statement[]}|{kind:'for';counter:string;from:Expression;to:Expression;step:Expression;body:Statement[]}|{kind:'while';condition:Expression;body:Statement[]}|{kind:'assignIndex';name:string;low:number;high:number;index:Expression;expr:Expression};
 export type STProgram={source:string;bodySource:string;statements:readonly Statement[];referencedInputs:string[];assignedOutputs:string[];declarations:readonly STDeclaration[]};
 export type STResult={outputs:Record<string,STValue>;signals:Record<string,STValue>;assignments:{tag:string;value:STValue}[];memory:Record<string,STValue>};
 const keyword=(s:string)=>s.toUpperCase();
 const identifier=/^[A-Za-z][A-Za-z0-9_]*$/;
 const number=/^(?:\d+(?:\.\d+)?|\.\d+)$/;
-const BUILTINS = new Set(['ABS','MIN','MAX','LIMIT']);
+const BUILTINS = new Set(['ABS','MIN','MAX','LIMIT','SQRT','SIN','COS','TAN','ATAN','LN','LOG','EXP','TRUNC','SCALE']);
+const ONE_ARG=new Set(['ABS','SQRT','SIN','COS','TAN','ATAN','LN','LOG','EXP','TRUNC']);
+/** R07 limits: array length, user function / function block call depth. */
+export const ST_MAX_ARRAY_ELEMENTS=64, ST_MAX_CALL_DEPTH=6;
+type UserDef={kind:'function'|'block';name:string;result?:STType;members:{name:string;type:STType|FbType;scope:'input'|'output'|'local';initial:STValue}[];body:Token[]};
 const precedence:Readonly<Record<string,number>>={OR:1,XOR:2,AND:3,'=':4,'<>':4,'<':4,'<=':4,'>':4,'>=':4,'+':5,'-':5,'*':6,'/':6,MOD:6};
-const RESERVED=new Set(['TON','TOF','TP','CTU','CTD','R_TRIG','F_TRIG','PID','IF','THEN','ELSIF','ELSE','END_IF','AND','OR','XOR','NOT','TRUE','FALSE','MOD','VAR','VAR_INPUT','VAR_OUTPUT','END_VAR','BOOL','INT','DINT','REAL','LREAL','CASE','OF','END_CASE','FOR','TO','BY','DO','END_FOR','WHILE','END_WHILE']);
+const RESERVED=new Set(['TON','TOF','TP','CTU','CTD','R_TRIG','F_TRIG','PID','IF','THEN','ELSIF','ELSE','END_IF','AND','OR','XOR','NOT','TRUE','FALSE','MOD','VAR','VAR_INPUT','VAR_OUTPUT','END_VAR','BOOL','INT','DINT','REAL','LREAL','CASE','OF','END_CASE','FOR','TO','BY','DO','END_FOR','WHILE','END_WHILE','ARRAY','TYPE','END_TYPE','STRUCT','END_STRUCT','FUNCTION','END_FUNCTION','FUNCTION_BLOCK','END_FUNCTION_BLOCK']);
 function tokenize(source:string):Token[]{
- if(typeof source!=='string'||source.length>12000)throw new RangeError('Structured Text must be at most 12,000 characters');
+ if(typeof source!=='string'||source.length>ST_MAX_SOURCE_CHARS)throw new RangeError(`Structured Text must be at most ${ST_MAX_SOURCE_CHARS.toLocaleString('en-US')} characters`);
  const tokens:Token[]=[];
  for(let i=0;i<source.length;){
   if(/\s/.test(source[i])){i++;continue;}
   if(source.slice(i,i+2)==='//'){const end=source.indexOf('\n',i+2);i=end<0?source.length:end+1;continue;}
   if(source.slice(i,i+2)==='(*'){const end=source.indexOf('*)',i+2);if(end<0)throw new SyntaxError(`Unterminated comment at ${i}`);i=end+2;continue;}
   const rest=source.slice(i);
-  const match=/^(?:[Tt]#(?:\d+(?:\.\d+)?(?:ms|s|m|h))+|(?:\d+(?:\.\d+)?|\.\d+)(?![A-Za-z_])|[A-Za-z][A-Za-z0-9_]*|:=|<=|>=|<>|[=<>+*\/\-();:,.])/.exec(rest);
+  const match=/^(?:[Tt]#(?:\d+(?:\.\d+)?(?:ms|s|m|h))+|(?:\d+(?:\.\d+)?|\.\d+)(?![A-Za-z_])|[A-Za-z][A-Za-z0-9_]*|:=|<=|>=|<>|\.\.|[=<>+*\/\-();:,.\[\]])/.exec(rest);
   if(!match)throw new SyntaxError(`Unexpected character at ${i}: ${source[i]}`);
   tokens.push({value:match[0],offset:i});i+=match[0].length;
-  if(tokens.length>3000)throw new RangeError('Structured Text token limit (3,000) exceeded');
+  if(tokens.length>ST_MAX_TOKENS)throw new RangeError(`Structured Text token limit (${ST_MAX_TOKENS.toLocaleString('en-US')}) exceeded`);
  }
  tokens.push({value:'<EOF>',offset:source.length});return tokens;
 }
@@ -55,14 +66,118 @@ function checkType(type:STType,value:STValue,name:string):void{
  if(type==='INT'&&(!Number.isInteger(value)||value<-32768||value>32767))throw new RangeError(`${name} requires INT in -32768..32767`);
  if(type==='DINT'&&(!Number.isInteger(value)||value<-2147483648||value>2147483647))throw new RangeError(`${name} requires DINT in -2147483648..2147483647`);
 }
+/**
+ * R07: pull `FUNCTION ... END_FUNCTION` and `FUNCTION_BLOCK ... END_FUNCTION_BLOCK` definitions out of the token stream.
+ * Definitions must come before the program's own TYPE / VAR blocks. Parameters and locals are scalar (a function block may also
+ * hold standard timer/counter/edge instances). Bodies are kept as tokens and inlined, with renamed variables, wherever they are used.
+ */
+function extractDefinitions(all:Token[]):{rest:Token[];defs:Map<string,UserDef>}{
+ const defs=new Map<string,UserDef>();const rest:Token[]=[];
+ const SCALARS=['BOOL','INT','DINT','REAL','LREAL'];
+ let i=0;
+ const fail=(m:string,at:number):never=>{throw new SyntaxError(`${m} at offset ${all[Math.min(at,all.length-1)].offset}`);};
+ while(i<all.length){
+  const head=keyword(all[i].value);
+  if(head!=='FUNCTION'&&head!=='FUNCTION_BLOCK'){rest.push(all[i]);i++;continue;}
+  if(rest.some(t=>['VAR','VAR_INPUT','VAR_OUTPUT','TYPE'].includes(keyword(t.value))))fail('Definitions must precede the program VAR and TYPE blocks',i);
+  const kind=head==='FUNCTION'?'function':'block',end=kind==='function'?'END_FUNCTION':'END_FUNCTION_BLOCK';
+  i++;const nameTok=all[i];
+  if(!nameTok||!identifier.test(nameTok.value)||RESERVED.has(keyword(nameTok.value))||BUILTINS.has(keyword(nameTok.value)))fail(`Invalid ${kind} name`,i);
+  const name=keyword(nameTok.value);if(defs.has(name))fail(`Duplicate definition ${nameTok.value}`,i);
+  i++;let result:STType|undefined;
+  if(kind==='function'){
+   if(all[i]?.value!==':')fail('A FUNCTION needs a return type (name : TYPE)',i);
+   const t=keyword(all[i+1]?.value??'');if(!SCALARS.includes(t))fail('A FUNCTION returns BOOL, INT, DINT, REAL or LREAL',i+1);
+   result=t as STType;i+=2;
+  }
+  const members:UserDef['members']=[];
+  while(['VAR','VAR_INPUT','VAR_OUTPUT'].includes(keyword(all[i]?.value??''))){
+   const header=keyword(all[i].value);const scope=header==='VAR_INPUT'?'input':header==='VAR_OUTPUT'?'output':'local';i++;
+   if(kind==='function'&&scope==='output')fail('A FUNCTION returns through its name; VAR_OUTPUT is only for function blocks',i);
+   while(keyword(all[i]?.value??'')!=='END_VAR'){
+    if(!all[i]||all[i].value==='<EOF>')fail('Unterminated variable block in definition',i);
+    const mname=all[i].value;
+    if(!identifier.test(mname)||RESERVED.has(keyword(mname)))fail('Invalid member name',i);
+    if(members.some(m=>keyword(m.name)===keyword(mname))||keyword(mname)===name)fail(`Duplicate member ${mname}`,i);
+    if(all[i+1]?.value!==':')fail('Expected :',i+1);
+    const type=keyword(all[i+2]?.value??'');i+=3;
+    const std=isFbType(type);
+    if(!std&&!SCALARS.includes(type))fail(`Unsupported member type ${type}`,i-1);
+    if(std&&(kind==='function'||scope!=='local'))fail('Standard function blocks may only be locals of a FUNCTION_BLOCK',i-1);
+    let initial:STValue=type==='BOOL'?false:0;
+    if(!std&&all[i]?.value===':='){
+     if(scope==='input'){/* defaults for inputs are allowed in definitions */}
+     i++;let sign=1;if(all[i].value==='-'){sign=-1;i++;}else if(all[i].value==='+')i++;
+     const lit=all[i];i++;const lu=keyword(lit.value);
+     if(lu==='TRUE'||lu==='FALSE')initial=lu==='TRUE';else if(number.test(lit.value))initial=sign*Number(lit.value);else fail('Expected literal initializer',i-1);
+     checkType(type as STType,initial,mname);
+    }
+    if(all[i]?.value!==';')fail('Expected ;',i);i++;
+    members.push({name:mname,type:std?(type as FbType):(type as STType),scope,initial});
+    if(members.length>64)throw new RangeError('A definition may declare at most 64 members');
+   }
+   i++;
+  }
+  const body:Token[]=[];
+  while(i<all.length&&keyword(all[i].value)!==end){
+   if(all[i].value==='<EOF>')fail(`Unterminated ${kind} (missing ${end})`,i);
+   const k=keyword(all[i].value);
+   if(k==='FUNCTION'||k==='FUNCTION_BLOCK')fail('Definitions cannot be nested',i);
+   body.push(all[i]);i++;
+  }
+  if(i>=all.length)fail(`Unterminated ${kind} (missing ${end})`,i);
+  i++;if(all[i]?.value===';')i++;
+  if(!body.length)fail(`${nameTok.value} has an empty body`,i-1);
+  for(let k=0;k<body.length-1;k++)if(keyword(body[k].value)===name&&body[k+1].value==='(')fail(`${nameTok.value} calls itself; recursion is not supported`,i-1);
+  defs.set(name,{kind,name:nameTok.value,result,members,body});
+ }
+ return {rest,defs};
+}
 export function compileStructuredText(source:string):STProgram{
- const tokens=tokenize(source);let pos=0;let statementCount=0;const reads=new Map<string,string>();const writes=new Map<string,string>();const declarations:STDeclaration[]=[];const namedDeclarations=new Set<string>();const fbInstances=new Map<string,FbType>();
+ const extracted=extractDefinitions(tokenize(source));let tokens=extracted.rest;const userDefs=extracted.defs;let pos=0;let statementCount=0;const reads=new Map<string,string>();const writes=new Map<string,string>();const declarations:STDeclaration[]=[];const namedDeclarations=new Set<string>();const fbInstances=new Map<string,FbType>();
  const peek=()=>tokens[pos].value, upper=()=>keyword(peek());
  const next=()=>tokens[pos++].value;
  const fail=(reason:string):never=>{throw new SyntaxError(`${reason} at offset ${tokens[Math.min(pos,tokens.length-1)].offset}`);};
  const accept=(value:string)=>{if(upper()===value){pos++;return true;}return false;};
  const requireToken=(value:string)=>{if(!accept(value))fail(`Expected ${value}, found ${peek()}`);};
  const readName=()=>{const t=peek();if(!identifier.test(t)||RESERVED.has(upper()))fail(`Expected variable name, found ${t}`);pos++;return t;};
+ // R07 aggregate and user-code state. Arrays and structures are flattened into scalar declarations (so scan memory, the
+ // capacity limits and type checks all apply unchanged); user functions and function blocks are inlined with renamed variables.
+ const arrays=new Map<string,{name:string;low:number;high:number;type:STType}>();
+ const structs=new Map<string,{fields:{name:string;type:STType;initial:STValue}[]}>();
+ const structInstances=new Map<string,string>();
+ const userInstances=new Map<string,UserDef>();
+ let pending:Statement[]=[];let callCounter=0;let callDepth=0;let noHoist=false;
+ const SCALAR_TYPES=['BOOL','INT','DINT','REAL','LREAL'];
+ const declareScalar=(name:string,type:STType,scope:STDeclaration['scope'],initial:STValue)=>{
+  const key=keyword(name);
+  if(declarations.length>=ST_MAX_DECLARATIONS)throw new RangeError(`Structured Text declaration limit (${ST_MAX_DECLARATIONS}) exceeded`);
+  if(namedDeclarations.has(key))fail(`Duplicate variable declaration ${name}`);
+  checkType(type,initial,name);namedDeclarations.add(key);declarations.push({name,type,scope,initial});
+ };
+ const declareStd=(key:string,typeName:FbType)=>{
+  namedDeclarations.add(key);fbInstances.set(key,typeName);
+  // The synthetic storage variables reserve their names so a user variable can never alias an instance's state.
+  for(const o of FB_SPEC[typeName].outputs){const n=fbKey(key,o.name);namedDeclarations.add(n);declarations.push({name:n,type:o.type,scope:'local',initial:o.type==='BOOL'?false:0});}
+  for(const h of FB_SPEC[typeName].hidden){const n=fbKey(key,h);namedDeclarations.add(n);declarations.push({name:n,type:'BOOL',scope:'local',initial:false});}
+  for(const h of FB_SPEC[typeName].hiddenReal??[]){const n=fbKey(key,h);namedDeclarations.add(n);declarations.push({name:n,type:'REAL',scope:'local',initial:0});}
+ };
+ const signedInt=():number=>{let sign=1;if(accept('-'))sign=-1;else accept('+');const t=next();if(!/^\d+$/.test(t))fail(`Expected integer, found ${t}`);return sign*Number(t);};
+ const memberKey=(prefix:string,member:string)=>keyword(prefix)+'__'+keyword(member);
+ const emitAssign=(key:string,expr:Expression):Statement=>{if(!writes.has(key))writes.set(key,key);return {kind:'assign',name:key,expr};};
+ const literalOf=(type:STType):Expression=>({kind:'literal',value:type==='BOOL'?false:0});
+ /** Inline a user definition's body with its members renamed to `<prefix>__<member>`. */
+ const instantiate=(def:UserDef,prefix:string):Statement[]=>{
+  if(callDepth>=ST_MAX_CALL_DEPTH)throw new RangeError(`Call depth limit (${ST_MAX_CALL_DEPTH}) exceeded; recursion is not supported`);
+  const map=new Map<string,string>();
+  for(const m of def.members)map.set(keyword(m.name),memberKey(prefix,m.name));
+  if(def.kind==='function')map.set(keyword(def.name),memberKey(prefix,def.name));
+  const renamed:Token[]=def.body.map(t=>{const m=identifier.test(t.value)?map.get(keyword(t.value)):undefined;return m?{value:m,offset:t.offset}:t;});
+  renamed.push({value:'<EOF>',offset:def.body[def.body.length-1].offset});
+  const saved={tokens,pos};tokens=renamed;pos=0;callDepth++;
+  try{const body=statements(new Set());if(peek()!=='<EOF>')fail(`Unexpected token ${peek()} in ${def.name}`);return body;}
+  finally{tokens=saved.tokens;pos=saved.pos;callDepth--;}
+ };
  function expression(minPrec=1,depth=0):Expression{
   if(depth>40)throw new RangeError('Expression nesting limit exceeded');
   const t=next(),u=keyword(t);let left!:Expression;
@@ -79,14 +194,48 @@ export function compileStructuredText(source:string):STProgram{
   else if(identifier.test(t)&&BUILTINS.has(u)&&peek()==='('){
    next();const args:Expression[]=[];
    if(peek()!==')'){
-    do{args.push(expression(1,depth+1));if(args.length>4)fail('Too many function arguments');}
+    do{args.push(expression(1,depth+1));if(args.length>(u==='SCALE'?5:4))fail('Too many function arguments');}
     while(accept(','));
    }
    requireToken(')');
-   if((u==='ABS'&&args.length!==1)||(u==='LIMIT'&&args.length!==3)||
+   if((ONE_ARG.has(u)&&args.length!==1)||(u==='LIMIT'&&args.length!==3)||(u==='SCALE'&&args.length!==5)||
       ((u==='MIN'||u==='MAX')&&(args.length<2||args.length>4)))
      fail('Unsupported function arity '+u);
-   left={kind:'call',name:u as 'ABS'|'MIN'|'MAX'|'LIMIT',args};
+   left={kind:'call',name:u as Extract<Expression,{kind:'call'}>['name'],args};
+  }
+  else if(identifier.test(t)&&!RESERVED.has(u)&&userDefs.get(u)?.kind==='function'&&peek()==='('){
+   // R07 user function: hoisted into statements that run just before the statement containing the call.
+   if(noHoist)fail('User function calls are not allowed in a WHILE condition');
+   const def=userDefs.get(u)!;next();const args:Expression[]=[];
+   if(peek()!==')'){do{args.push(expression(1,depth+1));if(args.length>16)fail('Too many function arguments');}while(accept(','));}
+   requireToken(')');
+   const inputs=def.members.filter(m=>m.scope==='input');
+   if(args.length!==inputs.length)fail(`${def.name} takes ${inputs.length} argument(s), got ${args.length}`);
+   const prefix=`${u}__C${callCounter++}`;
+   for(const m of def.members)declareScalar(memberKey(prefix,m.name),m.type as STType,'local',m.initial);
+   declareScalar(memberKey(prefix,def.name),def.result!,'local',def.result==='BOOL'?false:0);
+   inputs.forEach((m,i)=>pending.push(emitAssign(memberKey(prefix,m.name),args[i])));
+   for(const m of def.members.filter(x=>x.scope!=='input'))pending.push(emitAssign(memberKey(prefix,m.name),{kind:'literal',value:m.initial}));
+   pending.push(emitAssign(memberKey(prefix,def.name),literalOf(def.result!)));
+   pending.push(...instantiate(def,prefix));
+   const resultKey=memberKey(prefix,def.name);reads.set(resultKey,resultKey);left={kind:'read',name:resultKey};
+  }
+  else if(identifier.test(t)&&!RESERVED.has(u)&&arrays.has(u)&&peek()==='['){
+   const arr=arrays.get(u)!;next();const index=expression(1,depth+1);requireToken(']');
+   if(index.kind==='literal'&&(typeof index.value!=='number'||!Number.isSafeInteger(index.value)||index.value<arr.low||index.value>arr.high))
+    fail(`Array index outside ${arr.name}[${arr.low}..${arr.high}]`);
+   for(let k=0;k<arr.high-arr.low+1;k++){const key=`${u}__${k}`;reads.set(key,key);}
+   left={kind:'index',name:u,low:arr.low,high:arr.high,index};
+  }
+  else if(identifier.test(t)&&!RESERVED.has(u)&&structInstances.has(u)&&peek()==='.'){
+   next();const field=next(),def=structs.get(structInstances.get(u)!)!;
+   if(!def.fields.some(f=>keyword(f.name)===keyword(field)))fail(`${t}.${field} is not a field of ${structInstances.get(u)}`);
+   const key=memberKey(u,field);reads.set(key,key);left={kind:'read',name:key};
+  }
+  else if(identifier.test(t)&&!RESERVED.has(u)&&userInstances.has(u)&&peek()==='.'){
+   next();const member=next(),def=userInstances.get(u)!;
+   if(!def.members.some(m=>m.scope==='output'&&keyword(m.name)===keyword(member)))fail(`${t}.${member} is not an output of ${def.name}`);
+   const key=memberKey(u,member);reads.set(key,key);left={kind:'read',name:key};
   }
   else if(identifier.test(t)&&!RESERVED.has(u)&&peek()==='.'){
    // Function-block output such as tm.Q or c.CV; only declared instances and their real outputs are readable.
@@ -102,23 +251,71 @@ export function compileStructuredText(source:string):STProgram{
  }
  // Declaration blocks are restricted to the beginning of the program. Unsupported
  // qualifiers, aggregate types and vendor syntax fail closed rather than being ignored.
- while(['VAR','VAR_INPUT','VAR_OUTPUT'].includes(upper())){
+ while(['VAR','VAR_INPUT','VAR_OUTPUT','TYPE'].includes(upper())){
+  if(upper()==='TYPE'){
+   next();const structName=readName(),structKey=keyword(structName);
+   if(structs.has(structKey)||namedDeclarations.has(structKey))fail(`Duplicate type ${structName}`);
+   requireToken(':');requireToken('STRUCT');
+   const fields:{name:string;type:STType;initial:STValue}[]=[];
+   while(upper()!=='END_STRUCT'){
+    if(peek()==='<EOF>')fail('Unterminated STRUCT');
+    if(fields.length>=32)throw new RangeError('A STRUCT may have at most 32 fields');
+    const fname=readName();if(fields.some(f=>keyword(f.name)===keyword(fname)))fail(`Duplicate field ${fname}`);
+    requireToken(':');const ft=upper();if(!SCALAR_TYPES.includes(ft))fail(`Unsupported field type ${peek()}`);next();
+    let initial:STValue=ft==='BOOL'?false:0;
+    if(accept(':=')){let sign=1;if(accept('-'))sign=-1;else accept('+');const tok=next(),tu=keyword(tok);
+     if(tu==='TRUE'||tu==='FALSE')initial=tu==='TRUE';else if(number.test(tok))initial=sign*Number(tok);else fail(`Expected literal initializer, found ${tok}`);
+     checkType(ft as STType,initial,fname);}
+    requireToken(';');fields.push({name:fname,type:ft as STType,initial});
+   }
+   if(!fields.length)fail('A STRUCT needs at least one field');
+   requireToken('END_STRUCT');accept(';');requireToken('END_TYPE');accept(';');
+   structs.set(structKey,{fields});continue;
+  }
   const header=keyword(next());const scope:STDeclaration['scope']=header==='VAR_INPUT'?'input':header==='VAR_OUTPUT'?'output':'local';
   let count=0;
   while(upper()!=='END_VAR'){
    if(peek()==='<EOF>')fail('Unterminated variable declaration block');
-   if(declarations.length>=128)throw new RangeError('Structured Text declaration limit (128) exceeded');
+   if(declarations.length>=ST_MAX_DECLARATIONS)throw new RangeError(`Structured Text declaration limit (${ST_MAX_DECLARATIONS}) exceeded`);
    const name=readName(),key=keyword(name);
    if(namedDeclarations.has(key))fail(`Duplicate variable declaration ${name}`);
    requireToken(':');
    const typeName=upper();
+   if(typeName==='ARRAY'){
+    next();requireToken('[');const low=signedInt();requireToken('..');const high=signedInt();requireToken(']');requireToken('OF');
+    const elementType=upper();if(!SCALAR_TYPES.includes(elementType))fail(`Unsupported array element type ${peek()}`);next();
+    const length=high-low+1;
+    if(!Number.isSafeInteger(length)||length<1||length>ST_MAX_ARRAY_ELEMENTS)fail(`An array holds 1..${ST_MAX_ARRAY_ELEMENTS} elements`);
+    const type=elementType as STType;let initial:STValue=type==='BOOL'?false:0;
+    if(accept(':=')){
+     if(scope==='input')fail('VAR_INPUT initializers are not supported');
+     let sign=1;if(accept('-'))sign=-1;else accept('+');const tok=next(),tu=keyword(tok);
+     if(tu==='TRUE'||tu==='FALSE')initial=tu==='TRUE';else if(number.test(tok))initial=sign*Number(tok);else fail(`Expected literal initializer, found ${tok}`);
+    }
+    requireToken(';');
+    if(namedDeclarations.has(key))fail(`Duplicate variable declaration ${name}`);
+    namedDeclarations.add(key);arrays.set(key,{name,low,high,type});
+    // Elements are scalar cells; element k of name[low..high] is stored as name__(k-low).
+    for(let k=0;k<length;k++)declareScalar(`${name}__${k}`,type,scope,initial);
+    count++;continue;
+   }
+   if(structs.has(typeName)){
+    next();requireToken(';');namedDeclarations.add(key);structInstances.set(key,typeName);
+    for(const f of structs.get(typeName)!.fields)declareScalar(`${name}__${f.name}`,f.type,scope,f.initial);
+    count++;continue;
+   }
+   if(userDefs.get(typeName)?.kind==='block'){
+    if(scope!=='local')fail(`${peek()} instances must be declared in a VAR block`);
+    const def=userDefs.get(typeName)!;next();requireToken(';');namedDeclarations.add(key);userInstances.set(key,def);
+    for(const m of def.members){
+     const mapped=memberKey(key,m.name);
+     if(typeof m.type==='string'&&isFbType(m.type))declareStd(mapped,m.type);else declareScalar(mapped,m.type as STType,'local',m.initial);
+    }
+    count++;continue;
+   }
    if(isFbType(typeName)){
     if(scope!=='local')fail(`${typeName} instances must be declared in a VAR block`);
-    next();requireToken(';');namedDeclarations.add(key);fbInstances.set(key,typeName);
-    // The synthetic storage variables reserve their names so a user variable can never alias an instance's state.
-    for(const o of FB_SPEC[typeName].outputs){const n=fbKey(key,o.name);namedDeclarations.add(n);declarations.push({name:n,type:o.type,scope:'local',initial:o.type==='BOOL'?false:0});}
-    for(const h of FB_SPEC[typeName].hidden){const n=fbKey(key,h);namedDeclarations.add(n);declarations.push({name:n,type:'BOOL',scope:'local',initial:false});}
-    for(const h of FB_SPEC[typeName].hiddenReal??[]){const n=fbKey(key,h);namedDeclarations.add(n);declarations.push({name:n,type:'REAL',scope:'local',initial:0});}
+    next();requireToken(';');declareStd(key,typeName);
     count++;continue;
    }
    if(!['BOOL','INT','DINT','REAL','LREAL'].includes(typeName))fail(`Unsupported variable type ${peek()}`);
@@ -160,7 +357,9 @@ export function compileStructuredText(source:string):STProgram{
  function statements(terminators:ReadonlySet<string>,depth=0,caseBody=false):Statement[]{
   if(depth>16)throw new RangeError('IF nesting limit (16) exceeded');const result:Statement[]=[];
   while(peek()!=='<EOF>'&&!terminators.has(upper())&&!(caseBody&&startsCaseLabel())){
-   if(++statementCount>200)throw new RangeError('Statement limit (200) exceeded');
+   if(++statementCount>ST_MAX_STATEMENTS_PER_SCAN)throw new RangeError(`Statement limit (${ST_MAX_STATEMENTS_PER_SCAN}) exceeded`);
+   // User function calls met while parsing this statement are hoisted to run just before it.
+   const mark=result.length,outer=pending;pending=[];
    if(accept('IF')){
     const branches:{when:Expression;body:Statement[]}[]=[];
     const first=expression();requireToken('THEN');branches.push({when:first,body:statements(new Set(['ELSIF','ELSE','END_IF']),depth+1)});
@@ -179,7 +378,9 @@ export function compileStructuredText(source:string):STProgram{
     const otherwise=accept('ELSE')?statements(new Set(['END_CASE']),depth+1):[];
     requireToken('END_CASE');requireToken(';');result.push({kind:'case',selector,arms,otherwise});
    }else if(accept('WHILE')){
-    const condition=expression();requireToken('DO');
+    noHoist=true;let condition:Expression;
+    try{condition=expression();}finally{noHoist=false;}
+    requireToken('DO');
     const body=statements(new Set(['END_WHILE']),depth+1);
     requireToken('END_WHILE');requireToken(';');
     result.push({kind:'while',condition,body});
@@ -190,9 +391,23 @@ export function compileStructuredText(source:string):STProgram{
     requireToken('DO');const body=statements(new Set(['END_FOR']),depth+1);
     requireToken('END_FOR');requireToken(';');result.push({kind:'for',counter,from,to,step,body});
    }else{
-    const name=readName();
-    if(peek()==='('){
-     const instance=keyword(name),type=fbInstances.get(instance);
+    const name=readName();let key=keyword(name),shown=name;
+    if(peek()==='('&&userInstances.has(key)){
+     // R07 user function block call: inputs are assigned, then the instance's body runs against its own renamed variables.
+     const def=userInstances.get(key)!;next();const given=new Set<string>();
+     if(peek()!==')'){
+      do{
+       const param=keyword(readName());
+       const member=def.members.find(m=>m.scope==='input'&&keyword(m.name)===param);
+       if(!member)fail(`${param} is not an input of ${def.name}`);
+       if(given.has(param))fail(`Duplicate argument ${param}`);given.add(param);
+       requireToken(':=');result.push(emitAssign(memberKey(key,param),expression()));
+      }while(accept(','));
+     }
+     requireToken(')');requireToken(';');
+     result.push(...instantiate(def,key));
+    }else if(peek()==='('){
+     const instance=key,type=fbInstances.get(instance);
      if(!type)fail(`${name} is not a declared function block instance`);
      next();const args:Record<string,Expression>={};
      if(peek()!==')'){
@@ -203,10 +418,26 @@ export function compileStructuredText(source:string):STProgram{
        requireToken(':=');args[param]=expression();
       }while(accept(','));
      }
-     requireToken(')');requireToken(';');result.push({kind:'fb',instance,type:type!,args});continue;
+     requireToken(')');requireToken(';');result.push({kind:'fb',instance,type:type!,args});
+    }else if(peek()==='['){
+     const arr=arrays.get(key);if(!arr)fail(`${name} is not an array`);
+     next();const index=expression();requireToken(']');
+     if(index.kind==='literal'&&(typeof index.value!=='number'||!Number.isSafeInteger(index.value)||index.value<arr!.low||index.value>arr!.high))
+      fail(`Array index outside ${arr!.name}[${arr!.low}..${arr!.high}]`);
+     requireToken(':=');const expr=expression();requireToken(';');
+     for(let k=0;k<arr!.high-arr!.low+1;k++){const cell=`${key}__${k}`;if(!writes.has(cell))writes.set(cell,`${arr!.name}__${k}`);}
+     result.push({kind:'assignIndex',name:key,low:arr!.low,high:arr!.high,index,expr});
+    }else{
+     if(peek()==='.'&&structInstances.has(key)){
+      next();const field=next(),def=structs.get(structInstances.get(key)!)!;
+      if(!def.fields.some(f=>keyword(f.name)===keyword(field)))fail(`${name}.${field} is not a field of ${structInstances.get(key)}`);
+      key=memberKey(key,field);shown=`${name}__${field}`;
+     }
+     requireToken(':=');const expr=expression();requireToken(';');if(!writes.has(key))writes.set(key,shown);result.push({kind:'assign',name:key,expr});
     }
-    requireToken(':=');const expr=expression();requireToken(';');const key=keyword(name);if(!writes.has(key))writes.set(key,name);result.push({kind:'assign',name:key,expr});
    }
+   if(pending.length)result.splice(mark,0,...pending);
+   pending=outer;
   }
   return result;
  }
@@ -237,7 +468,7 @@ export function compileStructuredText(source:string):STProgram{
  return {source,bodySource:source.slice(bodyStart),statements:compiled,referencedInputs:Array.from(reads.entries()).filter(([key])=>!writes.has(key)).map(([,name])=>name),assignedOutputs:outputs,declarations};
 }
 /** One scan of a standard function block. State lives in the instance's synthetic variables, so it persists in scan memory. */
-function stepFunctionBlock(call:Extract<Statement,{kind:'fb'}>,values:Record<string,STValue>):void{
+function stepFunctionBlock(call:Extract<Statement,{kind:'fb'}>,values:Record<string,STValue>,scanMs:number):void{
  const get=(member:string)=>values[fbKey(call.instance,member)];
  const set=(member:string,value:STValue)=>{values[fbKey(call.instance,member)]=value;};
  const flag=(name:string)=>call.args[name]?bool(evaluate(call.args[name],values)):false;
@@ -252,15 +483,15 @@ function stepFunctionBlock(call:Extract<Statement,{kind:'fb'}>,values:Record<str
  const clampMs=(n:number)=>Math.max(0,Math.min(2147483647,n));
  switch(call.type){
   case 'TON':{const input=flag('IN'),pt=clampMs(int('PT'));
-   const et=input?Math.min(Number(get('ET'))+ST_SCAN_MS,pt):0;set('ET',et);set('Q',input&&et>=pt);break;}
+   const et=input?Math.min(Number(get('ET'))+scanMs,pt):0;set('ET',et);set('Q',input&&et>=pt);break;}
   case 'TOF':{const input=flag('IN'),pt=clampMs(int('PT'));
    if(input){set('Q',true);set('ET',0);}
-   else if(get('Q')===true){const et=Math.min(Number(get('ET'))+ST_SCAN_MS,pt);set('ET',et);if(et>=pt)set('Q',false);}
+   else if(get('Q')===true){const et=Math.min(Number(get('ET'))+scanMs,pt);set('ET',et);if(et>=pt)set('Q',false);}
    else set('ET',Math.min(Number(get('ET')),pt));break;}
   case 'TP':{const input=flag('IN'),pt=clampMs(int('PT'));
-   if(get('RUN')===true){const et=Math.min(Number(get('ET'))+ST_SCAN_MS,pt);set('ET',et);if(et>=pt){set('RUN',false);set('Q',false);}}
+   if(get('RUN')===true){const et=Math.min(Number(get('ET'))+scanMs,pt);set('ET',et);if(et>=pt){set('RUN',false);set('Q',false);}}
    else{
-    if(input&&get('PIN')!==true&&pt>0){set('RUN',true);set('Q',true);set('ET',Math.min(ST_SCAN_MS,pt));if(ST_SCAN_MS>=pt){set('RUN',false);set('Q',false);}}
+    if(input&&get('PIN')!==true&&pt>0){set('RUN',true);set('Q',true);set('ET',Math.min(scanMs,pt));if(scanMs>=pt){set('RUN',false);set('Q',false);}}
     else{set('Q',false);if(!input)set('ET',0);}
    }
    set('PIN',input);break;}
@@ -271,7 +502,7 @@ function stepFunctionBlock(call:Extract<Statement,{kind:'fb'}>,values:Record<str
    if(load)cv=Math.max(-32768,Math.min(32767,pv));else if(down&&get('PCD')!==true)cv=Math.max(cv-1,-32768);
    set('CV',cv);set('Q',cv<=0);set('PCD',down);break;}
   case 'PID':{
-   const dt=ST_SCAN_MS/1000,pv=real('PV',0),sp=real('SP',0),kp=real('KP',0),ki=real('KI',0),kd=real('KD',0),lo=real('OUT_MIN',0),hi=real('OUT_MAX',100);
+   const dt=scanMs/1000,pv=real('PV',0),sp=real('SP',0),kp=real('KP',0),ki=real('KI',0),kd=real('KD',0),lo=real('OUT_MIN',0),hi=real('OUT_MAX',100);
    if(lo>hi)throw new RangeError('PID.OUT_MIN must not exceed OUT_MAX');
    const e=sp-pv,primed=get('PRIMED')===true,integ=Number(get('INTEG')),perr=Number(get('PERR'));
    const trial=integ+ki*e*dt,d=primed?kd*(e-perr)/dt:0;
@@ -293,10 +524,22 @@ function evaluate(expr:Expression,signals:STSignals):STValue{
  if(expr.kind==='unary'){
   const v=evaluate(expr.inner,signals);return expr.op==='NOT'?!bool(v):expr.op==='-'?-numeric(v):+numeric(v);
  }
+ if(expr.kind==='index'){
+  const at=numeric(evaluate(expr.index,signals));
+  if(!Number.isSafeInteger(at)||at<expr.low||at>expr.high)throw new RangeError(`Array index ${at} outside ${expr.name}[${expr.low}..${expr.high}]`);
+  return evaluate({kind:'read',name:`${expr.name}__${at-expr.low}`},signals);
+ }
  if(expr.kind==='call'){
   const args=expr.args.map(a=>numeric(evaluate(a,signals)));
-  const result=expr.name==='ABS'?Math.abs(args[0]):expr.name==='MIN'?Math.min(...args):
-    expr.name==='MAX'?Math.max(...args):Math.max(args[0],Math.min(args[1],args[2]));
+  const [a0,a1,a2,a3,a4]=args;
+  if((expr.name==='SQRT'&&a0<0)||((expr.name==='LN'||expr.name==='LOG')&&a0<=0))throw new RangeError(`${expr.name} argument out of range`);
+  if(expr.name==='SCALE'&&a1===a2)throw new RangeError('SCALE needs different input bounds');
+  const result=expr.name==='ABS'?Math.abs(a0):expr.name==='MIN'?Math.min(...args):
+    expr.name==='MAX'?Math.max(...args):expr.name==='SQRT'?Math.sqrt(a0):expr.name==='SIN'?Math.sin(a0):
+    expr.name==='COS'?Math.cos(a0):expr.name==='TAN'?Math.tan(a0):expr.name==='ATAN'?Math.atan(a0):
+    expr.name==='LN'?Math.log(a0):expr.name==='LOG'?Math.log10(a0):expr.name==='EXP'?Math.exp(a0):
+    expr.name==='TRUNC'?Math.trunc(a0):expr.name==='SCALE'?a3+(a0-a1)*(a4-a3)/(a2-a1):
+    Math.max(a0,Math.min(a1,a2));
   if(expr.name==='LIMIT'&&args[0]>args[2])throw new RangeError('LIMIT requires lower bound <= upper bound');
   if(!Number.isFinite(result))throw new RangeError('Nonfinite ST function result');
   return result;
@@ -331,7 +574,7 @@ function evaluate(expr:Expression,signals:STSignals):STValue{
  return output;
 }
 function assertSignals(input:STSignals):void{
- if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).length>128)throw new RangeError('Signals must be a map of at most 128 BOOL/REAL tags');
+ if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).length>ST_MAX_DECLARATIONS*2)throw new RangeError(`Signals must be a map of at most ${ST_MAX_DECLARATIONS*2} BOOL/REAL tags`);
  const seen=new Set<string>();
  for(const [k,v] of Object.entries(input)){
   const key=keyword(k);
@@ -341,7 +584,9 @@ function assertSignals(input:STSignals):void{
  }
 }
 /** Each scan starts from last outputs, then samples current inputs; input tags cannot be overwritten. */
-export function executeStructuredText(program:STProgram,inputs:STSignals,previousOutputs:STSignals={}):STResult{
+/** `scanMs` is the simulated scan period this execution represents (timer function blocks and PID advance by it). */
+export function executeStructuredText(program:STProgram,inputs:STSignals,previousOutputs:STSignals={},scanMs:number=ST_SCAN_MS):STResult{
+ if(!Number.isSafeInteger(scanMs)||scanMs<1||scanMs>1000)throw new RangeError('Invalid scan period');
  assertSignals(inputs);assertSignals(previousOutputs);
  if(!program||!Array.isArray(program.statements))throw new TypeError('Compile Structured Text before executing');
  // IEC-style tag identifiers ignore case. Typed variables are initialized once,
@@ -372,9 +617,9 @@ export function executeStructuredText(program:STProgram,inputs:STSignals,previou
  const run=(statements:readonly Statement[],depth:number)=>{
   if(depth>16)throw new RangeError('Execution nesting limit exceeded');
   for(const statement of statements){
-   if(++operations>400)throw new RangeError('Execution statement budget exceeded');
+   if(++operations>ST_MAX_STATEMENTS_PER_SCAN)throw new RangeError(`Execution statement budget (${ST_MAX_STATEMENTS_PER_SCAN} per scan) exceeded`);
    if(statement.kind==='fb'){
-    stepFunctionBlock(statement,values);
+    stepFunctionBlock(statement,values,scanMs);
    }else if(statement.kind==='assign'){
     if(inputKeys.has(statement.name))throw new Error(`Cannot overwrite sampled input ${statement.name}`);
     const value=evaluate(statement.expr,values);
@@ -383,6 +628,18 @@ export function executeStructuredText(program:STProgram,inputs:STSignals,previou
     values[statement.name]=value;
     const tag=declaration?.name??outputNames.get(statement.name)??statement.name;
     if(!typed||declaration?.scope==='output')outputs[tag]=value;
+    assignments.push({tag,value});
+   }else if(statement.kind==='assignIndex'){
+    const at=numeric(evaluate(statement.index,values));
+    if(!Number.isSafeInteger(at)||at<statement.low||at>statement.high)throw new RangeError(`Array index ${at} outside ${statement.name}[${statement.low}..${statement.high}]`);
+    const cell=`${statement.name}__${at-statement.low}`;
+    if(inputKeys.has(cell))throw new Error(`Cannot overwrite sampled input ${cell}`);
+    const value=evaluate(statement.expr,values);
+    const declaration=declarationTypes.get(cell);
+    if(declaration)checkType(declaration.type,value,declaration.name);
+    values[cell]=value;
+    const tag=declaration?.name??cell;
+    if(declaration?.scope==='output')outputs[tag]=value;
     assignments.push({tag,value});
    }else if(statement.kind==='if'){
     let body:readonly Statement[]=statement.otherwise;

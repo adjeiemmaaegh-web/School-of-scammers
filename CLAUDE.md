@@ -26,6 +26,6 @@
 ```bash
 npx tsc --noEmit && npm test && npm run build && npm run verify:full
 ```
-`npm run verify:full` is the core automated build gate. GitHub CI additionally runs `scripts/sandbox-browser-acceptance.cjs` to prove the new visual workflow; don't mark P0/P1 accepted without this and existing browser-suite evidence. Keep `main` deployable; keep the 536 engine tests green. Node 22.
+`npm run verify:full` is the core automated build gate. GitHub CI additionally runs `scripts/sandbox-browser-acceptance.cjs` to prove the new visual workflow; don't mark P0/P1 accepted without this and existing browser-suite evidence. Keep `main` deployable; keep the whole Vitest suite green (2,125 tests on 2026-11-24). Node 22.
 
 **Working style:** small, working commits; few, high-signal docs (no per-task "report" files); honest claims.

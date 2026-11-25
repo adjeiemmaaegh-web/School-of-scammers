@@ -3,6 +3,9 @@
  * Equipment reads previous settled body/plant state; commands are the mapped PLC
  * output image. No setTimeout, renderer state, Date.now or Math.random.
  */
+import {FREE_HEADING_KINDS} from './headings';
+import type {MaterialSpec} from './materials';
+import {advanceOperator} from './operator-walk';
 import type {EquipmentDef,SceneOccluder} from './equipment';
 import {ctxOf} from './equipment';
 import type {EquipmentPlacement,LiveSignal,World,WorldInputs} from './types';
@@ -20,6 +23,8 @@ export const validatePlacements=(placements:readonly EquipmentPlacement[],librar
   if(!p||!p.id||!/^[a-z][a-z0-9-]{0,39}$/.test(p.id)||ids.has(p.id)||!library[p.kind])
    throw new Error('Unknown/duplicate plant equipment');
   ids.add(p.id);
+  if(p.headingDeg!==undefined&&(!Number.isFinite(p.headingDeg)||p.headingDeg<0||p.headingDeg>=360||!FREE_HEADING_KINDS.has(p.kind)))
+   throw new RangeError('Invalid free heading (only conveyors, transfer units, turntables, stations, stoppers, gates, fences and doors take one)');
   if(![0,90,180,270].includes(p.yawDeg)||!p.originMm||
    Object.values(p.originMm).some(v=>typeof v!=='number'||!Number.isFinite(v)||Math.abs(v)>100000))
    throw new RangeError('Invalid equipment location/orientation');
@@ -57,7 +62,10 @@ export const samplePlant=(world:World,placements:readonly EquipmentPlacement[],l
  return signals;
 };
 export function stepScene(previous:SceneRuntime,placements:readonly EquipmentPlacement[],
- library:EquipmentLibrary,inputs:WorldInputs={},faults:Readonly<Record<string,string|null>>={}):SceneRuntime{
+ library:EquipmentLibrary,inputs:WorldInputs={},faults:Readonly<Record<string,string|null>>={},scanMs:number=SCAN_MS,
+ materials:readonly MaterialSpec[]=[]):SceneRuntime{
+ if(!Number.isSafeInteger(scanMs)||scanMs<SUBSTEP_MS||scanMs%SUBSTEP_MS!==0)
+  throw new RangeError('A scan must be a whole number of '+SUBSTEP_MS+' ms plant substeps');
  validatePlacements(placements,library);
  let world=previous.world;
  // Explicitly modelled stationary solid envelopes cast sight shadows.
@@ -67,9 +75,10 @@ export function stepScene(previous:SceneRuntime,placements:readonly EquipmentPla
   .filter(item=>STATIC_SOLID_KINDS.includes(item.kind))
   .map(item=>({id:item.id,originMm:item.originMm,yawDeg:item.yawDeg,
    sizeMm:library[item.kind].footprint}));
- for(let i=0;i<SCAN_MS/SUBSTEP_MS;i++){
+ const peers=placements.map(item=>({id:item.id,kind:item.kind,originMm:item.originMm}));
+ for(let i=0;i<scanMs/SUBSTEP_MS;i++){
   for(const item of placements){
-   const def=library[item.kind],ctx=ctxOf(item,occluders);
+   const def=library[item.kind],ctx=ctxOf(item,occluders,peers,materials);
    const state=world.model[item.id]??def.fresh(item.params);
    const command=inputs[item.id]??{};
    for(const channel of def.commands){
@@ -82,7 +91,7 @@ export function stepScene(previous:SceneRuntime,placements:readonly EquipmentPla
    if(!changed||!changed.state||!changed.world)throw new Error('Equipment step failed '+item.id);
    world={...changed.world,model:{...changed.world.model,[item.id]:changed.state}};
   }
-  world=advanceBodies(world,placements,SUBSTEP_MS);
+  world=advanceOperator(advanceBodies(world,placements,SUBSTEP_MS),placements,SUBSTEP_MS);
   world={...world,timeMs:q(world.timeMs+SUBSTEP_MS)};
  }
  return {world,signals:samplePlant(world,placements,library)};

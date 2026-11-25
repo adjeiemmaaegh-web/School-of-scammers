@@ -30,13 +30,13 @@ export const GUIDE_TOPICS:readonly GuideTopic[]=[
 {title:'Start with the inputs',body:'PLC scans sample wired, powered inputs. Map a sensor or button to e.g. I0.0.'},
 {title:'Write the controlling logic',body:'Ladder uses contacts/coils; ST uses text; FBD connects function blocks. Use the supported subset.'},
 {title:'Associate outputs with loads',body:'Wire Q0.0 or another output to the load through the electrical model. Code cannot bypass wiring.'},
-{title:'Run one deterministic scan',body:'Fixed 50 ms scan: sample inputs, execute logic, update outputs. Run repeats; Step advances one.'},
+{title:'Run one deterministic scan',body:'Default 50 ms scan (configurable): sample inputs, execute logic, update outputs. Run repeats; Step advances one.'},
 {title:'Read the evidence',body:'Check live I/O, watch/trace, diagnostics and plant response. Wrong logic must not produce preset success.'}],next:'language-tools',appRoute:'/sandbox',appLabel:'Go to the programming dock'},
 {id:'language-tools',group:'plc',title:'Ladder, ST, FBD and PID',summary:'Choose a language and understand the simulator’s supported instructions.',minutes:10,keywords:['LD','ST','FBD','TON','CTU','CTD','PID','IEC','programming'],steps:[
 {title:'Ladder',body:'Contacts, coils, branches, timers and counters; up to 32 rungs and 48 local tags per program.'},
 {title:'Structured Text',body:'IF, CASE, bounded loops, typed variables, TON/TOF/TP, counters, edges and teaching PID.'},
 {title:'Function Block Diagram',body:'Connect logic, timer, counter, comparator and output nodes. Not full IEC 61131-3.'},
-{title:'Understand PID limits',body:'Teaching PID: clamped output, conditional anti-windup, 50 ms scan. No auto/manual, derivative filter, vendor tuning or dedicated 3D PID lesson yet.'},
+{title:'Understand PID limits',body:'Teaching PID: clamped output, conditional anti-windup, configured scan period. No auto/manual, derivative filter, vendor tuning or dedicated 3D PID lesson yet.'},
 {title:'When code fails',body:'Read compiler errors and check declarations and I/O mapping. A disconnected load cannot move.'}],next:'factory-scenes',appRoute:'/sandbox',appLabel:'Open the PLC editor'},
 {id:'factory-scenes',group:'workspace',title:'Your first factory scene',summary:'Find original factory arrangements and understand the wiring/logic work still required.',minutes:9,keywords:['scene','factory','gallery','sorting','conveyor','robot','material'],steps:[
 {title:'Browse the scene gallery',body:'Choose Foundation before Intermediate or Advanced in the scene library. The atlas covers all 21 original scenes.'},

@@ -14,15 +14,22 @@ export type WorkspaceFragment = {
   params?: ProjectFile['params'];
   plcPrograms?: Record<string, PlcProgram>;
   plcIo?: ProjectFile['plcIo'];
+  /** Groups wholly inside the copied selection (their structure is rebuilt with the new device ids on paste). */
+  groups?: import('./groups').Group[];
 };
 
 /** Discrete, validated edit commands committed by the authoritative simulator worker. */
 export type WorkspaceEdit =
   | { kind: 'translate'; ids: string[]; delta: XY; grid: GridStep }
   | { kind: 'rotate'; ids: string[]; quarterTurns: -1 | 1 }
+  | { kind: 'rotateFree'; ids: string[]; deltaDeg: number }
   | { kind: 'duplicate'; ids: string[]; offset: XY; grid: GridStep }
   | { kind: 'align'; ids: string[]; mode: AlignMode }
   | { kind: 'delete'; ids: string[] }
+  | { kind: 'group'; ids: string[]; name: string }
+  | { kind: 'ungroup'; ids: string[] }
+  | { kind: 'groupPort'; group: string; name: string; terminal: string | null }
+  | { kind: 'wirePort'; group: string; port: string; to: string }
   | { kind: 'paste'; fragment: WorkspaceFragment; at: XY; grid: GridStep };
 
 export type WorkspaceHistory = {

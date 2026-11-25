@@ -8,18 +8,24 @@ export const freshWorld=(seed=1):World=>({
  spawnedCount:0,despawnedCount:0,droppedEventCount:0,events:[],model:{},
 });
 export type SpawnSpec={shape?:'box'|'cylinder';size:Vec3;massKg:number;pos:Vec3;
- yawDeg?:0|90|180|270;tags?:Body['tags'];supportedBy?:string|null};
+ yawDeg?:0|90|180|270;tags?:Body['tags'];supportedBy?:string|null;parts?:Body['parts'];headingDeg?:number};
 export function spawnBody(world:World,source:string,spec:SpawnSpec):World{
  if(world.bodies.length>=MAX_BODIES)
-  return addEvent(world,{kind:'limit',source,detail:'60-body capacity reached; spawn refused'});
+  return addEvent(world,{kind:'limit',source,detail:MAX_BODIES+'-body capacity reached; spawn refused'});
  if(!spec.size||!spec.pos||Object.values(spec.size).some(n=>!Number.isFinite(n)||n<=0||n>5000)||
     Object.values(spec.pos).some(n=>!Number.isFinite(n)||Math.abs(n)>100000)||
     !Number.isFinite(spec.massKg)||spec.massKg<=0||spec.massKg>5000)
   throw new RangeError('Invalid plant body geometry or mass');
+ if(spec.parts!==undefined&&(!Array.isArray(spec.parts)||spec.parts.length<1||spec.parts.length>8||spec.parts.some(p=>
+  !p||![p.dx,p.dy,p.z,p.sx,p.sy,p.sz].every(Number.isFinite)||p.sx<=0||p.sy<=0||p.sz<=0||p.z<0||Math.abs(p.dx)>5000||Math.abs(p.dy)>5000||p.z+p.sz>5000)))
+  throw new RangeError('Invalid composite body parts (1-8 parts, positive sizes)');
+ if(spec.headingDeg!==undefined&&!Number.isFinite(spec.headingDeg))throw new RangeError('Invalid body heading');
+ const heading=spec.headingDeg===undefined?0:((spec.headingDeg%360)+360)%360;
  const id='b'+world.nextBodyId;
  const body:Body={id,shape:spec.shape??'box',size:vec(spec.size.x,spec.size.y,spec.size.z),
    massKg:q(spec.massKg),pos:vec(spec.pos.x,spec.pos.y,spec.pos.z),
-   yawDeg:spec.yawDeg??0,vel:vec(),supportedBy:spec.supportedBy??null,tags:{...spec.tags}};
+   yawDeg:spec.yawDeg??0,vel:vec(),supportedBy:spec.supportedBy??null,tags:{...spec.tags},
+   ...(spec.parts?{parts:spec.parts.map(p=>({...p}))}:{}),...(heading!==0?{headingDeg:heading}:{})};
  return addEvent({...world,bodies:[...world.bodies,body],nextBodyId:world.nextBodyId+1,
   spawnedCount:world.spawnedCount+1},{kind:'spawn',source,bodyId:id,detail:'Body entered plant'});
 }

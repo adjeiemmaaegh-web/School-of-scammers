@@ -5,9 +5,9 @@
  */
 import type {WorkspaceFragment} from './types';
 import {MAX_POSITION} from './geometry';
+import {MAX_COMPONENTS,MAX_WIRES} from '../sim/panels';
 
 const MAX_TEMPLATES=4;
-const MAX_COMPONENTS=60,MAX_WIRES=250;
 const owner=(pin:string):string=>{
  const at=pin.indexOf('.');
  if(at<1||at===pin.length-1)throw new Error('Malformed assembly terminal');

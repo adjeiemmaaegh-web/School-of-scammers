@@ -69,6 +69,8 @@ jobs:
             ln -s "$GITHUB_WORKSPACE/node_modules/vitest" "$coverage_dir/node_modules/vitest"
           fi
       - name: Execute all repository native tests with V8 source coverage
+        env:
+          PLC_COVERAGE_RUN: '1'   # relaxes only the wall-clock real-time guards (factory-scale, r7-soak-benchmark)
         run: npx vitest run --coverage --coverage.all --coverage.reporter=json-summary --coverage.reporter=text-summary
       - name: Preserve full-source coverage evidence
         if: always()
