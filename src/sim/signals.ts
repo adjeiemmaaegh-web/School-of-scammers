@@ -61,7 +61,7 @@ export type PlcProgram = {
 };
 /** The five physical input tags a PLC samples (I0.0..I0.4) and its six output coils (Q0.0..Q0.5). */
 export type PlcInputs = { Start: boolean; StopOK: boolean; Photoeye: boolean; TankHigh: boolean; ReverseRequest: boolean };
-/** Scan state of one additional PLC. The first PLC's scan state lives in the legacy WorldState fields. */
+/** Per-instance scan state; the first classic PLC mirrors shared interpreter results in legacy WorldState fields. */
 export type PlcRuntime = {
   powered: boolean;
   inputs: PlcInputs;
@@ -169,7 +169,7 @@ export type WorldState = {
   air: Record<string, import('../plant/air').Receiver>;
   /** Milliseconds each on-delay relay's coil has been energised (capped at its delay), by component id. */
   timers: Record<string, number>;
-  /** Scan state of every PLC after the first, by component id. */
+  /** Per-ID scan state for secondary PLCs and a first PLC16. */
   plcs: Record<string, PlcRuntime>;
   /** Energised state of every contactor, motor and lamp by component id (the legacy booleans mirror the first). */
   deviceOn: Record<string, boolean>;

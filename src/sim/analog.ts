@@ -10,7 +10,7 @@ import type { SceneRuntime } from '../plant/world/runner';
 import type { PlacedComponent, ProjectFile, Wire } from './signals';
 import { pinLocation, type PlcIoMap } from './plc-io';
 
-export type AnalogPoint = { terminal: string; tag: string; value: number; unit: string; connected: boolean; source: string | null };
+export type AnalogPoint = { terminal: string; tag: string; value: number; unit: string; connected: boolean; source: string | null; sampled?: boolean };
 type AnalogRole = 'analog-input' | 'analog-output';
 
 const terminalRole = (name: string, components: readonly PlacedComponent[]): AnalogRole | null => {
@@ -85,7 +85,7 @@ export function sampleAnalogInputs(
     }
     values[tag] = value;
     points.push({ terminal: pin, tag, value, unit: connected ? legacyTank ? 'ml' : airSensor ? 'bar' : channel?.unit ?? '' : '',
-      connected, source: connected ? source : null });
+      connected, source: connected ? source : null, ...(at.module ? { sampled: channelPowered } : {}) });
   }
   return { values, points };
 }

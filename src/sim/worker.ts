@@ -1,13 +1,20 @@
 /// <reference lib="webworker" />
 import { createWorld, renderSnapshot, tick } from './orchestrator';
 import type { RunRequest } from './assessment-handler';
+import { haltedSimulationWorld } from './phases/fail-closed';
+import { parseWorkerIngress, WorkerMailbox } from './worker-mailbox';
+import { boundedWorkerEvents } from './event-stream';
 import type { SimEvent, WorkerRequest, WorkerResponse, WorkerTiming } from './signals';
 import { createTimingWindow, freshClock, isTimeScale, pumpClock, scanMsOf, scanTiming, type ClockState } from './scan-config';
 
 const ctx: DedicatedWorkerGlobalScope = self as DedicatedWorkerGlobalScope;
 let world = createWorld();
-const pending: Extract<WorkerRequest, { kind: 'commands' }>['commands'] = [];
-const pendingRequestIds: number[] = [];
+const mailbox = new WorkerMailbox();
+function reject(message: string, requestId?: number): void {
+  ctx.postMessage({ kind: 'snapshot', snapshot: { ...renderSnapshot(world), lastError: message },
+    events: boundedWorkerEvents([{ tick: world.tick, kind: 'error', detail: message }]),
+    ...(requestId === undefined ? {} : { requestId }) } satisfies WorkerResponse);
+}
 
 /** Pacing only: how fast model time passes against the wall clock. It never changes what a scan computes. */
 let timeScale = 1;
@@ -30,11 +37,19 @@ function dispatch(commands: Extract<WorkerRequest, { kind: 'commands' }>['comman
   const started = performance.now();
   for (let i = 0; i < count; i++) {
     const t0 = performance.now();
-    const result = tick(world, i === 0 ? commands : []);
-    world = result.world;
-    snapshot = result.snapshot;
-    events.push(...result.events);
-    ran++;
+    try {
+      const result = tick(world, i === 0 ? commands : []);
+      world = result.world;
+      snapshot = result.snapshot;
+      events.push(...result.events);
+      ran++;
+    } catch (error) {
+      const message = 'Simulation tick failed: ' + (error instanceof Error ? error.message : 'unknown error');
+      world = haltedSimulationWorld(world, message, 'Worker tick interrupted; simulated outputs deenergized', 30);
+      snapshot = renderSnapshot(world);
+      events.push({ tick: world.tick, kind: 'error', detail: message });
+      break;
+    }
     if (world.running) timingWindow.add(performance.now() - t0);
     // A halted/paused world stops consuming the backlog; so does an exhausted compute budget.
     if (!world.running || performance.now() - started > PUMP_COMPUTE_BUDGET_MS) break;
@@ -42,7 +57,7 @@ function dispatch(commands: Extract<WorkerRequest, { kind: 'commands' }>['comman
   // tick() keeps the same project object when nothing was edited (tests/r3-project-identity.test.ts), so the full-project
   // JSON compare only runs when the object actually changed, not on every scan.
   const documentChanged = before !== world.project && JSON.stringify(before) !== JSON.stringify(world.project);
-  const reply: WorkerResponse = { kind: 'snapshot', snapshot, events,
+  const reply: WorkerResponse = { kind: 'snapshot', snapshot, events: boundedWorkerEvents(events),
     ...(requestId === undefined ? {} : { requestId }),
     ...(requestIds?.length ? { requestIds } : {}),
     ...(before !== world.project ? { project: world.project } : {}),
@@ -73,15 +88,23 @@ ctx.onmessage = (event: MessageEvent<WorkerRequest | RunRequest>) => {
     if (isTimeScale(data.scale)) { timeScale = data.scale; clock = { ...clock, owedModelMs: 0 }; behind = false; postTiming(true); }
     return;
   }
-  if (data?.kind !== 'commands' || !Array.isArray(data.commands)) return;
-  // While running, queue user actions for the next scan rather than inserting extra scans.
+  const parsed = parseWorkerIngress(data);
+  if (!parsed.ok) { reject(parsed.error, parsed.requestId); return; }
+  const packet = parsed.packet;
+  // Priority Pause preserves accepted FIFO controls and does not wait for a slow clock.
+  if (world.running && packet.commands.length === 1 && packet.commands[0].k === 'pause') {
+    const batch = mailbox.takeWithPause(packet.requestId);
+    dispatch(batch.commands, batch.requestIds.length === 1 ? batch.requestIds[0] : undefined,
+      batch.requestIds.length > 1 ? batch.requestIds : undefined);
+    clock = freshClock(); behind = false; postTiming(true);
+    return;
+  }
   if (world.running) {
-    pending.push(...data.commands);
-    if (Number.isSafeInteger(data.requestId)) pendingRequestIds.push(data.requestId!);
+    const error = mailbox.enqueue(packet);
+    if (error) reject(error, packet.requestId);
   } else {
-    dispatch(data.commands, Number.isSafeInteger(data.requestId) ? data.requestId : undefined);
-    clock = freshClock();
-    postTiming(true);
+    dispatch(packet.commands, packet.requestId);
+    clock = freshClock(); postTiming(true);
   }
 };
 ctx.postMessage({ kind: 'snapshot', snapshot: renderSnapshot(world), events: [], project: world.project } satisfies WorkerResponse);
@@ -91,9 +114,9 @@ setInterval(() => {
   lastPumpAt = now;
   if (!world.running) {
     clock = freshClock(); behind = false;
-    if (pending.length) { // queued edits that arrived just before a pause
-      const ids = pendingRequestIds.splice(0, pendingRequestIds.length);
-      dispatch(pending.splice(0, pending.length), ids.length === 1 ? ids[0] : undefined, ids.length > 1 ? ids : undefined);
+    if (mailbox.hasPending) {
+      const { commands, requestIds: ids } = mailbox.take();
+      dispatch(commands, ids.length === 1 ? ids[0] : undefined, ids.length > 1 ? ids : undefined);
     }
     return;
   }
@@ -102,8 +125,8 @@ setInterval(() => {
   behind = pumped.behind;
   // Queued edits wait for the next DUE scan: they never insert an extra scan, so PLC timing is identical at every speed.
   if (pumped.scans > 0) {
-    const ids = pendingRequestIds.splice(0, pendingRequestIds.length);
-    const ran = dispatch(pending.splice(0, pending.length), ids.length === 1 ? ids[0] : undefined,
+    const { commands, requestIds: ids } = mailbox.take();
+    const ran = dispatch(commands, ids.length === 1 ? ids[0] : undefined,
       ids.length > 1 ? ids : undefined, pumped.scans);
     if (ran < pumped.scans) { clock = { ...clock, droppedScans: clock.droppedScans + (pumped.scans - ran) }; behind = true; }
     postTiming();

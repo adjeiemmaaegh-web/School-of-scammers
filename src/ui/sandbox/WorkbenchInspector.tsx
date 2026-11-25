@@ -4,6 +4,7 @@ import { modelLimitFor } from '../../components/model-limits';
 import { paramSpecsOf, paramValue, type ParamSpec } from '../../components/params';
 import type { PlacedComponent, ProjectFile, RenderSnapshot } from '../../sim/signals';
 import { perDeviceLive, plantStatusText } from '../../sim/device-state';
+import { channelSemantics, readDeviceChannels } from '../../sim/device-channels';
 import { isP3Equipment } from '../../sim/p3-plant-bridge';
 import { OPERATOR_KEYS, OPERATOR_KINDS } from '../../sim/operator-values';
 
@@ -127,6 +128,7 @@ export function WorkbenchInspector({
   }
 
   const definition = COMPONENTS[selectedDevice.kind];
+  const channelImage = readDeviceChannels(project, snapshot, selectedDevice.id);
   const isPressed = selectedDevice.pressed;
   const isLive = selectedDevice.kind === 'revmotor' ? snapshot.motorDirection !== 'stopped' :
     selectedDevice.kind === 'forwardcontactor' ? snapshot.forwardContactorOn :
@@ -184,6 +186,22 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
       <span>Live state</span><strong className={isLive ? 'is-live' : ''}>{state}</strong>
       <span>Location</span><code>{Math.round(selectedDevice.x)}, {Math.round(selectedDevice.y)}</code>
     </div>
+    <details className="sandbox-inspector-channels" data-device-channels={selectedDevice.id}>
+      <summary>Live I/O and process signals ({channelImage.channels.length}{channelImage.truncated ? '+' : ''})</summary>
+      <p className="sandbox-help">These values come from the simulation snapshot, not from the 3D animation. Numeric process signals are separate from 24 V circuits.</p>
+      {channelImage.channels.length === 0 ? <p className="sandbox-help">No instrumented channels for this device.</p> :
+        <ul className="sandbox-inspector-channel-list">
+          {channelImage.channels.map(channel => <li key={channel.source + ':' + channel.endpoint}>
+            <code title={channel.endpoint}>{channel.tag}</code>
+            <strong>{channel.kind === 'digital' ? (channel.value ? 'ON' : 'OFF') :
+              channel.sampled === false ? 'PLC/module unpowered or unavailable · no sample' :
+              !channel.connected || channel.value === null ? 'Disconnected' :
+              `${channel.value} ${channel.unit ?? ''}`.trim()}</strong>
+            <small>{channelSemantics(channel).direction} · {channelSemantics(channel).domain} · {channelSemantics(channel).timing}{channel.kind === 'numeric' && channel.origin ? ` · from ${channel.origin}` : ''}</small>
+          </li>)}
+        </ul>}
+      {channelImage.truncated && <p className="sandbox-help">Only the first 512 channels are shown for this device.</p>}
+    </details>
     <div className="sandbox-inspector-position" role="group" aria-label="Exact position on the floor">
       <PositionField key={`${selectedDevice.id}-x`} label="X" attr="data-pos-x" max={FLOOR_MAX_X} value={selectedDevice.x} disabled={!editable}
         onCommit={x => onMoveTo(selectedDevice.id, { x, y: selectedDevice.y })} />

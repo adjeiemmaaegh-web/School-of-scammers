@@ -56,6 +56,12 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     const kept = Object.fromEntries(Object.entries(project.ioModules).filter(([m, l]) => m !== id && l.plc !== id));
     next = Object.keys(kept).length ? { ...rest, ioModules: kept } : rest;
   }
+  if (project.plantFaults && Object.prototype.hasOwnProperty.call(project.plantFaults, id)) {
+    const { plantFaults: _old, ...rest } = next;
+    const kept = { ...project.plantFaults };
+    delete kept[id];
+    next = Object.keys(kept).length ? { ...rest, plantFaults: kept } : rest;
+  }
   if (isPlcKind(target.kind)) {
     const wasFirst = primaryPlcId(project) === id;
     const promoted = wasFirst ? extraPlcs(project)[0] : undefined;
@@ -64,7 +70,7 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     if (promoted) {
       const cfg = programOf(project, promoted.id);
       delete remaining[promoted.id];
-      next = { ...next, program: cfg.program, language: cfg.language, stSource: cfg.stSource };
+      next = { ...next, program: cfg.program, language: cfg.language, stSource: cfg.stSource, fbd: cfg.fbd };
     }
     const { plcPrograms: _old, plcIo: _oldIo, ...rest } = next;
     const io = { ...(project.plcIo ?? {}) };

@@ -42,6 +42,7 @@ import './ux4-canvas-focus.css';
 import './ux6-workbench.css';
 import './ux7-reference-layout.css';
 import './stage1-workspace.css';
+import './stage2-channels.css';
 import { DEFAULT_SCAN_MS, SCAN_PRESETS_MS, TIME_SCALES, scanMsOf, type ScanTiming } from '../sim/scan-config';
 
 // Loaded on demand so opening the simulator does not download the project dialog, lessons, checklist or report builder.
