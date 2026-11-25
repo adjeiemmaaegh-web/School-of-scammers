@@ -36,7 +36,7 @@ const base = process.env.PLC_BASE_URL || 'http://127.0.0.1:4173';
       await page.goto(base + route, { waitUntil: 'domcontentloaded', timeout: 20000 });
       await page.waitForSelector('.primary-nav');
       const links = await page.$$eval('.primary-nav a', a => a.map(x => [x.textContent.trim(), x.getAttribute('href')]));
-      assert.deepEqual(links, [['Simulator', '/sandbox'], ['Learn & Practice', '/learn'], ['Assessments', '/assess']], `primary nav on ${route}`);
+      assert.deepEqual(links, [['Simulator', '/sandbox'], ['Steady Guide', '/guide'], ['Learn & Practice', '/learn'], ['Assessments', '/assess']], `primary nav on ${route}`);
     }
 
     // 3. Entering the simulator is free: an empty floor, no exercise, no assessment, no work order.
