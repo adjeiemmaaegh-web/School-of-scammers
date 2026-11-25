@@ -192,9 +192,9 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
       {channelImage.channels.length === 0 ? <p className="sandbox-help">No instrumented channels for this device.</p> :
         <ul className="sandbox-inspector-channel-list">
           {channelImage.channels.map(channel => <li key={channel.source + ':' + channel.endpoint}>
-            <code>{channel.tag}</code>
+            <code title={channel.endpoint}>{channel.tag}</code>
             <strong>{channel.kind === 'digital' ? (channel.value ? 'ON' : 'OFF') :
-              channel.sampled === false ? 'PLC unpowered · no sample' :
+              channel.sampled === false ? 'PLC/module unpowered or unavailable · no sample' :
               !channel.connected || channel.value === null ? 'Disconnected' :
               `${channel.value} ${channel.unit ?? ''}`.trim()}</strong>
             <small>{channelSemantics(channel).direction} · {channelSemantics(channel).domain} · {channelSemantics(channel).timing}{channel.kind === 'numeric' && channel.origin ? ` · from ${channel.origin}` : ''}</small>

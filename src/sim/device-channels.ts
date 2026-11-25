@@ -8,12 +8,13 @@
  */
 import type { ProjectFile, RenderSnapshot } from './signals';
 import { deviceIntegrationContract } from './device-contract';
+import { pinLocation } from './plc-io';
 
 export const MAX_DEVICE_CHANNELS = 512;
 export type DeviceChannel =
-  | { kind: 'digital'; deviceId: string; endpoint: string; tag: string; value: boolean;
+  | { kind: 'digital'; deviceId: string; controllerId?: string; endpoint: string; tag: string; value: boolean;
       source: 'plc-input' | 'plc-output' | 'plant' | 'actuator'; snapshotTick: number }
-  | { kind: 'numeric'; deviceId: string; endpoint: string; tag: string; value: number | null;
+  | { kind: 'numeric'; deviceId: string; controllerId?: string; endpoint: string; tag: string; value: number | null;
       unit?: string; connected: boolean; sampled?: boolean; origin?: string;
       source: 'plc-analog-input' | 'plant'; snapshotTick: number };
 
@@ -27,7 +28,7 @@ export type ChannelSemantics = {
     'plant-model-snapshot' | 'actuator-output-image';
   /** The plant's prior settled state is sampled by PLC numeric inputs. */
   readonly timing: 'plc-scan' | 'prior-settled-plant' | 'plant-snapshot' | 'actuator-snapshot';
-  readonly powerReference?: 'plc-L+-to-M';
+  readonly powerReference?: 'plc-L+-to-M' | 'module-L+-to-M';
   /** Unknown ranges and fault mechanisms stay unspecified: hidden faults must not be revealed. */
   readonly unit?: string;
 };
@@ -40,13 +41,13 @@ export function channelSemantics(channel: DeviceChannel): ChannelSemantics {
   switch (channel.source) {
     case 'plc-input':
       return { direction: 'input', domain: 'dc24', provenance: 'plc-input-image',
-        timing: 'plc-scan', powerReference: 'plc-L+-to-M' };
+        timing: 'plc-scan', powerReference: channel.controllerId ? 'module-L+-to-M' : 'plc-L+-to-M' };
     case 'plc-output':
       return { direction: 'output', domain: 'dc24', provenance: 'plc-output-image',
-        timing: 'plc-scan', powerReference: 'plc-L+-to-M' };
+        timing: 'plc-scan', powerReference: channel.controllerId ? 'module-L+-to-M' : 'plc-L+-to-M' };
     case 'plc-analog-input':
       return { direction: 'input', domain: 'numeric-process', provenance: 'analog-input-image',
-        timing: 'prior-settled-plant', ...(channel.unit ? { unit: channel.unit } : {}) };
+        timing: 'prior-settled-plant', powerReference: channel.controllerId ? 'module-L+-to-M' : 'plc-L+-to-M', ...(channel.unit ? { unit: channel.unit } : {}) };
     case 'plant':
       return { direction: 'measurement', domain: 'plant-model', provenance: 'plant-model-snapshot',
         timing: 'plant-snapshot', ...(channel.kind === 'numeric' && channel.unit ?
@@ -74,28 +75,39 @@ export function readDeviceChannels(
     else truncated = true;
   };
   for (const part of project.components) {
-    if (deviceId !== undefined && part.id !== deviceId) continue;
     const plc = snapshot.plcs[part.id];
     if ((part.kind === 'plc' || part.kind === 'plc16') && plc) {
-      for (const io of plc.io.inputs) append({
-        kind: 'digital', source: 'plc-input', deviceId: part.id, endpoint: part.id + '.' + io.terminal,
-        tag: io.tag, value: io.on, snapshotTick: snapshot.tick,
-      });
-      for (const io of plc.io.outputs) append({
-        kind: 'digital', source: 'plc-output', deviceId: part.id, endpoint: part.id + '.' + io.terminal,
-        tag: io.tag, value: io.on, snapshotTick: snapshot.tick,
-      });
-      for (const io of plc.io.analogInputs ?? []) append({
-        kind: 'numeric', source: 'plc-analog-input', deviceId: part.id,
-        endpoint: part.id + '.' + io.terminal, tag: io.tag,
-        // The wire can remain present while the PLC is unpowered, but a
-        // numeric value is not a live sample in that condition.
-        value: plc.powered && io.connected && Number.isFinite(io.value) ? io.value : null,
-        unit: io.unit, connected: io.connected && Number.isFinite(io.value),
-        sampled: plc.powered,
-        ...(io.source ? { origin: io.source } : {}), snapshotTick: snapshot.tick,
-      });
+      const identity = (terminal: string) => {
+        const at = pinLocation(part.id, terminal);
+        // The host view includes its attached channels; a module view includes
+        // only its own physical terminals. Never fabricate an endpoint on the host.
+        if (deviceId !== undefined && deviceId !== part.id && deviceId !== at.owner) return null;
+        if (at.module && !project.components.some(c => c.id === at.owner)) return null;
+        return { deviceId: at.owner, endpoint: at.owner + '.' + at.pin,
+          ...(at.module ? { controllerId: part.id } : {}) };
+      };
+      for (const io of plc.io.inputs) {
+        const id = identity(io.terminal); if (!id) continue;
+        append({ kind: 'digital', source: 'plc-input', ...id, tag: io.tag,
+          value: io.on, snapshotTick: snapshot.tick });
+      }
+      for (const io of plc.io.outputs) {
+        const id = identity(io.terminal); if (!id) continue;
+        append({ kind: 'digital', source: 'plc-output', ...id, tag: io.tag,
+          value: io.on, snapshotTick: snapshot.tick });
+      }
+      for (const io of plc.io.analogInputs ?? []) {
+        const id = identity(io.terminal); if (!id) continue;
+        // Module samples carry their actual scan-time power decision. Older
+        // module snapshots lacking that evidence must not imply a live zero.
+        const sampled = plc.powered && (id.controllerId ? io.sampled === true : true);
+        append({ kind: 'numeric', source: 'plc-analog-input', ...id, tag: io.tag,
+          value: sampled && io.connected && Number.isFinite(io.value) ? io.value : null,
+          unit: io.unit, connected: io.connected && Number.isFinite(io.value), sampled,
+          ...(io.source ? { origin: io.source } : {}), snapshotTick: snapshot.tick });
+      }
     }
+    if (deviceId !== undefined && part.id !== deviceId) continue;
     // These readings are the physical equipment model's actual reported image,
     // not a fabricated sensor state derived from an animation or a PLC command.
     const plant = snapshot.plantWorld.signals[part.id];

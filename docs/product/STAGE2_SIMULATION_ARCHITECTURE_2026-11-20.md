@@ -113,3 +113,7 @@ The exact-head UX2 run 45500492331 failed the P4 reversing browser regression af
 ## 2026-11-26 — reconciliation with University Recovery
 
 The previous Stage 2 head `c4a4765a` passed all four hosted workflows and Vercel preview, including the earlier P4 reversing regression. This integration preserves the newly merged University Recovery variable-period/time-scale worker and assessment dispatch, expansion I/O and pneumatic pressure sensing, all new command kinds (49), plant controls and inspector integrations. It restores bounded mailbox/event ingress and FIFO priority Pause on top of that worker, preserves the shared controller execution, updates the input sampler for powered module pins and retains pressure inputs in the controller and paused observation paths. Added module-reference regression and compile-time command-kind exhaustiveness. Existing CI budgets unchanged. Fresh exact-head CI required; no new test pass or merge approval claimed. Full R3 acceptance remains open.
+
+## Expansion telemetry and virtual failure boundary continuation
+
+Integrated physical module endpoint ownership in the read-only channel adapter, exposed actual scan-time module sample availability, and zeroed declared numeric output tags on failure. Added module identity/analog availability tests and extended failure-output assertions. Existing project format and non-module snapshot shape retained; independent hardware and full R3 closure remain open. Fresh CI required.

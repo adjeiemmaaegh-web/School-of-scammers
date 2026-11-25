@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createWorld, renderSnapshot } from '../src/sim/orchestrator';
-import { MAX_DEVICE_CHANNELS, readDeviceChannels } from '../src/sim/device-channels';
+import { MAX_DEVICE_CHANNELS, channelSemantics, readDeviceChannels } from '../src/sim/device-channels';
+import { sampleAnalogInputs } from '../src/sim/analog';
 import type { ProjectFile, RenderSnapshot } from '../src/sim/signals';
 
 const component = (id: string, kind: ProjectFile['components'][number]['kind']) =>
@@ -49,6 +50,32 @@ describe('Stage 2 per-device signal contract', () => {
     const analog = image.channels.filter(c => c.kind === 'numeric');
     expect(analog[0]).toMatchObject({ value: null, connected: false, unit: 'ml' });
     expect(analog[1]).toMatchObject({ value: 23.5, connected: true, unit: '°C', origin: 'probe.TEMP' });
+  });
+
+  it('reports physical expansion pins and an unpowered analog module as unavailable, not live zero', () => {
+    const project = { components: [component('host', 'plc16'), component('di', 'io-di8'),
+      component('ai', 'io-ai4'), component('tank', 'tank')],
+      wires: [{ id: 'numeric', from: 'tank.LEVEL', to: 'ai.AI0' }] };
+    const io = { inputs: {}, outputs: {}, analogInputs: { 'ai:AI0': 'Level' } };
+    const readings = sampleAnalogInputs(project, { tank: { levelMl: 123 } }, 'host', io, true);
+    expect(readings.points[0]).toMatchObject({ connected: true, sampled: false, value: 0 });
+    const powered = sampleAnalogInputs(project, { tank: { levelMl: 123 } }, 'host', io, true,
+      new Set(), undefined, id => id === 'ai');
+    expect(powered.points[0]).toMatchObject({ connected: true, sampled: true, value: 123 });
+    const snapshot = renderSnapshot(createWorld());
+    snapshot.plcs.host = { powered: true, io: {
+      inputs: [{ terminal: 'I0.0', tag: 'In0', on: true }, { terminal: 'di:I0', tag: 'Expanded', on: true }],
+      outputs: [], analogInputs: readings.points,
+    } } as RenderSnapshot['plcs'][string];
+    const digital = readDeviceChannels(project, snapshot, 'di').channels;
+    expect(digital).toHaveLength(1);
+    expect(digital[0]).toMatchObject({ deviceId: 'di', controllerId: 'host', endpoint: 'di.I0', value: true });
+    expect(channelSemantics(digital[0]).powerReference).toBe('module-L+-to-M');
+    expect(readDeviceChannels(project, snapshot, 'host').channels).toHaveLength(3);
+    const unpowered = readDeviceChannels(project, snapshot, 'ai').channels[0];
+    expect(unpowered).toMatchObject({ endpoint: 'ai.AI0', connected: true, sampled: false, value: null });
+    snapshot.plcs.host.io.analogInputs = powered.points;
+    expect(readDeviceChannels(project, snapshot, 'ai').channels[0]).toMatchObject({ sampled: true, value: 123, unit: 'ml' });
   });
 
   it('bounds a large incoming equipment image to prevent unbounded diagnostics rendering', () => {

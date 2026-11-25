@@ -4,7 +4,7 @@
 
 ## One identity and one authoritative scan
 
-A placed device has a unique project component `id` and a `kind` from `src/components/registry.ts`. Its terminals are addressed `<id>.<terminal>`. Validated project files preserve `formatVersion: 1`. The only PLC/plant state transition is `src/sim/orchestrator.ts:tick()`, which runs in the Web Worker using 50 ms PLC scans and five 10 ms plant substeps. Scene renderers and the inspector consume snapshots; they never generate a replacement sensor/actuator outcome.
+A placed device has a unique project component `id` and a `kind` from `src/components/registry.ts`. Its terminals are addressed `<id>.<terminal>`. Validated project files preserve `formatVersion: 1`. The only PLC/plant state transition is `src/sim/orchestrator.ts:tick()`, which runs in the Web Worker using the configured 10–500 ms PLC scan period (default 50 ms) and fixed 10 ms plant substeps. Scene renderers and the inspector consume snapshots; they never generate a replacement sensor/actuator outcome.
 
 The read-only `src/sim/device-contract.ts:deviceIntegrationContract(kind)` joins definitions **without** becoming a second component registry. A device model must retain the following sources of truth:
 
@@ -48,3 +48,7 @@ The read-only `src/sim/device-contract.ts:deviceIntegrationContract(kind)` joins
 - Stage 3 handles PLC IDE development, Stage 4 electrical/3D authoring, Stage 5 equipment breadth, and later stages diagnostics and learning flows. Do not enlarge Stage 2 into those projects.
 
 **Status:** Stage 2 development contract documented; further kernel consolidation remains. No merge or deployment implied.
+
+## University Recovery integration extension
+
+Expansion I/O channel identity uses `pinLocation()` to name the actual module terminal and host controller, not a synthetic host pin. The Inspector can scope readings to the physical module. Numeric expansion samples carry the scan-time module power decision, so an unpowered or unverified module is shown as unavailable rather than a measured zero. The virtual failure projection also clears registered numeric output tags while preserving unrelated input and register values. Source tests are authored; acceptance requires exact-head CI. This still does not establish per-actuator controller attribution or full numeric output instrumentation.

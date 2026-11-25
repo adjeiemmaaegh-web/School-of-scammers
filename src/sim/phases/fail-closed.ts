@@ -1,6 +1,7 @@
 /** Fail-closed helpers shared by the tick phases and the orchestrator's pause paths. */
 import type { SortingPlant } from '../../plant/sorting-conveyor';
-import type { PlcRuntime, WorldState } from '../signals';
+import type { PlcRuntime, ProjectFile, WorldState } from '../signals';
+import { ioOf } from '../plc-io';
 
 export const quietLanes = (lanes: Record<string, SortingPlant>): Record<string, SortingPlant> =>
   Object.fromEntries(Object.entries(lanes).map(([id, lane]) => [id, { ...lane, photoeyeActive: false }]));
@@ -11,13 +12,16 @@ export const quietLanes = (lanes: Record<string, SortingPlant>): Record<string, 
  * program memory or the device's real supply-powered indication.
  * The next authoritative PLC scan rebuilds the complete image.
  */
-export const deenergisedPlcs = (plcs: Record<string, PlcRuntime>): Record<string, PlcRuntime> =>
+export const deenergisedPlcs = (plcs: Record<string, PlcRuntime>, project?: ProjectFile): Record<string, PlcRuntime> =>
   Object.fromEntries(Object.entries(plcs).map(([id, rt]) => {
     const offTags = Object.fromEntries(Object.keys(rt.coils).map(tag => [tag, false]));
+    const device = project?.components.find(c => c.id === id);
+    const analogTags = device && project ? Object.values(ioOf(project, device).analogOutputs ?? {}) : [];
+    const zeroAnalog = Object.fromEntries(analogTags.filter(tag => Object.prototype.hasOwnProperty.call(rt.tagValues, tag)).map(tag => [tag, 0]));
     return [id, {
       ...rt,
       coils: {},
-      tagValues: { ...rt.tagValues, ...offTags },
+      tagValues: { ...rt.tagValues, ...offTags, ...zeroAnalog },
     }];
   }));
 
@@ -41,7 +45,7 @@ export function haltedSimulationWorld(
     running: false,
     coils: { ...w.coils, ...off },
     tagValues: { ...w.tagValues, ...off },
-    plcs: deenergisedPlcs(w.plcs),
+    plcs: deenergisedPlcs(w.plcs, w.project),
     deviceOn: {},
     timers: {},
     threePhase: {},

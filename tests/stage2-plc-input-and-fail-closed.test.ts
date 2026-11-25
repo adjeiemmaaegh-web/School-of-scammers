@@ -74,7 +74,7 @@ describe('Stage 2 one virtual fail-closed world boundary', () => {
     world.coils = { Run: true, Fill: true, Custom: true };
     world.tagValues = { ...world.tagValues, Run: true, Fill: true, Counter: 23 };
     world.plcs.p2.coils = { Out0: true };
-    world.plcs.p2.tagValues = { Out0: true, Count: 7 };
+    world.plcs.p2.tagValues = { Out0: true, Count: 7, AnalogOut0: 321 };
     world.running = true;
     world.motorOn = true;
     world.voltages = { 'p2.L+': 24 };
@@ -89,7 +89,7 @@ describe('Stage 2 one virtual fail-closed world boundary', () => {
     });
     expect(stopped.tagValues).toMatchObject({ Run: false, Fill: false, Counter: 23 });
     expect(stopped.plcs.p2.coils).toEqual({});
-    expect(stopped.plcs.p2.tagValues).toMatchObject({ Out0: false, Count: 7 });
+    expect(stopped.plcs.p2.tagValues).toMatchObject({ Out0: false, Count: 7, AnalogOut0: 0 });
     expect(stopped.voltages).toEqual({});
     expect(stopped.project).toBe(project);
     expect(stopped.diagnostics).toEqual(['previous', 'PLC scan interrupted; simulated outputs deenergized']);
