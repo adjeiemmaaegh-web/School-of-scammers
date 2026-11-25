@@ -182,7 +182,7 @@ export function scanPlc(
       if(!analogInputs.some(p=>p.tag.toLowerCase()===declaration.name.toLowerCase()&&p.connected))
         throw new Error('Numeric input '+declaration.name+' has no connected source');
     }
-    const result = executeStructuredText(compiled, tagInputs, prior.stMemory);
+    const result = executeStructuredText(compiled, tagInputs, prior.stMemory, dtMs);
     const out = (name: string) => Object.entries(result.outputs).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1];
     if (names.requireRun && typeof out('Run') !== 'boolean') throw new TypeError('ST Run output must be BOOL');
     for (const name of names.outputs) {

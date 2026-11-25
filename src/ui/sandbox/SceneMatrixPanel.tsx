@@ -117,7 +117,7 @@ export function SceneMatrixPanel({scene,project,snapshot}:Props){
     debug||snapshot.lastError)return;
   worker.current?.terminate();
   const runId=++nextId.current;
-  const local=new Worker(new URL('../../sim/p12-assessment.worker.ts',import.meta.url),
+  const local=new Worker(new URL('../../sim/worker.ts',import.meta.url),
    {type:'module'});
   worker.current=local;
   setPending(true);setError(null);setReport(null);setBatchReport(null);

@@ -48,6 +48,15 @@ describe('Stage 2 canonical per-controller input sampling', () => {
       .toEqual({ Start: false, Enable: false });
   });
 
+  it('reads expansion DI pins only against the powered module and host references', () => {
+    const io = { ...defaultIo('plc16'), inputs: { 'module:I0': 'Expanded' } };
+    const live = circuit('module.L+|module.M', 'module.I0|module.M');
+    expect(samplePlcDigitalInputs('host', io, true, live, sensorPower)).toEqual({ Expanded: true });
+    expect(samplePlcDigitalInputs('host', io, false, live, sensorPower)).toEqual({ Expanded: false });
+    expect(samplePlcDigitalInputs('host', io, true, circuit('module.I0|module.M'), sensorPower)).toEqual({ Expanded: false });
+    expect(samplePlcDigitalInputs('host', io, true, circuit('module.L+|module.M', 'module.I0|host.M'), sensorPower)).toEqual({ Expanded: false });
+  });
+
   it('keeps independently renamed I/O tag identities', () => {
     const io = { ...defaultIo('plc16'), inputs: { 'I0.0': 'ConveyorReady', 'I0.5': 'MotorStop' } };
     expect(samplePlcDigitalInputs('secondary', io, true,

@@ -82,6 +82,8 @@ describe('R7.5 / R11.8 maximal-project soak', () => {
     const sorted = [...a.ms].sort((x, y) => x - y);
     const p50 = sorted[Math.floor(sorted.length * 0.5)], p95 = sorted[Math.floor(sorted.length * 0.95)], p99 = sorted[Math.floor(sorted.length * 0.99)];
     nodeProcess?.stderr?.write(`SOAK comps=${start.project.components.length} wires=${start.project.wires.length} scans=12000 p50=${p50.toFixed(3)}ms p95=${p95.toFixed(3)}ms p99=${p99.toFixed(3)}ms max=${sorted[sorted.length - 1].toFixed(2)}ms\n`);
-    expect(p95).toBeLessThan(25); // half of the 50 ms scan budget, on a CI machine: generous on purpose
+    // half of the 50 ms scan budget on a CI machine; the coverage job (PLC_COVERAGE_RUN) instruments every line, so it gets more room
+    const coverageRun = !!(globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.PLC_COVERAGE_RUN;
+    expect(p95).toBeLessThan(coverageRun ? 125 : 25);
   }, 180000);
 });

@@ -8,6 +8,7 @@
  * per-controller I/O semantics. It never scans, controls or mutates a PLC.
  */
 import { sampleAnalogInputs } from './analog';
+import { airSensorReadings } from './air-sensors';
 import { faultsOf } from './faults';
 import { ioOf, LEGACY_IO } from './plc-io';
 import { legacyPrimaryId, plcComponents, plcView, programOf } from './plcs';
@@ -30,7 +31,7 @@ export function plcObservationImage(world: WorldState): Record<string, PlcView> 
           const negative = world.voltages[id + '.M'];
           return typeof positive === 'number' && typeof negative === 'number' &&
             Math.abs(positive - negative - 24) < 0.001;
-        }).points
+        }, airSensorReadings(world.project, world.air)).points
       : rt?.analogInputs ?? [];
     return [c.id, c.id === legacyId
       ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,

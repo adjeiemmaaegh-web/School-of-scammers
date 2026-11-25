@@ -3,7 +3,7 @@
  *
  * This module has NO timer, browser, renderer or simulation dependency.
  * A packet is validated once when received, then commands are applied in
- * arrival order at the normal 50 ms boundary. Queue rejection never partially
+ * arrival order at the configured scan boundary. Queue rejection never partially
  * inserts commands or leaks unbounded request acknowledgements.
  *
  * Limits cover the working v1 project format (<=1 MB in local storage) while
@@ -18,16 +18,61 @@ export const MAX_WORKER_PENDING_COMMANDS = 256;
 export const MAX_WORKER_PENDING_BYTES = 2_500_000;
 export const MAX_WORKER_PENDING_REQUESTS = 256;
 
-const KINDS: ReadonlySet<Command['k']> = new Set([
-  'editWorkspace', 'place', 'move', 'wire', 'unwire', 'operate', 'operateToggle',
-  'injectFault', 'injectSeededFault', 'clearFault', 'revealFault', 'repair',
-  'remove', 'setWireStyle', 'setParam', 'addPanel', 'feedParcel',
-  'setPlantFault', 'setTrainingOperator', 'loadPlantScene', 'operateProtection',
-  'setMeterProbe', 'setMeterMode', 'setThreePhasePower', 'configureIo',
-  'loadProgram', 'loadST', 'loadFBD', 'activateLanguage', 'breakAtScan',
-  'breakOnTag', 'breakOnInstruction', 'forceLocal', 'loadProject',
-  'run', 'pause', 'step', 'reset', 'clear',
-]);
+const COMMAND_KINDS = [
+  "editWorkspace",
+  "place",
+  "move",
+  "wire",
+  "unwire",
+  "operate",
+  "operateToggle",
+  "injectFault",
+  "injectSeededFault",
+  "clearFault",
+  "revealFault",
+  "repair",
+  "remove",
+  "setScanPeriod",
+  "setWireStyle",
+  "setParam",
+  "setOperator",
+  "addPanel",
+  "feedParcel",
+  "setPlantFault",
+  "setTrainingOperator",
+  "walkOperator",
+  "loadPlantScene",
+  "operateProtection",
+  "setMeterProbe",
+  "setMeterMode",
+  "setThreePhasePower",
+  "attachIoModule",
+  "renameModuleTag",
+  "setMechanicalLink",
+  "defineShape",
+  "removeShape",
+  "configureIo",
+  "loadProgram",
+  "loadST",
+  "loadSFC",
+  "loadIL",
+  "loadFBD",
+  "activateLanguage",
+  "breakAtScan",
+  "breakOnTag",
+  "breakOnInstruction",
+  "forceLocal",
+  "loadProject",
+  "run",
+  "pause",
+  "step",
+  "reset",
+  "clear"
+] as const satisfies readonly Command['k'][];
+// Compile-time exhaustiveness: adding a command requires extending ingress.
+const allCommandKindsCovered: Exclude<Command['k'], typeof COMMAND_KINDS[number]> extends never ? true : never = true;
+void allCommandKindsCovered;
+const KINDS: ReadonlySet<Command['k']> = new Set(COMMAND_KINDS);
 
 export type WorkerCommandPacket = {
   readonly commands: Command[];

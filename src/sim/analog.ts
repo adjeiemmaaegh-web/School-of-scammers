@@ -8,7 +8,7 @@ import { COMPONENTS } from '../components/registry';
 import { PLANT_EQUIPMENT } from '../plant/equipment';
 import type { SceneRuntime } from '../plant/world/runner';
 import type { PlacedComponent, ProjectFile, Wire } from './signals';
-import type { PlcIoMap } from './plc-io';
+import { pinLocation, type PlcIoMap } from './plc-io';
 
 export type AnalogPoint = { terminal: string; tag: string; value: number; unit: string; connected: boolean; source: string | null };
 type AnalogRole = 'analog-input' | 'analog-output';
@@ -46,11 +46,15 @@ export function sampleAnalogInputs(
   vessels: Readonly<Record<string, { levelMl: number }>>,
   plcId: string, io: PlcIoMap, powered: boolean, openWireIds: ReadonlySet<string> = new Set(),
   plant?: SceneRuntime, isPlantSourcePowered: (id: string) => boolean = () => false,
+  airBar: Readonly<Record<string, number>> = {},
 ): { values: Record<string, number>; points: AnalogPoint[] } {
   const values: Record<string, number> = {};
   const points: AnalogPoint[] = [];
   for (const [pin, tag] of Object.entries(io.analogInputs ?? {})) {
-    const target = plcId + '.' + pin;
+    // R13: a pin of an expansion AI module is wired on the MODULE and reads only while the module itself is powered.
+    const at = pinLocation(plcId, pin);
+    const target = at.owner + '.' + at.pin;
+    const channelPowered = powered && (!at.module || isPlantSourcePowered(at.owner));
     const link = project.wires.find(w => !openWireIds.has(w.id) &&
       (w.from === target || w.to === target) && isAnalogWire(w, project.components));
     const source = link ? (link.from === target ? link.to : link.from) : null;
@@ -62,21 +66,25 @@ export function sampleAnalogInputs(
     const model = part && PLANT_EQUIPMENT[part.kind];
     const channel = model?.signals.find(ch => ch.kind === 'number' && signal === 'AN_' + ch.name);
     const processSensor = !!source && !!channel && !!plant && isPlantSourcePowered(id);
-    const connected = legacyTank || processSensor;
+    // R06: an air pressure sensor's analog output is the working pressure at its AIR port.
+    const airSensor = !!source && part?.kind === 'pressure-sensor' && signal === 'AN_pressureBar' && isPlantSourcePowered(id);
+    const connected = legacyTank || processSensor || airSensor;
     let value = 0;
-    if (powered && legacyTank) {
+    if (channelPowered && legacyTank) {
       const reading = vessels[id]?.levelMl ?? 0;
       if (!Number.isFinite(reading) || reading < 0 || reading > 1000)
         throw new RangeError('Invalid tank numeric signal');
       value = reading;
-    } else if (powered && processSensor) {
+    } else if (channelPowered && airSensor) {
+      value = airBar[id] ?? 0;
+    } else if (channelPowered && processSensor) {
       const reading = plant!.signals[id]?.[channel!.name];
       if (typeof reading !== 'number' || !Number.isFinite(reading) || Math.abs(reading) > 1_000_000_000)
         throw new RangeError('Invalid physical equipment numeric signal');
       value = reading;
     }
     values[tag] = value;
-    points.push({ terminal: pin, tag, value, unit: connected ? legacyTank ? 'ml' : channel?.unit ?? '' : '',
+    points.push({ terminal: pin, tag, value, unit: connected ? legacyTank ? 'ml' : airSensor ? 'bar' : channel?.unit ?? '' : '',
       connected, source: connected ? source : null });
   }
   return { values, points };

@@ -1,8 +1,8 @@
 /** P1/P3 educational 24V components; original assets, bounded single-lane plant. */
 import { EQUIPMENT } from '../plant/equipment';
 import type { EquipmentDef } from '../plant/world/equipment';
-export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive';
-export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' | 'three-phase' };
+export type ComponentKind = 'supply' | 'plc' | 'plc16' | 'start' | 'stop' | 'contactor' | 'motor' | 'conveyor' | 'photoeye' | 'diverter' | 'tank' | 'pump' | 'levelprobe' | 'drainvalve' | 'breaker' | 'overload' | 'lamp' | 'relay' | 'timerelay' | 'cylinder' | 'stacklight' | 'estop' | 'reversebutton' | 'forwardcontactor' | 'reversecontactor' | 'revmotor' | 'belt-conveyor' | 'roller-conveyor' | 'turntable' | 'stopper' | 'pusher' | 'diverter-gate' | 'box-feeder' | 'geometry-photoeye' | 'inductive-prox' | 'capacitive-prox' | 'light-curtain' | 'weigh-cell' | 'lift' | 'scissor-lift' | 'rotary-actuator' | 'pick-and-place' | 'palletizer' | 'shelf' | 'asrs-crane' | 'robot-arm' | 'process-tank' | 'mixer' | 'heater' | 'proportional-valve' | 'filler' | 'capper' | 'three-phase-supply' | 'star-delta-drive' | 'selector' | 'buzzer' | 'siren' | 'collector' | 'retro-photoeye' | 'laser-distance' | 'rfid-reader' | 'vision-sensor' | 'incremental-encoder' | 'compressor' | 'air-regulator' | 'safety-fence' | 'guard-door' | 'curved-conveyor' | 'transfer-unit' | 'process-station' | 'handrail' | 'platform' | 'stairs' | 'work-zone' | 'potentiometer' | 'selector-3pos' | 'seven-segment' | 'numeric-display' | 'operator-station' | 'indicator-panel' | 'io-di8' | 'io-do8' | 'io-ai4' | 'io-ao2' | 'transfer-pump' | 'merge-gate' | 'pressure-sensor' | 'gantry' | 'index-table' | 'machine-guard' | 'drive' | 'transfer-valve';
+export type Terminal = { name: string; side: 'left' | 'right'; y: number; role: 'supply' | 'return' | 'passive' | 'input' | 'output' | 'load' | 'analog-input' | 'analog-output' | 'three-phase' | 'air' };
 export type Definition = { kind: ComponentKind; label: string; help: string; terminals: readonly Terminal[] };
 /** Both controller kinds: the fixed 5-in/6-out `plc` and the configurable 16-in/16-out `plc16`. */
 export const isPlcKind = (kind: string): boolean => kind === 'plc' || kind === 'plc16';
@@ -15,7 +15,23 @@ const plc16Terminals = (): Terminal[] => [
   ...PLC16_OUTPUT_TERMINALS.map((name, i): Terminal => ({ name, side: 'right', y: 30 + i * 6.5, role: 'output' })),
   { name:'AI0',side:'left',y:142,role:'analog-input' },
   { name:'AI1',side:'left',y:153,role:'analog-input' },
+  { name:'AO0',side:'right',y:164,role:'analog-output' },
+  { name:'AO1',side:'right',y:175,role:'analog-output' },
 ];
+/** Expansion I/O modules (R13): digital 8-point DI/DO and analog 4-input AI / 2-output AO modules, powered separately from the PLC they extend. */
+export const IO_MODULE_POINTS = 8;
+export type IoModuleKind = 'io-di8' | 'io-do8' | 'io-ai4' | 'io-ao2';
+export const IO_MODULE_ANALOG_INPUTS = 4, IO_MODULE_ANALOG_OUTPUTS = 2;
+export const isIoModuleKind = (kind: string): kind is IoModuleKind => kind === 'io-di8' || kind === 'io-do8' || kind === 'io-ai4' || kind === 'io-ao2';
+function ioModuleTerminals(kind: IoModuleKind): Terminal[] {
+  const power: Terminal[] = [{ name: 'L+', side: 'left', y: 8, role: 'supply' }, { name: 'M', side: 'left', y: 22, role: 'return' }];
+  const row = (count: number, prefix: string, side: 'left' | 'right', role: Terminal['role']): Terminal[] =>
+    Array.from({ length: count }, (_, i): Terminal => ({ name: `${prefix}${i}`, side, y: 36 + i * 12, role }));
+  if (kind === 'io-di8') return [...power, ...row(IO_MODULE_POINTS, 'I', 'left', 'input')];
+  if (kind === 'io-do8') return [...power, ...row(IO_MODULE_POINTS, 'Q', 'right', 'output')];
+  if (kind === 'io-ai4') return [...power, ...row(IO_MODULE_ANALOG_INPUTS, 'AI', 'left', 'analog-input')];
+  return [...power, ...row(IO_MODULE_ANALOG_OUTPUTS, 'AO', 'right', 'analog-output')];
+}
 const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
   stacklight: { kind: 'stacklight', label: 'Stack light (R/Y/G)', help: 'Three 24V signal lamps on one column: R, Y and G each to the common M-', terminals: [
     { name: 'R', side: 'left', y: 32, role: 'load' }, { name: 'Y', side: 'left', y: 62, role: 'load' },
@@ -29,11 +45,20 @@ const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
     { name: 'A1', side: 'left', y: 24, role: 'load' }, { name: 'A2', side: 'left', y: 48, role: 'load' },
     { name: '13', side: 'left', y: 100, role: 'passive' }, { name: '14', side: 'right', y: 100, role: 'passive' },
     { name: '21', side: 'left', y: 126, role: 'passive' }, { name: '22', side: 'right', y: 126, role: 'passive' }] },
-  cylinder: { kind: 'cylinder', label: 'Pneumatic cylinder', help: 'Double-acting cylinder: EXT+ / RET+ solenoids to M- (energising both holds it), limit switches EXT_LS / RET_LS powered from L+. Air is assumed available.', terminals: [
+  cylinder: { kind: 'cylinder', label: 'Pneumatic cylinder', help: 'Double-acting cylinder: EXT+ / RET+ solenoids to M- (energising both holds it), limit switches EXT_LS / RET_LS powered from L+. Air is assumed available unless the project has an air compressor: then plumb the AIR port to a compressor or regulator.', terminals: [
     { name: 'EXT+', side: 'left', y: 28, role: 'load' }, { name: 'RET+', side: 'left', y: 54, role: 'load' },
     { name: 'M-', side: 'left', y: 80, role: 'load' }, { name: 'L+', side: 'left', y: 106, role: 'supply' },
-    { name: 'EXT_LS', side: 'right', y: 54, role: 'output' }, { name: 'RET_LS', side: 'right', y: 90, role: 'output' }] },
+    { name: 'EXT_LS', side: 'right', y: 54, role: 'output' }, { name: 'RET_LS', side: 'right', y: 90, role: 'output' },
+    { name: 'AIR', side: 'right', y: 124, role: 'air' }] },
   plc16: { kind: 'plc16', label: 'Virtual PLC 16/16', help: '24V PLC, 16 digital inputs and 16 high-side outputs with names you choose', terminals: plc16Terminals() },
+  'io-di8': { kind: 'io-di8', label: 'Expansion DI8 module', help: 'Eight-point 24V digital-input expansion module: power L+/M, inputs I0-I7 read by the host PLC chosen in the inspector (R13)', terminals: ioModuleTerminals('io-di8') },
+  'io-ai4': { kind: 'io-ai4', label: 'Expansion AI4 module', help: 'Four-channel analog-input expansion module: power L+/M, inputs AI0-AI3 read by the host PLC chosen in the inspector (R13)', terminals: ioModuleTerminals('io-ai4') },
+  'io-ao2': { kind: 'io-ao2', label: 'Expansion AO2 module', help: 'Two-channel analog-output expansion module: power L+/M, outputs AO0-AO1 driven by REAL outputs of the host PLC (R13)', terminals: ioModuleTerminals('io-ao2') },
+  'io-do8': { kind: 'io-do8', label: 'Expansion DO8 module', help: 'Eight-point 24V high-side digital-output expansion module: power L+/M, outputs Q0-Q7 driven by the host PLC chosen in the inspector (R13)', terminals: ioModuleTerminals('io-do8') },
+  'pressure-sensor': { kind: 'pressure-sensor', label: 'Air pressure sensor', help: 'Measures the air pressure of the line its AIR port is plumbed to (R06). Powered by L+/M: AN_pressureBar is an analog output in bar for a PLC analog input, OUT_atPressure closes while the pressure is at or above the setpoint in the inspector. An unplumbed or unpowered sensor reads 0', terminals: [
+    { name: 'L+', side: 'left', y: 28, role: 'supply' }, { name: 'M', side: 'left', y: 54, role: 'return' },
+    { name: 'AIR', side: 'left', y: 84, role: 'air' },
+    { name: 'OUT_atPressure', side: 'right', y: 40, role: 'output' }, { name: 'AN_pressureBar', side: 'right', y: 76, role: 'analog-output' }] },
   supply: { kind: 'supply', label: '24V supply', help: 'Educational DC source', terminals: [
     { name: 'P24', side: 'right', y: 45, role: 'supply' }, { name: 'M0', side: 'right', y: 92, role: 'return' }] },
   plc: { kind: 'plc', label: 'Virtual PLC', help: '24V PLC, five digital inputs and six high-side outputs', terminals: [
@@ -118,6 +143,18 @@ const EXISTING_COMPONENTS: Partial<Record<ComponentKind,Definition>> = {
       { name: 'TRIP_OUT', side: 'right', y: 89, role: 'output' },
       { name: 'STAR_OUT', side: 'right', y: 117, role: 'output' },
       { name: 'DELTA_OUT', side: 'right', y: 145, role: 'output' }] },
+  selector: { kind: 'selector', label: 'Selector switch (2-position)', help: 'Maintained two-position selector: turning it to position 2 closes its A-B contact and it stays there until turned back. Wire it like a pushbutton. Educational model.', terminals: [
+    { name: 'A', side: 'left', y: 70, role: 'passive' }, { name: 'B', side: 'right', y: 70, role: 'passive' }] },
+  buzzer: { kind: 'buzzer', label: '24V buzzer', help: 'Sounds only when its two actual 24V DC terminals are energized (simulated tone, no audio hardware)', terminals: [
+    { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
+  siren: { kind: 'siren', label: '24V alarm siren', help: 'Sounds only when its two actual 24V DC terminals are energized (simulated alarm, no audio hardware)', terminals: [
+    { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
+  compressor: { kind: 'compressor', label: 'Air compressor with receiver', help: 'Motor coil A1-A2 (24V) pumps a receiver tank between its cut-in and cut-out pressure; PS_A-PS_B is a pressure-switch contact that closes when the receiver is at or above the switch pressure; AIR is the outlet to air lines. Educational lumped model.', terminals: [
+    { name: 'A1', side: 'left', y: 40, role: 'load' }, { name: 'A2', side: 'left', y: 90, role: 'load' },
+    { name: 'PS_A', side: 'left', y: 118, role: 'passive' }, { name: 'PS_B', side: 'right', y: 118, role: 'passive' },
+    { name: 'AIR', side: 'right', y: 60, role: 'air' }] },
+  'air-regulator': { kind: 'air-regulator', label: 'Air pressure regulator', help: 'Passes air from AIR_IN to AIR_OUT, never above its set pressure (one way). Wire air lines between air ports only.', terminals: [
+    { name: 'AIR_IN', side: 'left', y: 70, role: 'air' }, { name: 'AIR_OUT', side: 'right', y: 70, role: 'air' }] },
   lamp: { kind: 'lamp', label: '24V pilot lamp', help: 'Illuminates only when its two actual 24V DC terminals are energized', terminals: [
     { name: 'L+', side: 'left', y: 48, role: 'load' }, { name: 'M-', side: 'left', y: 94, role: 'load' }] },
 };

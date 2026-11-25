@@ -13,6 +13,7 @@ import { faultsOf } from '../faults';
 import { ioOf, LEGACY_IO } from '../plc-io';
 import { classicInputs, freshPlcRuntime, namesFor, programOf, runtimePlcs, scanPlc } from '../plcs';
 import { sampleAnalogInputs } from '../analog';
+import { airSensorReadings } from '../air-sensors';
 import { samplePlcDigitalInputs } from '../plc-input-image';
 import { haltedSimulationWorld } from './fail-closed';
 import type { PlacedComponent, PlcInputs, PlcRuntime, SimEvent, WorldState } from '../signals';
@@ -99,7 +100,7 @@ export function scanControllers(
     try {
       const openAnalogWires = new Set(faultsOf(w.project).filter(f => f.kind === 'wire-open').map(f => f.target));
       const numeric = sampleAnalogInputs(w.project, w.vessels, extra.id, io, extraPowered, openAnalogWires,
-        w.plantWorld, id => circuit.reads24(terminal(id, 'L+'), terminal(id, 'M')));
+        w.plantWorld, id => circuit.reads24(terminal(id, 'L+'), terminal(id, 'M')), airSensorReadings(w.project, w.air));
       // Physical numeric process inputs come from the preceding settled scan state.
       const tagInputs = { ...digitalInputs, ...numeric.values };
       nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)),

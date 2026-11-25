@@ -6,13 +6,17 @@
 import {useMemo,useState} from 'react';
 import type {ProjectFile,RenderSnapshot,Command} from '../../sim/signals';
 import {SCENES} from '../../plant/scenes/catalogue';
+import {DEMOS} from '../../plant/demos';
 import {sceneFromProject} from '../../plant/scenes/commissioning';
 import {SceneCommissioningPanel} from './SceneCommissioningPanel';
 import {PLANT_EQUIPMENT} from '../../plant/equipment';
 import {SCENE_CATEGORIES,SCENE_METADATA,searchSceneIds,
  type SceneCategory} from '../../plant/scenes/metadata';
+import {MATERIALS,MAX_CUSTOM_SHAPES} from '../../plant/world/materials';
+import {ShapeEditor} from './ShapeEditor';
 import './plant-scene.css';
 
+const SHAPE_EXAMPLE=JSON.stringify({id:'my-bracket',label:'My bracket',massKg:3,blocks:[{x:0,y:0,z:0,w:100,d:60,h:20},{x:0,y:0,z:20,w:20,d:60,h:80}]},null,2);
 type Props={project:ProjectFile|null;snapshot:RenderSnapshot|null;editable:boolean;
  onCommands:(commands:Command[])=>void};
 
@@ -44,7 +48,65 @@ export function PlantScenePanel({project,snapshot,editable,onCommands}:Props){
   setOpenedId(id);
   setPendingId(null);
  };
+ const [pendingDemo,setPendingDemo]=useState<string|null>(null);
+ const startDemo=(id:string)=>{
+  if(!editable)return;
+  if(project?.components.length&&pendingDemo!==id){setPendingDemo(id);return;}
+  const demo=DEMOS.find(d=>d.id===id);
+  if(demo)onCommands([{k:'loadProject',project:demo.build()}]);
+  setPendingDemo(null);
+ };
+ // R02 custom shapes: a JSON block list (millimetres, corner origin) is validated by the worker like any other edit.
+ const [shapeText,setShapeText]=useState(SHAPE_EXAMPLE);
+ const [shapeNote,setShapeNote]=useState<string|null>(null);
+ const defineShape=()=>{
+  try{onCommands([{k:'defineShape',shape:JSON.parse(shapeText)}]);setShapeNote(null);}
+  catch{setShapeNote('That is not valid JSON.');}
+ };
+ const [opX,setOpX]=useState('0');
+ const [opY,setOpY]=useState('-2000');
+ const operator=snapshot?.plantWorld.world.trainingOperator;
+ const mm=(v:string)=>Math.max(-6000,Math.min(6000,Math.round(Number(v)||0)));
  return <>
+  <details className="sandbox-plant-scenes panel" data-sandbox-operator>
+   <summary>Simulated operator (R24) · {operator?`at ${Math.round(operator.pos.x)}, ${Math.round(operator.pos.y)} mm, height ${Math.round(operator.pos.z)} mm`:'not placed'}</summary>
+   <p className="sandbox-help">A training actor, not a camera or a real person detector. It walks at 1.2 m/s, is stopped by fences, closed guard doors, handrails, shelves and tanks, climbs only stairs, and is seen by zone sensors and operator-aware photoeyes at its real position and height. Floor coordinates are millimetres from the floor centre.</p>
+   <div className="sandbox-p9-scene-filter">
+    <label>X (mm)<input type="number" data-operator-x value={opX} min={-6000} max={6000} step={100} onChange={e=>setOpX(e.target.value)}/></label>
+    <label>Y (mm)<input type="number" data-operator-y value={opY} min={-6000} max={6000} step={100} onChange={e=>setOpY(e.target.value)}/></label>
+    <button type="button" className="btn ghost small" data-operator-place onClick={()=>onCommands([{k:'setTrainingOperator',enabled:true,xMm:mm(opX),yMm:mm(opY),feetMm:0}])}>Place operator here</button>
+    <button type="button" className="btn primary small" data-operator-walk disabled={!operator} onClick={()=>onCommands([{k:'walkOperator',xMm:mm(opX),yMm:mm(opY)}])}>Walk to here</button>
+    <button type="button" className="btn ghost small" data-operator-remove disabled={!operator} onClick={()=>onCommands([{k:'setTrainingOperator',enabled:false,xMm:0,yMm:0,feetMm:0}])}>Remove operator</button>
+   </div>
+  </details>
+  <details className="sandbox-plant-scenes panel" data-custom-shapes>
+   <summary>Custom shapes · {project?.customShapes?.length??0} of {MAX_CUSTOM_SHAPES} defined</summary>
+   <p className="sandbox-help">Describe your own workpiece as up to 8 touching blocks (millimetres) and use it by number: a feeder's <em>Material</em> or a collector's <em>Accepted material</em> setting {MATERIALS.length+1} is your first shape, {MATERIALS.length+2} the second, and so on. Pause the simulation to change shapes. Draw it below: the blocks are listed and drawn as you edit them.</p>
+   <ol data-shape-list>{(project?.customShapes??[]).map((shape,i)=><li key={shape.id}>
+    <strong>{MATERIALS.length+i+1}</strong> {shape.label} <code>{shape.id}</code> · {shape.blocks.length} block{shape.blocks.length===1?'':'s'} · {shape.massKg} kg
+    <button type="button" className="btn ghost small" disabled={!editable} data-shape-remove={shape.id}
+     onClick={()=>onCommands([{k:'removeShape',id:shape.id}])}>Remove</button></li>)}</ol>
+   <ShapeEditor text={shapeText} onChange={setShapeText} disabled={!editable}/>
+   <details><summary>Advanced: the definition as JSON</summary>
+    <label>Shape definition (JSON)<textarea data-shape-json rows={9} value={shapeText} spellCheck={false}
+     onChange={e=>setShapeText(e.target.value)}/></label>
+   </details>
+   {shapeNote&&<p role="alert">{shapeNote}</p>}
+   <button type="button" className="btn primary small" disabled={!editable} data-shape-define onClick={defineShape}>Define or replace shape</button>
+  </details>
+  <details className="sandbox-plant-scenes panel" data-sandbox-demos>
+   <summary>Demonstrations · {DEMOS.length} complete, wired and programmed example factories</summary>
+   <p className="sandbox-help">Unlike the unsolved scenes below, a demonstration is already wired and programmed so you can run it, then change it, break it with a fault and troubleshoot it. Every behaviour comes from the same simulation as your own projects. Educational simulation only.</p>
+   <div className="sandbox-plant-scene-grid">
+    {DEMOS.map(demo=><section key={demo.id} className="sandbox-plant-scene-choice" data-demo-card={demo.id}>
+     <strong>{demo.letter}. {demo.title}</strong>
+     <p>{demo.summary}</p>
+     {pendingDemo===demo.id&&<p role="status">This replaces your current project. Save or export it before confirming.</p>}
+     <button type="button" className="btn primary small" disabled={!editable} data-demo-load={demo.id}
+      onClick={()=>startDemo(demo.id)}>{pendingDemo===demo.id?'Confirm: replace project':'Load demonstration'}</button>
+    </section>)}
+   </div>
+  </details>
   <details className="sandbox-plant-scenes panel" data-p3-scene-gallery data-p9-scene-gallery>
    <summary>Plant Library · {SCENES.length} original editable learning scenes</summary>
    <p className="sandbox-help">Every scene starts unsolved: equipment and a blank wiring harness only.

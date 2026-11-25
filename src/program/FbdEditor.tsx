@@ -55,7 +55,7 @@ export function FbdEditor({document,snapshot,disabled,onActivate,showExamples=tr
   return <section className="sandbox-fbd-editor" aria-label="Function Block Diagram programming editor">
     <header className="sandbox-section-head"><div><span className="eyebrow">PLC program · connected blocks</span>
       <h2>Function Block Diagram (FBD)</h2></div>
-      <span className="status-pill is-idle">Deterministic 50 ms PLC scan</span>
+      <span className="status-pill is-idle">Deterministic PLC scan</span>
     </header>
     <p className="sandbox-help">Blocks are wired by selecting a source for each input pin. Their connections are displayed below. Feedback uses an INPUT block reading a previously published output tag, never an unbounded graph cycle. This is an educational subset, not vendor PLC hardware.</p>
     <div className="sandbox-fbd-actions">

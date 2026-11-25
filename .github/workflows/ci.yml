@@ -44,6 +44,36 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r9-lessons-browser.cjs
       - name: Browser - wire colour and net label (R5.1)
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r5-wire-style-browser.cjs
+      - name: R09/R23 scan period and simulation speed - same model-time behaviour at different periods and speeds, diagnostics, persistence
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-scan-time-browser.cjs
+      - name: R10 factory scale - 250-component project loads, runs in the real worker and reports load
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-factory-scale-browser.cjs
+      - name: R12 operator devices - selector switch, buzzer and siren built from an empty floor, fault consequence, reload
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-operator-devices-browser.cjs
+      - name: Sandbox seven demonstration projects load and run browser acceptance
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-demos-browser.cjs
+      - name: R02 custom shapes - drawn editor (views, add, remove, shape and turn), define, reject invalid, remove
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r02-shapes-browser.cjs
+      - name: R21/R22 free rotation - turn a belt by 15 degree steps from the toolbar, back to its exact saved shape
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r22-free-rotation-browser.cjs
+      - name: R07/R14 inspector - attach an expansion module, rename a channel, link a belt to a drive
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r07-inspector-browser.cjs
+      - name: R22 grouping - group, whole-group selection, rotate about the centre, ungroup, undo, reload
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r22-groups-browser.cjs
+      - name: R12 live operator controls - hold START on the station and watch the process respond
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r12-operator-live-browser.cjs
+      - name: R24 simulated operator - place, walk, blocked by the closed door, access request, walk in
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r24-operator-browser.cjs
+      - name: R02/R16/R26 material flow - feeder quantity, collector counting, conservation, live status
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-material-flow-browser.cjs
+      - name: R03 inclined belt - friction sorts cartons from glass bottles, incline set in the inspector
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-incline-browser.cjs
+      - name: R04/R17 sensors - vision inspection and RFID tags read live on a running line
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-sensors-browser.cjs
+      - name: R06 pneumatics - compressor, regulator and cylinder (pressure builds, stroke follows the regulator, low pressure blocks)
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-pneumatics-browser.cjs
+      - name: R20 guard door - a closed interlocked door holds the line, the operator opens it, material flows
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r13-guard-door-browser.cjs
       - name: R1 contextual workbench - canvas share, no clipped controls at five sizes, explicit tools, shortcuts, preference recovery
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r1-workbench-browser.cjs
       - name: Open sandbox P1 - place, wire, program, run and test failures
@@ -178,35 +208,6 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/accessibility-acceptance.cjs
       - name: No-WebGL low-resource browser functionality
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/cpu-fallback-acceptance.cjs
-      - name: Install Firefox and Linux WebKit for browser acceptance
-        # The apt/CDN download occasionally hangs for the whole job timeout (seen twice on 2026-11-18): bound each attempt
-        # and retry, so an infrastructure stall costs minutes instead of 40 and still fails loudly if it never succeeds.
-        timeout-minutes: 35
-        run: |
-          npm install --no-save --no-audit --no-fund playwright@1.64.1
-          ok=0
-          for attempt in 1 2 3; do
-            # Hosted runners run apt in the background on first boot; wait (bounded) for its dpkg lock instead of failing on it.
-            for _ in $(seq 1 60); do
-              sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1 || break
-              sleep 10
-            done
-            if timeout 480 npx playwright install --with-deps firefox webkit; then ok=1; break; fi
-            echo "playwright install attempt $attempt failed or timed out"; sleep 10
-          done
-          test "$ok" = 1
-      - name: Firefox browser smoke - DC, PLC workcell and mobile
-        run: |
-          npx vite preview --host 127.0.0.1 --port 4174 > /tmp/plc-firefox-preview.log 2>&1 &
-          for i in $(seq 1 40); do
-            if curl --silent --fail http://127.0.0.1:4174/ > /dev/null; then break; fi
-            sleep 1
-          done
-          curl --silent --fail http://127.0.0.1:4174/ > /dev/null
-          PLC_BASE_URL=http://127.0.0.1:4174 node scripts/firefox-acceptance.cjs
-      - name: Linux WebKit browser smoke - DC, workcell and mobile
-        run: |
-          PLC_BASE_URL=http://127.0.0.1:4174 node scripts/webkit-acceptance.cjs
       - name: Collect dependency, security and asset evidence (not legal clearance)
         if: always()
         shell: bash
@@ -238,3 +239,32 @@ jobs:
           name: plc-skills-lab-dist
           path: dist/
           if-no-files-found: error
+  firefox-webkit:
+    # Firefox and Linux WebKit run in Microsoft's Playwright image, whose browsers and system libraries are preinstalled at the
+    # same version as the pinned playwright package. The old in-job apt install stalled on a slow mirror, and its timeout
+    # killed npx but left apt-get holding the dpkg lock, so every retry failed and the whole build job hit 40 minutes.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Production build
+        run: npm run build
+      - name: Use the image's preinstalled Firefox and WebKit
+        run: npm install --no-save --no-audit --no-fund playwright@1.64.1
+      - name: Firefox and Linux WebKit browser smoke - DC, PLC workcell and mobile
+        # One step: a background preview server is not guaranteed to outlive a step inside a container job.
+        # HOME=/root: the job runs as root but GitHub mounts $HOME owned by pwuser, and Firefox refuses to start then.
+        env:
+          HOME: /root
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4174 > /tmp/plc-firefox-preview.log 2>&1 &
+          node -e "const go=async()=>{for(let i=0;i<40;i++){try{if((await fetch('http://127.0.0.1:4174/')).ok)return}catch{}await new Promise(r=>setTimeout(r,1000))}process.exit(1)};go()"
+          PLC_BASE_URL=http://127.0.0.1:4174 node scripts/firefox-acceptance.cjs
+          PLC_BASE_URL=http://127.0.0.1:4174 node scripts/webkit-acceptance.cjs

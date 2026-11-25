@@ -15,19 +15,19 @@ export const DEVICE_FAMILIES = [
 ] as const;
 export type DeviceFamily = (typeof DEVICE_FAMILIES)[number]['id'];
 const families: Record<Exclude<DeviceFamily,'all'>,readonly string[]> = {
-  plc:['plc','plc16'],
+  plc:['plc','plc16','io-di8','io-do8','io-ai4','io-ao2'],
   electrical:['supply','breaker','overload','contactor','forwardcontactor',
-    'reversecontactor','relay','timerelay','estop','start','stop','reversebutton',
+    'reversecontactor','relay','timerelay','estop','start','stop','reversebutton','selector',
     'three-phase-supply','star-delta-drive'],
   sensors:['photoeye','levelprobe','geometry-photoeye','inductive-prox',
-    'capacitive-prox','light-curtain','weigh-cell'],
-  drives:['motor','revmotor'],
-  handling:['conveyor','diverter','belt-conveyor','roller-conveyor','turntable',
-    'stopper','pusher','diverter-gate','box-feeder','palletizer','shelf','asrs-crane'],
-  motion:['cylinder','lift','scissor-lift','rotary-actuator','pick-and-place','robot-arm'],
-  process:['tank','pump','drainvalve','process-tank','mixer','heater',
+    'capacitive-prox','light-curtain','weigh-cell','retro-photoeye','pressure-sensor','laser-distance','rfid-reader','vision-sensor','incremental-encoder'],
+  drives:['motor','revmotor','drive'],
+  handling:['conveyor','diverter','belt-conveyor','roller-conveyor','turntable','curved-conveyor','transfer-unit','merge-gate','index-table','process-station','handrail','platform','stairs','work-zone','potentiometer','selector-3pos','seven-segment','numeric-display','operator-station','indicator-panel',
+    'stopper','pusher','diverter-gate','box-feeder','collector','safety-fence','machine-guard','guard-door','palletizer','shelf','asrs-crane'],
+  motion:['cylinder','compressor','air-regulator','lift','scissor-lift','rotary-actuator','pick-and-place','gantry','robot-arm'],
+  process:['tank','pump','drainvalve','process-tank','transfer-pump','transfer-valve','mixer','heater',
     'proportional-valve','filler','capper'],
-  indicators:['lamp','stacklight'],
+  indicators:['lamp','stacklight','buzzer','siren'],
 };
 export function familyForKind(kind:string):Exclude<DeviceFamily,'all'> {
   for (const [family,kinds] of Object.entries(families)) {

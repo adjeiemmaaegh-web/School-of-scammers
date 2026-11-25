@@ -8,8 +8,10 @@ import type {EquipmentPlacement,LiveSignal,WorldEvent} from '../plant/world/type
 import type {SceneRuntime} from '../plant/world/runner';
 import {freshRuntime,stepScene} from '../plant/world/runner';
 import {freshWorld} from '../plant/world/bodies';
+import {FREE_HEADING_KINDS} from '../plant/world/headings';
 import {drainEvents} from '../plant/world/events';
 import {PLANT_EQUIPMENT} from '../plant/equipment';
+import {composeShape} from '../plant/world/custom-shapes';
 import {paramSpecsOf,paramValue} from '../components/params';
 
 export const isP3Equipment=(kind:string):boolean=>Object.hasOwn(PLANT_EQUIPMENT,kind);
@@ -21,6 +23,7 @@ export function plantPlacements(project:Pick<ProjectFile,'components'|'params'>)
  return project.components.filter(c=>isP3Equipment(c.kind)).map(c=>({
   id:c.id,kind:c.kind,originMm:{...coordinate(c.x,c.y),z:c.elevationMm??0},
   yawDeg:c.yawDeg ?? 0, // Persisted quarter-turn placement drives plant physics and 3D equally
+  ...(c.freeYawDeg&&FREE_HEADING_KINDS.has(c.kind)?{headingDeg:c.freeYawDeg}:{}),
   params:Object.fromEntries(paramSpecsOf(c.kind).map(spec=>
    [spec.key,paramValue(project.params,c.id,spec)])),
  }));
@@ -59,16 +62,20 @@ export function defaultUnwiredPlantNumber(
  if(name==='setpointC')return Math.max(params.ambientC??20,
   Math.min(80,params.maxC??120));
  if(name==='openingPct')return 0;
+ if(name==='speedPct')return 100;
  return 0;
 }
 
+/** The project's learner-authored shapes as spawnable materials (empty for every project that has none). */
+export const customMaterialsOf=(project:Pick<ProjectFile,'customShapes'>)=>(project.customShapes??[]).map(composeShape);
 export type PlantTick={runtime:SceneRuntime;events:WorldEvent[]};
 export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
  energizedLoads:readonly string[],dtMs:number,
- options:Readonly<{controllerPowered?:boolean}>={}):PlantTick{
+ options:Readonly<{controllerPowered?:boolean;isSourcePowered?:(id:string)=>boolean;analogOutputs?:Readonly<Record<string,number>>}>={}):PlantTick{
  const placements=plantPlacements(project);
  if(!placements.length)return {runtime:previous,events:[]};
- if(dtMs!==50)throw new RangeError('P3 plant world advances by exactly five 10ms substeps per 50ms PLC scan');
+ if(!Number.isSafeInteger(dtMs)||dtMs<10||dtMs%10!==0)
+  throw new RangeError('The plant world advances in whole 10 ms substeps per PLC scan (scan period must be a multiple of 10 ms)');
  const inputs:Record<string,Record<string,boolean|number>>={};
  const set=new Set(energizedLoads);
  for(const item of placements){
@@ -82,16 +89,38 @@ export function stepProjectPlant(previous:SceneRuntime,project:ProjectFile,
    // output wiring implementation; PLC AO remains unavailable.
    if(ch.name==='height'&&(item.kind==='lift'||item.kind==='scissor-lift'))
     return [];
+   if(ch.kind==='number'){
+    // R12/R19 analog control: a numeric command terminal wired to another device's analog output (a potentiometer knob, a
+    // sensor) takes that device's value from the previous settled scan, only while the source is powered.
+    const link=project.wires.find(w=>w.from===item.id+'.SET_'+ch.name||w.to===item.id+'.SET_'+ch.name);
+    const source=link?(link.from===item.id+'.SET_'+ch.name?link.to:link.from):'';
+    const dot=source.indexOf('.');
+    // A PLC analog output (R13) wired to a numeric command: the value the program wrote on its previous scan.
+    const fromPlc=options.analogOutputs?.[source];
+    if(typeof fromPlc==='number'&&Number.isFinite(fromPlc))return [[ch.name,fromPlc]];
+    if(dot>0&&source.slice(dot+1).startsWith('AN_')){
+     const id=source.slice(0,dot),signal=source.slice(dot+4);
+     const reading=previous.signals[id]?.[signal];
+     if(typeof reading==='number'&&Number.isFinite(reading)&&(options.isSourcePowered?options.isSourcePowered(id):false))
+      return [[ch.name,reading]];
+    }
+   }
    return [[ch.name,ch.kind==='bool'?set.has(item.id+'-CMD_'+ch.name):
     defaultUnwiredPlantNumber(item.kind,ch.name,item.params)]];
   }));
+ }
+ // R14/R28 mechanical links: a belt turned by a drive takes its run state and speed from the drive's shaft (previous settled scan),
+ // overriding its own electrical command; a drive that is stopped or tripped stops the belt.
+ for(const link of project.mechanicalLinks??[]){
+  const rpm=previous.world.model[link.drive]?.value??0;
+  inputs[link.target]={...inputs[link.target],run:rpm>0.5,speed:Math.max(0,Math.min(1000,rpm/60*link.mmPerRev))};
  }
  // P19: only the real solved PLC netlist provides controller supply status;
  // no program tag or UI input can spoof the equipment's supply evidence.
  if(typeof options.controllerPowered==='boolean')for(const item of placements)
   if(item.kind==='belt-conveyor')inputs[item.id]={...inputs[item.id],
    controllerPowered:options.controllerPowered};
- const updated=stepScene(previous,placements,PLANT_EQUIPMENT,inputs,project.plantFaults??{});
+ const updated=stepScene(previous,placements,PLANT_EQUIPMENT,inputs,project.plantFaults??{},dtMs,customMaterialsOf(project));
  const drained=drainEvents(updated.world);
  return {runtime:{world:drained.world,signals:updated.signals},events:drained.events};
 }

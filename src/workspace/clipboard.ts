@@ -3,6 +3,7 @@ import type { ProjectFile } from '../sim/signals';
 import { assertSelection } from './selection';
 import type { WorkspaceFragment } from './types';
 import { isPlcKind } from '../components/registry';
+import { leafDevices } from './groups';
 import { programOf } from '../sim/plcs';
 
 const owner = (pin: string): string => pin.slice(0, pin.indexOf('.'));
@@ -20,7 +21,11 @@ export function makeFragment(project: ProjectFile, ids: readonly string[]): Work
       inputs: { ...project.plcIo![id].inputs },
       outputs: { ...project.plcIo![id].outputs },
     }]));
+  // Groups copy whole: a group is kept only when every device it contains is in the selection.
+  const groups = (project.groups ?? []).filter(g => leafDevices(project.groups!, g.id, project.components).every(id => chosen.has(id)))
+    .map(g => ({ id: g.id, name: g.name, members: [...g.members], ...(g.ports ? { ports: g.ports.map(p => ({ ...p })) } : {}) }));
   return { version: 1, components, wires,
+    ...(groups.length ? { groups } : {}),
     ...(Object.keys(params).length ? { params } : {}),
     ...(Object.keys(plcPrograms).length ? { plcPrograms } : {}),
     ...(Object.keys(plcIo).length ? { plcIo } : {}),

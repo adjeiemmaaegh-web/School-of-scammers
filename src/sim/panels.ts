@@ -2,14 +2,16 @@
  * Editing a plant like a bench: remove a device, or drop in a ready-made starter panel.
  * Pure functions over a `ProjectFile`; the orchestrator applies them (paused only) and resets runtime.
  */
+import { pruneGroups } from '../workspace/groups';
 import type { LadderDocument } from '../engineering/ladder';
 import { isPlcKind } from '../components/registry';
 import { pruneWireStyles } from '../components/wire-style';
 import { MAX_PLCS, extraPlcs, plcComponents, primaryPlcId, programOf, withProgramOf } from './plcs';
 import type { PlacedComponent, ProjectFile, Wire, XY } from './signals';
 
-export const MAX_COMPONENTS = 60;
-export const MAX_WIRES = 250;
+/** Factory scale (R10): raised from 60 components / 250 wires; bounded by the profiled budgets in tests/factory-scale.test.ts. */
+export const MAX_COMPONENTS = 250;
+export const MAX_WIRES = 1000;
 export const MAX_SUPPLIES = 6;
 
 const ownsTerminal = (terminal: string, id: string) => terminal.startsWith(`${id}.`);
@@ -30,6 +32,7 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     wires: project.wires.filter(w => !goneWires.has(w.id)),
   };
   next = pruneWireStyles(next);
+  next = pruneGroups(next);
   if (project.faults) {
     const faults = project.faults.filter(f => f.target !== id && !(f.kind === 'wire-open' && goneWires.has(f.target)));
     const { faults: _old, ...rest } = next;
@@ -41,9 +44,18 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     delete kept[id];
     next = Object.keys(kept).length ? { ...rest, params: kept } : rest;
   }
-  // Plant faults belong to physical instances, not a global singleton. A
-  // removed device must not leave a stale fault against an absent component:
-  // it would invalidate the next project import/reload.
+  // R14/R28: removing a drive or the belt it turns drops that mechanical connection.
+  if (project.mechanicalLinks?.some(l => l.drive === id || l.target === id)) {
+    const { mechanicalLinks: _links, ...rest } = next;
+    const kept = project.mechanicalLinks.filter(l => l.drive !== id && l.target !== id);
+    next = kept.length ? { ...rest, mechanicalLinks: kept } : rest;
+  }
+  // R13: removing a module drops its link; removing a PLC16 drops the links of the modules it hosted (they stay as unattached devices).
+  if (project.ioModules && (project.ioModules[id] || Object.values(project.ioModules).some(l => l.plc === id))) {
+    const { ioModules: _old, ...rest } = next;
+    const kept = Object.fromEntries(Object.entries(project.ioModules).filter(([m, l]) => m !== id && l.plc !== id));
+    next = Object.keys(kept).length ? { ...rest, ioModules: kept } : rest;
+  }
   if (project.plantFaults && Object.prototype.hasOwnProperty.call(project.plantFaults, id)) {
     const { plantFaults: _old, ...rest } = next;
     const kept = { ...project.plantFaults };
@@ -58,8 +70,6 @@ export function removeComponent(project: ProjectFile, id: string): ProjectFile |
     if (promoted) {
       const cfg = programOf(project, promoted.id);
       delete remaining[promoted.id];
-      // The promoted controller must keep its FBD graph as well as LD/ST code.
-      // Otherwise an existing top-level FBD from the removed controller wins.
       next = { ...next, program: cfg.program, language: cfg.language, stSource: cfg.stSource, fbd: cfg.fbd };
     }
     const { plcPrograms: _old, plcIo: _oldIo, ...rest } = next;

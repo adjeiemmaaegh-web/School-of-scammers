@@ -7,7 +7,7 @@
  * PLC has the fixed LEGACY_IO map, while configurable PLCs supply their
  * independently owned maps.
  */
-import type { PlcIoMap } from './plc-io';
+import { pinLocation, type PlcIoMap } from './plc-io';
 
 type Differential24V = {
   reads24: (terminal: string, reference: string) => boolean;
@@ -30,11 +30,12 @@ export function samplePlcDigitalInputs(
   circuit: Differential24V,
   sensors: PoweredSensorImage,
 ): Record<string, boolean> {
-  return Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => [
-    tag,
-    powered &&
+  return Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => {
+    const at = pinLocation(plcId, pin);
+    const modulePowered = !at.module || circuit.reads24(at.owner + '.L+', at.owner + '.M');
+    return [tag, powered && modulePowered &&
       (tag !== 'Photoeye' || sensors.photoeye) &&
       (tag !== 'TankHigh' || sensors.levelprobe) &&
-      circuit.reads24(plcId + '.' + pin, plcId + '.M'),
-  ]));
+      circuit.reads24(at.owner + '.' + at.pin, at.owner + '.M')];
+  }));
 }

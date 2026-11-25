@@ -14,15 +14,19 @@ import type { SceneRuntime } from '../plant/world/runner';
 import type { AnalogPoint } from './analog';
 
 export type XY = { x: number; y: number };
+import type { SfcDocument } from '../engineering/sfc';
 export type PlacedComponent = XY & { id: string; kind: ComponentKind; pressed: boolean;
  yawDeg?: 0 | 90 | 180 | 270;
+ /** R22 continuous rotation (degrees, 5 degree steps, 5..355) added on top of the quarter-turn yaw. Only kinds whose behaviour does not depend on orientation take it (see workspace/geometry.ts); physics never sees it. */
+ freeYawDeg?: number;
  /** Optional P9 saved factory elevation in millimetres; legacy devices remain at zero. */
  elevationMm?: number;
 };
 export type Wire = { id: string; from: string; to: string };
 /** Component/wire failures that alter what the circuit solver sees (P5). */
 export type FaultKind = 'wire-open' | 'contactor-coil-open' | 'contactor-welded' | 'motor-open-winding' | 'button-stuck' | 'sensor-stuck'
-  | 'cylinder-no-air' | 'cylinder-jammed' | 'cylinder-ext-switch-dead' | 'cylinder-ret-switch-dead';
+  | 'cylinder-no-air' | 'cylinder-jammed' | 'cylinder-ext-switch-dead' | 'cylinder-ret-switch-dead'
+  | 'compressor-motor-fault' | 'air-leak';
 export type FaultSpec = {
   id: string;
   kind: FaultKind;
@@ -57,7 +61,7 @@ export type PlcProgram = {
 };
 /** The five physical input tags a PLC samples (I0.0..I0.4) and its six output coils (Q0.0..Q0.5). */
 export type PlcInputs = { Start: boolean; StopOK: boolean; Photoeye: boolean; TankHigh: boolean; ReverseRequest: boolean };
-/** Independent scan state for secondary PLCs and a first PLC16; a first classic PLC executes through the same interpreter but mirrors state in legacy WorldState fields. */
+/** Per-instance scan state; the first classic PLC mirrors shared interpreter results in legacy WorldState fields. */
 export type PlcRuntime = {
   powered: boolean;
   inputs: PlcInputs;
@@ -108,11 +112,21 @@ export type ProjectFile = {
   /** Programs of PLCs beyond the first, keyed by PLC component id. Omitted for single-PLC projects. */
   plcPrograms?: Record<string, PlcProgram>;
   /** Tag names of the configurable (16/16) controllers, by PLC id. Omitted when every name is the default. */
+  /** Expansion I/O modules (R13): module component id -> the PLC16 that reads/drives its channels and the slot (1..4) that names its tags. */
+  ioModules?: Record<string, { plc: string; slot: number; names?: Record<string, string> }>;
+  /** Learner-authored composite shapes (R02), at most 8; feeders and collectors address them by index after the catalogue. */
+  customShapes?: import('../plant/world/custom-shapes').CustomShapeDef[];
+  /** Mechanical connections (R14/R28): a `drive` device's shaft turns a belt; belt speed = rpm / 60 x mmPerRev. One drive per belt. */
+  mechanicalLinks?: { drive: string; target: string; mmPerRev: number }[];
   plcIo?: Record<string, { inputs: Record<string, string>; outputs: Record<string, string> }>;
   /** Device settings that differ from the default (a timer relay's delay), by component id then setting key. */
   params?: Record<string, Record<string, number>>;
   plantFaults?: Record<string,string>;
+  /** R22 named groups of devices (and nested groups); absent when nothing is grouped. */
+  groups?: import('../workspace/groups').Group[];
   /** Presentation only: colour and net label per wire id. Never read by the solver. */
+  /** Simulated PLC scan period in ms (10-500, multiples of 10); absent means the 50 ms default. See sim/scan-config.ts. */
+  scanMs?: number;
   wireStyles?: Record<string, { color?: 'red' | 'blue' | 'black' | 'green' | 'yellow' | 'orange' | 'white' | 'brown'; label?: string }>;
 };
 export type WorldState = {
@@ -149,9 +163,13 @@ export type WorldState = {
   tripped: Record<string, boolean>;
   /** Rod position, limit switches and valve state of every pneumatic cylinder, by component id. */
   cylinders: Record<string, CylinderState>;
+  /** Live operator settings (potentiometer knob, selector position, held station buttons) by component id; absent until used. */
+  operatorValues?: Record<string, Record<string, number>>;
+  /** Receiver tank of every compressor by component id (R06). Empty unless the project has a compressor. */
+  air: Record<string, import('../plant/air').Receiver>;
   /** Milliseconds each on-delay relay's coil has been energised (capped at its delay), by component id. */
   timers: Record<string, number>;
-  /** Per-ID state for secondary PLCs and the first PLC16; first classic PLC keeps legacy state mirrors. */
+  /** Per-ID scan state for secondary PLCs and a first PLC16. */
   plcs: Record<string, PlcRuntime>;
   /** Energised state of every contactor, motor and lamp by component id (the legacy booleans mirror the first). */
   deviceOn: Record<string, boolean>;
@@ -204,9 +222,12 @@ export type Command =
   /** Delete a device and everything that depended on it (its wires, faults, PLC program). Paused only. */
   | { k: 'remove'; id: string }
   /** Colour and/or net label of one wire (null clears). Presentation only; paused only. */
+  | { k: 'setScanPeriod'; ms: number }
   | { k: 'setWireStyle'; id: string; color?: string | null; label?: string | null }
   /** Set a device setting (e.g. an on-delay relay's delay). Validated against its spec. Paused only. */
   | { k: 'setParam'; id: string; key: string; value: number }
+  /** Turn an operator device (knob, selector, held button) while the simulation runs; the value lives in the running world only. */
+  | { k: 'setOperator'; id: string; key: string; value: number }
   /** Drop in a ready-made, pre-wired start/stop starter panel at a free spot (or `at`). Paused only. */
   | { k: 'addPanel'; template: 'motor-starter'; at?: XY }
   /** `conveyor` names the lane; omitted means the first conveyor (the single-conveyor behaviour). */
@@ -214,6 +235,8 @@ export type Command =
   | { k:'setPlantFault'; id:string; fault:string|null }
   /** User-controlled training-person proxy: ephemeral, in mm, worker authoritative. */
   | { k:'setTrainingOperator'; enabled:boolean; xMm:number; yMm:number; feetMm:number }
+  /** Walk the training operator toward a floor point at walking speed (R24); obstacles and stairs apply. */
+  | { k:'walkOperator'; xMm:number; yMm:number }
   | { k:'loadPlantScene'; id:string }
   | { k: 'operateProtection'; id: string; action: 'trip' | 'reset' }
   | { k: 'setMeterProbe'; lead: 'positive' | 'negative'; terminal: string | null }
@@ -222,9 +245,16 @@ export type Command =
   | { k: 'setThreePhasePower'; id: string; enabled: boolean }
   /** `plc` names the target PLC component; omitted means the first PLC (the legacy single-PLC behaviour). */
   /** Rename the tags of a configurable (16/16) PLC. Refused if it would break that PLC's program. Paused only. */
+  | { k: 'attachIoModule'; module: string; plc: string | null }
+  | { k: 'renameModuleTag'; module: string; tag: string; name: string | null }
+  | { k: 'setMechanicalLink'; drive: string; target: string; mmPerRev: number | null }
+  | { k: 'defineShape'; shape: import('../plant/world/custom-shapes').CustomShapeDef }
+  | { k: 'removeShape'; id: string }
   | { k: 'configureIo'; plc: string; io: { inputs: Record<string, string>; outputs: Record<string, string> } }
   | { k: 'loadProgram'; program: LadderDocument; plc?: string }
   | { k: 'loadST'; source: string; plc?: string }
+  | { k: 'loadSFC'; document: SfcDocument; plc?: string }
+  | { k: 'loadIL'; source: string; plc?: string }
   | { k: 'loadFBD'; document: FbdDocument; plc?: string }
   | { k: 'activateLanguage'; language: 'ladder' | 'st' | 'fbd'; plc?: string }
   | { k: 'breakAtScan'; scan: number | null }
@@ -259,7 +289,13 @@ export type RenderSnapshot = {
   /** Every pneumatic cylinder by component id: rod position 0 (retracted)..1 (extended) and its limit switches. */
   /** Every on-delay relay by component id: elapsed and preset milliseconds, and whether its contacts have transferred. */
   timers: Record<string, { elapsedMs: number; delayMs: number; done: boolean }>;
-  cylinders: Record<string, { position: number; extendLimit: boolean; retractLimit: boolean; command: string; alarm: string | null; conflict: boolean }>;
+  /** Live operator settings by component id (R12/R19); present only after an operator turned something. */
+  operatorValues?: Record<string, Record<string, number>>;
+  cylinders: Record<string, { position: number; extendLimit: boolean; retractLimit: boolean; command: string; alarm: string | null; conflict: boolean;
+    /** R06: force, load and port pressure; present only for a cylinder with circuit settings. */
+    circuit?: { forceN: number; loadN: number; portBar: number; holding: boolean } }>;
+  /** Compressed-air state (R06): present only when the project has a compressor. Receiver pressure and pump state by compressor id, and the working pressure (bar) at every cylinder's AIR port. */
+  air?: { receivers: Record<string, { pressureBar: number; pumping: boolean }>; working: Record<string, number> };
   /** Energised state of every contactor, motor and lamp by component id. */
   deviceOn: Record<string, boolean>;
   /** Shaft angle of every motor by component id. */
@@ -297,6 +333,9 @@ export type RenderSnapshot = {
   breakpointInstruction: InstructionBreakpoint | null;
   scanTrace: ScanTrace[];
 };
-export type WorkerRequest = { kind: 'commands'; commands: Command[]; requestId?: number };
+export type WorkerRequest = { kind: 'commands'; commands: Command[]; requestId?: number }
+  | { kind: 'timeScale'; scale: number };
+/** Pacing diagnostics measured by the worker (wall-clock cost per scan, speed, dropped scans). Not part of the simulation state. */
+export type WorkerTiming = { kind: 'timing'; timing: import('./scan-config').ScanTiming };
 export type WorkerResponse = { kind: 'snapshot'; snapshot: RenderSnapshot; events: SimEvent[];
   requestId?: number; requestIds?: number[]; project?: ProjectFile; previousProject?: ProjectFile };

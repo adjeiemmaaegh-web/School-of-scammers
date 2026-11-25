@@ -1,7 +1,7 @@
 /**
  * R3.7 — Deterministic, bounded replay of the authoritative simulator.
  *
- * Frames represent successive worker dispatch boundaries (one 50 ms tick
+ * Frames represent successive worker dispatch boundaries (one configured-period tick
  * each); extraScans advances the SAME tick path with no commands.
  * This is a reusable source-level replay primitive for instructor scenarios
  * and diagnostics, not an alternative runtime or a wall-clock scheduler.
@@ -72,7 +72,7 @@ function validateFrames(frames: readonly ReplayFrame[]): void {
     throw new RangeError('Replay exceeds its command, scan or checkpoint budget');
 }
 
-/** Executes a validated script using the existing 50 ms kernel. */
+/** Executes a validated script using the existing configured-period kernel. */
 export function replaySimulation(project: ProjectFile, frames: readonly ReplayFrame[]): ReplayResult {
   validateFrames(frames);
   let world: WorldState = createWorld(project);

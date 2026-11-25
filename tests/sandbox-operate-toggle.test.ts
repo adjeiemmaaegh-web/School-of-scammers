@@ -83,7 +83,7 @@ describe('operateToggle is resolved against authoritative worker state', () => {
     const w0 = fixture();
     for (const id of ['con', 'does-not-exist']) {
       const w = tick(w0, [toggle(id)]).world;
-      expect(w.lastError).toBe('Only pushbuttons and training E-stop can be operated');
+      expect(w.lastError).toBe('Only pushbuttons, selector switches and training E-stop can be operated');
       expect(w.project.components).toEqual(w0.project.components);
     }
   });

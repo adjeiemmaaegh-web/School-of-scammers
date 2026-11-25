@@ -43,12 +43,19 @@ export function turn(yawDeg: number = 0, turns: -1 | 1): 0 | 90 | 180 | 270 {
   return (((yawDeg + turns * 90 + 360) % 360) as 0 | 90 | 180 | 270);
 }
 export function rotateFloorOffset(offset: { x: number; z: number }, yawDeg: number): { x: number; z: number } {
-  const turns = (((yawDeg % 360) + 360) % 360) / 90;
+  const norm = ((yawDeg % 360) + 360) % 360;
+  const turns = norm / 90;
+  // Quarter turns keep their exact original vectors; any other angle (R22 free rotation) uses the true rotation.
   switch (turns) {
     case 0: return { ...offset };
     case 1: return { x: -offset.z, z: offset.x };
     case 2: return { x: -offset.x, z: -offset.z };
     case 3: return { x: offset.z, z: -offset.x };
-    default: throw new RangeError('Only quarter-turn orientation is supported');
+    default: {
+      const a = norm * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+      return { x: offset.x * c - offset.z * s, z: offset.x * s + offset.z * c };
+    }
   }
 }
+/** The orientation a device is drawn at: its quarter-turn yaw plus its free (continuous) rotation, normalised to 0..360. */
+export const effectiveYaw = (c: { yawDeg?: number; freeYawDeg?: number }): number => (((c.yawDeg ?? 0) + (c.freeYawDeg ?? 0)) % 360 + 360) % 360;

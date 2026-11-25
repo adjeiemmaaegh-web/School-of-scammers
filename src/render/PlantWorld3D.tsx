@@ -31,7 +31,18 @@ const clampPositive=(n:number)=>Math.max(.015,n);
 function PhysicalBody({body}:{body:Body}){
  const colour=body.tags.jammed===true?'#d6785c':body.tags.material==='metal'?'#a1afbb':
   body.tags.marked===true?'#bd9758':'#c9ad79';
- return <mesh position={bodyPosition(body)} rotation={[0,-(body.visualYawDeg??body.yawDeg)*Math.PI/180,0]}>
+ // Composite bodies draw every part at its own offset, so the picture is the same shape the physics collides with.
+ if(body.parts&&body.parts.length>0)return <group position={bodyPosition(body)} rotation={[0,-((body.visualYawDeg??body.yawDeg)+(body.headingDeg??0))*Math.PI/180,0]}>
+   {body.parts.map((part,index)=><mesh key={index} position={[metres(part.dx),metres(part.z+part.sz/2-body.size.z/2),metres(part.dy)]}
+     rotation={[0,part.visual?-part.visual.yawDeg*Math.PI/180:0,0]}>
+     {part.shape==='sphere'?<sphereGeometry args={[metres(part.sx/2),18,12]}/>:
+      (part.shape??'box')==='box'?<boxGeometry args={boxSize(part.visual?{x:part.visual.w,y:part.visual.d,z:part.sz}:{x:part.sx,y:part.sy,z:part.sz})}/>:
+      <cylinderGeometry args={[metres(part.sx/2),metres(part.sx/2),metres(part.sz),14]}/>}
+     <meshStandardMaterial color={body.tags.transparent===true?'#9fc6d4':colour} roughness={0.78} metalness={body.tags.metal===true?.48:.05}
+       transparent={body.tags.transparent===true} opacity={body.tags.transparent===true?.7:1}/>
+   </mesh>)}
+ </group>;
+ return <mesh position={bodyPosition(body)} rotation={[0,-((body.visualYawDeg??body.yawDeg)+(body.headingDeg??0))*Math.PI/180,0]}>
    {body.shape==='box'?<boxGeometry args={boxSize(body.size)}/>:
     <cylinderGeometry args={[metres(body.size.x/2),metres(body.size.x/2),metres(body.size.z),14]}/>}
    <meshStandardMaterial color={colour} roughness={0.78} metalness={body.tags.material==='metal'?.48:.05}/>
@@ -49,6 +60,7 @@ function Drawing({drawing,kind,progress=0}:{drawing:EquipmentDrawing;kind:string
  const railWidth=.028;
  return <group position={equipmentPosition(drawing)}
    rotation={[0,-drawing.yawDeg*Math.PI/180,0]}>
+  <group rotation={[0,0,(drawing.pitchDeg??0)*Math.PI/180]}>
    {roller ? <>
      <mesh position={[0,-height*.22,0]}>
        <boxGeometry args={[len,clampPositive(height*.4),depth]}/>
@@ -154,6 +166,7 @@ function Drawing({drawing,kind,progress=0}:{drawing:EquipmentDrawing;kind:string
        <cylinderGeometry args={[len/2,len/2,height,20]}/>}
       <meshStandardMaterial color={drawing.colour} metalness={.25} roughness={.6}/>
    </mesh>}
+ </group>
  </group>;
 }
 /** This volume is projected from the *same* sensor-zone descriptor read
@@ -239,8 +252,14 @@ export function PlantWorld3D({project,scene,onPointerDownPart,onPointerMovePart,
   {scene.world.bodies.map(body=><PhysicalBody key={body.id} body={body}/>)}
   {/* View-only ground marker of the explicitly enabled WORKER person proxy.
       This renders saved simulation state; it does not author PLC signals. */}
+  {scene.world.trainingOperator&&<mesh name="p8-worker-training-figure"
+    position={[metres(scene.world.trainingOperator.pos.x),metres(scene.world.trainingOperator.pos.z)+.85,
+      metres(scene.world.trainingOperator.pos.y)]} raycast={()=>{}}>
+    <cylinderGeometry args={[.16,.16,1.7,12]}/>
+    <meshStandardMaterial color="#e7c86b"/>
+  </mesh>}
   {scene.world.trainingOperator&&<mesh name="p8-worker-training-operator"
-    position={[metres(scene.world.trainingOperator.pos.x),.015,
+    position={[metres(scene.world.trainingOperator.pos.x),metres(scene.world.trainingOperator.pos.z)+.015,
       metres(scene.world.trainingOperator.pos.y)]}
     rotation={[-Math.PI/2,0,0]} raycast={()=>{}}>
     <ringGeometry args={[.15,.24,20]}/>
