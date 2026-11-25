@@ -1,9 +1,12 @@
 /** P0/P1 authoritative deterministic sandbox. Pure simulation: no DOM, timers or wall clock. */
-import { COMPONENTS, isPlcKind, terminalExists, type ComponentKind } from '../components/registry';
+import { validateGroups } from '../workspace/groups';
+import { COMPONENTS, isIoModuleKind, isPlcKind, terminalExists, type ComponentKind } from '../components/registry';
 import { solveNetAware, type Device } from '../engineering/electrical';
 import { executeLadder, type LadderDocument, type LadderResult } from '../engineering/ladder';
 import { compileFbd, executeFbd, type FbdResult } from '../engineering/fbd';
 import { executeStructuredText, type STResult, type STValue } from '../engineering/structured-text';
+import { compileSfcToSt } from '../engineering/sfc';
+import { compileIlToSt } from '../engineering/il';
 import { compileSandboxST, DEFAULT_ST_SOURCE, validateSandboxProgram } from '../program/p2-contract';
 import { appendScanTrace, buildScanTrace, tagEdge, validateTagBreakpoint } from '../program/scan-trace';
 import { fbdReadings, instructionBreakpointHit, ladderReadings, validateInstructionBreakpoint } from '../program/instruction-breakpoint';
@@ -14,7 +17,7 @@ import {
   MAX_PLCS, blankProgram, defaultProgramFor, extraPlcs, freshPlcRuntime, legacyPrimaryId, namesFor, plcComponents, plcView,
   primaryPlcId, programOf, runtimePlcs, scanPlc, withProgramOf,
 } from './plcs';
-import { LEGACY_IO, defaultIo, ioOf, isConfigurableIo, validateIoMap } from './plc-io';
+import { LEGACY_IO, MAX_IO_MODULES_PER_PLC, defaultIo, ioOf, isConfigurableIo, moduleDiagnostics, moduleNameError, modulesOf, pinLocation, validateIoMap } from './plc-io';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { measureContinuity } from '../electrical/continuity';
@@ -31,9 +34,15 @@ import { scanControllers } from './phases/controller-scan';
 import { deenergisedPlcs, quietLanes } from './phases/fail-closed';
 import { paramError, paramSpecsOf, paramValue } from '../components/params';
 import { pruneWireStyles, validateWireStyles, withWireStyle, type WireColor } from '../components/wire-style';
+import { DEFAULT_SCAN_MS, isValidScanMs, scanMsOf } from './scan-config';
+import { airWireError, solveAir } from '../plant/air';
 import { clearedAlarm } from '../plant/cylinder';
 import { analogWireError, sampleAnalogInputs } from './analog';
-import { editWorkspace as applyWorkspaceEdit } from '../workspace/editor';
+import { airSensorReadings } from './air-sensors';
+import { shapeErrors, type CustomShapeDef } from '../plant/world/custom-shapes';
+import { MATERIALS, MAX_CUSTOM_SHAPES } from '../plant/world/materials';
+import { OPERATOR_KEYS, OPERATOR_KINDS, withOperatorValues } from './operator-values';
+import { editWorkspace as applyWorkspaceEdit, isFreeRotation } from '../workspace/editor';
 import {firstNewCarrierSuperposition,carrierSuperpositionError} from '../workspace/carrier-clearance';
 import { freshProjectPlant, stepProjectPlant, sensorImage, validatePlantFaults } from './p3-plant-bridge';
 import { makePlantSceneProject } from './p3-scene-import';
@@ -145,7 +154,7 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
     breakpointScan: null, breakpointHit: null, breakpointTag: null, breakpointInstruction: null, scanTrace: [],
     contactorOn: false, motorOn: false, motorAngleRad: 0,
     plcs: Object.fromEntries(runtimePlcs(project).map(c => [c.id, freshPlcRuntime(programOf(project, c.id), namesFor(project, c.id))])),
-    lanes: {}, vessels: {}, tripped: {}, cylinders: {}, timers: {},
+    lanes: {}, vessels: {}, tripped: {}, cylinders: {}, air: {}, timers: {},
     plantWorld: freshProjectPlant(project),
     threePhase: {}, threePhasePower: {},
     deviceOn: {}, motorAngles: {},
@@ -180,6 +189,9 @@ export function validateProject(raw: unknown): ProjectFile {
     }
     if (entry.yawDeg !== undefined && !([0, 90, 180, 270] as unknown[]).includes(entry.yawDeg))
       throw new Error('Device orientation must be a quarter turn');
+    if (entry.freeYawDeg !== undefined && (!isFreeRotation(entry.kind) || !Number.isInteger(entry.freeYawDeg) ||
+        entry.freeYawDeg < 5 || entry.freeYawDeg > 355 || entry.freeYawDeg % 5 !== 0))
+      throw new Error('Invalid free rotation (5 to 355 degrees in 5 degree steps, on devices that may turn freely)');
     if (entry.elevationMm !== undefined &&
         (!Object.hasOwn(PLANT_EQUIPMENT, entry.kind) ||
          !Number.isSafeInteger(entry.elevationMm) ||
@@ -188,6 +200,7 @@ export function validateProject(raw: unknown): ProjectFile {
     ids.add(entry.id);
     components.push({ id: entry.id, kind: entry.kind as ComponentKind, x: entry.x, y: entry.y,
       pressed: entry.pressed === true, ...(entry.yawDeg === undefined ? {} : { yawDeg: entry.yawDeg }),
+      ...(entry.freeYawDeg === undefined ? {} : { freeYawDeg: entry.freeYawDeg }),
       ...(entry.elevationMm === undefined ? {} : { elevationMm: entry.elevationMm }) });
   }
   // One of each protective branch device per educational circuit: state is
@@ -206,13 +219,22 @@ export function validateProject(raw: unknown): ProjectFile {
         !terminalExists(wire.from, components) || !terminalExists(wire.to, components)) throw new Error('Invalid wire in project');
     const phaseError = threePhaseWireError(wire.from, wire.to, phaseOwners);
     if (phaseError) throw new Error(phaseError);
-    const domainError = analogWireError(wire.from, wire.to, components, wiresChecked);
+    const domainError = airWireError(wire.from, wire.to, components) ?? analogWireError(wire.from, wire.to, components, wiresChecked);
     if (domainError) throw new Error(domainError);
     wiresChecked.push({ id: wire.id, from: wire.from, to: wire.to });
     wireIds.add(wire.id);
   }
   const plcIo = validatePlcIo(p.plcIo, components);
-  const names = namesFor({ components, plcIo } as ProjectFile, undefined);
+  const ioModules = validateIoModules(p.ioModules, components);
+  for (const plcC of components.filter(c => c.kind === 'plc16')) {
+    const seen = new Set<string>();
+    const io = ioOf({ components, plcIo, ioModules } as ProjectFile, plcC);
+    for (const tag of [...Object.values(io.inputs), ...Object.values(io.outputs), ...Object.values(io.analogInputs ?? {}), ...Object.values(io.analogOutputs ?? {})]) {
+      if (seen.has(tag.toUpperCase())) throw new Error(`PLC ${plcC.id}: tag ${tag} is used twice (check expansion module channel names)`);
+      seen.add(tag.toUpperCase());
+    }
+  }
+  const names = namesFor({ components, plcIo, ioModules } as ProjectFile, undefined);
   const programErrors = validateSandboxProgram(p.program, names);
   if (programErrors.length) throw new Error(programErrors.join('; '));
   if (p.language !== undefined && p.language !== 'ladder' && p.language !== 'st' && p.language !== 'fbd')
@@ -224,16 +246,20 @@ export function validateProject(raw: unknown): ProjectFile {
     if (p.stSource) compileSandboxST(p.stSource, names);
   }
   if(p.fbd!==undefined||p.language==='fbd'){
-    const candidate={...p,components,plcIo} as ProjectFile;
+    const candidate={...p,components,plcIo,ioModules} as ProjectFile;
     const config=programOf(candidate,undefined);
     compileFbd(p.fbd??config.fbd,names);
   }
   const wires = p.wires.map(w => ({ id: w.id, from: w.from, to: w.to }));
   const faults = validateFaults(p.faults, components, wires);
-  const plcPrograms = validatePlcPrograms(p.plcPrograms, components, plcIo);
+  const plcPrograms = validatePlcPrograms(p.plcPrograms, components, plcIo, ioModules);
   const params = validateParams(p.params, components);
   const plantFaults = validatePlantFaults(p.plantFaults, { components });
   const wireStyles = validateWireStyles(p.wireStyles, wires);
+  const groups = validateGroups(p.groups, new Set(components.map(c => c.id)), components);
+  const customShapes = validateCustomShapes(p.customShapes, components, params);
+  const mechanicalLinks = validateMechanicalLinks(p.mechanicalLinks, components);
+  if (p.scanMs !== undefined && !isValidScanMs(p.scanMs)) throw new Error('Invalid scan period (10-500 ms in steps of 10)');
   return {
     formatVersion: 1, components, wires, program: p.program,
     ...(p.language !== undefined ? { language: p.language } : {}),
@@ -243,10 +269,32 @@ export function validateProject(raw: unknown): ProjectFile {
     ...(faults.length ? { faults } : {}),
     ...(plcPrograms ? { plcPrograms } : {}),
     ...(plcIo ? { plcIo } : {}),
+    ...(ioModules ? { ioModules } : {}),
     ...(params ? { params } : {}),
     ...(plantFaults ? { plantFaults } : {}),
     ...(wireStyles ? { wireStyles } : {}),
+    ...(groups ? { groups } : {}),
+    ...(customShapes ? { customShapes } : {}),
+    ...(mechanicalLinks ? { mechanicalLinks } : {}),
+    // The default period is never stored, so existing projects keep their exact shape.
+    ...(p.scanMs !== undefined && p.scanMs !== DEFAULT_SCAN_MS ? { scanMs: p.scanMs } : {}),
   };
+}
+/** R13: the previous scan's analog output values of every PLC16, keyed by terminal id (`plc.AO0`); 0 while a PLC is unpowered or has not written the tag. */
+function analogOutputsOf(w: WorldState): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const c of plcComponents(w.project)) {
+    const io = ioOf(w.project, c);
+    for (const [pin, tag] of Object.entries(io.analogOutputs ?? {})) {
+      const runtime = w.plcs[c.id];
+      // R13: an expansion AO module writes only while ITS OWN supply is present as well as the PLC's.
+      const at = pinLocation(c.id, pin);
+      const moduleLive = !at.module || (w.voltages[at.owner + '.L+'] !== undefined && w.voltages[at.owner + '.M'] !== undefined);
+      const raw = runtime?.powered && moduleLive ? runtime.tagValues[tag] : undefined;
+      out[`${at.owner}.${at.pin}`] = typeof raw === 'number' && Number.isFinite(raw) && Math.abs(raw) <= 1_000_000 ? raw : 0;
+    }
+  }
+  return out;
 }
 /** Device settings: each key must be a setting its device kind defines, with an allowed value that differs from the default. */
 function validateParams(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['params'] | undefined {
@@ -285,7 +333,66 @@ function validatePlcIo(raw: unknown, components: readonly PlacedComponent[]): Pr
   }
   return Object.keys(out).length ? out : undefined;
 }
-function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[], plcIo: ProjectFile['plcIo']): Record<string, PlcProgram> | undefined {
+/** R14/R28 mechanical links: each is a real `drive` turning a belt-type conveyor, a belt has at most one drive, and the ratio is bounded. */
+const LINKABLE = new Set(['belt-conveyor', 'roller-conveyor', 'curved-conveyor']);
+function validateMechanicalLinks(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['mechanicalLinks'] | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw) || raw.length > 16) throw new Error('Invalid mechanical links (at most 16)');
+  const targets = new Set<string>(), out: NonNullable<ProjectFile['mechanicalLinks']> = [];
+  for (const l of raw as { drive?: unknown; target?: unknown; mmPerRev?: unknown }[]) {
+    const drive = components.find(c => c.id === l?.drive), target = components.find(c => c.id === l?.target);
+    if (!drive || drive.kind !== 'drive') throw new Error(`Mechanical link: ${String(l?.drive)} is not a drive in this project`);
+    if (!target || !LINKABLE.has(target.kind)) throw new Error(`Mechanical link: ${String(l?.target)} is not a belt, roller or curved conveyor`);
+    if (!Number.isFinite(l.mmPerRev) || (l.mmPerRev as number) < 10 || (l.mmPerRev as number) > 2000) throw new Error('Mechanical link: travel per revolution must be 10 to 2000 mm');
+    if (targets.has(target.id)) throw new Error(`Mechanical link: ${target.id} already has a drive`);
+    targets.add(target.id);
+    out.push({ drive: drive.id, target: target.id, mmPerRev: l.mmPerRev as number });
+  }
+  return out.length ? out : undefined;
+}
+/** R02: at most MAX_CUSTOM_SHAPES valid, uniquely named shapes; a device setting may only name a custom shape that exists. */
+function validateCustomShapes(raw: unknown, components: readonly PlacedComponent[], params: ProjectFile['params']): ProjectFile['customShapes'] | undefined {
+  const list = raw === undefined ? [] : raw;
+  if (!Array.isArray(list) || list.length > MAX_CUSTOM_SHAPES) throw new Error(`Invalid custom shapes (at most ${MAX_CUSTOM_SHAPES})`);
+  const ids = new Set<string>();
+  for (const shape of list as CustomShapeDef[]) {
+    const errors = shapeErrors(shape);
+    if (errors.length) throw new Error(`Custom shape ${String((shape as { id?: unknown })?.id)}: ${errors.join('; ')}`);
+    if (ids.has(shape.id)) throw new Error(`Custom shape ${shape.id} is defined twice`);
+    ids.add(shape.id);
+  }
+  for (const c of components) {
+    const key = c.kind === 'box-feeder' ? 'materialId' : c.kind === 'collector' ? 'acceptMaterial' : null;
+    const index = key ? params?.[c.id]?.[key] : undefined;
+    if (index !== undefined && index > MATERIALS.length && index - MATERIALS.length > list.length)
+      throw new Error(`${c.id}: material ${index} is a custom shape that is not defined in this project`);
+  }
+  return list.length ? (list as CustomShapeDef[]).map(s => JSON.parse(JSON.stringify(s)) as CustomShapeDef) : undefined;
+}
+/** R13: each module is attached to one existing PLC16 with a free slot 1..MAX; nothing else may appear. */
+function validateIoModules(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['ioModules'] | undefined {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid expansion module configuration');
+  const out: NonNullable<ProjectFile['ioModules']> = {};
+  const used = new Set<string>();
+  for (const [id, link] of Object.entries(raw as Record<string, unknown>)) {
+    const mod = components.find(c => c.id === id);
+    if (!mod || !isIoModuleKind(mod.kind)) throw new Error(`Expansion module ${id}: not an expansion module in this project`);
+    const l = link as { plc?: unknown; slot?: unknown } | null;
+    const host = components.find(c => c.id === l?.plc);
+    if (!host || host.kind !== 'plc16') throw new Error(`Expansion module ${id}: host must be a 16/16 PLC in this project`);
+    if (!Number.isInteger(l?.slot) || (l?.slot as number) < 1 || (l?.slot as number) > MAX_IO_MODULES_PER_PLC) throw new Error(`Expansion module ${id}: slot must be 1 to ${MAX_IO_MODULES_PER_PLC}`);
+    const key = `${host.id}#${l?.slot}`;
+    if (used.has(key)) throw new Error(`Expansion module ${id}: slot ${l?.slot} of ${host.id} is already used`);
+    used.add(key);
+    const names = (l as { names?: unknown })?.names;
+    if (names !== undefined && (!names || typeof names !== 'object' || Array.isArray(names) || Object.values(names).some(n => typeof n !== 'string')))
+      throw new Error(`Expansion module ${id}: invalid channel names`);
+    out[id] = { plc: host.id, slot: l?.slot as number, ...(names && Object.keys(names).length ? { names: { ...(names as Record<string, string>) } } : {}) };
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[], plcIo: ProjectFile['plcIo'], ioModules?: ProjectFile['ioModules']): Record<string, PlcProgram> | undefined {
   if (raw === undefined) return undefined;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid PLC programs');
   const extras = new Set(extraPlcs({ components }).map(c => c.id));
@@ -294,7 +401,7 @@ function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[
     if (!extras.has(id)) throw new Error(`PLC program for ${id}: not an additional PLC in this project`);
     const e = entry as Partial<PlcProgram> | null;
     if (!e || typeof e !== 'object' || !e.program) throw new Error(`Invalid program for PLC ${id}`);
-    const names = namesFor({ components, plcIo } as ProjectFile, id);
+    const names = namesFor({ components, plcIo, ioModules } as ProjectFile, id);
     const issues = validateSandboxProgram(e.program, names);
     if (issues.length) throw new Error(`PLC ${id}: ${issues.join('; ')}`);
     if (e.language !== undefined && e.language !== 'ladder' && e.language !== 'st' && e.language !== 'fbd') throw new Error(`PLC ${id}: unknown language`);
@@ -303,7 +410,7 @@ function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[
     if (e.stSource) compileSandboxST(e.stSource, names);
     if (e.fbd!==undefined||e.language==='fbd'){
       const component=components.find(c=>c.id===id)!;
-      const cfg=defaultProgramFor(component.kind,ioOf({components,plcIo} as ProjectFile,component));
+      const cfg=defaultProgramFor(component.kind,ioOf({components,plcIo,ioModules} as ProjectFile,component));
       compileFbd(e.fbd??cfg.fbd,names);
     }
     out[id] = { program: e.program,
@@ -406,9 +513,56 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
           vel:{x:0,y:0,z:0},supportedBy:null,
           tags:{material:'person',trainingOperator:true},
         };
-        else delete next.trainingOperator;
+        else { delete next.trainingOperator; delete next.operatorGoal; }
         world={...world,plantWorld:{...world.plantWorld,world:next}};
       }
+    }
+    else if (cmd.k === 'walkOperator') {
+      const ok = (n: number) => Number.isSafeInteger(n) && n >= -6000 && n <= 6000;
+      if (!ok(cmd.xMm) || !ok(cmd.yMm)) world = setError(world, 'Invalid walking target');
+      else if (!world.plantWorld.world.trainingOperator) world = setError(world, 'Place the simulated operator first');
+      else world = { ...world, plantWorld: { ...world.plantWorld, world: { ...world.plantWorld.world, operatorGoal: { x: cmd.xMm, y: cmd.yMm } } }, lastError: null };
+    }
+    else if (cmd.k === 'setMechanicalLink') {
+      // R14/R28: connect a drive's shaft to a belt (or change the ratio, or with null remove the connection) while paused.
+      if (world.running) world = setError(world, 'Pause before changing mechanical connections');
+      else try {
+        const rest = (world.project.mechanicalLinks ?? []).filter(l => l.target !== cmd.target);
+        const next = cmd.mmPerRev === null ? rest : [...rest, { drive: cmd.drive, target: cmd.target, mmPerRev: cmd.mmPerRev }];
+        const checked = validateMechanicalLinks(next, world.project.components);
+        const { mechanicalLinks: _old, ...base } = world.project;
+        world = createWorld(checked ? { ...base, mechanicalLinks: checked } : base);
+        commandEvents.push({ tick: world.tick, kind: 'edit', detail: cmd.mmPerRev === null ? `Disconnected ${cmd.target} from its drive` : `${cmd.target} is driven by ${cmd.drive}` });
+      } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Invalid mechanical link'); }
+    }
+    else if (cmd.k === 'defineShape' || cmd.k === 'removeShape') {
+      // R02: define, replace or remove a learner-authored shape while paused.
+      if (world.running) world = setError(world, 'Pause before changing custom shapes');
+      else try {
+        const current = world.project.customShapes ?? [];
+        let next: CustomShapeDef[];
+        if (cmd.k === 'defineShape') {
+          const at = current.findIndex(s => s.id === cmd.shape.id);
+          next = at < 0 ? [...current, cmd.shape] : current.map((s, i) => (i === at ? cmd.shape : s));
+        } else {
+          const at = current.findIndex(s => s.id === cmd.id);
+          if (at < 0) throw new Error(`No custom shape ${cmd.id}`);
+          // Shapes are addressed by position, so removing one must not shift a shape that a device still uses.
+          const first = MATERIALS.length + at + 1;
+          const user = world.project.components.find(c => {
+            const key = c.kind === 'box-feeder' ? 'materialId' : c.kind === 'collector' ? 'acceptMaterial' : null;
+            const index = key ? world.project.params?.[c.id]?.[key] : undefined;
+            return index !== undefined && index >= first;
+          });
+          if (user) throw new Error(`${user.id} still uses ${cmd.id} or a shape after it; change that device setting first`);
+          next = current.filter((_, i) => i !== at);
+        }
+        const { customShapes: _old, ...rest } = world.project;
+        const candidate = { ...rest, ...(next.length ? { customShapes: next } : {}) } as ProjectFile;
+        validateCustomShapes(candidate.customShapes, candidate.components, candidate.params);
+        world = createWorld(candidate);
+        commandEvents.push({ tick: world.tick, kind: 'edit', detail: cmd.k === 'defineShape' ? `Defined custom shape ${cmd.shape.id}` : `Removed custom shape ${cmd.id}` });
+      } catch (error) { world = setError(world, error instanceof Error ? error.message : 'Invalid custom shape'); }
     }
     else if (cmd.k === 'setPlantFault') {
       if (world.running) world = setError(world, 'Pause before changing a plant equipment fault');
@@ -488,8 +642,8 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       } };
     } else if (cmd.k === 'operate' || cmd.k === 'operateToggle') {
       const target = world.project.components.find(c => c.id === cmd.id &&
-        (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton'));
-      if (!target) world = setError(world, 'Only pushbuttons and training E-stop can be operated');
+        (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton' || c.kind === 'selector'));
+      if (!target) world = setError(world, 'Only pushbuttons, selector switches and training E-stop can be operated');
       else {
         // A toggle is resolved here, against authoritative state, in command order. Resolving it in
         // the UI from a snapshot loses presses when clicks land between scans.
@@ -532,6 +686,12 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         world = withFaults(world, faultsOf(world.project).map(f => f.id === cmd.id ? { ...f, hidden: false } : f));
         commandEvents.push({ tick: world.tick, kind: 'fault', detail: `Fault revealed: ${describeFault(fault)}` });
       }
+    } else if (cmd.k === 'setOperator') {
+      const part = world.project.components.find(c => c.id === cmd.id);
+      const spec = part && OPERATOR_KINDS.has(part.kind) ? paramSpecsOf(part.kind).find(s => s.key === cmd.key && OPERATOR_KEYS.has(s.key)) : undefined;
+      const error = !part ? 'Unknown component' : !spec ? 'This device has no live operator setting' : paramError(spec, cmd.value);
+      if (error || !part || !spec) world = setError(world, error ?? 'Invalid setting');
+      else world = { ...world, operatorValues: { ...(world.operatorValues ?? {}), [part.id]: { ...(world.operatorValues?.[part.id] ?? {}), [spec.key]: cmd.value } }, lastError: null };
     } else if (!canEdit(world)) world = setError(world, 'Pause simulation before modifying the project');
     else if (cmd.k === 'repair') {
       // Replacing a part is only possible with the plant isolated (paused). The event is neutral on
@@ -542,6 +702,13 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         world = withFaults(world, faultsOf(world.project).filter(f => f.target !== cmd.target));
         world = resetCylinderAlarm(world, cmd.target);
         commandEvents.push({ tick: world.tick, kind: 'repair', detail: repairDetail(cmd.target) });
+      }
+    }
+    else if (cmd.k === 'setScanPeriod') {
+      if (!isValidScanMs(cmd.ms)) world = setError(world, 'Scan period must be 10-500 ms in steps of 10');
+      else {
+        const { scanMs: _previous, ...rest } = world.project;
+        world = { ...world, project: cmd.ms === DEFAULT_SCAN_MS ? rest : { ...rest, scanMs: cmd.ms }, lastError: null };
       }
     }
     else if (cmd.k === 'setWireStyle') {
@@ -584,6 +751,76 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         else {
           world = { ...world, project: withStarterPanel(world.project, plan, latchProgram()) };
           commandEvents.push({ tick: world.tick, kind: 'edit', detail: `Added a pre-wired starter panel (${plan.plcId})` });
+        }
+      }
+    }
+    else if (cmd.k === 'renameModuleTag') {
+      // R13: give one expansion-module channel your own tag name (null restores the default); refused if it would break a program.
+      const link = world.project.ioModules?.[cmd.module];
+      const host = link ? plcComponents(world.project).find(c => c.id === link.plc) : undefined;
+      if (!link || !host) world = setError(world, 'Attach the module to a PLC before renaming its channels');
+      else {
+        const current = ioOf(world.project, host);
+        const all = [...Object.values(current.inputs), ...Object.values(current.outputs), ...Object.values(current.analogInputs ?? {}), ...Object.values(current.analogOutputs ?? {})];
+        const shown = link.names?.[cmd.tag] ?? cmd.tag;
+        const isChannel = (() => { const m = /^M(\d)(In|Out|Ai|Ao)(\d)$/.exec(cmd.tag); return !!m && Number(m[1]) === link.slot; })();
+        const problem0 = !isChannel || !all.includes(shown) ? `${cmd.tag} is not a channel of ${cmd.module}` : cmd.name !== null ? moduleNameError(cmd.name, current, shown) : null;
+        if (problem0) world = setError(world, problem0);
+        else {
+          const names = { ...(link.names ?? {}) };
+          if (cmd.name === null || cmd.name === cmd.tag) delete names[cmd.tag]; else names[cmd.tag] = cmd.name;
+          const nextLink = { plc: link.plc, slot: link.slot, ...(Object.keys(names).length ? { names } : {}) };
+          const candidate: ProjectFile = { ...world.project, ioModules: { ...(world.project.ioModules ?? {}), [cmd.module]: nextLink } };
+          let problem: string | null = null;
+          for (const plc of plcComponents(candidate)) {
+            const cfg = programOf(candidate, plc.id), nm = namesFor(candidate, plc.id);
+            try {
+              if (cfg.language === 'st') compileSandboxST(cfg.stSource, nm);
+              else if (cfg.language === 'fbd') compileFbd(cfg.fbd, nm);
+              else { const issues = validateSandboxProgram(cfg.program, nm); if (issues.length) problem = issues.join('; '); }
+            } catch (error) { problem = error instanceof Error ? error.message : 'Program no longer compiles'; }
+            if (problem) { problem = `${plc.id}: ${problem}`; break; }
+          }
+          if (problem) world = setError(world, `Renaming would break a program: ${problem}`);
+          else { world = createWorld(candidate); commandEvents.push({ tick: world.tick, kind: 'edit', detail: cmd.name ? `Renamed ${cmd.tag} to ${cmd.name}` : `Restored ${cmd.tag}` }); }
+        }
+      }
+    }
+    else if (cmd.k === 'attachIoModule') {
+      // R13: attach / detach an expansion module while paused (it adds channels the programs may use).
+      const mod = world.project.components.find(c => c.id === cmd.module);
+      const host = cmd.plc === null ? undefined : plcComponents(world.project).find(c => c.id === cmd.plc);
+      const next = { ...(world.project.ioModules ?? {}) };
+      if (!mod || !isIoModuleKind(mod.kind)) world = setError(world, 'Unknown expansion module');
+      else if (cmd.plc !== null && (!host || host.kind !== 'plc16')) world = setError(world, 'Expansion modules attach to a 16/16 PLC');
+      else {
+        delete next[mod.id];
+        let slot = 1;
+        if (host) {
+          const taken = new Set(modulesOf({ components: world.project.components, ioModules: next }, host.id).map(m => m.slot));
+          while (taken.has(slot)) slot++;
+          if (slot <= MAX_IO_MODULES_PER_PLC) next[mod.id] = { plc: host.id, slot };
+        }
+        if (host && slot > MAX_IO_MODULES_PER_PLC) world = setError(world, `A PLC takes at most ${MAX_IO_MODULES_PER_PLC} expansion modules`);
+        else {
+          const { ioModules: _old, ...rest } = world.project;
+          const candidate: ProjectFile = Object.keys(next).length ? { ...rest, ioModules: next } : rest;
+          // Detaching removes tags: refuse rather than break a program that uses them.
+          let problem: string | null = null;
+          for (const plc of plcComponents(candidate)) {
+            const cfg = programOf(candidate, plc.id), names = namesFor(candidate, plc.id);
+            try {
+              if (cfg.language === 'st') compileSandboxST(cfg.stSource, names);
+              else if (cfg.language === 'fbd') compileFbd(cfg.fbd, names);
+              else { const issues = validateSandboxProgram(cfg.program, names); if (issues.length) problem = issues.join('; '); }
+            } catch (error) { problem = error instanceof Error ? error.message : 'Program no longer compiles'; }
+            if (problem) { problem = `${plc.id}: ${problem}`; break; }
+          }
+          if (problem) world = setError(world, `Cannot change expansion modules: ${problem}`);
+          else {
+            world = createWorld(candidate);
+            commandEvents.push({ tick: world.tick, kind: 'edit', detail: host ? `Attached ${mod.id} to ${host.id} (slot ${slot})` : `Detached ${mod.id}` });
+          }
         }
       }
     }
@@ -673,7 +910,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
     } else if (cmd.k === 'wire') {
       const phaseError = threePhaseWireError(cmd.from, cmd.to,
         Object.fromEntries(world.project.components.map(c => [c.id, c.kind])));
-      const domainError = phaseError ?? analogWireError(cmd.from, cmd.to, world.project.components, world.project.wires);
+      const domainError = phaseError ?? airWireError(cmd.from, cmd.to, world.project.components) ?? analogWireError(cmd.from, cmd.to, world.project.components, world.project.wires);
       if (domainError) world = setError(world, domainError);
       else if (!validId(cmd.id) || world.project.wires.some(w => w.id === cmd.id || (w.from === cmd.from && w.to === cmd.to) || (w.from === cmd.to && w.to === cmd.from)) ||
           cmd.from === cmd.to || !terminalExists(cmd.from, world.project.components) ||
@@ -685,7 +922,7 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
       // Removing a broken conductor is a legitimate repair, and a dangling fault would make the
       // exported project fail validation.
       world = withFaults(world, faultsOf(world.project).filter(f => !(f.kind === 'wire-open' && f.target === cmd.id)));
-    } else if (cmd.k === 'loadProgram' || cmd.k === 'loadST' || cmd.k === 'loadFBD' || cmd.k === 'activateLanguage') {
+    } else if (cmd.k === 'loadProgram' || cmd.k === 'loadST' || cmd.k === 'loadSFC' || cmd.k === 'loadIL' || cmd.k === 'loadFBD' || cmd.k === 'activateLanguage') {
       // `plc` selects the target controller; omitted means the first PLC, exactly as with one PLC.
       if (cmd.plc !== undefined && !plcComponents(world.project).some(c => c.id === cmd.plc)) {
         world = setError(world, 'Unknown PLC');
@@ -697,6 +934,22 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
         try{compileFbd(cmd.document,namesFor(world.project,cmd.plc));
           world=createWorld(withProgramOf(world.project,cmd.plc,{language:'fbd',fbd:cmd.document}));}
         catch(error){world=setError(world,error instanceof Error?error.message:'Invalid FBD graph');}
+      } else if (cmd.k === 'loadIL') {
+        // R07: Instruction List compiles to Structured Text; the IL text travels in the source header so it can be re-opened.
+        try {
+          const names = namesFor(world.project, cmd.plc);
+          const source = compileIlToSt(cmd.source, names);
+          compileSandboxST(source, names);
+          world = createWorld(withProgramOf(world.project, cmd.plc, { language: 'st', stSource: source }));
+        } catch (error) { world = setError(world, error instanceof Error ? `IL: ${error.message}` : 'Invalid IL program'); }
+      } else if (cmd.k === 'loadSFC') {
+        // R07: a chart compiles to Structured Text; the chart travels in the source header so it can be re-opened.
+        try {
+          const names = namesFor(world.project, cmd.plc);
+          const source = compileSfcToSt(cmd.document, names);
+          compileSandboxST(source, names);
+          world = createWorld(withProgramOf(world.project, cmd.plc, { language: 'st', stSource: source }));
+        } catch (error) { world = setError(world, error instanceof Error ? `SFC: ${error.message}` : 'Invalid SFC chart'); }
       } else if (cmd.k === 'loadST') {
         try {
           compileSandboxST(cmd.source, namesFor(world.project, cmd.plc));
@@ -759,6 +1012,22 @@ function applyCommands(initial: WorldState, commands: readonly Command[]): {
   }
   return { world, forceStep, events: commandEvents };
 }
+/** Compressed-air view for the snapshot (R06). Empty object for a project without a compressor, so nothing else changes. */
+function airSnapshot(world: WorldState): { air?: NonNullable<RenderSnapshot['air']> } {
+  if (!world.project.components.some(c => c.kind === 'compressor')) return {};
+  const setpoints = Object.fromEntries(world.project.components.filter(c => c.kind === 'air-regulator')
+    .map(r => [r.id, paramValue(world.project.params, r.id, paramSpecsOf('air-regulator')[0])]));
+  const solution = solveAir(world.project.components, world.project.wires.filter(x => !hasFault(world.project, 'wire-open', x.id)), world.air, setpoints);
+  return { air: {
+    receivers: Object.fromEntries(world.project.components.filter(c => c.kind === 'compressor')
+      .map(c => [c.id, { pressureBar: world.air[c.id]?.pressureBar ?? 0, pumping: world.air[c.id]?.pumping === true }])),
+    // Working pressure at every cylinder AIR port, and at every regulator OUTLET (keyed by component id).
+    working: Object.fromEntries([
+      ...world.project.components.filter(c => c.kind === 'cylinder').map(c => [c.id, solution.pressureAt(`${c.id}.AIR`)] as const),
+      ...world.project.components.filter(c => c.kind === 'air-regulator').map(r => [r.id, solution.pressureAt(`${r.id}.AIR_OUT`)] as const),
+    ]),
+  } };
+}
 function buildCircuit(world: WorldState): Device[] {
   const devices: Device[] = [];
   const primary = legacyPrimaryId(world.project);
@@ -766,7 +1035,8 @@ function buildCircuit(world: WorldState): Device[] {
     // Equipment described as data (relay, cylinder): the definition says which loads and switches it contributes.
     const described = electricalDevices(c, { on: world.deviceOn[c.id] === true, hasFault: kind => hasFault(world.project, kind, c.id),
       cylinder: world.cylinders[c.id], plantSignals: sensorImage(world.plantWorld, c.id),
-      threePhase: world.threePhase[c.id] });
+      threePhase: world.threePhase[c.id],
+      ...(c.kind === 'compressor' ? { airOk: (world.air[c.id]?.pressureBar ?? 0) >= paramValue(world.project.params, c.id, paramSpecsOf('compressor')[3]) } : {}) });
     if (described) { devices.push(...described); continue; }
     if (c.kind === 'supply') devices.push({ id: c.id, kind: 'supply', positive: terminal(c.id, 'P24'), negative: terminal(c.id, 'M0'), volts: 24 });
     if (c.kind === 'breaker') devices.push({
@@ -777,26 +1047,34 @@ function buildCircuit(world: WorldState): Device[] {
       id: c.id, kind: 'switch', a: terminal(c.id,'95'), b: terminal(c.id,'96'),
       closed: world.tripped[c.id] !== true,
     });
-    if (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') {
+    if (c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton' || c.kind === 'selector') {
       // A stuck-button fault overrides what the operator did; the circuit sees the stuck contact.
       const pressed = effectivePressed(world.project, c);
       devices.push({
         id: c.id, kind: 'switch', a: terminal(c.id, 'A'), b: terminal(c.id, 'B'),
-        closed: c.kind === 'start' || c.kind === 'reversebutton' ? pressed : !pressed,
+        closed: c.kind === 'start' || c.kind === 'reversebutton' || c.kind === 'selector' ? pressed : !pressed,
       });
     }
     if (isPlcKind(c.kind)) {
       // Each PLC drives only its own output terminals, through its I/O map, from its own scan state.
       const coils = c.id === primary ? world.coils : world.plcs[c.id]?.coils ?? {};
-      Object.entries(ioOf(world.project, c).outputs).forEach(([pin, tag], i) => devices.push({
-        id: c.kind === 'plc' ? (i === 0 ? `${c.id}-Q` : `${c.id}-Q${i}`) : `${c.id}-${pin}`, kind: 'switch',
-        a: terminal(c.id, 'L+'), b: terminal(c.id, pin), closed: coils[tag] === true }));
+      Object.entries(ioOf(world.project, c).outputs).forEach(([pin, tag], i) => {
+        // R13: a module output switches the MODULE's own L+ onto the module's terminal.
+        const at = pinLocation(c.id, pin);
+        devices.push({
+          id: c.kind === 'plc' ? (i === 0 ? `${c.id}-Q` : `${c.id}-Q${i}`) : `${c.id}-${pin}`, kind: 'switch',
+          a: terminal(at.owner, 'L+'), b: terminal(at.owner, at.pin), closed: coils[tag] === true });
+      });
     }
     // A stuck-output sensor lies to the PLC: only its electrical output changes. The plant truth
     // (world.plant.photoeyeActive / world.tank.highLevel) keeps computing from real geometry and level.
     if (c.kind === 'photoeye') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
       a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'),
       closed: effectiveSensor(world.project, c, eyeActive(world, c)) });
+    // R06: the pressure sensor's contact closes while the pressure at its AIR port is at or above its setpoint.
+    if (c.kind === 'pressure-sensor') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
+      a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT_atPressure'),
+      closed: (airSensorReadings(world.project, world.air)[c.id] ?? 0) >= paramValue(world.project.params, c.id, paramSpecsOf('pressure-sensor')[0]) });
     if (c.kind === 'levelprobe') devices.push({ id: `${c.id}-OUT`, kind: 'switch',
       a: terminal(c.id, 'L+'), b: terminal(c.id, 'OUT'),
       closed: effectiveSensor(world.project, c, probeHigh(world, c)) });
@@ -858,7 +1136,8 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       const analogPoints = io.analogInputs && !world.running
         ? sampleAnalogInputs(world.project, world.vessels, c.id, io, rt?.powered ?? false,
           new Set(faultsOf(world.project).filter(f => f.kind === 'wire-open').map(f => f.target)),
-          world.plantWorld, id => world.voltages[id + '.L+'] !== undefined && world.voltages[id + '.M'] !== undefined).points
+          world.plantWorld, id => world.voltages[id + '.L+'] !== undefined && world.voltages[id + '.M'] !== undefined,
+          airSensorReadings(world.project, world.air)).points
         : rt?.analogInputs ?? [];
       return [c.id, c.id === legacyPrimaryId(world.project)
         ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
@@ -895,7 +1174,10 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       return [c.id, { elapsedMs, delayMs, done: elapsedMs >= delayMs }];
     })),
     cylinders: Object.fromEntries(Object.entries(world.cylinders).map(([id, c]) => [id, {
-      position: c.position, extendLimit: c.extendLimit, retractLimit: c.retractLimit, command: c.command, alarm: c.alarm, conflict: c.conflict }])),
+      position: c.position, extendLimit: c.extendLimit, retractLimit: c.retractLimit, command: c.command, alarm: c.alarm, conflict: c.conflict,
+      ...(c.circuit ? { circuit: c.circuit } : {}) }])),
+    ...(airSnapshot(world)),
+    ...(world.operatorValues ? { operatorValues: Object.fromEntries(Object.entries(world.operatorValues).map(([id, v]) => [id, { ...v }])) } : {}),
     forwardContactorOn: world.forwardContactorOn, reverseContactorOn: world.reverseContactorOn,
     motorDirection: world.motorDirection, reverseMotorAngleRad: world.reverseMotorAngleRad,
     interlockConflict: world.interlockConflict,
@@ -916,12 +1198,15 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
     })) };
 }
 /** Only this function owns the ten phases. Sensor state is sampled for the NEXT tick. */
-export function tick(initial: WorldState, commands: readonly Command[] = [], dtMs = SCAN_MS):
+/** `dtOverride` is for tests and tools; normally one scan advances the project's own scan period (default 50 ms). */
+export function tick(initial: WorldState, commands: readonly Command[] = [], dtOverride?: number):
   { world: WorldState; snapshot: RenderSnapshot; events: SimEvent[] } {
-  if (!Number.isSafeInteger(dtMs) || dtMs < 1 || dtMs > 1000) throw new RangeError('Invalid simulation timestep');
+  if (dtOverride !== undefined && (!Number.isSafeInteger(dtOverride) || dtOverride < 1 || dtOverride > 1000)) throw new RangeError('Invalid simulation timestep');
   // 1. Apply commands. Run/Pause/Step are commands, not renderer state.
   const change = applyCommands(initial, commands);
   let w = change.world;
+  // The step is resolved AFTER commands so a project loaded or reconfigured in this call is scanned at its own period.
+  const dtMs = dtOverride ?? scanMsOf(w.project);
   const events: SimEvent[] = [...change.events];
   if (!w.running && !change.forceStep) {
     // Measurements update while paused without advancing PLC/plant state.
@@ -974,12 +1259,14 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
   // Actuator image: legacy single-device flags plus per-instance state (see sim/phases/actuators.ts).
   const { contactor, motor, conveyor, diverter, pump, drain, lamp, forwardContactor, reverseContactor, reversibleMotor, forwardCoilOn, reverseCoilOn, interlockConflict, forwardContactorOn, reverseContactorOn, forwardMotorPowered, reverseMotorPowered, opposingDrives, motorDirection, reverseMotorAngleRad, contactorOn, motorOn, motorAngleRad, conveyorOn, diverterOn, nextLanes, pumpOn, drainOn, lampOn, deviceOn, motorAngles } = stepActuators(w, circuit.energizedLoads, dtMs, events);
   // On-delay relays, pneumatic cylinders and tank vessels advance from the solved circuit (see sim/phases/equipment-state.ts).
-  const { nextTimers, nextCylinders, nextVessels } = stepEquipmentState(w, circuit.energizedLoads, dtMs, deviceOn, events);
+  const { nextTimers, nextCylinders, nextVessels, nextAir } = stepEquipmentState(w, circuit.energizedLoads, dtMs, deviceOn, events);
   // The authoritative P3 world advances exactly five 10 ms substeps AFTER PLC
   // outputs and the electrical actuator image settle. Geometry sensors feed the
   // following PLC scan, never the current scan's input image.
-  const p3 = stepProjectPlant(w.plantWorld, w.project, circuit.energizedLoads, dtMs,
-    {controllerPowered:powered});
+  const p3 = stepProjectPlant(w.plantWorld, withOperatorValues(w.project, w.operatorValues), circuit.energizedLoads, dtMs,
+    // The controller-supply condition only exists when the project HAS a controller: a hard-wired cell (no PLC) must not
+    // be held off by a PLC that was never placed (R14/R28: a working cell can be built from an empty workspace).
+    {...(plc ? {controllerPowered:powered} : {}),isSourcePowered:(id:string)=>circuit.reads24(id+'.L+',id+'.M'),analogOutputs:analogOutputsOf(w)});
   for (const event of p3.events)
     events.push({ tick: w.tick + 1, kind: 'plant', detail: event.source + ': ' + event.detail });
   // P4 three-phase process after the worker's actual 24V coil demand scan.
@@ -1054,7 +1341,7 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
     alarms: alarmUpdate.alarms, alarmWatch: alarmUpdate.watch,
     forwardContactorOn, reverseContactorOn, motorDirection,
     reverseMotorAngleRad, interlockConflict,
-    conveyorOn, diverterOn, lanes: nextLanes, vessels: nextVessels, cylinders: nextCylinders, timers: nextTimers,
+    conveyorOn, diverterOn, lanes: nextLanes, vessels: nextVessels, cylinders: nextCylinders, air: nextAir, timers: nextTimers,
     plantWorld: p3.runtime,
     pumpOn, drainOn, lampOn,
     voltages: circuit.voltage,
@@ -1068,7 +1355,8 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtM
       ...(opposingDrives ? ['Both direction terminals energized: reversible motor inhibited'] : []),
       ...Object.entries(nextThreePhase).flatMap(([id, state]) => state.motor.diagnostics.map(msg => id + ': ' + msg)),
       ...(!powered && plc ? ['PLC is not powered (wire L+ and M to the 24V supply)'] : []),
-      ...unpoweredExtras.map(id => `PLC ${id} is not powered (wire L+ and M to a 24V supply)`)],
+      ...unpoweredExtras.map(id => `PLC ${id} is not powered (wire L+ and M to a 24V supply)`),
+      ...moduleDiagnostics(w.project, id => circuit.reads24(terminal(id, 'L+'), terminal(id, 'M')))],
     breakpointHit,
     running: change.forceStep || !!breakpointHit ? false : w.running,
   };

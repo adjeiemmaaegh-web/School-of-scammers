@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blankProgram, createWorld, latchProgram, renderSnapshot, tick, validateProject } from '../src/sim/orchestrator';
+import { blankProgram, createWorld, latchProgram, MAX_COMPONENTS, renderSnapshot, tick, validateProject } from '../src/sim/orchestrator';
 import type { Command, WorldState } from '../src/sim/signals';
 
 const add = (w: WorldState, n = 1, at?: { x: number; y: number }): WorldState => {
@@ -83,9 +83,10 @@ describe('addPanel: a ready-made, pre-wired starter panel', () => {
   it('respects the project size limits', () => {
     let w = createWorld();
     for (let i = 0; i < 6; i++) w = tick(w, [{ k: 'place', id: `x${i}`, kind: 'lamp', at: { x: 10 + i, y: 10 } }]).world;
-    const parts: Command[] = Array.from({ length: 50 }, (_, i) => ({ k: 'place', id: `m${i}`, kind: 'motor', at: { x: 10, y: 10 + i } }));
+    // Fill the project to within 4 of the cap: a starter panel (more than 4 parts) no longer fits.
+    const parts: Command[] = Array.from({ length: MAX_COMPONENTS - 6 - 4 }, (_, i) => ({ k: 'place', id: `m${i}`, kind: 'motor', at: { x: 10 + (i % 20) * 10, y: 10 + Math.floor(i / 20) * 10 } }));
     w = tick(w, parts).world;
-    expect(w.project.components.length).toBeGreaterThan(54);
+    expect(w.project.components.length).toBe(MAX_COMPONENTS - 4);
     expect(tick(w, [{ k: 'addPanel', template: 'motor-starter' }]).world.lastError).toMatch(/Not enough room/);
   });
 });

@@ -9,11 +9,13 @@
  *
  * Pure and deterministic like everything under src/sim.
  */
-import { PLC16_INPUT_TERMINALS, PLC16_OUTPUT_TERMINALS } from '../components/registry';
+import { IO_MODULE_ANALOG_INPUTS, IO_MODULE_ANALOG_OUTPUTS, IO_MODULE_POINTS, PLC16_INPUT_TERMINALS, PLC16_OUTPUT_TERMINALS, isIoModuleKind, type IoModuleKind } from '../components/registry';
 import type { PlacedComponent, ProjectFile } from './signals';
 
 /** terminal -> tag, for inputs and for outputs. */
-export type PlcIoMap = { inputs: Record<string, string>; outputs: Record<string, string>; analogInputs?: Record<string, string> };
+export type PlcIoMap = { inputs: Record<string, string>; outputs: Record<string, string>; analogInputs?: Record<string, string>;
+  /** PLC16 analog OUTPUTS (R13): a REAL VAR_OUTPUT with this name drives whatever numeric device input the terminal is wired to. */
+  analogOutputs?: Record<string, string> };
 
 export const LEGACY_IO: PlcIoMap = {
   inputs: { 'I0.0': 'Start', 'I0.1': 'StopOK', 'I0.2': 'Photoeye', 'I0.3': 'TankHigh', 'I0.4': 'ReverseRequest' },
@@ -24,17 +26,58 @@ export const defaultIo = (kind: string): PlcIoMap => kind === 'plc16' ? {
   outputs: Object.fromEntries(PLC16_OUTPUT_TERMINALS.map((t, i) => [t, `Out${i}`])),
   // Two fixed engineering-unit numeric channels, separate from the 24V digital netlist.
   analogInputs: { AI0: 'Analog0', AI1: 'Analog1' },
+  analogOutputs: { AO0: 'AnalogOut0', AO1: 'AnalogOut1' },
 } : LEGACY_IO;
 
 /** The classic controller's map is fixed; only the 16/16 controller can be renamed. */
 export const isConfigurableIo = (kind: string): boolean => kind === 'plc16';
 
-/** The resolved map of one PLC: its saved names laid over the defaults for its kind. */
-export function ioOf(project: Pick<ProjectFile, 'plcIo'>, plc: Pick<PlacedComponent, 'id' | 'kind'>): PlcIoMap {
+/** Expansion modules (R13): at most this many per PLC; slot numbers 1..MAX name the tags (`M1In0`, `M2Out3`). */
+export const MAX_IO_MODULES_PER_PLC = 4;
+/** A module pin inside a PLC map is `<moduleId>:<pin>`; a plain pin belongs to the PLC itself. */
+export const MODULE_PIN_SEPARATOR = ':';
+/** Where a map pin physically lives: the PLC's own terminal, or a terminal of an expansion module with that module's power pins. */
+export function pinLocation(plcId: string, pin: string): { owner: string; pin: string; module: boolean } {
+  const at = pin.indexOf(MODULE_PIN_SEPARATOR);
+  return at < 0 ? { owner: plcId, pin, module: false } : { owner: pin.slice(0, at), pin: pin.slice(at + 1), module: true };
+}
+/** Modules attached to one PLC, in slot order. Only modules still in the project count. */
+export function modulesOf(project: Partial<Pick<ProjectFile, 'components' | 'ioModules'>>, plcId: string): { id: string; kind: IoModuleKind; slot: number; names?: Record<string, string> }[] {
+  const out: { id: string; kind: IoModuleKind; slot: number; names?: Record<string, string> }[] = [];
+  for (const [id, link] of Object.entries(project.ioModules ?? {})) {
+    const c = project.components?.find(x => x.id === id);
+    if (c && link.plc === plcId && isIoModuleKind(c.kind)) out.push({ id, kind: c.kind, slot: link.slot, ...(link.names ? { names: link.names } : {}) });
+  }
+  return out.sort((a, b) => a.slot - b.slot);
+}
+const withModules = (map: PlcIoMap, project: Partial<Pick<ProjectFile, 'components' | 'ioModules'>>, plc: Pick<PlacedComponent, 'id' | 'kind'>): PlcIoMap => {
+  if (plc.kind !== 'plc16') return map;
+  const mods = modulesOf(project, plc.id);
+  if (!mods.length) return map;
+  const inputs = { ...map.inputs }, outputs = { ...map.outputs };
+  const analogInputs = { ...(map.analogInputs ?? {}) }, analogOutputs = { ...(map.analogOutputs ?? {}) };
+  for (const m of mods) {
+    const key = (pin: string) => `${m.id}${MODULE_PIN_SEPARATOR}${pin}`;
+    // R13: a learner's own name for a channel replaces its slot-numbered default (`M1In0`).
+    const rename = (tag: string): string => m.names?.[tag] ?? tag;
+    if (m.kind === 'io-di8') for (let k = 0; k < IO_MODULE_POINTS; k++) inputs[key(`I${k}`)] = rename(`M${m.slot}In${k}`);
+    else if (m.kind === 'io-do8') for (let k = 0; k < IO_MODULE_POINTS; k++) outputs[key(`Q${k}`)] = rename(`M${m.slot}Out${k}`);
+    else if (m.kind === 'io-ai4') for (let k = 0; k < IO_MODULE_ANALOG_INPUTS; k++) analogInputs[key(`AI${k}`)] = rename(`M${m.slot}Ai${k}`);
+    else for (let k = 0; k < IO_MODULE_ANALOG_OUTPUTS; k++) analogOutputs[key(`AO${k}`)] = rename(`M${m.slot}Ao${k}`);
+  }
+  return { ...map, inputs, outputs, ...(Object.keys(analogInputs).length ? { analogInputs } : {}), ...(Object.keys(analogOutputs).length ? { analogOutputs } : {}) };
+};
+
+/** The resolved map of one PLC: its saved names laid over the defaults for its kind, plus the channels of its expansion modules. */
+export function ioOf(project: Pick<ProjectFile, 'plcIo'> & Partial<Pick<ProjectFile, 'components' | 'ioModules'>>, plc: Pick<PlacedComponent, 'id' | 'kind'>): PlcIoMap {
+  return withModules(ownIoOf(project, plc), project, plc);
+}
+function ownIoOf(project: Pick<ProjectFile, 'plcIo'>, plc: Pick<PlacedComponent, 'id' | 'kind'>): PlcIoMap {
   const base = defaultIo(plc.kind);
   const saved = isConfigurableIo(plc.kind) ? project.plcIo?.[plc.id] : undefined;
   return saved ? { inputs: { ...base.inputs, ...saved.inputs }, outputs: { ...base.outputs, ...saved.outputs },
-    ...(base.analogInputs ? { analogInputs: { ...base.analogInputs } } : {}) } : base;
+    ...(base.analogInputs ? { analogInputs: { ...base.analogInputs } } : {}),
+    ...(base.analogOutputs ? { analogOutputs: { ...base.analogOutputs } } : {}) } : base;
 }
 
 /** Words a program tag may not be: they would collide with Structured Text and Ladder syntax or the engine. */
@@ -64,7 +107,7 @@ export function validateIoMap(kind: string, map: unknown): string[] {
   if (errors.length) return errors;
   // Names are case-insensitive in Structured Text, so uniqueness is checked that way across inputs AND outputs.
   const full = { inputs: { ...base.inputs, ...(inputs as Record<string, string>) }, outputs: { ...base.outputs, ...(outputs as Record<string, string>) } };
-  for (const side of ['inputs', 'outputs', 'analogInputs'] as const) for (const [terminal, tag] of Object.entries(side === 'analogInputs' ? base.analogInputs ?? {} : full[side])) {
+  for (const side of ['inputs', 'outputs', 'analogInputs', 'analogOutputs'] as const) for (const [terminal, tag] of Object.entries(side === 'analogInputs' ? base.analogInputs ?? {} : side === 'analogOutputs' ? base.analogOutputs ?? {} : full[side])) {
     const key = tag.toUpperCase();
     if (seen.has(key)) errors.push(`Tag ${tag} is used by both ${seen.get(key)} and ${terminal}`); else seen.set(key, terminal);
   }
@@ -72,10 +115,29 @@ export function validateIoMap(kind: string, map: unknown): string[] {
 }
 
 /** The program-visible names for a PLC: what validators and editors accept as inputs and outputs. */
-export type IoNames = { inputs: string[]; outputs: string[]; numericInputs: string[]; requireRun: boolean };
+export type IoNames = { inputs: string[]; outputs: string[]; numericInputs: string[]; numericOutputs?: string[]; requireRun: boolean };
 export const namesOf = (io: PlcIoMap): IoNames => ({
-  inputs: Object.values(io.inputs), outputs: Object.values(io.outputs), numericInputs: Object.values(io.analogInputs ?? {}),
+  inputs: Object.values(io.inputs), outputs: Object.values(io.outputs), numericInputs: Object.values(io.analogInputs ?? {}), numericOutputs: Object.values(io.analogOutputs ?? {}),
   requireRun: Object.values(io.outputs).includes('Run'),
 });
 /** What the classic controller always accepted. */
 export const LEGACY_NAMES: IoNames = namesOf(LEGACY_IO);
+
+/** Tag names a valid module channel name may take (the same rule as renaming a PLC channel); empty when fine. */
+export function moduleNameError(name: string, io: PlcIoMap, exceptTag?: string): string | null {
+  if (!TAG.test(name) || RESERVED.has(name.toUpperCase())) return `"${name}" is not a valid tag name (letters, digits and _ , starting with a letter, up to 24, not a reserved word)`;
+  const taken = new Set([...Object.values(io.inputs), ...Object.values(io.outputs), ...Object.values(io.analogInputs ?? {}), ...Object.values(io.analogOutputs ?? {})]
+    .filter(t => t !== exceptTag).map(t => t.toUpperCase()));
+  return taken.has(name.toUpperCase()) ? `Tag ${name} is already used on this controller` : null;
+}
+/** Plain-language diagnostics for the expansion modules of a project: unattached, or attached but without supply. */
+export function moduleDiagnostics(project: Pick<ProjectFile, 'components' | 'ioModules'>, powered: (moduleId: string) => boolean): string[] {
+  const out: string[] = [];
+  for (const c of project.components) {
+    if (!isIoModuleKind(c.kind)) continue;
+    const link = project.ioModules?.[c.id];
+    if (!link) out.push(`Expansion module ${c.id} is not attached to a PLC (choose its host in the inspector)`);
+    else if (!powered(c.id)) out.push(`Expansion module ${c.id} (slot ${link.slot} of ${link.plc}) is not powered: its channels read false and its outputs cannot drive anything`);
+  }
+  return out;
+}

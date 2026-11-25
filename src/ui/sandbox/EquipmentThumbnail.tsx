@@ -17,7 +17,7 @@ export function EquipmentThumbnail({ kind }: { kind: ComponentKind }) {
   const process = family === 'process' && !motor;
   const motion = family === 'motion';
   const indicator = family === 'indicators';
-  const pushButton = ['start','stop','reversebutton','estop'].includes(kind);
+  const pushButton = ['start','stop','reversebutton','estop','selector'].includes(kind);
   const supply = kind === 'supply' || kind === 'three-phase-supply';
   const contact = ['breaker','overload','contactor','forwardcontactor','reversecontactor','relay','timerelay'].includes(kind);
   const danger = ['stop','estop'].includes(kind);

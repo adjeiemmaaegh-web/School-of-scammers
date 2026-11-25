@@ -1,6 +1,6 @@
 /** P3 Tier 2 sensor geometry, response time and seeded load-cell noise. */
 import type {EquipmentDef,EquipmentContext} from '../world/equipment';
-import {draw,initial,param,spec} from '../world/equipment';
+import {draw,flag,initial,param,spec} from '../world/equipment';
 import type {Body,World} from '../world/types';
 import {insideFootprint,q,vec} from '../world/math';
 import {nextSeed} from '../world/seed';
@@ -17,6 +17,8 @@ const optical=(kind:string,label:string,predicate:(b:Body)=>boolean):EquipmentDe
   // 0 preserves old saved-project area sensing; 1 enables a forward zone.
   spec('beamMode','Detection mode','0=area, 1=forward',0,1,1,0),
   spec('beamWidthMm','Forward beam width','mm',20,400,10,100),
+  // R21: continuous aim of a forward beam, independent of the quarter-turn placement yaw; 0 keeps every saved project unchanged.
+  spec('aimDeg','Beam aim (forward mode)','degrees',-180,180,5,0),
   // Legacy forward detection stays unchanged. Explicit opt-in enables a
   // bounded LOS check against shelves and process tanks in the worker.
   spec('occlusionMode','Line of sight','0=off, 1=fixed, 2=fixed+bodies, 3=material',0,3,1,0),
@@ -58,19 +60,45 @@ export const photoeye=optical('geometry-photoeye','Geometry photoeye',()=>true);
 export const inductiveProx=optical('inductive-prox','Inductive proximity sensor',
  b=>b.tags.material==='metal'||b.tags.metal===true);
 export const capacitiveProx=optical('capacitive-prox','Capacitive proximity sensor',()=>true);
+/**
+ * Light curtain with MUTING (R20). `mute` (command) deliberately ignores the curtain so material can pass, as a muting
+ * arrangement does while a pallet is on its way through, but only for `maxMuteMs`: a mute held longer expires, the curtain is live
+ * again and `muteTimeout` is raised until the mute is released (a stuck mute must never leave the opening unprotected).
+ * Educational model of the principle; not a rated safety function and not a two-sensor muting sequence.
+ */
 export const lightCurtain:EquipmentDef={
  kind:'light-curtain',label:'Height-classifying light curtain',footprint:vec(100,450,1100),
- commands:[],signals:[{name:'blocked',kind:'bool'},{name:'tall',kind:'bool'}],
- params:[spec('heightMm','Threshold height','mm',100,1500,50,500)],
+ commands:[{name:'mute',kind:'bool'},{name:'m1',kind:'bool'},{name:'m2',kind:'bool'}],
+ signals:[{name:'blocked',kind:'bool'},{name:'tall',kind:'bool'},{name:'muted',kind:'bool'},{name:'muteTimeout',kind:'bool'},{name:'sequenceOk',kind:'bool'}],
+ params:[spec('heightMm','Threshold height','mm',100,1500,50,500),
+  spec('maxMuteMs','Maximum mute time','ms',500,60000,500,10000),
+  spec('sequenceMs','Muting sensor window','ms',200,10000,100,2000)],
  faults:['beam-broken','alignment-error'],
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
-  const visible=bodiesNear(w,ctx,500),blocked=visible.length>0&&f!=='beam-broken';
+  const visible=bodiesNear(w,ctx,500);
+  // TWO-SENSOR MUTING: m1 then m2 within the window starts a mute that lasts while either is still active. m2 first, or m2 too late,
+  // is not a valid sequence and does not mute, which is how a person (who would break them in the wrong order) is told from a pallet.
+  const m1=flag(c,'m1'),m2=flag(c,'m2');
+  let phase=s.phase??0,seq=s.progress;
+  // A sequence is armed by a fresh rising edge of m1 (count remembers the previous m1): holding m1 after a timeout must not re-arm it.
+  if(phase===0&&m1&&s.count===0&&!m2){phase=1;seq=0;}
+  else if(phase===1){
+   if(m2&&m1){phase=2;}
+   else if(m2){phase=0;seq=0;}                                                   // m1 was released before m2: not a pass
+   else{seq=seq+dt;if(seq>param(ctx,'sequenceMs',2000)||!m1){phase=0;seq=0;}}
+  }else if(phase===2&&!m1&&!m2){phase=0;seq=0;}
+  // elapsedMs counts how long a mute (commanded, or from a valid sequence) has been held; a release resets it and clears the timeout.
+  const asked=flag(c,'mute')||phase===2;
+  const heldMs=asked?s.elapsedMs+dt:0;
+  const expired=asked&&heldMs>param(ctx,'maxMuteMs',10000);
+  const muted=asked&&!expired;
+  const blocked=!muted&&visible.length>0&&f!=='beam-broken';
   const tall=blocked&&visible.some(b=>b.size.z>=param(ctx,'heightMm',500))&&f!=='alignment-error';
-  return {world:w,state:{...s,engaged:blocked,done:tall,faulted:!!f}};
+  return {world:w,state:{...s,elapsedMs:q(heldMs),engaged:blocked,done:tall,stalled:expired,lastCommand:muted,phase,progress:q(seq),count:m1?1:0,faulted:!!f}};
  },
- read:s=>({blocked:s.engaged,tall:s.done}),
- describe:(s,ctx)=>[draw(ctx,'curtain','box',vec(80,430,1000),500,s.engaged?'#8fbad6':'#577f98')],
+ read:s=>({blocked:s.engaged,tall:s.done,muted:s.lastCommand,muteTimeout:s.stalled,sequenceOk:(s.phase??0)===2}),
+ describe:(s,ctx)=>[draw(ctx,'curtain','box',vec(80,430,1000),500,s.lastCommand?'#c9b45a':s.engaged?'#8fbad6':'#577f98')],
 };
 export const weighCell:EquipmentDef={
  kind:'weigh-cell',label:'Numeric weighing platform',footprint:vec(350,350,100),

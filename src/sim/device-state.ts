@@ -16,6 +16,9 @@ export function perDeviceLive(snapshot: RenderSnapshot, c: Pick<PlacedComponent,
     case 'contactor': return snapshot.deviceOn[c.id] ?? snapshot.contactorOn;
     case 'lamp': return snapshot.deviceOn[c.id] ?? snapshot.lampOn;
     case 'conveyor': return snapshot.deviceOn[c.id] ?? snapshot.conveyorOn;
+    case 'buzzer':
+    case 'siren':
+    case 'compressor':
     case 'relay':
     case 'timerelay': return snapshot.deviceOn[c.id] ?? false;
     case 'stacklight': return ['R', 'Y', 'G'].some(l => snapshot.deviceOn[`${c.id}-${l}`] === true);
@@ -29,4 +32,17 @@ export function perDeviceLive(snapshot: RenderSnapshot, c: Pick<PlacedComponent,
     case 'overload': return !(snapshot.tripped[c.id] ?? snapshot.overloadTripped);
     default: return undefined;
   }
+}
+
+/**
+ * One-line live status for plant equipment (feeder, collector, sensors, ...), derived from the worker's own signal image:
+ * every active boolean signal in capitals plus the numeric readings. Never stored by the UI. Idle equipment reads 'IDLE'.
+ */
+export function plantStatusText(signals: Record<string, boolean | number> | undefined): string | undefined {
+  if (!signals) return undefined;
+  const flags = Object.entries(signals).filter(([, v]) => v === true).map(([k]) => k.toUpperCase());
+  const readings = Object.entries(signals).filter(([, v]) => typeof v === 'number').slice(0, 2)
+    .map(([k, v]) => `${k} ${Number.isInteger(v) ? v : (v as number).toFixed(1)}`);
+  const parts = [...flags, ...readings];
+  return parts.length ? parts.join(' · ') : 'IDLE';
 }

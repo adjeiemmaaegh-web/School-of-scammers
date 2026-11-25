@@ -10,9 +10,10 @@ import { executeStructuredText, type STResult, type STValue } from '../../engine
 import { compileSandboxST } from '../../program/p2-contract';
 import { solveNetAware } from '../../engineering/electrical';
 import { faultsOf } from '../faults';
-import { ioOf } from '../plc-io';
+import { ioOf, pinLocation } from '../plc-io';
 import { freshPlcRuntime, namesFor, programOf, runtimePlcs, scanPlc } from '../plcs';
 import { sampleAnalogInputs } from '../analog';
+import { airSensorReadings } from '../air-sensors';
 import { deenergisedPlcs, quietLanes } from './fail-closed';
 import type { PlacedComponent, PlcInputs, PlcRuntime, SimEvent, WorldState } from '../signals';
 
@@ -51,7 +52,7 @@ export function scanControllers(
           inputs,w.coils,w.fbdMemory,dtMs);
       } else if (w.project.language === 'st') {
         const compiled = w.stCompiled ?? compileSandboxST(w.project.stSource ?? '');
-        stResult = executeStructuredText(compiled, inputs, w.stMemory);
+        stResult = executeStructuredText(compiled, inputs, w.stMemory, dtMs);
         const run = Object.entries(stResult.outputs).find(([key]) => key.toLowerCase() === 'run')?.[1];
         if (typeof run !== 'boolean') throw new TypeError('ST Run output must be BOOL');
       } else ladderResult = executeLadder(w.project.program, inputs, w.coils, w.ladderMemory, dtMs, w.ladderNumeric,
@@ -131,14 +132,19 @@ export function scanControllers(
     const extraPowered = !shorted && circuit.reads24(terminal(extra.id, 'L+'), terminal(extra.id, 'M'));
     const io = ioOf(w.project, extra);
     // A sensor-named input only reads high if some powered sensor of that kind exists (guards a wire straight to P24).
-    const digitalInputs = Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => [tag, extraPowered &&
-      (tag === 'Photoeye' ? eyePowered : tag === 'TankHigh' ? probePowered : true) &&
-      circuit.reads24(terminal(extra.id, pin), terminal(extra.id, 'M'))]));
+    // R13: an expansion-module pin reads against that module's own M, and only while the MODULE is powered.
+    const digitalInputs = Object.fromEntries(Object.entries(io.inputs).map(([pin, tag]) => {
+      const at = pinLocation(extra.id, pin);
+      const live = at.module ? circuit.reads24(terminal(at.owner, 'L+'), terminal(at.owner, 'M')) : extraPowered;
+      return [tag, extraPowered && live &&
+        (tag === 'Photoeye' ? eyePowered : tag === 'TankHigh' ? probePowered : true) &&
+        circuit.reads24(terminal(at.owner, at.pin), terminal(at.owner, 'M'))];
+    }));
     const cfg = programOf(w.project, extra.id);
     try {
       const openAnalogWires = new Set(faultsOf(w.project).filter(f => f.kind === 'wire-open').map(f => f.target));
       const numeric = sampleAnalogInputs(w.project, w.vessels, extra.id, io, extraPowered, openAnalogWires,
-        w.plantWorld, id => circuit.reads24(terminal(id, 'L+'), terminal(id, 'M')));
+        w.plantWorld, id => circuit.reads24(terminal(id, 'L+'), terminal(id, 'M')), airSensorReadings(w.project, w.air));
       // Physical numeric process inputs come from the preceding settled scan state.
       const tagInputs = { ...digitalInputs, ...numeric.values };
       nextPlcs[extra.id] = scanPlc(cfg, io, w.plcs[extra.id] ?? freshPlcRuntime(cfg, namesFor(w.project, extra.id)),

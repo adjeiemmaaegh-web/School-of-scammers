@@ -1,6 +1,6 @@
-/// <reference lib="webworker" />
-/** P12 private offline assessment Worker: independent deterministic bench.
- * No timers, fetch, storage, server, external PLC actions or renderer state.
+/** P12 private offline assessment bench: independent deterministic runs of the scene matrices.
+ * Pure and DOM-free. It is loaded lazily inside a FRESH simulation-worker instance (see worker.ts), so an assessment never touches
+ * the live sandbox world, and the engine code is shared with that worker instead of being bundled twice (STATUS F-25).
  */
 import {runPlantMatrix} from '../plant/scenes/matrix';
 import {expandedSpecFor,runExpandedMatrix} from '../plant/scenes/matrix-p13';
@@ -20,8 +20,8 @@ import {runP24HoldCampaign} from '../plant/scenes/matrix-p24';
 import {runP25FaultRetryCampaign} from '../plant/scenes/matrix-p25';
 import type {ProjectFile} from './signals';
 
-type RunRequest={kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery'|'run-power-recovery'|'run-gate-obstruction'|'run-queue-accumulation'|'run-zone-backpressure'|'run-two-belt-handoff'|'run-outfeed-hold-release'|'run-stuck-outfeed-retry';id:number;sceneId:string;project:ProjectFile};
-type RunResponse={kind:'matrix-result';id:number;result:ReturnType<typeof runPlantMatrix>}|
+export type RunRequest={kind:'run-matrix'|'run-batch'|'run-autonomous'|'run-resilience'|'run-material-lots'|'run-jam-recovery'|'run-power-recovery'|'run-gate-obstruction'|'run-queue-accumulation'|'run-zone-backpressure'|'run-two-belt-handoff'|'run-outfeed-hold-release'|'run-stuck-outfeed-retry';id:number;sceneId:string;project:ProjectFile};
+export type RunResponse={kind:'matrix-result';id:number;result:ReturnType<typeof runPlantMatrix>}|
  {kind:'batch-result';id:number;result:ReturnType<typeof runP15Batch>}|
  {kind:'autonomous-result';id:number;result:ReturnType<typeof runP15AutonomousSort>|ReturnType<typeof runP15AutonomousFactory>}|
  {kind:'resilience-result';id:number;result:ReturnType<typeof runP16ResilienceAudit>}|
@@ -35,9 +35,9 @@ type RunResponse={kind:'matrix-result';id:number;result:ReturnType<typeof runPla
  {kind:'outfeed-hold-result';id:number;result:ReturnType<typeof runP24HoldCampaign>}|
  {kind:'stuck-outfeed-retry-result';id:number;result:ReturnType<typeof runP25FaultRetryCampaign>}|
  {kind:'matrix-error';id:number;message:string};
-const scope:DedicatedWorkerGlobalScope=self as DedicatedWorkerGlobalScope;
-scope.onmessage=(event:MessageEvent<RunRequest>)=>{
- const req=event.data;
+export const ASSESSMENT_KINDS:readonly RunRequest['kind'][]=['run-matrix','run-batch','run-autonomous','run-resilience','run-material-lots','run-jam-recovery','run-power-recovery','run-gate-obstruction','run-queue-accumulation','run-zone-backpressure','run-two-belt-handoff','run-outfeed-hold-release','run-stuck-outfeed-retry'];
+/** Runs one assessment request and returns the response to post, or null when the message is not a valid request. */
+export function handleAssessment(req:RunRequest):RunResponse|null{
  if(!req||(req.kind!=='run-matrix'&&req.kind!=='run-batch'&&req.kind!=='run-autonomous'&&
    req.kind!=='run-resilience'&&req.kind!=='run-material-lots'&&
    req.kind!=='run-jam-recovery'&&req.kind!=='run-power-recovery'&&
@@ -45,58 +45,58 @@ scope.onmessage=(event:MessageEvent<RunRequest>)=>{
    req.kind!=='run-zone-backpressure'&&req.kind!=='run-two-belt-handoff'&&
    req.kind!=='run-outfeed-hold-release'&&req.kind!=='run-stuck-outfeed-retry')||
    !Number.isSafeInteger(req.id)||
-   typeof req.sceneId!=='string'||!req.project)return;
+   typeof req.sceneId!=='string'||!req.project)return null;
  try{
   const size=JSON.stringify(req.project).length;
   if(size>300000)throw new RangeError('Assessment project exceeds bounded local trial size');
   if(req.kind==='run-stuck-outfeed-retry'){
    const result=runP25FaultRetryCampaign(req.project,req.sceneId);
-   scope.postMessage({kind:'stuck-outfeed-retry-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'stuck-outfeed-retry-result',id:req.id,result} satisfies RunResponse;
   }else if(req.kind==='run-outfeed-hold-release'){
    const result=runP24HoldCampaign(req.project,req.sceneId);
-   scope.postMessage({kind:'outfeed-hold-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'outfeed-hold-result',id:req.id,result} satisfies RunResponse;
   }else if(req.kind==='run-two-belt-handoff'){
    const result=runP23HandoffCampaign(req.project,req.sceneId);
-   scope.postMessage({kind:'two-belt-handoff-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'two-belt-handoff-result',id:req.id,result} satisfies RunResponse;
   }else if(req.kind==='run-zone-backpressure'){
    const result=runP22ZoneCampaign(req.project,req.sceneId);
-   scope.postMessage({kind:'zone-backpressure-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'zone-backpressure-result',id:req.id,result} satisfies RunResponse;
   }else if(req.kind==='run-queue-accumulation'){
    const result=runP21Accumulation(req.project,req.sceneId);
-   scope.postMessage({kind:'queue-accumulation-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'queue-accumulation-result',id:req.id,result} satisfies RunResponse;
   }else if(req.kind==='run-gate-obstruction'){
    const result=runP20Obstruction(req.project,req.sceneId);
-   scope.postMessage({kind:'gate-obstruction-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'gate-obstruction-result',id:req.id,result} satisfies RunResponse;
   }else if(req.kind==='run-power-recovery'){
    const result=runP19PowerCampaign(req.project,req.sceneId);
-   scope.postMessage({kind:'power-recovery-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'power-recovery-result',id:req.id,result} satisfies RunResponse;
   }else if(req.kind==='run-jam-recovery'){
    const result=runP18JamRecovery(req.project,req.sceneId);
-   scope.postMessage({kind:'jam-recovery-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'jam-recovery-result',id:req.id,result} satisfies RunResponse;
   }else if(req.kind==='run-material-lots'){
    const result=runP17MaterialCampaign(req.project,req.sceneId);
-   scope.postMessage({kind:'material-lots-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'material-lots-result',id:req.id,result} satisfies RunResponse;
   }else if(req.kind==='run-resilience'){
    const result=runP16ResilienceAudit(req.project,req.sceneId);
-   scope.postMessage({kind:'resilience-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'resilience-result',id:req.id,result} satisfies RunResponse;
   }else if(req.kind==='run-autonomous'){
    const result=req.sceneId==='robot-sort'?
     runP15AutonomousSort(req.project,req.sceneId):
     runP15AutonomousFactory(req.project,req.sceneId);
-   scope.postMessage({kind:'autonomous-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'autonomous-result',id:req.id,result} satisfies RunResponse;
   }else if(req.kind==='run-batch'){
    const result=runP15Batch(req.project,req.sceneId);
-   scope.postMessage({kind:'batch-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'batch-result',id:req.id,result} satisfies RunResponse;
   }else{
    const result=advancedSpecFor(req.sceneId)?
     runAdvancedProcess(req.project,req.sceneId):
     expandedSpecFor(req.sceneId)?
     runExpandedMatrix(req.project,req.sceneId):
     runPlantMatrix(req.project,req.sceneId);
-   scope.postMessage({kind:'matrix-result',id:req.id,result} satisfies RunResponse);
+   return {kind:'matrix-result',id:req.id,result} satisfies RunResponse;
   }
  }catch(error){
-  scope.postMessage({kind:'matrix-error',id:req.id,
-   message:error instanceof Error?error.message:'Local trial could not execute'} satisfies RunResponse);
+  return {kind:'matrix-error',id:req.id,
+   message:error instanceof Error?error.message:'Local trial could not execute'} satisfies RunResponse;
  }
 };

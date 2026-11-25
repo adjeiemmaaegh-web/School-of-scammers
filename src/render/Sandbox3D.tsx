@@ -14,11 +14,12 @@ import type { PlacedComponent, ProjectFile, RenderSnapshot, XY } from '../sim/si
 import type { Parcel } from '../plant/sorting-conveyor';
 import { supportsWebGL } from '../components/SceneShell';
 import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-coordinates';
-import { perDeviceLive } from '../sim/device-state';
+import { perDeviceLive, plantStatusText } from '../sim/device-state';
+import { isP3Equipment } from '../sim/p3-plant-bridge';
 import { PlantWorld3D } from './PlantWorld3D';
 import { PLANT_EQUIPMENT } from '../plant/equipment';
 import { footprintOf } from '../workspace/floor-plan';
-import { clampPlacement } from '../workspace/geometry';
+import { clampPlacement, effectiveYaw } from '../workspace/geometry';
 import type { GridStep } from '../workspace/types';
 import { WorkcellCameraRig } from './WorkcellCameraRig';
 import { frameIndustrialPlant,initialNavigationPose,initialOrbitFraming,presetCameraPosition, type CameraPose, type ViewPreset, type WorkcellCameraMode } from './workcell-camera';
@@ -153,6 +154,19 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
     <mesh position={[0.29,0.84,-0.38]}><sphereGeometry args={[0.06,10,8]} />
       <meshStandardMaterial color={status} emissive={status} emissiveIntensity={0.48} /></mesh>
   </group>;
+  if (kind === 'selector') return <group>
+    <mesh position={[0, 0.22, 0]}><boxGeometry args={[0.86, 0.38, 0.76]} /><meshStandardMaterial color={COLORS.chassis} metalness={0.2} /></mesh>
+    <mesh position={[0, 0.44, 0]}><cylinderGeometry args={[0.26, 0.28, 0.1, 24]} /><meshStandardMaterial color={COLORS.steel} metalness={0.35} /></mesh>
+    <mesh position={[0, 0.58, 0]} rotation={[0, 0, pressed ? -0.7 : 0.7]}><boxGeometry args={[0.1, 0.3, 0.1]} /><meshStandardMaterial color={pressed ? '#16a77b' : '#e3e8ee'} metalness={0.2} /></mesh>
+  </group>;
+  if (kind === 'buzzer') return <group>
+    <mesh position={[0, 0.2, 0]}><cylinderGeometry args={[0.38, 0.38, 0.22, 20]} /><meshStandardMaterial color={COLORS.panel} metalness={0.5} /></mesh>
+    <mesh position={[0, 0.42, 0]}><cylinderGeometry args={[0.28, 0.32, 0.24, 20]} /><meshStandardMaterial color={active ? '#f06d4c' : '#4a5663'} emissive={active ? '#f06d4c' : '#000000'} emissiveIntensity={active ? 0.4 : 0} /></mesh>
+  </group>;
+  if (kind === 'siren') return <group>
+    <mesh position={[0, 0.18, 0]}><boxGeometry args={[0.7, 0.2, 0.7]} /><meshStandardMaterial color={COLORS.panel} metalness={0.5} /></mesh>
+    <mesh position={[0, 0.5, 0]}><cylinderGeometry args={[0.1, 0.34, 0.46, 20]} /><meshStandardMaterial color={active ? '#f0b34c' : '#59646f'} emissive={active ? '#f0b34c' : '#000000'} emissiveIntensity={active ? 0.45 : 0} /></mesh>
+  </group>;
   if (kind === 'lamp') return <group>
     <mesh position={[0,0.20,0]}><cylinderGeometry args={[0.40,0.40,0.18,18]} />
       <meshStandardMaterial color={COLORS.panel} metalness={0.5} /></mesh>
@@ -196,6 +210,15 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
           <meshStandardMaterial color={lit ? colour : '#3a4651'} emissive={lit ? colour : '#000000'} emissiveIntensity={lit ? 1.1 : 0} transparent opacity={lit ? 1 : 0.7} /></mesh>; })}
     </group>;
   }
+  if (kind === 'compressor') return <group>
+    <mesh position={[0, 0.2, 0]}><boxGeometry args={[1.1, 0.16, 0.6]} /><meshStandardMaterial color={COLORS.panel} metalness={0.4} /></mesh>
+    <mesh position={[-0.1, 0.5, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.24, 0.24, 0.8, 20]} /><meshStandardMaterial color={active ? '#3f8d6a' : COLORS.chassis} metalness={0.5} roughness={0.4} /></mesh>
+    <mesh position={[0.5, 0.42, 0]}><boxGeometry args={[0.24, 0.3, 0.3]} /><meshStandardMaterial color={active ? '#d9a441' : '#5b6672'} /></mesh>
+  </group>;
+  if (kind === 'air-regulator') return <group>
+    <mesh position={[0, 0.3, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.13, 0.13, 0.9, 16]} /><meshStandardMaterial color={COLORS.steel} metalness={0.7} roughness={0.3} /></mesh>
+    <mesh position={[0, 0.56, 0]}><cylinderGeometry args={[0.15, 0.2, 0.22, 16]} /><meshStandardMaterial color="#3c7fa6" metalness={0.3} /></mesh>
+  </group>;
   if (kind === 'cylinder') {
     const out = Math.max(0, Math.min(1, rod ?? 0));
     return <group>
@@ -254,8 +277,8 @@ function DeviceSculpture({ kind, active, pressed, motorAngleRad, parcel, tankLev
   </group>;
 }
 
-function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPress, onLabelPress, placeKind, onMoveDrag, onEndDrag, onFocus }: {
-  c: PlacedComponent; project: ProjectFile; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean };
+function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLevelMl, rod, lamps, plantText, editable, selected, selectedTerminal, moveTarget, onTerminal, onOperate, onSelect, onPress, onLabelPress, placeKind, onMoveDrag, onEndDrag, onFocus }: {
+  c: PlacedComponent; project: ProjectFile; active: boolean; motorAngleRad: number; direction?: 'stopped' | 'forward' | 'reverse'; parcel?: Parcel | null; tankLevelMl?: number; rod?: number; lamps?: { R: boolean; Y: boolean; G: boolean }; plantText?: string;
   editable: boolean; selected: boolean; selectedTerminal: string | null; moveTarget: string | null;
   onTerminal: (id: string) => void; onOperate: (id: string) => void;
   onSelect: (id: string, additive: boolean) => void;
@@ -285,7 +308,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   const showDeviceTerminals = !galleryScene || selected;
   // P3 equipment uses the real worker-owned 3D shapes, not duplicated large
   // placeholder housings. Its outline is only a selection/drag affordance.
-  return <group position={[x, y, z]} rotation={[0, -(c.yawDeg ?? 0) * Math.PI / 180, 0]}>
+  return <group position={[x, y, z]} rotation={[0, -effectiveYaw(c) * Math.PI / 180, 0]}>
     <mesh position={[0, plant ? 0.02 : 0.035, 0]}
       onPointerDown={e => onPress(e, c.id)}
       onPointerMove={onMoveDrag} onPointerUp={onEndDrag}
@@ -332,10 +355,13 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
           c.kind === 'drainvalve' ? (active ? 'DRAIN OPEN' : 'CLOSED') :
           c.kind === 'breaker' ? (active ? 'CLOSED' : 'TRIPPED') :
           c.kind === 'overload' ? (active ? '95-96 CLOSED' : 'TRIPPED') :
+          c.kind === 'compressor' ? (active ? 'RUNNING' : 'OFF') : c.kind === 'air-regulator' ? 'REGULATING' :
+          c.kind === 'selector' ? (c.pressed ? 'POSITION 2 · CLOSED' : 'POSITION 1 · OPEN') :
+          c.kind === 'buzzer' || c.kind === 'siren' ? (active ? 'SOUNDING' : 'SILENT') :
           c.kind === 'lamp' ? (active ? 'ILLUMINATED' : 'OFF') :
           c.kind === 'supply' ? '24 V DC' : c.kind === 'estop' ?
-          (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') : c.pressed ? 'PRESSED' : 'RELEASED'}</small>
-        {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton') && <button type="button"
+          (c.pressed ? 'OPEN · LATCHED' : 'NC · RESET') : plantText ?? (c.pressed ? 'PRESSED' : 'RELEASED')}</small>
+        {(c.kind === 'start' || c.kind === 'stop' || c.kind === 'estop' || c.kind === 'reversebutton' || c.kind === 'selector') && <button type="button"
           disabled={false} onPointerDown={e => e.stopPropagation()}
           onClick={e => { e.stopPropagation(); onOperate(c.id); }}>{c.pressed ? 'Release' : 'Press'}</button>}
       </div>
@@ -668,6 +694,7 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusS
       direction={c.kind === 'revmotor' ? snapshot.motorDirection : undefined}
       parcel={c.kind === 'conveyor' ? snapshot.lanes[c.id]?.parcel ?? null : null} tankLevelMl={c.kind === 'tank' ? snapshot.vessels[c.id]?.levelMl ?? 0 : 0}
       rod={c.kind === 'cylinder' ? snapshot.cylinders[c.id]?.position ?? 0 : undefined}
+      plantText={isP3Equipment(c.kind) ? (plantStatusText(snapshot.plantWorld.signals[c.id]) ?? 'IDLE') : undefined}
       lamps={c.kind === 'stacklight' ? { R: !!snapshot.deviceOn[`${c.id}-R`], Y: !!snapshot.deviceOn[`${c.id}-Y`], G: !!snapshot.deviceOn[`${c.id}-G`] } : undefined}
       selectedTerminal={selectedTerminal} moveTarget={moveTarget}
       active={perDeviceLive(snapshot, c) ?? (c.kind === 'revmotor' ? snapshot.motorDirection !== 'stopped' :
@@ -676,7 +703,7 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusS
         c.kind === 'photoeye' ? snapshot.io.Photoeye :
         c.kind === 'levelprobe' ? snapshot.io.TankHigh :
         c.kind === 'estop' ? !c.pressed :
-        c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' ? c.pressed : false)}
+        c.kind === 'start' || c.kind === 'stop' || c.kind === 'reversebutton' || c.kind === 'selector' ? c.pressed : false)}
       onTerminal={onTerminal} onOperate={onOperate} onSelect={onSelect}
       onPress={start} onLabelPress={startLabel}
       placeKind={placeKind}

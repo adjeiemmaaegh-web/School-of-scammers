@@ -142,7 +142,7 @@ P2 advanced engineering, full P3 equipment breadth and full physical/real low-sp
 - 🚧 **Phase 2** — ladder UI done + rank 1 built; ranks 2–10 designed as planned rungs, authored incrementally.
 - ⏳ **Phase 4+** — second trade, then backend/accounts.
 
-Everything builds, typechecks, and the 536 engine tests pass; a headless run plays the conveyor exercise to a 100% pass with no console errors.
+Everything builds, typechecks, and the engine tests passed at the time (historical; see `STATUS.md` section 0 for the current count); a headless run plays the conveyor exercise to a 100% pass with no console errors.
 
 ---
 

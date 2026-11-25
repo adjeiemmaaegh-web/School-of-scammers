@@ -45,4 +45,15 @@ describe('R8 hidden faults do not name themselves', () => {
     expect(onlyHidden.faults).toBeUndefined();
     expect(redactHiddenFaults(createWorld().project)).toEqual(createWorld().project);
   });
+  it('redaction also drops seeded plant equipment faults from a graded export (F-12) and keeps everything else', () => {
+    const project = { ...createWorld().project, plantFaults: { s1: 'stuck-extended' }, faults: [] };
+    const exported = redactHiddenFaults(project);
+    expect(exported.plantFaults).toBeUndefined();
+    expect(JSON.stringify(exported)).not.toContain('stuck-extended');
+    expect(exported.components).toEqual(project.components);
+    const both = redactHiddenFaults({ ...bench().project, plantFaults: { s1: 'stuck-extended' } });
+    expect(both.plantFaults).toBeUndefined(); expect(both.faults).toBeUndefined();
+    const empty = { ...createWorld().project, plantFaults: {} };
+    expect(redactHiddenFaults(empty)).toBe(empty);
+  });
 });

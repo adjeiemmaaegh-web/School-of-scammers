@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { COMPONENTS } from '../../components/registry';
+import { COMPONENTS, isIoModuleKind } from '../../components/registry';
 import { modelLimitFor } from '../../components/model-limits';
 import { paramSpecsOf, paramValue, type ParamSpec } from '../../components/params';
 import type { PlacedComponent, ProjectFile, RenderSnapshot } from '../../sim/signals';
-import { perDeviceLive } from '../../sim/device-state';
+import { perDeviceLive, plantStatusText } from '../../sim/device-state';
+import { isP3Equipment } from '../../sim/p3-plant-bridge';
+import { OPERATOR_KEYS, OPERATOR_KINDS } from '../../sim/operator-values';
 
 type Props = {
   project: ProjectFile;
@@ -21,7 +23,22 @@ type Props = {
   onClearSelection: () => void;
   /** Change a device setting (see Command `setParam`). */
   onSetParam: (id: string, key: string, value: number) => void;
+  /** Turn a knob / selector / held button live while the simulation runs (see Command `setOperator`). */
+  onSetOperator?: (id: string, key: string, value: number) => void;
+  /** Attach an expansion I/O module to a 16/16 PLC, or detach it with null (see Command `attachIoModule`). */
+  onAttachModule?: (module: string, plc: string | null) => void;
+  /** Give one expansion-module channel your own tag name, or null to restore the default (see Command `renameModuleTag`). */
+  onRenameModuleTag?: (module: string, tag: string, name: string | null) => void;
+  /** Connect a belt to a drive's shaft (travel per revolution in mm), or disconnect it with null (see Command `setMechanicalLink`). */
+  onSetMechanicalLink?: (drive: string, target: string, mmPerRev: number | null) => void;
 };
+
+/** The program tags an attached expansion module adds (see sim/plc-io.ts). */
+function moduleTags(kind: string, slot: number): string[] {
+  const n = kind === 'io-ai4' ? 4 : kind === 'io-ao2' ? 2 : 8;
+  const word = kind === 'io-di8' ? 'In' : kind === 'io-do8' ? 'Out' : kind === 'io-ai4' ? 'Ai' : 'Ao';
+  return Array.from({ length: n }, (_, k) => `M${slot}${word}${k}`);
+}
 
 /** Largest top-left coordinates that keep a device (170 x 130) on the 1080 x 580 floor. */
 const FLOOR_MAX_X = 910, FLOOR_MAX_Y = 450;
@@ -47,6 +64,15 @@ function PositionField({ label, attr, max, value, disabled, onCommit }: {
 }
 
 /** A device setting (e.g. an on-delay relay's delay): a draft that commits on Enter or blur, clamped and snapped to the spec. */
+/** A live operator control: a slider for a knob or selector, a hold button for a pushbutton. Works while the simulation runs. */
+function OperatorControl({ spec, value, onSet }: { spec: ParamSpec; value: number; onSet: (n: number) => void }) {
+  if (spec.max === 1 && spec.step === 1)
+    return <button type="button" data-operator={spec.key} className={value === 1 ? 'btn primary small' : 'btn ghost small'} aria-pressed={value === 1}
+      onClick={() => onSet(value === 1 ? 0 : 1)}>{spec.label}: {value === 1 ? 'held (click to release)' : 'released (click to hold)'}</button>;
+  return <label>{spec.label} ({spec.unit}) <output>{value}</output>
+    <input type="range" data-operator={spec.key} min={spec.min} max={spec.max} step={spec.step} value={value} onChange={e => onSet(Number(e.target.value))} />
+  </label>;
+}
 function ParamField({ spec, value, disabled, onCommit }: { spec: ParamSpec; value: number; disabled: boolean; onCommit: (n: number) => void }) {
   const [draft, setDraft] = useState(String(value));
   useEffect(() => { setDraft(String(value)); }, [value]);
@@ -67,7 +93,7 @@ function ParamField({ spec, value, disabled, onCommit }: { spec: ParamSpec; valu
 /** Read-only contextual view of the worker snapshot. Actions emit existing Commands. */
 export function WorkbenchInspector({
   project, snapshot, selectedDevice, selectedTerminal, editable,
-  onTerminal, onCancelWire, onMove, onMoveTo, onOperate, onClearSelection, onSetParam,
+  onTerminal, onCancelWire, onMove, onMoveTo, onOperate, onClearSelection, onSetParam, onSetOperator, onAttachModule, onRenameModuleTag, onSetMechanicalLink,
 }: Props) {
   const hasLatchBranch = project.program.rungs.some(rung =>
     rung.elements.some(element => element.type === 'branch'));
@@ -105,7 +131,7 @@ export function WorkbenchInspector({
   const isLive = selectedDevice.kind === 'revmotor' ? snapshot.motorDirection !== 'stopped' :
     selectedDevice.kind === 'forwardcontactor' ? snapshot.forwardContactorOn :
     selectedDevice.kind === 'reversecontactor' ? snapshot.reverseContactorOn :
-    selectedDevice.kind === 'reversebutton' ? isPressed :
+    selectedDevice.kind === 'reversebutton' || selectedDevice.kind === 'selector' ? isPressed :
     selectedDevice.kind === 'levelprobe' ? snapshot.io.TankHigh :
     selectedDevice.kind === 'photoeye' ? snapshot.io.Photoeye :
     perDeviceLive(snapshot, selectedDevice) !== undefined ? perDeviceLive(snapshot, selectedDevice) === true :
@@ -120,14 +146,19 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
     selectedDevice.kind === 'forwardcontactor' ? (isLive ? 'Forward contact closed' : 'Open') :
     selectedDevice.kind === 'reversecontactor' ? (isLive ? 'Reverse contact closed' : 'Open') :
     selectedDevice.kind === 'reversebutton' ? (isPressed ? 'Request pressed' : 'Released') :
+    selectedDevice.kind === 'selector' ? (isPressed ? 'Position 2 · contact closed' : 'Position 1 · contact open') :
+    selectedDevice.kind === 'buzzer' || selectedDevice.kind === 'siren' ? (isLive ? 'Sounding' : 'Silent') :
     selectedDevice.kind === 'breaker' ? (isLive ? 'Closed' : 'Tripped open') :
     selectedDevice.kind === 'overload' ? (isLive ? '95-96 closed' : '95-96 tripped open') :
     selectedDevice.kind === 'lamp' ? (isLive ? 'Illuminated' : 'Off') :
     selectedDevice.kind === 'stacklight' ? (['R', 'Y', 'G'].filter(l => snapshot.deviceOn[`${selectedDevice.id}-${l}`]).join(' · ') || 'All lamps off') :
+    selectedDevice.kind === 'compressor' ? (() => { const a = snapshot.air?.receivers[selectedDevice.id]; return a ? `${a.pressureBar.toFixed(1)} bar${a.pumping ? ' · pump running' : ' · pump stopped'}` : 'Not simulated'; })() :
+    selectedDevice.kind === 'air-regulator' ? `Outlet ${(snapshot.air?.working[selectedDevice.id] ?? 0).toFixed(1)} bar` :
     selectedDevice.kind === 'cylinder' ? (() => { const r = snapshot.cylinders[selectedDevice.id]; const base = !r || r.retractLimit ? 'Retracted' : r.extendLimit ? 'Extended' : `Moving ${Math.round(r.position * 100)}%`; return r?.alarm ? `${base} · ${r.alarm}` : base; })() :
     selectedDevice.kind === 'relay' ? (isLive ? 'Energised' : 'Released') :
     selectedDevice.kind === 'timerelay' ? (() => { const t = snapshot.timers[selectedDevice.id]; return !t || t.elapsedMs === 0 ? 'Coil off' : t.done ? 'Contacts transferred' : `Timing ${(t.elapsedMs / 1000).toFixed(1)} / ${(t.delayMs / 1000).toFixed(1)} s`; })() :
     selectedDevice.kind === 'tank' ? `${Math.round(snapshot.vessels[selectedDevice.id]?.levelMl ?? 0)} / 1000 ml` :
+    isP3Equipment(selectedDevice.kind) ? (plantStatusText(snapshot.plantWorld.signals[selectedDevice.id]) ?? 'Idle') :
     selectedDevice.kind === 'pump' ? (isLive ? 'Filling' : 'Off') :
     selectedDevice.kind === 'levelprobe' ? (isLive ? 'High level' : 'Below level switch') :
     selectedDevice.kind === 'drainvalve' ? (isLive ? 'Open' : 'Closed') :
@@ -163,14 +194,55 @@ selectedDevice.kind === 'revmotor' ? snapshot.motorDirection.toUpperCase() :
       {paramSpecsOf(selectedDevice.kind).map(spec => <ParamField key={`${selectedDevice.id}-${spec.key}`} spec={spec} disabled={!editable}
         value={paramValue(project.params, selectedDevice.id, spec)} onCommit={n => onSetParam(selectedDevice.id, spec.key, n)} />)}
     </div>}
+    {isIoModuleKind(selectedDevice.kind) && onAttachModule && <div className="sandbox-inspector-position" role="group" aria-label="Expansion module host">
+      <label>Host PLC <select data-module-host value={project.ioModules?.[selectedDevice.id]?.plc ?? ''} disabled={!editable}
+        onChange={e => onAttachModule(selectedDevice.id, e.target.value || null)}>
+        <option value="">Not attached</option>
+        {project.components.filter(c => c.kind === 'plc16').map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
+      </select></label>
+      {project.ioModules?.[selectedDevice.id] && <div data-module-tags>
+        <p className="sandbox-help">Channel tags (type a new name and press Enter or leave the field; empty restores the default):</p>
+        {moduleTags(selectedDevice.kind, project.ioModules[selectedDevice.id]!.slot).map(tag => <label key={tag} className="sandbox-module-tag">
+          <code>{tag}</code>
+          <input type="text" data-module-tag={tag} disabled={!editable || !onRenameModuleTag} maxLength={24}
+            defaultValue={project.ioModules![selectedDevice.id]!.names?.[tag] ?? tag}
+            key={`${tag}-${project.ioModules![selectedDevice.id]!.names?.[tag] ?? tag}`}
+            onBlur={e => { const v = e.target.value.trim(); const cur = project.ioModules![selectedDevice.id]!.names?.[tag] ?? tag; if (v !== cur) onRenameModuleTag?.(selectedDevice.id, tag, v === '' || v === tag ? null : v); }}
+            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+        </label>)}
+      </div>}
+    </div>}
+    {['belt-conveyor', 'roller-conveyor', 'curved-conveyor'].includes(selectedDevice.kind) && onSetMechanicalLink && project.components.some(c => c.kind === 'drive') && <div className="sandbox-inspector-position" role="group" aria-label="Mechanical connection to a drive">
+      {(() => {
+        const link = project.mechanicalLinks?.find(l => l.target === selectedDevice.id);
+        return <>
+          <label>Driven by <select data-mechanical-drive value={link?.drive ?? ''} disabled={!editable}
+            onChange={e => onSetMechanicalLink(e.target.value || (link?.drive ?? ''), selectedDevice.id, e.target.value ? (link?.mmPerRev ?? 100) : null)}>
+            <option value="">Own command (not driven)</option>
+            {project.components.filter(c => c.kind === 'drive').map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
+          </select></label>
+          {link && <label>Travel per revolution (mm) <input type="number" data-mechanical-ratio min={10} max={2000} step={10} disabled={!editable}
+            defaultValue={link.mmPerRev} key={`${link.drive}-${link.mmPerRev}`}
+            onBlur={e => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== link.mmPerRev) onSetMechanicalLink(link.drive, selectedDevice.id, v); }} /></label>}
+          {link && <p className="sandbox-help">Belt speed = drive rpm / 60 x {link.mmPerRev} mm. Its own run command is ignored while it is driven.</p>}
+        </>;
+      })()}
+    </div>}
+    {OPERATOR_KINDS.has(selectedDevice.kind) && onSetOperator && <div className="sandbox-inspector-position" role="group" aria-label="Operator controls (live)">
+      {paramSpecsOf(selectedDevice.kind).filter(spec => OPERATOR_KEYS.has(spec.key)).map(spec =>
+        <OperatorControl key={`${selectedDevice.id}-op-${spec.key}`} spec={spec}
+          value={snapshot.operatorValues?.[selectedDevice.id]?.[spec.key] ?? paramValue(project.params, selectedDevice.id, spec)}
+          onSet={n => onSetOperator(selectedDevice.id, spec.key, n)} />)}
+    </div>}
     <p className="sandbox-help">Sensors, diverters, pumps and level switches act on the conveyor or tank they are placed beside, so exact positions matter.</p>
     <button type="button" className="btn ghost small sandbox-inspector-move" disabled={!editable}
       onClick={() => onMove(selectedDevice.id)}>Move on 3D floor</button>
-    {(selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' || selectedDevice.kind === 'reversebutton') &&
+    {(selectedDevice.kind === 'start' || selectedDevice.kind === 'stop' || selectedDevice.kind === 'estop' || selectedDevice.kind === 'reversebutton' || selectedDevice.kind === 'selector') &&
       <button type="button" className="btn primary small sandbox-inspector-operate"
         onClick={() => onOperate(selectedDevice.id)}>
         {selectedDevice.kind === 'estop' ?
           (isPressed ? 'Reset training E-stop' : 'Press training E-stop') :
+          selectedDevice.kind === 'selector' ? (isPressed ? 'Turn to position 1' : 'Turn to position 2') :
           isPressed ? 'Release pushbutton' : 'Press pushbutton'}
       </button>}
     <div className="sandbox-inspector-subheading"><h3>Terminals</h3><small>{definition.terminals.length ?

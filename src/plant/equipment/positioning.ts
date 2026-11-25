@@ -3,6 +3,7 @@ import type {EquipmentDef} from '../world/equipment';
 import {draw,flag,initial,numeric,param,spec} from '../world/equipment';
 import {insideFootprint,q,vec} from '../world/math';
 import type {World,EquipmentState} from '../world/types';
+import {staticSolidSize} from '../world/solid-geometry';
 const approach=(current:number,target:number,maxDelta:number):number=>
  q(current+Math.max(-maxDelta,Math.min(maxDelta,target-current)));
 const liftBase=(kind:string):EquipmentDef=>({
@@ -86,6 +87,73 @@ export const pickAndPlace:EquipmentDef={
  describe:(s,ctx)=>[draw(ctx,'gantry','box',vec(1300,280,100),1400,'#658baa'),
    draw({...ctx,originMm:vec(ctx.originMm.x+s.positionMm,ctx.originMm.y,ctx.originMm.z+s.value)},
      'gripper','box',vec(110,90,140),50,s.heldBodyId?'#56aa92':'#c5a869')],
+};
+/**
+ * R27 three-axis (Cartesian) gantry. X runs along its beam, Y across it, Z lifts the gripper; targets are in millimetres from the
+ * gantry origin. Two constraints make it behave like a machine rather than a free-flying hand:
+ *  - SAFE HEIGHT: sideways travel (X or Y) is only allowed with the gripper at or above `safeZMm`. A move that needs it lifts first,
+ *    then travels, then lowers to the commanded Z, so it clears whatever stands on the table.
+ *  - PAYLOAD: a part heavier than `payloadKg` cannot be lifted; the grip is refused and `overload` is raised.
+ * The gripper closes on the nearest part under it (within a small window) and carries it; releasing drops it where it is.
+ * State: positionMm = X, progress = Y, value = Z. Teaching model: no acceleration, no collision between the gripper and equipment.
+ */
+export const gantry:EquipmentDef={
+ kind:'gantry',label:'Three-axis gantry',footprint:vec(1600,900,1900),
+ commands:[{name:'xTargetMm',kind:'number',unit:'mm'},{name:'yTargetMm',kind:'number',unit:'mm'},{name:'zTargetMm',kind:'number',unit:'mm'},
+  {name:'grip',kind:'bool'}],
+ signals:[{name:'inPosition',kind:'bool'},{name:'partHeld',kind:'bool'},{name:'overload',kind:'bool'},{name:'collision',kind:'bool'},
+  {name:'xMm',kind:'number',unit:'mm'},{name:'yMm',kind:'number',unit:'mm'},{name:'zMm',kind:'number',unit:'mm'}],
+ params:[spec('travelXMm','X travel','mm',300,3000,50,1500),spec('travelYMm','Y travel','mm',200,2000,50,800),
+  spec('riseMm','Z travel','mm',200,2000,50,800),spec('speedMmS','Servo speed','mm/s',20,1000,10,400),
+  spec('safeZMm','Safe travel height','mm',0,2000,50,400),spec('payloadKg','Payload limit','kg',1,100,1,20)],
+ faults:['servo-stuck','gripper-leak','axis-slip'],
+ fresh:()=>initial({}),
+ step:(s,w,c,dt,f,ctx)=>{
+  const tx=numeric(c,'xTargetMm',0,0,param(ctx,'travelXMm',1500));
+  const ty=numeric(c,'yTargetMm',0,0,param(ctx,'travelYMm',800));
+  const tz=numeric(c,'zTargetMm',0,0,param(ctx,'riseMm',800));
+  const safe=Math.min(param(ctx,'safeZMm',400),param(ctx,'riseMm',800));
+  const step=param(ctx,'speedMmS',400)*(f==='axis-slip'?.35:1)*dt/1000;
+  let x=s.positionMm,y=s.progress,z=s.value,blockedBy=false;
+  if(f!=='servo-stuck'){
+   const sideways=Math.abs(tx-x)>0.01||Math.abs(ty-y)>0.01;
+   if(sideways&&z<safe-0.01)z=approach(z,safe,step);                          // lift to the safe height first
+   else if(sideways){
+    const nx=approach(x,tx,step),ny=approach(y,ty,step);
+    // The gripper is a 120 mm box: it may not travel into the footprint of stationary equipment that stands taller than its height,
+    // so a route through a machine is stopped (`collision`) instead of passing through it.
+    const gx=ctx.originMm.x+nx,gy=ctx.originMm.y+ny,gz=ctx.originMm.z+z;
+    const hit=(ctx.peers??[]).some(p=>{
+     if(p.id===ctx.id)return false;
+     const solid=staticSolidSize(p.kind);
+     if(!solid||gz>=p.originMm.z+solid.z)return false;
+     const half=Math.max(solid.x,solid.y)/2+60;                                  // a conservative square envelope, whatever the machine's heading
+     return Math.abs(gx-p.originMm.x)<half&&Math.abs(gy-p.originMm.y)<half;
+    });
+    if(hit)blockedBy=true;else{x=nx;y=ny;}
+   }
+   else z=approach(z,tz,step);                                                 // then go to the commanded height
+  }
+  const gripping=flag(c,'grip')&&f!=='gripper-leak';
+  let held=gripping?s.heldBodyId??null:null;
+  let overload=false;
+  if(gripping&&!held){
+   const body=w.bodies.find(b=>Math.abs(b.pos.x-(ctx.originMm.x+x))<110&&Math.abs(b.pos.y-(ctx.originMm.y+y))<110&&
+    Math.abs(b.pos.z-(ctx.originMm.z+z))<220);
+   if(body){if(body.massKg>param(ctx,'payloadKg',20))overload=true;else held=body.id;}
+  }
+  const bodies=w.bodies.map(b=>b.id===held?{...b,pos:vec(ctx.originMm.x+x,ctx.originMm.y+y,ctx.originMm.z+z),vel:vec(),supportedBy:ctx.id}:
+   s.heldBodyId===b.id&&!held?{...b,supportedBy:null}:b);
+  const done=Math.abs(x-tx)<0.01&&Math.abs(y-ty)<0.01&&Math.abs(z-tz)<0.01;
+  return {world:{...w,bodies},state:{...s,positionMm:x,progress:y,value:z,heldBodyId:held,engaged:!!held,done,
+   stalled:f==='servo-stuck',faulted:!!f,
+   // the overload condition is remembered in `phase` so the signal reads it (a state field the gantry owns)
+   phase:overload?1:blockedBy?2:0}};
+ },
+ read:s=>({inPosition:s.done,partHeld:!!s.heldBodyId,overload:s.phase===1,collision:s.phase===2,xMm:s.positionMm,yMm:s.progress,zMm:s.value}),
+ describe:(s,ctx)=>[draw(ctx,'beam','box',vec(1500,120,100),1700,'#658baa'),
+  draw({...ctx,originMm:vec(ctx.originMm.x+s.positionMm,ctx.originMm.y+s.progress,ctx.originMm.z+s.value)},
+   'gripper','box',vec(110,90,140),50,s.heldBodyId?'#56aa92':s.phase===1?'#c0583f':'#c5a869')],
 };
 export const palletizer:EquipmentDef={
  kind:'palletizer',label:'Pattern palletizer',footprint:vec(1300,1000,1750),

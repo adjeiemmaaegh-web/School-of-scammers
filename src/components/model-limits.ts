@@ -2,11 +2,11 @@
 const GENERIC = 'Educational model: simplified, not calibrated, certified or safety-rated.';
 const BY_KIND: Readonly<Record<string, string>> = {
   supply: 'Ideal 24 V DC source with no current limit or ripple; a different supply is a different reference.',
-  plc: 'Fixed 5-input / 6-output teaching controller on a 50 ms scan; not a vendor firmware model.',
-  plc16: 'Configurable 16/16 teaching controller on a 50 ms scan; not a vendor firmware model.',
+  plc: 'Fixed 5-input / 6-output teaching controller on a configurable simulated scan (default 50 ms); not a vendor firmware model.',
+  plc16: 'Configurable 16/16 teaching controller on a configurable simulated scan (default 50 ms); not a vendor firmware model.',
   contactor: 'Coil and contacts with a one-scan delay; no arcing, bounce, ratings or coil inrush.',
   relay: 'Coil and contacts with a one-scan delay; contact ratings are not modelled.',
-  timerelay: 'On-delay only, with a delay resolution of one 50 ms scan; no off-delay or pulse modes.',
+  timerelay: 'On-delay only, with a delay resolution of one scan (default 50 ms); no off-delay or pulse modes.',
   motor: 'Idealised 24 V load: on or off, no torque, speed, thermal or current model.',
   breaker: 'Trips on a modelled short or manually; not a rated protective device.',
   overload: 'Manual test trip of an auxiliary contact; no thermal model.',
