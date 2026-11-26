@@ -1,0 +1,40 @@
+/* Stage 2: inspector readings are independent of both the scrollable device catalog
+   and 3D canvas. Display only worker-derived instrument values. */
+.efo-ux2-shell .sandbox-inspector-channels {
+  margin: 10px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #6d8292);
+  border-radius: 8px;
+}
+.efo-ux2-shell .sandbox-inspector-channels summary {
+  cursor: pointer;
+  font-weight: 650;
+  padding: 4px 0;
+}
+.efo-ux2-shell .sandbox-inspector-channels summary:focus-visible {
+  outline: 2px solid var(--accent, #3c8cba);
+  outline-offset: 2px;
+}
+.efo-ux2-shell .sandbox-inspector-channel-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  max-height: 190px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+.efo-ux2-shell .sandbox-inspector-channel-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border, #6d8292);
+}
+.efo-ux2-shell .sandbox-inspector-channel-list code {
+  overflow-wrap: anywhere;
+}
+.efo-ux2-shell .sandbox-inspector-channel-list small {
+  grid-column: 1 / -1;
+  opacity: .75;
+}

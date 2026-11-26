@@ -9,7 +9,7 @@ import type { Assignment, AttemptResult } from '../platform/types';
 import { AppHeader } from '../ui/AppHeader';
 import { CopyField } from '../ui/CopyField';
 import { ExercisePlayer } from '../ui/ExercisePlayer';
-const SandboxPage = lazy(() => import('./SandboxPage').then(m => ({ default: m.SandboxPage })));
+const SandboxPage = lazy(() => import('./ScenarioSandbox').then(m => ({ default: m.ScenarioSandbox })));
 
 function readAssignmentFromHash(): { assignment?: Assignment; error?: string } {
   if (typeof window === 'undefined') return {};

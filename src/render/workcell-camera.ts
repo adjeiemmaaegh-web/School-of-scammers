@@ -184,3 +184,13 @@ export function presetCameraPosition(
  if(preset==='front')return [tx,ty+d*.18,tz+d*.98];
  return [tx+d*.98,ty+d*.18,tz];
 }
+/** Vertical field of view (degrees) of the sandbox perspective camera; the orthographic zoom matches its framing. */
+export const SANDBOX_FOV_DEG = 42;
+/**
+ * R6.2 orthographic inspection view: the zoom that makes an orthographic camera show the same height of the scene at the
+ * framing target as the perspective camera does from `distance` (visible height = 2·d·tan(fov/2)). Clamped to a sane range.
+ */
+export function orthographicZoomFor(distance:number,viewportHeightPx:number,fovDeg=SANDBOX_FOV_DEG):number{
+ const visible=2*Math.max(0.1,distance)*Math.tan(fovDeg*Math.PI/360);
+ return Math.min(2000,Math.max(5,viewportHeightPx/visible));
+}

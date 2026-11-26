@@ -50,8 +50,24 @@ jobs:
           node-version: '22'
       - name: Install exact lockfile dependencies
         run: npm ci --no-audit --no-fund
-      - name: Install pinned Vitest 5.1-compatible V8 coverage provider for CI only
-        run: npm install --legacy-peer-deps --no-save --package-lock=false --no-audit --no-fund @vitest/coverage-v8@5.1.0
+      - name: Install pinned Vitest 5.1-compatible V8 coverage provider outside the project lockfile
+        # Installing --no-save into the root project repeatedly triggered npm Arborist
+        # "Cannot read properties of null (reading 'edgesOut')" on Node 22.
+        # Isolated install uses legacy-peer-deps to avoid npm 10's broken optional peer-set traversal.
+        # Keep npm ci's installed production/test tree untouched; expose exactly
+        # one compatible coverage provider through a symlink for actual coverage.
+        run: |
+          set -euo pipefail
+          coverage_dir="$RUNNER_TEMP/plc-coverage-provider"
+          npm install --prefix "$coverage_dir" --no-audit --no-fund --package-lock=false --legacy-peer-deps @vitest/coverage-v8@5.1.0
+          test -f "$coverage_dir/node_modules/@vitest/coverage-v8/package.json"
+          mkdir -p node_modules/@vitest
+          ln -s "$coverage_dir/node_modules/@vitest/coverage-v8" node_modules/@vitest/coverage-v8
+          # V8 provider's peer needs to resolve to the exact tested project Vitest,
+          # not a duplicate in an isolated npm tree.
+          if test ! -e "$coverage_dir/node_modules/vitest"; then
+            ln -s "$GITHUB_WORKSPACE/node_modules/vitest" "$coverage_dir/node_modules/vitest"
+          fi
       - name: Execute all repository native tests with V8 source coverage
         env:
           PLC_COVERAGE_RUN: '1'   # relaxes only the wall-clock real-time guards (factory-scale, r7-soak-benchmark)

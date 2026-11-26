@@ -55,7 +55,15 @@ export const pusher:EquipmentDef={
  fresh:()=>initial({}),
  step:(s,w,c,dt,f,ctx)=>{
   const active=flag(c,'extend')&&!flag(c,'retract')&&f!=='pusher-stuck';
-  const hit=w.bodies.find(b=>insideFootprint(b.pos,ctx.originMm,vec(260,230,0)));
+  // The ram zone (260 x 230 mm at yaw 0) and the push direction (+y at yaw 0) turn with the placement yaw and any free
+  // heading. Yaw 0 keeps the exact original arithmetic.
+  const turn=(ctx.yawDeg+(ctx.headingDeg??0))*Math.PI/180,cs=Math.cos(turn),sn=Math.sin(turn),turned=turn!==0;
+  const inZone=(b:{pos:{x:number;y:number;z:number}})=>{
+   if(!turned)return insideFootprint(b.pos as never,ctx.originMm,vec(260,230,0));
+   const dx=b.pos.x-ctx.originMm.x,dy=b.pos.y-ctx.originMm.y;
+   return Math.abs(dx*cs+dy*sn)<=130&&Math.abs(-dx*sn+dy*cs)<=115;
+  };
+  const hit=w.bodies.find(inZone);
   const limit=param(ctx,'maxMassKg',20)*(f==='pusher-weak'?.2:1);
   const stalled=active&&!!hit&&hit.massKg>limit;
   const speed=param(ctx,'speedMmS',220)*(f==='air-leak'?.4:1);
@@ -63,7 +71,7 @@ export const pusher:EquipmentDef={
   const x=Math.max(0,Math.min(param(ctx,'strokeMm',260),s.positionMm+(stalled?0:delta)));
   const move=q(x-s.positionMm);
   const bodies=active&&!stalled&&hit?w.bodies.map(b=>b.id===hit.id?{
-    ...b,pos:{...b.pos,y:q(b.pos.y+move)}}:b):w.bodies;
+    ...b,pos:turned?{...b.pos,x:q(b.pos.x-sn*move),y:q(b.pos.y+cs*move)}:{...b.pos,y:q(b.pos.y+move)}}:b):w.bodies;
   return {state:{...s,positionMm:q(x),engaged:active,stalled,faulted:!!f},
     world:bodies===w.bodies?w:{...w,bodies}};
  },

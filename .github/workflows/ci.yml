@@ -42,6 +42,22 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/offline-update-browser.cjs
       - name: R9 guided lessons - unwired starter, honest failure, UI build passes the outcome check, wrong build rejected, downloadable starters
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r9-lessons-browser.cjs
+      - name: Steady Guide first lamp - real UI placement, 3 wires, OFF ON OFF, disconnected wire refusal and project isolation
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/steady-guide-first-lamp-browser.cjs
+      - name: Steady Guide - read-only onboarding, 92 devices, 21 scenes, real screenshot, search and mobile
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/steady-guide-browser.cjs
+      - name: Capture authentic Steady Guide review screenshots (not automatically published)
+        env:
+          STEADY_GUIDE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/steady-guide-capture-browser.cjs
+      - name: Preserve Steady Guide raw screenshots for review (even if capture is incomplete)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: steady-guide-raw-captures
+          path: qa-artifacts/steady-guide-captures/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Browser - wire colour and net label (R5.1)
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r5-wire-style-browser.cjs
       - name: R09/R23 scan period and simulation speed - same model-time behaviour at different periods and speeds, diagnostics, persistence
@@ -58,6 +74,16 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r22-free-rotation-browser.cjs
       - name: R07/R14 inspector - attach an expansion module, rename a channel, link a belt to a drive
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r07-inspector-browser.cjs
+      - name: R4.1 Ladder editing - duplicate, copy/paste, move, undo/redo with buttons and Ctrl+Z / Ctrl+Y
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r4-ladder-edit-browser.cjs
+      - name: R5.5 process trend - real worker values from a running plant, drawn, CSV matches the display
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r5-trend-browser.cjs
+      - name: R6.2 orthographic view - projection toggle, refit, label size kept, Fly returns to perspective, project untouched
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r6-orthographic-browser.cjs
+      - name: R5.5 logic probe - no reading before a solve, then HIGH / LOW / FLOATING from the solver
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r5-logic-probe-browser.cjs
+      - name: R10.2 authored checks - author a measurable check, PASS from the real tick, export and re-import the scene package
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r10-authored-checks-browser.cjs
       - name: R22 grouping - group, whole-group selection, rotate about the centre, ungroup, undo, reload
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r22-groups-browser.cjs
       - name: R12 live operator controls - hold START on the station and watch the process respond

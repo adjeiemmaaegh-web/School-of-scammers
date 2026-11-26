@@ -8,6 +8,7 @@
  * is an authentication or tamper-protection mechanism: stored projects are user data, never trusted input.
  */
 import { buildScenePackage, parseScenePackage } from './scene-package';
+import type { AuthoredCheck } from '../exercises/authored-checks-schema';
 
 export const LIBRARY_SCHEMA = 1;
 export const MAX_PROJECTS = 50;
@@ -191,14 +192,15 @@ export function createLibrary(deps: LibraryDeps) {
     },
 
     /** Imports a scene package (data-only file with objectives) as a new project; the objectives are returned for display. */
-    async importScenePackage(raw: string): Promise<{ ok: true; meta: ProjectMeta; objectives: string[]; hints: string[]; level: string } | { ok: false; message: string }> {
+    async importScenePackage(raw: string): Promise<{ ok: true; meta: ProjectMeta; objectives: string[]; hints: string[]; level: string; description: string; checks: AuthoredCheck[] } | { ok: false; message: string }> {
       const parsed = parseScenePackage(raw, validate);
       if (!parsed.ok) return parsed;
       const made = await this.create(parsed.pkg.title, parsed.pkg.project);
-      return made.ok ? { ok: true, meta: made.meta, objectives: parsed.pkg.objectives, hints: parsed.pkg.hints, level: parsed.pkg.level } : made;
+      return made.ok ? { ok: true, meta: made.meta, objectives: parsed.pkg.objectives, hints: parsed.pkg.hints, level: parsed.pkg.level,
+        description: parsed.pkg.description, checks: parsed.pkg.checks ?? [] } : made;
     },
 
-    async exportScenePackage(id: string, details: { description: string; level: 'beginner' | 'intermediate' | 'advanced'; objectives: string[]; hints: string[] }): Promise<string | undefined> {
+    async exportScenePackage(id: string, details: { description: string; level: 'beginner' | 'intermediate' | 'advanced'; objectives: string[]; hints: string[]; checks?: AuthoredCheck[] }): Promise<string | undefined> {
       const rec = await store.get(id);
       return rec ? buildScenePackage({ title: rec.title, project: rec.project, ...details }, validate) : undefined;
     },

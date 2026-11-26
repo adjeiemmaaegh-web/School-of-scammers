@@ -6,16 +6,22 @@ import type { PlacedComponent, RenderSnapshot } from './signals';
  * legacy first-device flags before the first scan has populated the per-device maps. Undefined for
  * every other kind: those have their own single-instance state.
  */
+function firstId(snapshot: RenderSnapshot, kinds: readonly string[]): string | undefined {
+  return snapshot.components.find(part => kinds.includes(part.kind))?.id;
+}
+function legacyFor(snapshot: RenderSnapshot, c: Pick<PlacedComponent, 'id'>, kinds: readonly string[], legacy: boolean): boolean {
+  return firstId(snapshot, kinds) === c.id ? legacy : false;
+}
 export function perDeviceLive(snapshot: RenderSnapshot, c: Pick<PlacedComponent, 'id' | 'kind'>): boolean | undefined {
   switch (c.kind) {
     case 'plc':
-    case 'plc16': return snapshot.plcs[c.id]?.powered ?? snapshot.io.PlcPowered;
+    case 'plc16': return snapshot.plcs[c.id]?.powered ?? (firstId(snapshot, ['plc', 'plc16']) === c.id && c.kind === 'plc' ? snapshot.io.PlcPowered : false);
     case 'three-phase-supply': return snapshot.threePhaseSources[c.id] !== false;
     case 'star-delta-drive': return snapshot.threePhase[c.id]?.mainClosed === true;
-    case 'motor': return snapshot.deviceOn[c.id] ?? snapshot.motorOn;
-    case 'contactor': return snapshot.deviceOn[c.id] ?? snapshot.contactorOn;
-    case 'lamp': return snapshot.deviceOn[c.id] ?? snapshot.lampOn;
-    case 'conveyor': return snapshot.deviceOn[c.id] ?? snapshot.conveyorOn;
+    case 'motor': return snapshot.deviceOn[c.id] ?? legacyFor(snapshot, c, ['motor'], snapshot.motorOn);
+    case 'contactor': return snapshot.deviceOn[c.id] ?? legacyFor(snapshot, c, ['contactor'], snapshot.contactorOn);
+    case 'lamp': return snapshot.deviceOn[c.id] ?? legacyFor(snapshot, c, ['lamp'], snapshot.lampOn);
+    case 'conveyor': return snapshot.deviceOn[c.id] ?? legacyFor(snapshot, c, ['conveyor'], snapshot.conveyorOn);
     case 'buzzer':
     case 'siren':
     case 'compressor':
@@ -24,12 +30,12 @@ export function perDeviceLive(snapshot: RenderSnapshot, c: Pick<PlacedComponent,
     case 'stacklight': return ['R', 'Y', 'G'].some(l => snapshot.deviceOn[`${c.id}-${l}`] === true);
     // A cylinder reads as "live" while its rod is anywhere but fully retracted.
     case 'cylinder': return (snapshot.cylinders[c.id]?.position ?? 0) > 0;
-    case 'diverter': return snapshot.deviceOn[c.id] ?? snapshot.diverterOn;
-    case 'pump': return snapshot.deviceOn[c.id] ?? snapshot.pumpOn;
-    case 'drainvalve': return snapshot.deviceOn[c.id] ?? snapshot.drainOn;
+    case 'diverter': return snapshot.deviceOn[c.id] ?? legacyFor(snapshot, c, ['diverter'], snapshot.diverterOn);
+    case 'pump': return snapshot.deviceOn[c.id] ?? legacyFor(snapshot, c, ['pump'], snapshot.pumpOn);
+    case 'drainvalve': return snapshot.deviceOn[c.id] ?? legacyFor(snapshot, c, ['drainvalve'], snapshot.drainOn);
     // A protection device is "live" (closed) until it has tripped.
-    case 'breaker': return !(snapshot.tripped[c.id] ?? snapshot.breakerTripped);
-    case 'overload': return !(snapshot.tripped[c.id] ?? snapshot.overloadTripped);
+    case 'breaker': return !(snapshot.tripped[c.id] ?? legacyFor(snapshot, c, ['breaker'], snapshot.breakerTripped));
+    case 'overload': return !(snapshot.tripped[c.id] ?? legacyFor(snapshot, c, ['overload'], snapshot.overloadTripped));
     default: return undefined;
   }
 }

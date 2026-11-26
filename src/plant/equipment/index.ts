@@ -37,3 +37,5 @@ export const EQUIPMENT:readonly EquipmentDef[]=SOURCE_EQUIPMENT.map(def=>
 export const PLANT_EQUIPMENT:Readonly<Record<string,EquipmentDef>>=
  Object.fromEntries(EQUIPMENT.map(def=>[def.kind,def]));
 export const plantKinds=EQUIPMENT.map(def=>def.kind);
+/** True for kinds with a plant (motion/sensing) definition. Lives here so UI code need not import the plant runner or physics. */
+export const isPlantEquipmentKind=(kind:string):boolean=>Object.hasOwn(PLANT_EQUIPMENT,kind);

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
+import { clipboardRung, copyRung, duplicateRung, emptyLadderHistory, insertRungCopy, moveRung, recordEdit, redoEdit, undoEdit, type LadderHistory } from './ladder-edit';
 import type { Branch, Contact, LadderDocument, NumericRungOperation, NumericTagType, Rung, RungElement, RungOperation } from '../engineering/ladder';
 import { NumericInstructionControls } from './NumericInstructionControls';
 import type { RenderSnapshot } from '../sim/signals';
@@ -56,7 +57,20 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
   const coils = Array.from(new Set([...outputNames, 'Unused', ...boolSymbols]));
   const live: Record<string, boolean | number> = { ...snapshot.tagValues, Unused: false };
 
-  const patchRung = (rungId: string, replacement: Rung) => onChange({
+  // R4.1: every change goes through edit(), which records the document it replaces for undo (bounded history).
+  const [history, setHistory] = useState<LadderHistory>(emptyLadderHistory);
+  const [copied, setCopied] = useState<string | null>(null);
+  const edit = (next: LadderDocument) => { if (next === document) return; setHistory(h => recordEdit(h, document)); onChange(next); };
+  const undo = () => { const r = undoEdit(history, document); if (r) { setHistory(r.history); onChange(r.doc); } };
+  const redo = () => { const r = redoEdit(history, document); if (r) { setHistory(r.history); onChange(r.doc); } };
+  const paste = (afterId?: string) => { const rung = clipboardRung(); if (rung) edit(insertRungCopy(document, rung, afterId)); };
+  const onKeys = (e: KeyboardEvent<HTMLElement>) => {
+    if (disabled || !(e.ctrlKey || e.metaKey) || (e.target as HTMLElement).matches('input[type="text"], input[type="number"], textarea')) return;
+    const key = e.key.toLowerCase();
+    if (key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+    else if (key === 'y' || (key === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+  };
+  const patchRung = (rungId: string, replacement: Rung) => edit({
     ...document, rungs: document.rungs.map(rung => rung.id === rungId ? replacement : rung),
   });
   const updateElement = (rung: Rung, index: number, element: RungElement) =>
@@ -81,7 +95,7 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
     const definition = newTagType === 'BOOL' ?
       { description: 'Local BOOL / memory tag' } :
       { description: `Local ${newTagType} register`, type: newTagType, initial: value };
-    onChange({ ...document, symbols: { ...document.symbols, [name]: definition } });
+    edit({ ...document, symbols: { ...document.symbols, [name]: definition } });
     setNewTag(''); setNewInitial('0'); setTagError(null);
   };
   const removeTag = (tag: string) => {
@@ -99,7 +113,7 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
     }
     const remaining = { ...document.symbols };
     delete remaining[tag];
-    onChange({ ...document, symbols: remaining });
+    edit({ ...document, symbols: remaining });
     setTagError(null);
   };
   const addRung = () => {
@@ -109,7 +123,7 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
     const newCoil = `Aux${number}`;
     let suffix = 1;
     while (document.rungs.some(r => r.id === `rung-${suffix}`)) suffix++;
-    onChange({
+    edit({
       ...document,
       symbols: { ...document.symbols, [newCoil]: { description: 'Local BOOL rung output' } },
       rungs: [...document.rungs, {
@@ -117,7 +131,7 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
       }],
     });
   };
-  const reset = () => onChange(classic ? blankProgram() : { id: 'sandbox-program', version: '1.0', rungs: [{ id: 'rung-1', elements: [{ type: 'contact', tag: inputNames[0] }], coil: outputNames[0] }] });
+  const reset = () => edit(classic ? blankProgram() : { id: 'sandbox-program', version: '1.0', rungs: [{ id: 'rung-1', elements: [{ type: 'contact', tag: inputNames[0] }], coil: outputNames[0] }] });
   const updateTimerPreset = (rung: Rung, presetMs: number) => {
     const operation = rung.operation;
     if (operation && 'presetMs' in operation)
@@ -134,10 +148,16 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
       patchRung(rung.id, { ...rung, operation: { ...operation, resetTag: resetTag || undefined } });
   };
 
-  return <section className="sandbox-editor panel" aria-label="Ladder programming editor">
+  return <section className="sandbox-editor panel" aria-label="Ladder programming editor" onKeyDown={onKeys}>
     <div className="sandbox-section-head">
       <div><span className="eyebrow">PLC program · live monitor</span><h2>Ladder Logic</h2></div>
       <span className="status-pill is-idle">{document.rungs.length} / {MAX_SANDBOX_RUNGS} rungs</span>
+    </div>
+    <div className="sandbox-ladder-tools" role="toolbar" aria-label="Ladder editing">
+      <button type="button" className="btn ghost small" data-ladder-undo disabled={disabled || !history.past.length} onClick={undo} title="Undo (Ctrl+Z)">Undo</button>
+      <button type="button" className="btn ghost small" data-ladder-redo disabled={disabled || !history.future.length} onClick={redo} title="Redo (Ctrl+Y)">Redo</button>
+      <button type="button" className="btn ghost small" data-ladder-paste disabled={disabled || !copied || document.rungs.length >= MAX_SANDBOX_RUNGS} onClick={() => paste()}
+        title="Paste the copied rung at the end">Paste rung{copied ? ` (${copied})` : ''}</button>
     </div>
     <p className="sandbox-help">Real deterministic scan execution. Rungs execute top-to-bottom; upstream coils can feed later contacts. Timers use simulated scan milliseconds, not wall time.</p>
     <fieldset disabled={disabled} className="sandbox-editor-fieldset">
@@ -151,8 +171,20 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
             <div className="sandbox-rung-execution" aria-live="off">{trace ?
               `${trace.result ? 'TRUE' : 'FALSE'} · ${trace.operation.toUpperCase()}${trace.elapsedMs !== undefined ? ` · ${trace.elapsedMs}ms` : ''}${trace.count !== undefined ? ` · CV=${trace.count}` : ''}${trace.numericResult !== undefined ? ` · VALUE=${trace.numericResult}` : ''}`
               : 'Not scanned'}</div>
-            {document.rungs.length > 1 && <button type="button" className="btn ghost small"
-              onClick={() => onChange({ ...document, rungs: document.rungs.filter(r => r.id !== rung.id) })}>Remove rung</button>}
+            <span className="sandbox-rung-actions">
+              <button type="button" className="btn ghost small" data-rung-up={rung.id} disabled={rungIndex === 0} aria-label={`Move network ${rungIndex + 1} up`}
+                onClick={() => edit(moveRung(document, rung.id, -1))}>↑</button>
+              <button type="button" className="btn ghost small" data-rung-down={rung.id} disabled={rungIndex === document.rungs.length - 1} aria-label={`Move network ${rungIndex + 1} down`}
+                onClick={() => edit(moveRung(document, rung.id, 1))}>↓</button>
+              <button type="button" className="btn ghost small" data-rung-duplicate={rung.id} disabled={document.rungs.length >= MAX_SANDBOX_RUNGS}
+                onClick={() => edit(duplicateRung(document, rung.id))}>Duplicate</button>
+              <button type="button" className="btn ghost small" data-rung-copy={rung.id}
+                onClick={() => { if (copyRung(document, rung.id)) setCopied(`network ${rungIndex + 1}`); }}>Copy</button>
+              {copied && <button type="button" className="btn ghost small" data-rung-paste-after={rung.id} disabled={document.rungs.length >= MAX_SANDBOX_RUNGS}
+                onClick={() => paste(rung.id)}>Paste below</button>}
+              {document.rungs.length > 1 && <button type="button" className="btn ghost small"
+                onClick={() => edit({ ...document, rungs: document.rungs.filter(r => r.id !== rung.id) })}>Remove rung</button>}
+            </span>
           </div>
           <div className="sandbox-rung" data-rung-id={rung.id}>
             <span className="sandbox-rail" aria-hidden="true">│</span>
@@ -242,10 +274,10 @@ export function LadderEditor({ document, snapshot, disabled, onChange, showExamp
           disabled={document.rungs.length >= MAX_SANDBOX_RUNGS || symbols.length >= MAX_SANDBOX_SYMBOLS}
           onClick={addRung}>+ Add rung</button>
         {showExamples && <>
-          <button type="button" className="btn ghost small" onClick={() => onChange(latchProgram())}>Load editable latch example</button>
-          <button type="button" className="btn ghost small" onClick={() => onChange(sortingProgram())}>Load sorting program example</button>
-          <button type="button" className="btn ghost small" onClick={() => onChange(tankProgram())}>Load tank control example</button>
-          <button type="button" className="btn ghost small" onClick={() => onChange(reversingProgram())}>Load forward/reverse example</button>
+          <button type="button" className="btn ghost small" onClick={() => edit(latchProgram())}>Load editable latch example</button>
+          <button type="button" className="btn ghost small" onClick={() => edit(sortingProgram())}>Load sorting program example</button>
+          <button type="button" className="btn ghost small" onClick={() => edit(tankProgram())}>Load tank control example</button>
+          <button type="button" className="btn ghost small" onClick={() => edit(reversingProgram())}>Load forward/reverse example</button>
         </>}
         <button type="button" className="btn ghost small" onClick={reset}>Reset to one contact</button>
       </div>

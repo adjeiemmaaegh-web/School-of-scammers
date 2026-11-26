@@ -14,16 +14,16 @@ import { applyLocalForce } from '../program/local-force';
 import { feedPlant, freshPlant, stepPlant } from '../plant/sorting-conveyor';
 import { freshTank } from '../plant/tank-process';
 import {
-  MAX_PLCS, blankProgram, defaultProgramFor, extraPlcs, freshPlcRuntime, legacyPrimaryId, namesFor, plcComponents, plcView,
+  MAX_PLCS, blankProgram, defaultProgramFor, extraPlcs, freshPlcRuntime, legacyPrimaryId, namesFor, plcComponents,
   primaryPlcId, programOf, runtimePlcs, scanPlc, withProgramOf,
 } from './plcs';
-import { LEGACY_IO, MAX_IO_MODULES_PER_PLC, defaultIo, ioOf, isConfigurableIo, moduleDiagnostics, moduleNameError, modulesOf, pinLocation, validateIoMap } from './plc-io';
+import { MAX_IO_MODULES_PER_PLC, defaultIo, ioOf, isConfigurableIo, moduleDiagnostics, moduleNameError, modulesOf, pinLocation, validateIoMap } from './plc-io';
 export { blankProgram };
 import { emptyMeter, measureDC24 } from '../electrical/panel-meter';
 import { measureContinuity } from '../electrical/continuity';
 import { threePhaseWireError, threePhaseConnections } from '../electrical/three-phase-netlist';
 import { freshStarterPanel } from '../electrical/three-phase-types';
-import { stepWiredStarter } from '../electrical/wired-star-delta';
+import { stepThreePhase } from './phases/three-phase';
 import { readPhaseMeter } from '../electrical/phase-instruments';
 import { MAX_COMPONENTS, MAX_SUPPLIES, MAX_WIRES, planStarterPanel, removeComponent, withStarterPanel } from './panels';
 import { laneOf, lanesOf, vesselOf } from './stations';
@@ -37,7 +37,9 @@ import { pruneWireStyles, validateWireStyles, withWireStyle, type WireColor } fr
 import { DEFAULT_SCAN_MS, isValidScanMs, scanMsOf } from './scan-config';
 import { airWireError, solveAir } from '../plant/air';
 import { clearedAlarm } from '../plant/cylinder';
-import { analogWireError, sampleAnalogInputs } from './analog';
+import { analogWireError } from './analog';
+import { plcObservationImage } from './plc-observation';
+import { anyControllerPowered, controllerPowerImage } from './plc-power';
 import { airSensorReadings } from './air-sensors';
 import { shapeErrors, type CustomShapeDef } from '../plant/world/custom-shapes';
 import { MATERIALS, MAX_CUSTOM_SHAPES } from '../plant/world/materials';
@@ -47,6 +49,8 @@ import {firstNewCarrierSuperposition,carrierSuperpositionError} from '../workspa
 import { freshProjectPlant, stepProjectPlant, sensorImage, validatePlantFaults } from './p3-plant-bridge';
 import { makePlantSceneProject } from './p3-scene-import';
 import { PLANT_EQUIPMENT } from '../plant/equipment';
+import { newProject, validateProject, validId, validPos, validateCustomShapes, validateMechanicalLinks } from './project-validation';
+export { newProject, validateProject };
 export { MAX_COMPONENTS, MAX_WIRES };
 import { freshAlarmWatch, updateAlarms } from '../diagnostics/alarms';
 import {
@@ -138,10 +142,6 @@ export const reversingProgram = (): LadderDocument => ({
     { id: 'inactive-dol', elements: [{ type: 'contact', tag: 'Unused' }], coil: 'Run' },
   ],
 });
-export const newProject = (): ProjectFile => ({
-  formatVersion: 1, components: [], wires: [], program: blankProgram(),
-  language: 'ladder', stSource: DEFAULT_ST_SOURCE,
-});
 export function createWorld(project: ProjectFile = newProject()): WorldState {
   return {
     project, running: false, tick: 0, coils: {}, ladderMemory: {}, ladderNumeric: {},
@@ -170,116 +170,6 @@ export function createWorld(project: ProjectFile = newProject()): WorldState {
   };
 }
 const terminal = (id: string, pin: string) => `${id}.${pin}`;
-const validId = (value: unknown): value is string => typeof value === 'string' && /^[A-Za-z0-9_-]{1,45}$/.test(value);
-const validPos = (value: unknown): value is { x: number; y: number } =>
-  !!value && typeof value === 'object' && 'x' in value && 'y' in value &&
-  typeof value.x === 'number' && Number.isFinite(value.x) && value.x >= 0 && value.x <= 3000 &&
-  typeof value.y === 'number' && Number.isFinite(value.y) && value.y >= 0 && value.y <= 3000;
-
-export function validateProject(raw: unknown): ProjectFile {
-  if (!raw || typeof raw !== 'object') throw new Error('Project must be an object');
-  const p = raw as Partial<ProjectFile>;
-  if (p.formatVersion !== 1 || !Array.isArray(p.components) || !Array.isArray(p.wires) || !p.program ||
-      p.components.length > MAX_COMPONENTS || p.wires.length > MAX_WIRES) throw new Error('Unsupported project format or size');
-  const components: PlacedComponent[] = [];
-  const ids = new Set<string>();
-  for (const entry of p.components) {
-    if (!entry || !validId(entry.id) || ids.has(entry.id) || !Object.hasOwn(COMPONENTS, entry.kind) || !validPos(entry)) {
-      throw new Error('Invalid component in project');
-    }
-    if (entry.yawDeg !== undefined && !([0, 90, 180, 270] as unknown[]).includes(entry.yawDeg))
-      throw new Error('Device orientation must be a quarter turn');
-    if (entry.freeYawDeg !== undefined && (!isFreeRotation(entry.kind) || !Number.isInteger(entry.freeYawDeg) ||
-        entry.freeYawDeg < 5 || entry.freeYawDeg > 355 || entry.freeYawDeg % 5 !== 0))
-      throw new Error('Invalid free rotation (5 to 355 degrees in 5 degree steps, on devices that may turn freely)');
-    if (entry.elevationMm !== undefined &&
-        (!Object.hasOwn(PLANT_EQUIPMENT, entry.kind) ||
-         !Number.isSafeInteger(entry.elevationMm) ||
-         entry.elevationMm < 0 || entry.elevationMm > 2500))
-      throw new Error('Invalid supported plant elevation');
-    ids.add(entry.id);
-    components.push({ id: entry.id, kind: entry.kind as ComponentKind, x: entry.x, y: entry.y,
-      pressed: entry.pressed === true, ...(entry.yawDeg === undefined ? {} : { yawDeg: entry.yawDeg }),
-      ...(entry.freeYawDeg === undefined ? {} : { freeYawDeg: entry.freeYawDeg }),
-      ...(entry.elevationMm === undefined ? {} : { elevationMm: entry.elevationMm }) });
-  }
-  // One of each protective branch device per educational circuit: state is
-  // explicitly maintained per role, not silently shared among duplicates.
-  if (plcComponents({ components }).length > MAX_PLCS) throw new Error(`At most ${MAX_PLCS} PLCs are supported`);
-  if (components.filter(c => c.kind === 'supply').length > MAX_SUPPLIES) throw new Error(`At most ${MAX_SUPPLIES} 24V supplies are supported`);
-  for (const kind of ['reversebutton', 'forwardcontactor', 'reversecontactor', 'revmotor'] as const)
-    if (components.filter(c => c.kind === kind).length > 1)
-      throw new Error(`Only one ${kind} protection device is supported`);
-  const wireIds = new Set<string>();
-  const wiresChecked: { id: string; from: string; to: string }[] = [];
-  const phaseOwners = Object.fromEntries(components.map(c => [c.id, c.kind]));
-  for (const wire of p.wires) {
-    if (!wire || !validId(wire.id) || wireIds.has(wire.id) || typeof wire.from !== 'string' ||
-        typeof wire.to !== 'string' || wire.from === wire.to ||
-        !terminalExists(wire.from, components) || !terminalExists(wire.to, components)) throw new Error('Invalid wire in project');
-    const phaseError = threePhaseWireError(wire.from, wire.to, phaseOwners);
-    if (phaseError) throw new Error(phaseError);
-    const domainError = airWireError(wire.from, wire.to, components) ?? analogWireError(wire.from, wire.to, components, wiresChecked);
-    if (domainError) throw new Error(domainError);
-    wiresChecked.push({ id: wire.id, from: wire.from, to: wire.to });
-    wireIds.add(wire.id);
-  }
-  const plcIo = validatePlcIo(p.plcIo, components);
-  const ioModules = validateIoModules(p.ioModules, components);
-  for (const plcC of components.filter(c => c.kind === 'plc16')) {
-    const seen = new Set<string>();
-    const io = ioOf({ components, plcIo, ioModules } as ProjectFile, plcC);
-    for (const tag of [...Object.values(io.inputs), ...Object.values(io.outputs), ...Object.values(io.analogInputs ?? {}), ...Object.values(io.analogOutputs ?? {})]) {
-      if (seen.has(tag.toUpperCase())) throw new Error(`PLC ${plcC.id}: tag ${tag} is used twice (check expansion module channel names)`);
-      seen.add(tag.toUpperCase());
-    }
-  }
-  const names = namesFor({ components, plcIo, ioModules } as ProjectFile, undefined);
-  const programErrors = validateSandboxProgram(p.program, names);
-  if (programErrors.length) throw new Error(programErrors.join('; '));
-  if (p.language !== undefined && p.language !== 'ladder' && p.language !== 'st' && p.language !== 'fbd')
-    throw new Error('Unknown PLC programming language');
-  if (p.stSource !== undefined && typeof p.stSource !== 'string')
-    throw new Error('Invalid Structured Text source');
-  if (p.language === 'st' || p.stSource !== undefined) {
-    if (p.language === 'st' && !p.stSource) throw new Error('ST mode requires a compiled source');
-    if (p.stSource) compileSandboxST(p.stSource, names);
-  }
-  if(p.fbd!==undefined||p.language==='fbd'){
-    const candidate={...p,components,plcIo,ioModules} as ProjectFile;
-    const config=programOf(candidate,undefined);
-    compileFbd(p.fbd??config.fbd,names);
-  }
-  const wires = p.wires.map(w => ({ id: w.id, from: w.from, to: w.to }));
-  const faults = validateFaults(p.faults, components, wires);
-  const plcPrograms = validatePlcPrograms(p.plcPrograms, components, plcIo, ioModules);
-  const params = validateParams(p.params, components);
-  const plantFaults = validatePlantFaults(p.plantFaults, { components });
-  const wireStyles = validateWireStyles(p.wireStyles, wires);
-  const groups = validateGroups(p.groups, new Set(components.map(c => c.id)), components);
-  const customShapes = validateCustomShapes(p.customShapes, components, params);
-  const mechanicalLinks = validateMechanicalLinks(p.mechanicalLinks, components);
-  if (p.scanMs !== undefined && !isValidScanMs(p.scanMs)) throw new Error('Invalid scan period (10-500 ms in steps of 10)');
-  return {
-    formatVersion: 1, components, wires, program: p.program,
-    ...(p.language !== undefined ? { language: p.language } : {}),
-    ...(p.stSource !== undefined ? { stSource: p.stSource } : {}),
-    ...(p.fbd !== undefined ? { fbd: p.fbd } : {}),
-    // Omitted when empty so legacy and fault-free projects keep their exact v1 shape.
-    ...(faults.length ? { faults } : {}),
-    ...(plcPrograms ? { plcPrograms } : {}),
-    ...(plcIo ? { plcIo } : {}),
-    ...(ioModules ? { ioModules } : {}),
-    ...(params ? { params } : {}),
-    ...(plantFaults ? { plantFaults } : {}),
-    ...(wireStyles ? { wireStyles } : {}),
-    ...(groups ? { groups } : {}),
-    ...(customShapes ? { customShapes } : {}),
-    ...(mechanicalLinks ? { mechanicalLinks } : {}),
-    // The default period is never stored, so existing projects keep their exact shape.
-    ...(p.scanMs !== undefined && p.scanMs !== DEFAULT_SCAN_MS ? { scanMs: p.scanMs } : {}),
-  };
-}
 /** R13: the previous scan's analog output values of every PLC16, keyed by terminal id (`plc.AO0`); 0 while a PLC is unpowered or has not written the tag. */
 function analogOutputsOf(w: WorldState): Record<string, number> {
   const out: Record<string, number> = {};
@@ -295,130 +185,6 @@ function analogOutputsOf(w: WorldState): Record<string, number> {
     }
   }
   return out;
-}
-/** Device settings: each key must be a setting its device kind defines, with an allowed value that differs from the default. */
-function validateParams(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['params'] | undefined {
-  if (raw === undefined) return undefined;
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid device settings');
-  const out: NonNullable<ProjectFile['params']> = {};
-  for (const [id, values] of Object.entries(raw as Record<string, unknown>)) {
-    const part = components.find(c => c.id === id);
-    if (!part || !paramSpecsOf(part.kind).length) throw new Error(`Settings for ${id}: not a configurable device in this project`);
-    if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error(`Invalid settings for ${id}`);
-    const kept: Record<string, number> = {};
-    for (const [key, value] of Object.entries(values as Record<string, unknown>)) {
-      const spec = paramSpecsOf(part.kind).find(s => s.key === key);
-      if (!spec) throw new Error(`Settings for ${id}: unknown setting ${key}`);
-      const error = paramError(spec, value);
-      if (error) throw new Error(`${id}: ${error}`);
-      if (value !== spec.default) kept[key] = value as number;
-    }
-    if (Object.keys(kept).length) out[id] = kept;
-  }
-  return Object.keys(out).length ? out : undefined;
-}
-/** Programs of the additional PLCs. Keys must name a PLC after the first; omitted when there are none. */
-/** Tag names of the configurable controllers. Keys must be 16/16 PLCs; omitted when there are none. */
-function validatePlcIo(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['plcIo'] | undefined {
-  if (raw === undefined) return undefined;
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid PLC I/O configuration');
-  const out: NonNullable<ProjectFile['plcIo']> = {};
-  for (const [id, map] of Object.entries(raw as Record<string, unknown>)) {
-    const plc = components.find(c => c.id === id);
-    if (!plc || !isConfigurableIo(plc.kind)) throw new Error(`I/O configuration for ${id}: not a configurable PLC in this project`);
-    const errors = validateIoMap(plc.kind, map);
-    if (errors.length) throw new Error(`PLC ${id} I/O: ${errors.join('; ')}`);
-    const m = map as { inputs: Record<string, string>; outputs: Record<string, string> };
-    out[id] = { inputs: { ...m.inputs }, outputs: { ...m.outputs } };
-  }
-  return Object.keys(out).length ? out : undefined;
-}
-/** R14/R28 mechanical links: each is a real `drive` turning a belt-type conveyor, a belt has at most one drive, and the ratio is bounded. */
-const LINKABLE = new Set(['belt-conveyor', 'roller-conveyor', 'curved-conveyor']);
-function validateMechanicalLinks(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['mechanicalLinks'] | undefined {
-  if (raw === undefined) return undefined;
-  if (!Array.isArray(raw) || raw.length > 16) throw new Error('Invalid mechanical links (at most 16)');
-  const targets = new Set<string>(), out: NonNullable<ProjectFile['mechanicalLinks']> = [];
-  for (const l of raw as { drive?: unknown; target?: unknown; mmPerRev?: unknown }[]) {
-    const drive = components.find(c => c.id === l?.drive), target = components.find(c => c.id === l?.target);
-    if (!drive || drive.kind !== 'drive') throw new Error(`Mechanical link: ${String(l?.drive)} is not a drive in this project`);
-    if (!target || !LINKABLE.has(target.kind)) throw new Error(`Mechanical link: ${String(l?.target)} is not a belt, roller or curved conveyor`);
-    if (!Number.isFinite(l.mmPerRev) || (l.mmPerRev as number) < 10 || (l.mmPerRev as number) > 2000) throw new Error('Mechanical link: travel per revolution must be 10 to 2000 mm');
-    if (targets.has(target.id)) throw new Error(`Mechanical link: ${target.id} already has a drive`);
-    targets.add(target.id);
-    out.push({ drive: drive.id, target: target.id, mmPerRev: l.mmPerRev as number });
-  }
-  return out.length ? out : undefined;
-}
-/** R02: at most MAX_CUSTOM_SHAPES valid, uniquely named shapes; a device setting may only name a custom shape that exists. */
-function validateCustomShapes(raw: unknown, components: readonly PlacedComponent[], params: ProjectFile['params']): ProjectFile['customShapes'] | undefined {
-  const list = raw === undefined ? [] : raw;
-  if (!Array.isArray(list) || list.length > MAX_CUSTOM_SHAPES) throw new Error(`Invalid custom shapes (at most ${MAX_CUSTOM_SHAPES})`);
-  const ids = new Set<string>();
-  for (const shape of list as CustomShapeDef[]) {
-    const errors = shapeErrors(shape);
-    if (errors.length) throw new Error(`Custom shape ${String((shape as { id?: unknown })?.id)}: ${errors.join('; ')}`);
-    if (ids.has(shape.id)) throw new Error(`Custom shape ${shape.id} is defined twice`);
-    ids.add(shape.id);
-  }
-  for (const c of components) {
-    const key = c.kind === 'box-feeder' ? 'materialId' : c.kind === 'collector' ? 'acceptMaterial' : null;
-    const index = key ? params?.[c.id]?.[key] : undefined;
-    if (index !== undefined && index > MATERIALS.length && index - MATERIALS.length > list.length)
-      throw new Error(`${c.id}: material ${index} is a custom shape that is not defined in this project`);
-  }
-  return list.length ? (list as CustomShapeDef[]).map(s => JSON.parse(JSON.stringify(s)) as CustomShapeDef) : undefined;
-}
-/** R13: each module is attached to one existing PLC16 with a free slot 1..MAX; nothing else may appear. */
-function validateIoModules(raw: unknown, components: readonly PlacedComponent[]): ProjectFile['ioModules'] | undefined {
-  if (raw === undefined) return undefined;
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid expansion module configuration');
-  const out: NonNullable<ProjectFile['ioModules']> = {};
-  const used = new Set<string>();
-  for (const [id, link] of Object.entries(raw as Record<string, unknown>)) {
-    const mod = components.find(c => c.id === id);
-    if (!mod || !isIoModuleKind(mod.kind)) throw new Error(`Expansion module ${id}: not an expansion module in this project`);
-    const l = link as { plc?: unknown; slot?: unknown } | null;
-    const host = components.find(c => c.id === l?.plc);
-    if (!host || host.kind !== 'plc16') throw new Error(`Expansion module ${id}: host must be a 16/16 PLC in this project`);
-    if (!Number.isInteger(l?.slot) || (l?.slot as number) < 1 || (l?.slot as number) > MAX_IO_MODULES_PER_PLC) throw new Error(`Expansion module ${id}: slot must be 1 to ${MAX_IO_MODULES_PER_PLC}`);
-    const key = `${host.id}#${l?.slot}`;
-    if (used.has(key)) throw new Error(`Expansion module ${id}: slot ${l?.slot} of ${host.id} is already used`);
-    used.add(key);
-    const names = (l as { names?: unknown })?.names;
-    if (names !== undefined && (!names || typeof names !== 'object' || Array.isArray(names) || Object.values(names).some(n => typeof n !== 'string')))
-      throw new Error(`Expansion module ${id}: invalid channel names`);
-    out[id] = { plc: host.id, slot: l?.slot as number, ...(names && Object.keys(names).length ? { names: { ...(names as Record<string, string>) } } : {}) };
-  }
-  return Object.keys(out).length ? out : undefined;
-}
-function validatePlcPrograms(raw: unknown, components: readonly PlacedComponent[], plcIo: ProjectFile['plcIo'], ioModules?: ProjectFile['ioModules']): Record<string, PlcProgram> | undefined {
-  if (raw === undefined) return undefined;
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid PLC programs');
-  const extras = new Set(extraPlcs({ components }).map(c => c.id));
-  const out: Record<string, PlcProgram> = {};
-  for (const [id, entry] of Object.entries(raw as Record<string, unknown>)) {
-    if (!extras.has(id)) throw new Error(`PLC program for ${id}: not an additional PLC in this project`);
-    const e = entry as Partial<PlcProgram> | null;
-    if (!e || typeof e !== 'object' || !e.program) throw new Error(`Invalid program for PLC ${id}`);
-    const names = namesFor({ components, plcIo, ioModules } as ProjectFile, id);
-    const issues = validateSandboxProgram(e.program, names);
-    if (issues.length) throw new Error(`PLC ${id}: ${issues.join('; ')}`);
-    if (e.language !== undefined && e.language !== 'ladder' && e.language !== 'st' && e.language !== 'fbd') throw new Error(`PLC ${id}: unknown language`);
-    if (e.stSource !== undefined && typeof e.stSource !== 'string') throw new Error(`PLC ${id}: invalid Structured Text source`);
-    if (e.language === 'st' && !e.stSource) throw new Error(`PLC ${id}: ST mode requires a source`);
-    if (e.stSource) compileSandboxST(e.stSource, names);
-    if (e.fbd!==undefined||e.language==='fbd'){
-      const component=components.find(c=>c.id===id)!;
-      const cfg=defaultProgramFor(component.kind,ioOf({components,plcIo,ioModules} as ProjectFile,component));
-      compileFbd(e.fbd??cfg.fbd,names);
-    }
-    out[id] = { program: e.program,
-      ...(e.language !== undefined ? { language: e.language } : {}),
-      ...(e.stSource !== undefined ? { stSource: e.stSource } : {}),
-      ...(e.fbd !== undefined ? { fbd: e.fbd } : {}) };
-  }
-  return Object.keys(out).length ? out : undefined;
 }
 const setError = (world: WorldState, message: string): WorldState => ({ ...world, lastError: message });
 /**
@@ -1126,27 +892,7 @@ export function renderSnapshot(world: WorldState): RenderSnapshot {
       'Q0.4': world.coils.Forward === true, 'Q0.5': world.coils.Reverse === true,
       PlcPowered: world.powered },
     voltages: { ...world.voltages }, contactorOn: world.contactorOn, motorOn: world.motorOn, motorAngleRad: world.motorAngleRad,
-    plcs: Object.fromEntries(plcComponents(world.project).map(c => {
-      const lang = programOf(world.project, c.id).language;
-      const idle: Record<string, boolean> = {};
-      const rt = world.plcs[c.id];
-      const io = ioOf(world.project, c);
-      // Show the physical numeric connection on the paused bench before the first scan.
-      // While running, the live PLC view shows the previous scan's actual sampled value.
-      const analogPoints = io.analogInputs && !world.running
-        ? sampleAnalogInputs(world.project, world.vessels, c.id, io, rt?.powered ?? false,
-          new Set(faultsOf(world.project).filter(f => f.kind === 'wire-open').map(f => f.target)),
-          world.plantWorld, id => world.voltages[id + '.L+'] !== undefined && world.voltages[id + '.M'] !== undefined,
-          airSensorReadings(world.project, world.air)).points
-        : rt?.analogInputs ?? [];
-      return [c.id, c.id === legacyPrimaryId(world.project)
-        ? plcView(c.kind, lang, world.powered, LEGACY_IO, world.inputs, world.coils,
-          { tagValues: world.tagValues, ladderSteps: world.ladderSteps, ladderMemory: world.ladderMemory,
-            fbdSteps: world.fbdSteps }, [], world.debugForces[c.id] ?? {})
-        : plcView(c.kind, lang, rt?.powered ?? false, io, rt?.tagInputs ?? idle, rt?.coils ?? {},
-          { tagValues: rt?.tagValues ?? {}, ladderSteps: rt?.ladderSteps ?? [], ladderMemory: rt?.ladderMemory ?? {},
-            fbdSteps: rt?.fbdSteps ?? [] }, analogPoints, world.debugForces[c.id] ?? {})];
-    })),
+    plcs: plcObservationImage(world),
     deviceOn: { ...world.deviceOn }, motorAngles: { ...world.motorAngles },
     plantWorld: {
       world: { ...world.plantWorld.world,
@@ -1249,9 +995,10 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtO
   const shorted = circuit.diagnostics.some(d => d.startsWith('Supply short'));
   const plc = plcComponents(w.project)[0];
   // "24 V" always means 24 V relative to the device's OWN reference, so isolated supplies cannot leak.
-  const powered = !!plc && !shorted && circuit.reads24(terminal(plc.id, 'L+'), terminal(plc.id, 'M'));
+  const powerById = controllerPowerImage(w.project, circuit, shorted);
+  const powered = plc ? powerById[plc.id] === true : false;
   // 3-4. Sample the wired input image and scan every controller (see sim/phases/controller-scan.ts).
-  const scan = scanControllers(w, circuit, shorted, plc, powered, dtMs);
+  const scan = scanControllers(w, circuit, shorted, plc, powered, dtMs, powerById);
   if (scan.halt) return { world: scan.halt.world, snapshot: renderSnapshot(scan.halt.world), events: scan.halt.events };
   const { eyePowered, probePowered, inputs, ladderResult, stResult, fbdResult, coils, tagValues, nextPlcs, unpoweredExtras } = scan;
   // 5. Publish output image (Q0.0 follows coil Run, only when PLC is powered).
@@ -1266,33 +1013,10 @@ export function tick(initial: WorldState, commands: readonly Command[] = [], dtO
   const p3 = stepProjectPlant(w.plantWorld, withOperatorValues(w.project, w.operatorValues), circuit.energizedLoads, dtMs,
     // The controller-supply condition only exists when the project HAS a controller: a hard-wired cell (no PLC) must not
     // be held off by a PLC that was never placed (R14/R28: a working cell can be built from an empty workspace).
-    {...(plc ? {controllerPowered:powered} : {}),isSourcePowered:(id:string)=>circuit.reads24(id+'.L+',id+'.M'),analogOutputs:analogOutputsOf(w)});
+    {...(plc ? {controllerPowered:anyControllerPowered(powerById)} : {}),isSourcePowered:(id:string)=>circuit.reads24(id+'.L+',id+'.M'),analogOutputs:analogOutputsOf(w)});
   for (const event of p3.events)
     events.push({ tick: w.tick + 1, kind: 'plant', detail: event.source + ': ' + event.detail });
-  // P4 three-phase process after the worker's actual 24V coil demand scan.
-  // Three-phase conductors are not supplied by the 24V electrical solver.
-  const connectedThreePhase=threePhaseConnections(w.project.components,w.project.wires.filter(wire=>
-    !faultsOf(w.project).some(f=>f.kind==='wire-open'&&f.target===wire.id)));
-  const nextThreePhase:WorldState['threePhase']={};
-  for(const part of w.project.components.filter(c=>c.kind==='star-delta-drive')){
-    const wired=connectedThreePhase[part.id]??null;
-    const live=wired&&w.threePhasePower[wired.supplyId]!==false?wired:null;
-    const coils={
-      main:circuit.energizedLoads.includes(part.id+'-MAIN'),
-      star:circuit.energizedLoads.includes(part.id+'-STAR'),
-      delta:circuit.energizedLoads.includes(part.id+'-DELTA'),
-      reset:circuit.energizedLoads.includes(part.id+'-RESET'),
-    };
-    const previous=w.threePhase[part.id]??freshStarterPanel();
-    const next=stepWiredStarter(previous,live,coils,dtMs);
-    nextThreePhase[part.id]=next;
-    deviceOn[part.id]=next.mainClosed&&(next.starClosed||next.deltaClosed);
-    if(next.motor.mode!==previous.motor.mode||next.motor.tripped!==previous.motor.tripped)
-      events.push({tick:w.tick+1,kind:'three-phase',detail:part.id+': '+next.motor.mode+
-        (next.motor.tripped?' (thermal trip)':'')});
-    if(next.conflict&&!previous.conflict)events.push({tick:w.tick+1,kind:'interlock',
-      detail:part.id+': STAR/DELTA control conflict; motor inhibited'});
-  }
+  const nextThreePhase = stepThreePhase(w, circuit.energizedLoads, dtMs, deviceOn, events);
   // 8. Photoeye state from geometry is sampled by the circuit on NEXT scan.
   // 9. Collect ordered events for observation/replay.
   if (contactorOn !== w.contactorOn) events.push({ tick: w.tick + 1, kind: 'contactor', detail: contactorOn ? 'Contactor energised' : 'Contactor released' });

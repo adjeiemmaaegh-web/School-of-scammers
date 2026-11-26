@@ -24,6 +24,11 @@ const rectOf=(item:EquipmentPlacement,length:number,width:number):Rect=>{
  const quarter=item.yawDeg===90||item.yawDeg===270;
  return {cx:item.originMm.x,cy:item.originMm.y,hx:(quarter?width:length)/2,hy:(quarter?length:width)/2};
 };
+/** A point in an item's own frame: u along its length (toward the heading end), v across it. */
+const localOf=(item:EquipmentPlacement,x:number,y:number):{u:number;v:number}=>{
+ const t=(item.yawDeg+(item.headingDeg??0))*Math.PI/180,dx=x-item.originMm.x,dy=y-item.originMm.y;
+ return {u:dx*Math.cos(t)+dy*Math.sin(t),v:-dx*Math.sin(t)+dy*Math.cos(t)};
+};
 const insideRect=(r:Rect,x:number,y:number,pad=0)=>Math.abs(x-r.cx)<=r.hx+pad&&Math.abs(y-r.cy)<=r.hy+pad;
 /** Distance from a point to a rectangle (0 inside). */
 const distanceTo=(r:Rect,x:number,y:number):number=>{
@@ -61,10 +66,22 @@ export function floorHeightAt(items:readonly EquipmentPlacement[],x:number,y:num
  let height=0;
  for(const item of items){
   if(item.kind==='platform'){
+   if(item.headingDeg){
+    // A platform turned to a free heading: the floor is the true turned rectangle, not its bounding box.
+    const {u,v}=localOf(item,x,y);
+    if(Math.abs(u)<=lengthOf(item,1200)/2&&Math.abs(v)<=widthOf(item,1200)/2)height=Math.max(height,item.params.heightMm??900);
+    continue;
+   }
    const r=rectOf(item,lengthOf(item,1200),widthOf(item,1200));
    if(insideRect(r,x,y))height=Math.max(height,item.params.heightMm??900);
   }else if(item.kind==='stairs'){
    const length=lengthOf(item,1800),width=widthOf(item,900),rise=item.params.heightMm??900;
+   if(item.headingDeg){
+    const {u,v}=localOf(item,x,y);
+    if(Math.abs(u)>length/2||Math.abs(v)>width/2)continue;
+    height=Math.max(height,rise*Math.max(0,Math.min(1,(u+length/2)/length)));
+    continue;
+   }
    const r=rectOf(item,length,width);
    if(!insideRect(r,x,y))continue;
    // The stair rises toward its heading end (yaw 0 = +x, 90 = +y, 180 = -x, 270 = -y).

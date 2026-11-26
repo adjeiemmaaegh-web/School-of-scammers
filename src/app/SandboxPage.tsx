@@ -24,15 +24,14 @@ import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
 import {DEVICE_FAMILIES,matchesFamily,supportedFamilies,type DeviceFamily} from '../ui/sandbox/workspace-catalog';
 import { ScenarioPanel } from '../ui/sandbox/ScenarioPanel';
 import { perDeviceLive, plantStatusText } from '../sim/device-state';
-import { isP3Equipment } from '../sim/p3-plant-bridge';
+import { isPlantEquipmentKind as isP3Equipment } from '../plant/equipment';
 import { plcComponents, programOf } from '../sim/plcs';
 import { vesselsOf } from '../sim/stations';
 import { appendEvidence, evidenceFromCommand } from '../exercises/evidence';
-import { scenarioStorageKey, type ScenarioRequest, type ScenarioSession } from '../exercises/session';
-import { getScenario } from '../exercises/catalogue';
+import { scenarioStorageKey, type ScenarioSession } from '../exercises/session';
 import type { AttemptResult, EvidenceEvent, RubricResult } from '../platform/types';
 import type { Command, ProjectFile, RenderSnapshot, WorkerResponse, WorkerTiming } from '../sim/signals';
-import { validateProject } from '../sim/orchestrator';
+import { validateProject } from '../sim/project-validation';
 import { readSandboxProject, persistSandboxProject, sandboxRecoveryKey } from '../platform/sandbox-project-storage';
 import './sandbox.css';
 import './p5-workspace.css';
@@ -42,11 +41,15 @@ import './ux4-canvas-focus.css';
 import './ux6-workbench.css';
 import './ux7-reference-layout.css';
 import './stage1-workspace.css';
+import './stage2-channels.css';
 import { DEFAULT_SCAN_MS, SCAN_PRESETS_MS, TIME_SCALES, scanMsOf, type ScanTiming } from '../sim/scan-config';
 
 // Loaded on demand so opening the simulator does not download the project dialog, lessons, checklist or report builder.
 const ProjectLibraryPanel = lazy(() => import('../ui/sandbox/ProjectLibraryPanel').then(m => ({ default: m.ProjectLibraryPanel })));
+const SteadyGuideDrawer = lazy(() => import('../steady-guide/GuideDrawer').then(m => ({ default: m.GuideDrawer })));
 const LessonPanel = lazy(() => import('../ui/sandbox/LessonPanel').then(m => ({ default: m.LessonPanel })));
+const TrendPanel = lazy(() => import('../ui/sandbox/TrendPanel').then(m => ({ default: m.TrendPanel })));
+const LogicProbe = lazy(() => import('../ui/sandbox/LogicProbe').then(m => ({ default: m.LogicProbe })));
 const FatChecklist = lazy(() => import('../ui/sandbox/FatChecklist').then(m => ({ default: m.FatChecklist })));
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
@@ -98,19 +101,13 @@ const reverseWireGuide = 'P4 forward/reverse (21 wires): supply P24 → breaker 
  * worker, the same 3D scene and the same tools, plus a work order, the scenario's starter project,
  * an evidence trail and a headless outcome grader. Answer-revealing helpers are hidden.
  */
-export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest } = {}) {
-  // Resolved here, inside the lazy workbench chunk, so linking pages stay light.
+export function SandboxPage({ scenario }: { scenario?: ScenarioSession } = {}) {
+  // A scenario arrives already resolved (see ScenarioSandbox), so the open sandbox route never loads the grading benches.
   // Coarse-pointer tablets use explicit tap-to-place rather than unreliable
   // native HTML5 drag (which can consume synthesized touch clicks).
   // Pointer-fine PCs retain genuine draggable equipment tiles.
   const primaryTouch = typeof window !== 'undefined' &&
     window.matchMedia('(pointer: coarse)').matches;
-  const scenario = useMemo<ScenarioSession | undefined>(() => {
-    const def = request ? getScenario(request.scenarioId) : undefined;
-    if (!request || !def) return undefined;
-    const { scenarioId: _id, ...rest } = request;
-    return { ...rest, def };
-  }, [request]);
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
   // Pacing only (never saved in a project): how fast model time runs, and the worker's measured scan cost.
   const [timeScale, setTimeScale] = useState(1);
@@ -162,6 +159,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
   const [dockExpanded,setDockExpanded] = useState(!!scenario||initialVisible.dock);
   const [dockFocus,setDockFocus] = useState<'program'|'diagnostics'>('program');
   const [workspaceHelp,setWorkspaceHelp] = useState(false);
+  const [steadyHelpOpen,setSteadyHelpOpen] = useState(false);
   // These affect layout only; they never enter a saved PLC project.
   const [panelSizes,setPanelSizes] = useState<UiPanelSizes>(initialPanelSizes);
   const resizeGesture=useRef<{panel:ResizePanel;pointerId:number;x:number;y:number;size:number}|null>(null);
@@ -821,11 +819,18 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
           </div>}
         </div></details>
         <details><summary>Help</summary><div className="p5-menu-content">
+          <button type="button" data-steady-open-help onClick={()=>setSteadyHelpOpen(true)}>Open Steady Guide help beside my work</button>
+          <Link to="/guide/workspace" data-steady-context="workspace">Steady Guide: find your way around</Link>
+          <Link to="/guide/equipment" data-steady-context="equipment">Steady Guide: explain equipment</Link>
+          <Link to="/guide/topic/wire-safely" data-steady-context="wiring">Steady Guide: wiring and instruments</Link>
+          <Link to="/guide/topic/plc-basics" data-steady-context="plc">Steady Guide: PLC programming</Link>
+          <Link to="/guide/topic/diagnose" data-steady-context="diagnostics">Steady Guide: troubleshooting</Link>
           <button type="button" onClick={()=>setWorkspaceHelp(v=>!v)}>Toggle workspace instructions</button>
           <span>Alt+1 logical · Alt+2 3D · Alt+3 plan · Alt+L library · Alt+I inspector · Alt+D dock · Ctrl+S export · Esc cancel</span>
           <span>Educational model only: no real PLC firmware, certified electrical protection, safety-rated E-stop, or field hardware equivalence.</span>
         </div></details>
       </nav>
+      {steadyHelpOpen&&<Suspense fallback={<span role="status">Loading Steady Guide help…</span>}><SteadyGuideDrawer onClose={()=>setSteadyHelpOpen(false)} activeView={workspaceView} activeTool={activeTool} selectedKind={project?.components.find(c=>c.id===selectedDeviceId)?.kind}/></Suspense>}
       {workspaceHelp&&<aside className="p5-help" aria-label="Workspace instructions">
         Place supported equipment from the library, connect real terminal pairs in Logical/Wiring,
         edit the selected PLC program, then Run or Step. Both views share one project and one
@@ -943,7 +948,7 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
       </div>}
       {!scenario && (library.status === 'unavailable' || library.status === 'failed') && library.message &&
         <div role="status" className="sandbox-alert ux6-lib-banner" data-library-unavailable>{library.message}</div>}
-      {!scenario && libraryOpen && library.lib && <Suspense fallback={<div role="status" className="sandbox-help">Loading the project library…</div>}><ProjectLibraryPanel lib={library.lib} active={library.active} status={library.status}
+      {!scenario && libraryOpen && library.lib && <Suspense fallback={<div role="status" className="sandbox-help">Loading the project library…</div>}><ProjectLibraryPanel project={project} lib={library.lib} active={library.active} status={library.status}
         editable={editable} onOpen={library.openProject} onNew={library.newProject} onChanged={()=>void library.refreshActive()}
         onSaveVersion={library.saveVersion} onRestoreVersion={library.restoreVersion}
         onClose={()=>setLibraryOpen(false)} onNotice={setClientError} /></Suspense>}
@@ -1453,6 +1458,8 @@ export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest 
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
           {project && snapshot && <DiagnosticsOverview project={project} snapshot={snapshot} />}
           <Suspense fallback={null}>
+            {project && snapshot && <TrendPanel project={project} snapshot={snapshot} />}
+            {snapshot && <LogicProbe snapshot={snapshot} />}
             {!scenario && project && snapshot && <FatChecklist project={project} snapshot={snapshot} projectKey={library.active?.id ?? 'working-copy'} />}
             {!scenario && project && <LessonPanel project={project} editable={editable} canStart={!!library.lib} onStart={library.createFrom} />}
           </Suspense>

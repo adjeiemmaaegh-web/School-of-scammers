@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createLibrary, type ProjectLibrary } from '../platform/project-library';
 import { openIdbStore } from '../platform/project-library-idb';
-import { createWorld, validateProject } from '../sim/orchestrator';
+import { newProject as blankProjectFile, validateProject } from '../sim/project-validation';
 import type { ProjectFile } from '../sim/signals';
 
 export const ACTIVE_PROJECT_KEY = 'efo-active-project-v1';
@@ -182,7 +182,7 @@ export function useProjectLibrary(options: Options) {
   const newProject = useCallback(async (title: string): Promise<boolean> => {
     if (!lib) return false;
     await commit();
-    const made = await lib.create(title, createWorld().project);
+    const made = await lib.create(title, blankProjectFile());
     if (!made.ok) { opts.current.onNotice(made.message); return false; }
     return openProject(made.meta.id);
   }, [lib, commit, openProject]);

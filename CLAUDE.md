@@ -12,6 +12,7 @@
    **Plant library (co-developer brief):** `docs/product/PLANT_LIBRARY_BRIEF.md` — the contract for the physics core, equipment types and scenes written by the co-developer; the integrator owns orchestrator, registry, 3D wiring and tests.
    **Factory slices P6–P25 (3D builder, 25 equipment models, 21 scenes, worker-verified scenarios):** `docs/product/FACTORY_SLICES_INDEX.md` — index of the archived per-slice evidence records; read `RELEASE_READINESS_2026-11-15.md` for current gates.
    **P5 faults & diagnostics:** `docs/product/P5_FAULTS_PROGRESS.md` — seeded/hidden fault injection that changes real solver inputs, symptom-only alarms, repair, and what is still open.
+   **Development register (R0–R13 traceability, continuation checkpoint, owner acceptance checklist):** `docs/product/DEVELOPMENT_REGISTER.md`.
    **Current status + the ONE forward plan:** `docs/product/STATUS.md` (baseline evidence, inventory, findings register, task register) and `docs/product/MASTER_ROADMAP.md` (R0–R12; stage order is binding). Older P1–P25 / UX records are history, not a backlog.
 3. `.claude/skills/automation-platform/SKILL.md` — the day-to-day developer guide and recipes. **Follow it when writing simulator code.**
 4. `docs/product/HANDOVER_CHECKLIST.md` — current status and what's next.

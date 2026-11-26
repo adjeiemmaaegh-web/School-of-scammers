@@ -2,16 +2,18 @@
  * Several PLCs in one project (Packet-Tracer-style: any number of controllers on the bench).
  *
  * The FIRST PLC component keeps its program in the legacy top-level `ProjectFile` fields and its scan
- * state in the legacy `WorldState` fields, so every single-PLC project, test and saved file behaves
- * exactly as before. Every further PLC has its program in `ProjectFile.plcPrograms[id]` and its scan
- * state in `WorldState.plcs[id]`. Each PLC samples its OWN terminals and drives its OWN outputs; PLCs
+ * state in the legacy `WorldState` compatibility fields. Its Ladder/ST/FBD program now executes via
+ * the same `scanPlc` interpreter path as every further PLC; the first controller's results are mirrored
+ * into historical state and trace fields without changing the saved v1 format. Further PLCs own programs
+ * in `ProjectFile.plcPrograms[id]` and runtime state in `WorldState.plcs[id]`. Each PLC samples its OWN
+ * terminals and drives its OWN outputs; PLCs
  * only affect each other through the 24 V netlist (a wire from one PLC's output to another's input).
  * Pure and deterministic, like everything under src/sim.
  */
-import { executeLadder, type LadderDocument, type LadderMemory, type LadderStep } from '../engineering/ladder';
-import { compileFbd, executeFbd, fbdMotorStarter, type FbdDocument, type FbdStep } from '../engineering/fbd';
+import { executeLadder, type LadderDocument, type LadderMemory, type LadderStep, type LadderResult } from '../engineering/ladder';
+import { compileFbd, executeFbd, fbdMotorStarter, type FbdDocument, type FbdStep, type FbdResult } from '../engineering/fbd';
 import type { AnalogPoint } from './analog';
-import { executeStructuredText, type STValue } from '../engineering/structured-text';
+import { executeStructuredText, type STValue, type STResult } from '../engineering/structured-text';
 import { compileSandboxST, DEFAULT_ST_SOURCE } from '../program/p2-contract';
 import { isPlcKind } from '../components/registry';
 import { defaultIo, ioOf, namesOf, type IoNames, type PlcIoMap } from './plc-io';
@@ -40,7 +42,7 @@ export const extraPlcs = (project: HasComponents): PlacedComponent[] =>
   plcComponents(project).slice(1);
 /**
  * The first PLC keeps its program in the legacy fields; if it is the classic `plc` it ALSO keeps its scan state in
- * the legacy `WorldState` fields and its original fixed-name code path. Any other PLC (every PLC after the first,
+ * the legacy `WorldState` compatibility fields, now populated by the shared `scanPlc` executor. Any other PLC (every PLC after the first,
  * and a first PLC that is a configurable `plc16`) is scanned by the generic path and lives in `WorldState.plcs`.
  */
 export const legacyPrimaryId = (project: HasComponents): string | undefined => {
@@ -91,6 +93,11 @@ export function namesFor(project: ProjectFile, plcId: string | undefined): IoNam
 
 /** Project with one PLC's program changed. The first PLC writes the legacy fields. */
 export function withProgramOf(project: ProjectFile, plcId: string | undefined, patch: Partial<PlcProgram>): ProjectFile {
+  // A program target is a concrete placed controller, not an arbitrary string:
+  // otherwise a stale selection creates an orphan entry that can later attach
+  // unexpected code to a newly placed device with the same identifier.
+  if (plcId !== undefined && !plcComponents(project).some(c => c.id === plcId))
+    throw new RangeError('Unknown PLC program target: ' + plcId);
   if (plcId === undefined || plcId === primaryPlcId(project)) return {
     ...project,
     ...(patch.program !== undefined ? { program: patch.program } : {}),
@@ -126,6 +133,14 @@ export const classicInputs = (tags: Record<string, STValue>): PlcInputs => ({
   TankHigh: tags.TankHigh === true, ReverseRequest: tags.ReverseRequest === true,
 });
 
+/** Executed interpreter result for trace/breakpoint compatibility on the classic PLC.
+ * Other PLCs do not need to collect this transient data.
+ */
+export type PlcExecution =
+  | { language: 'ladder'; result: LadderResult }
+  | { language: 'st'; result: STResult }
+  | { language: 'fbd'; result: FbdResult };
+
 /**
  * One scan of a PLC through its I/O map. `tagInputs` is the sampled input image keyed by tag; outputs come back
  * keyed by tag too. Throws on a runtime fault; the caller fails the whole plant closed.
@@ -134,6 +149,7 @@ export function scanPlc(
   cfg: ResolvedProgram, io: PlcIoMap, prior: PlcRuntime, tagInputs: Record<string, STValue>, powered: boolean, dtMs: number,
   analogInputs: AnalogPoint[] = [],
   localForces: Readonly<Record<string, boolean | number>> = {},
+  onExecuted?: (execution: PlcExecution) => void,
 ): PlcRuntime {
   const names = namesOf(io);
   const inputs = classicInputs(tagInputs);
@@ -152,6 +168,7 @@ export function scanPlc(
         throw new Error('Numeric input ' + node.tag + ' has no connected source');
     }
     const result = executeFbd(program, tagInputs, prior.coils, prior.fbdMemory, dtMs);
+    onExecuted?.({ language: 'fbd', result });
     const coils = result.outputs;
     return { ...prior, powered, inputs, tagInputs, analogInputs, coils,
       fbdMemory: result.memory, fbdSteps: result.steps,
@@ -174,6 +191,7 @@ export function scanPlc(
         throw new TypeError(names.requireRun ? 'PLC Sort/Fill/Drain/Forward/Reverse outputs must be BOOL' : `PLC output ${name} must be BOOL`);
     }
     // Structured Text is case-insensitive; the physical bindings use the canonical mapped names.
+    onExecuted?.({ language: 'st', result });
     const coils = {
       ...Object.fromEntries(Object.entries(result.outputs).filter(([, v]) => typeof v === 'boolean')),
       ...Object.fromEntries(names.outputs.map(n => [n, out(n) === true])),
@@ -183,6 +201,7 @@ export function scanPlc(
       tagValues: { ...tagInputs, ...result.signals, ...coils, ...mappedOutputs(coils), Unused: false } };
   }
   const result = executeLadder(cfg.program, tagInputs, prior.coils, prior.ladderMemory, dtMs, prior.ladderNumeric, localForces);
+  onExecuted?.({ language: 'ladder', result });
   const coils = result.outputs;
   return { ...prior, powered, inputs, tagInputs, analogInputs, coils, stMemory: {}, ladderMemory: result.memory, ladderNumeric: result.numericValues, ladderSteps: [...result.steps],
     fbdMemory: {}, fbdSteps: [],

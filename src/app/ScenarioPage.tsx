@@ -6,7 +6,7 @@ import { recordProgress } from '../platform/persistence';
 import type { AttemptResult } from '../platform/types';
 import { AppHeader } from '../ui/AppHeader';
 
-const SandboxPage = lazy(() => import('./SandboxPage').then(m => ({ default: m.SandboxPage })));
+const SandboxPage = lazy(() => import('./ScenarioSandbox').then(m => ({ default: m.ScenarioSandbox })));
 const seedKey = (id: string) => `efo-scenario-seed-v1:${id}`;
 const rollSeed = () => Math.floor(Math.random() * 1_000_000) + 1;
 

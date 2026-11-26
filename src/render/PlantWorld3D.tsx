@@ -5,6 +5,7 @@
  * changes a sensor or writes a PLC signal.
  */
 import {Html} from '@react-three/drei';
+import {useLabelDistanceFactor} from './label-scale';
 import type {ThreeEvent} from '@react-three/fiber';
 import type {SceneRuntime} from '../plant/world/runner';
 import type {ProjectFile} from '../sim/signals';
@@ -198,8 +199,9 @@ function OpticalSensingVolume({zone,on}:{zone:OpticalZone;on:boolean}){
 const formatSignal=(name:string,value:boolean|number)=>
  `${name}: ${typeof value==='boolean'?(value?'ON':'OFF'):Number(value.toFixed(2))}`;
 function PlantSignalOverlay({id,signals,fault}:{id:string;signals:LiveSignal;fault?:string}){
+ const labelScale=useLabelDistanceFactor(1);
  const values=Object.entries(signals);
- return <Html center position={[0,.8,0]} distanceFactor={9}
+ return <Html center position={[0,.8,0]} distanceFactor={9*labelScale}
    style={{pointerEvents:'none'}} occlude={false}>
    <div className="p7-3d-live-tags" data-p7-signals={id} role="status">
      <strong>{id} · simulated I/O</strong>
