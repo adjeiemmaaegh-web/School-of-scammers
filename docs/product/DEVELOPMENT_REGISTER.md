@@ -26,7 +26,7 @@ all **pending** for every row unless a row says otherwise.
 |---|---|---|---|
 | 1 | R4.1 Ladder editing | rung duplicate, copy/paste (also across PLCs), move up/down, undo/redo (buttons, Ctrl+Z / Ctrl+Y, 50 steps); a copy whose coil is already driven writes a new local `AuxN` tag so the program stays valid | DONE: `src/program/ladder-edit.ts`, `tests/ladder-edit.test.ts` (7), `scripts/sandbox-r4-ladder-edit-browser.cjs` (3/3, in CI) |
 | 2 | R5.5 / R8.1 process trends | up to four signals (PLC I/O, analog channels, numeric tags, plant signals) recorded from snapshots over model time, 600 scans, CSV | DONE: `src/diagnostics/trend.ts`, `TrendPanel.tsx`, `tests/trend.test.ts` (4, incl. no hidden-fault leak), `scripts/sandbox-r5-trend-browser.cjs` (3/3, in CI) |
-| 3 | R6.2 orthographic view | camera presets exist (top/side/front/iso, Orbit/Fly/First Person) but every view is perspective | MISSING |
+| 3 | R6.2 orthographic view | Orbit mode toggles a parallel-projection camera (zoom matched to the perspective framing; fit, focus and top/front/side presets work); labels keep their size; Fly/First Person stay perspective | DONE: `orthographicZoomFor` (`render/workcell-camera.ts`), `render/label-scale.ts`, `tests/orthographic-view.test.ts` (3), `scripts/sandbox-r6-orthographic-browser.cjs` (in CI; its label-size check fails on the unscaled-label bug) |
 | 4 | R5.5 logic probe | the multimeter reads solver voltages; no digital logic-probe reading of a terminal as HIGH/LOW/floating | MISSING |
 | 5 | R10.5 contributor templates | `CONTRIBUTING.md`, `CHANGELOG.md` and an issue template exist; no pull-request template | PARTIAL |
 | 6 | R3.4 first-controller storage | the first classic PLC still keeps its runtime in legacy `WorldState` fields (coils, ladderMemory, stCompiled, tagValues…) mirrored for compatibility; every other PLC uses `plcs[id]` | PARTIAL (documented migration risk; see row R3.4) |
@@ -61,7 +61,7 @@ all **pending** for every row unless a row says otherwise.
 | R5.5 | Instruments | PARTIAL (trend #2, logic probe #4) | multimeter, continuity, phase instruments read the solver | — |
 | R5.6–R5.7 | Fault semantics, three-phase labelling | DONE | `sim/faults.ts`, P5 tests, `three-phase` limits text | — |
 | R6.1 | Device audit | DONE | generated `DEVICE_CATALOG.md` (92 kinds) with staleness test | — |
-| R6.2 | 3D authoring and views | PARTIAL (orthographic #3) | Orbit/Fly/First Person, presets, align, snap, groups, free heading | — |
+| R6.2 | 3D authoring and views | DONE | Orbit/Fly/First Person, presets, align, snap, groups, free heading | — |
 | R6.3–R6.7 | Assemblies with ports, sensor geometry, library, truth tables, user-authored lines | DONE | `workspace/groups.ts`, `AssemblyLibrary.tsx`, `UNIVERSITY_RECOVERY_REGISTER.md` R01–R28 | — |
 | R7.1–R7.6 | Material, actuators, process, events, benchmarks, model limits | DONE | University Recovery R01–R28 rows; `factory-scale`, `r7-soak-benchmark` tests; `model-limits.ts` | — |
 | R8.1–R8.6 | Diagnostics, hidden faults, commissioning, evidence, privacy | DONE except trends (#2) | `TroubleshootingPanel`, `FatChecklist`, `commissioning-report`, `redact.ts` (F-12 fixed) | — |

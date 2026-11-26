@@ -22,7 +22,8 @@ import { footprintOf } from '../workspace/floor-plan';
 import { clampPlacement, effectiveYaw } from '../workspace/geometry';
 import type { GridStep } from '../workspace/types';
 import { WorkcellCameraRig } from './WorkcellCameraRig';
-import { frameIndustrialPlant,initialNavigationPose,initialOrbitFraming,presetCameraPosition, type CameraPose, type ViewPreset, type WorkcellCameraMode } from './workcell-camera';
+import { useLabelDistanceFactor } from './label-scale';
+import { frameIndustrialPlant,initialNavigationPose,initialOrbitFraming,orthographicZoomFor,presetCameraPosition, type CameraPose, type ViewPreset, type WorkcellCameraMode } from './workcell-camera';
 import {
   assess3DPlacement, placementMessage, previewDimensions,
   type PlacementAssessment,
@@ -289,6 +290,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
   onEndDrag: (event: ThreeEvent<PointerEvent>) => void;
   onFocus: (id: string) => void;
 }) {
+  const labelScale=useLabelDistanceFactor(1);
   const [x, y, z] = worldPosition(c);
   const def = COMPONENTS[c.kind];
   const plant = Boolean(PLANT_EQUIPMENT[c.kind]);
@@ -330,7 +332,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
         rod={c.kind === 'cylinder' ? rod : undefined} lamps={c.kind === 'stacklight' ? lamps : undefined} />
     </group>}
     <Html position={[0, compact ? (plant ? .66 : 1.08) : 1.22, 0]} center
-      distanceFactor={compact ? 3.1 : 11}>
+      distanceFactor={(compact ? 3.1 : 11) * labelScale}>
       <div className={`sandbox-3d-label ${compact ? 'ux3-compact-label' : 'ux3-selected-label'}`} data-3d-drag-handle={c.id}
         title={`${def.label} · ${c.id}. Select to inspect; drag to move while paused.`}
         onPointerDown={event=>{
@@ -386,7 +388,7 @@ function Device3D({ c, project, active, motorAngleRad, direction, parcel, tankLe
           <meshStandardMaterial color={selected ? COLORS.highlight : COLORS.light}
             emissive={selected ? COLORS.highlight : '#000000'} emissiveIntensity={0.35} />
         </mesh>}
-        <Html position={[t.side === 'left' ? -0.14 : 0.14, 0.09, 0]} center distanceFactor={12}>
+        <Html position={[t.side === 'left' ? -0.14 : 0.14, 0.09, 0]} center distanceFactor={12 * labelScale}>
           <button type="button" className={`sandbox-3d-terminal ${selected ? 'selected' : ''} ${showTerminal ? '' : 'ux3-hidden-terminal'}`}
             data-scene-terminal-id={fullId} disabled={!editable}
             tabIndex={showTerminal ? 0 : -1} aria-hidden={!showTerminal}
@@ -428,10 +430,11 @@ function SceneTransformGizmo({component,grid,onMove,onRotate}:{
   component:PlacedComponent;grid:GridStep;
   onMove:(id:string,to:XY)=>void;onRotate:(id:string,turns:-1|1)=>void;
 }){
+  const labelScale=useLabelDistanceFactor(1);
  const [x,,z]=worldPosition(component);
  const move=(dx:number,dy:number)=>onMove(component.id,
    clampPlacement({x:component.x+dx,y:component.y+dy},grid));
- return <Html position={[x,1.7,z]} center distanceFactor={10}
+ return <Html position={[x,1.7,z]} center distanceFactor={10 * labelScale}
    zIndexRange={[20000000,19000000]}
    style={{pointerEvents:'auto'}}>
    <div className="p7-3d-gizmo" data-p7-gizmo={component.id}
@@ -476,14 +479,23 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusS
   onRotate:(id:string,turns:-1|1)=>void;
   onCameraPose:(pose:CameraPose)=>void;
 }) {
-  const { camera, gl } = useThree();
+  const { camera, gl, size } = useThree();
   const [interest,setInterest]=useState<[number,number,number]>(()=>initialOrbitFraming(project).target);
+  /** Place the camera; an orthographic camera also gets the zoom that shows what the perspective view would (R6.2). */
+  const frame=(position:readonly [number,number,number],target:readonly [number,number,number])=>{
+    camera.position.set(position[0],position[1],position[2]);
+    camera.lookAt(target[0],target[1],target[2]);
+    if((camera as {isOrthographicCamera?:boolean}).isOrthographicCamera){
+      const d=Math.hypot(position[0]-target[0],position[1]-target[1],position[2]-target[2]);
+      (camera as unknown as {zoom:number}).zoom=orthographicZoomFor(d,size.height);
+      camera.updateProjectionMatrix();
+    }
+  };
   useEffect(()=>{
     if(!fitRequest||mode!=='orbit')return;
     const framing=frameIndustrialPlant(project);
     setInterest(framing.target);
-    camera.position.set(...framing.position);
-    camera.lookAt(...framing.target);
+    frame(framing.position,framing.target);
   // Explicit fit respects existing worker-authored plant placements, not
   // unrelated PLC terminal boxes. No PLC or physics state is changed.
   },[fitRequest]);
@@ -493,8 +505,7 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusS
     if(!chosen.length)return;
     const framing=frameIndustrialPlant({...project,components:chosen});
     setInterest(framing.target);
-    camera.position.set(...framing.position);
-    camera.lookAt(...framing.target);
+    frame(framing.position,framing.target);
   // Selection is explicit; later PLC scans and position updates never refit.
   },[focusSelectedRequest]);
   useEffect(()=>{
@@ -503,8 +514,7 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusS
     const chosen=project.components.filter(c=>selectedDeviceIds.includes(c.id));
     const framing=frameIndustrialPlant(chosen.length?{...project,components:chosen}:project);
     setInterest(framing.target);
-    camera.position.set(...presetCameraPosition(framing,viewPreset.name));
-    camera.lookAt(...framing.target);
+    frame(presetCameraPosition(framing,viewPreset.name),framing.target);
   },[viewPreset.n]);
   // An already-loaded two-machine plant should frame on first mount too.
   // Do not refit on subsequent individual placements or worker scan updates.
@@ -520,8 +530,7 @@ function Workbench({ project, snapshot, editable, grid, mode, fitRequest, focusS
     // later scans and drag edits cannot hijack the camera.
     const framing=frameIndustrialPlant(project);
     setInterest(framing.target);
-    camera.position.set(...framing.position);
-    camera.lookAt(...framing.target);
+    frame(framing.position,framing.target);
   },[project.components,mode]);
   const [drag,setDrag]=useState<DeviceDrag|null>(null);
   const currentDrag=useRef<DeviceDrag|null>(null);
@@ -753,6 +762,8 @@ export function Sandbox3D(props: Sandbox3DProps) {
   const [fitRequest,setFitRequest]=useState(0);
   const [focusSelectedRequest,setFocusSelectedRequest]=useState(0);
   const [viewPreset,setViewPreset]=useState<{name:ViewPreset;n:number}>({name:'top',n:0});
+  // R6.2: an orthographic (no perspective) camera for inspection in Orbit mode; Fly and First Person stay perspective.
+  const [orthographic,setOrthographic]=useState(false);
   const [cameraPose,setCameraPose]=useState<CameraPose|null>(null);
   const [operatorEnabled,setOperatorEnabled]=useState(false);
   const operatorLive=useRef(false),operatorSender=useRef(props.onTrainingOperator);
@@ -856,6 +867,10 @@ export function Sandbox3D(props: Sandbox3DProps) {
          if(operatorEnabled){props.onTrainingOperator(false,null);setOperatorEnabled(false);}
          setCameraMode('orbit');setViewPreset(v=>({name,n:v.n+1}));
         }}>{name[0].toUpperCase()+name.slice(1)}</button>)}
+      <label className="p7-3d-check" title="Parallel projection: equal sizes at every depth, for measuring and aligning (camera only)">
+        <input type="checkbox" data-3d-orthographic disabled={!available||cameraMode!=='orbit'} checked={orthographic}
+          onChange={event=>{setOrthographic(event.target.checked);setFitRequest(n=>n+1);}}/> Orthographic
+      </label>
         </div>
       </details>
       <button type="button" data-3d-fit-selected
@@ -896,9 +911,12 @@ export function Sandbox3D(props: Sandbox3DProps) {
         Selected I/O</label>
       <button type="button" data-p7-wire onClick={props.onOpenWiring}>Wire PLC terminals</button>
     </div>
-    {available ? <Canvas className="sandbox-three-canvas" dpr={[1, 1.5]}
+    {available ? <Canvas key={orthographic&&cameraMode==='orbit'?'orthographic':'perspective'}
+      className="sandbox-three-canvas" dpr={[1, 1.5]} data-3d-projection={orthographic&&cameraMode==='orbit'?'orthographic':'perspective'}
       gl={{ antialias: true, powerPreference: 'low-power' }}
-      camera={{ position: [7, 8.5, 10], fov: 42, near: 0.1, far: 120 }}
+      orthographic={orthographic&&cameraMode==='orbit'}
+      camera={orthographic&&cameraMode==='orbit' ? { position: [7, 8.5, 10], zoom: 60, near: -200, far: 200 }
+        : { position: [7, 8.5, 10], fov: 42, near: 0.1, far: 120 }}
       onCreated={state => { camera.current = state.camera; state.camera.lookAt(0, 0, 0); }}>
       <Workbench project={props.project} snapshot={props.snapshot} editable={props.editable}
         grid={props.grid??5} mode={cameraMode} fitRequest={fitRequest}
@@ -928,7 +946,7 @@ export function Sandbox3D(props: Sandbox3DProps) {
             aria-label={`Simulated body ${body.id} at ${Math.round(body.pos.x)} by ${Math.round(body.pos.y)} millimetres`}/>)}
       </output>
       <span data-3d-camera-status>{cameraMode==='orbit'
-        ? '3D ORBIT · Drag to rotate · Right drag to pan · Wheel zoom · Double-click to focus'
+        ? (orthographic ? '3D ORBIT · ORTHOGRAPHIC · ' : '3D ORBIT · ')+'Drag to rotate · Right drag to pan · Wheel zoom · Double-click to focus'
         : cameraMode==='fly'
         ? '3D FLY · Focus scene, WASD to move · Q/E height · Right drag to look'
         : '3D FIRST PERSON · Eye height 1.8 m · Focus scene, WASD to walk · Right drag to look'}
