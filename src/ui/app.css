@@ -322,12 +322,13 @@ body::before {
   @keyframes spin { to { transform: rotate(360deg); } }
 }
 
-/* ---- primary navigation: Simulator first, Learn second, Assessments last and quieter ---- */
+/* ---- primary navigation: Simulator first, optional Steady Guide second, Assessments last and quieter ---- */
 .primary-nav { display: flex; align-items: center; gap: 4px; margin-left: 18px; flex-wrap: wrap; }
 .pn-link { padding: 7px 12px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted); border: 1px solid transparent; }
 .pn-link:hover { color: var(--ink); background: var(--surface); }
 .pn-link.is-active { color: var(--ink); background: var(--surface); border-color: var(--line); }
 .pn-sim { color: var(--accent-text); font-weight: 800; }
+.pn-guide { color: var(--accent-text); }
 .pn-secondary { font-weight: 500; font-size: 13px; }
 @media (max-width: 720px) {
   .app-header-inner { flex-wrap: wrap; row-gap: 6px; }

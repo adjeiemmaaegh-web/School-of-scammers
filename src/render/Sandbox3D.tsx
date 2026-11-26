@@ -15,7 +15,7 @@ import type { Parcel } from '../plant/sorting-conveyor';
 import { supportsWebGL } from '../components/SceneShell';
 import { clamp, projectPlacement, terminalPoint, worldPosition } from './scene-coordinates';
 import { perDeviceLive, plantStatusText } from '../sim/device-state';
-import { isP3Equipment } from '../sim/p3-plant-bridge';
+import { isPlantEquipmentKind as isP3Equipment } from '../plant/equipment';
 import { PlantWorld3D } from './PlantWorld3D';
 import { PLANT_EQUIPMENT } from '../plant/equipment';
 import { footprintOf } from '../workspace/floor-plan';

@@ -65,12 +65,14 @@ const matchers = registered
   .filter((r) => r !== '*')
   .map((r) => new RegExp('^' + r.split('/').map((seg) => (seg.startsWith(':') ? '[^/]+' : seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))).join('/') + '$'));
 
+const splatRoutes=registered.filter(r=>r.endsWith('/*')).map(r=>r.slice(0,-2));
 function isRegistered(target) {
-  return registeredSet.has(target) || matchers.some((re) => re.test(target));
+  return registeredSet.has(target) || matchers.some((re) => re.test(target)) ||
+    splatRoutes.some(prefix=>target===prefix||target.startsWith(prefix+'/'));
 }
 
 // Collect static navigation targets from the experience layer only.
-const navFiles = [path.join(root, 'src/main.tsx'), ...walk(path.join(root, 'src/app')), ...walk(path.join(root, 'src/ui'))];
+const navFiles = [path.join(root, 'src/main.tsx'), ...walk(path.join(root, 'src/app')), ...walk(path.join(root, 'src/ui')),...walk(path.join(root, 'src/steady-guide'))];
 const targets = new Set();
 for (const f of navFiles) {
   const src = fs.readFileSync(f, 'utf8');

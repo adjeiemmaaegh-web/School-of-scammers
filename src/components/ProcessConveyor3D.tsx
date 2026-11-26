@@ -1,7 +1,8 @@
 import { Canvas } from '@react-three/fiber';
 import {SceneShell} from './SceneShell';
 import { useMemo } from 'react';
-import { OrbitControls, Text } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
+import { SceneLabel } from './SceneLabel';
 import type { ProcessState } from '../engineering/conveyor-process';
 
 /** Pure rendering adapter: no clock, physics, or PLC logic runs in the scene. */
@@ -33,7 +34,7 @@ function Photoeye({x,active,label}:{x:number;active:boolean;label:string}) {
     <mesh position={[0,1.04,0.75]}><boxGeometry args={[0.17,0.2,0.23]}/><meshStandardMaterial color="#263b53" metalness={0.55}/></mesh>
     <mesh position={[0,1.05,0.875]}><sphereGeometry args={[0.055,12,8]}/><meshStandardMaterial color={active?'#22d3ee':'#f87171'} emissive={active?'#0891b2':'#7f1d1d'} emissiveIntensity={0.8}/></mesh>
     <mesh position={[0,0.55,0.75]}><cylinderGeometry args={[0.025,0.025,0.8,8]}/><meshStandardMaterial color="#9aaaba" metalness={0.7}/></mesh>
-    <Text position={[0,1.38,0.8]} fontSize={0.11} color="#cbd5e1">{label}</Text>
+    <SceneLabel position={[0,1.38,0.8]} size={0.11} color="#cbd5e1">{label}</SceneLabel>
   </group>;
 }
 function SafetyFence({z}:{z:number}) {
@@ -60,7 +61,7 @@ export function ProcessConveyor3D({process}:{process:ProcessState}) {
       <group position={[2.05,0.43,0.94]}>
         <mesh><boxGeometry args={[0.55,0.43,0.4]}/><meshStandardMaterial color="#2d7185" metalness={0.5}/></mesh>
         <mesh position={[0.39,0,0]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[0.16,0.16,0.32,16]}/><meshStandardMaterial color="#9aa8b9" metalness={0.75}/></mesh>
-        <Text position={[0,0.34,0]} fontSize={0.12} color="#e2e8f0">M1</Text>
+        <SceneLabel position={[0,0.34,0]} size={0.12} color="#e2e8f0">M1</SceneLabel>
       </group>
       <mesh position={[0,0.6,0]}><boxGeometry args={[4.3,0.22,1.3]}/><meshStandardMaterial color={scene.beltRunning?'#245b62':'#303e52'} roughness={0.8}/></mesh>
       {[-1.85,1.85].map(x=>[-0.52,0.52].map(z=><mesh key={`${x}:${z}`} position={[x,0.17,z]}><boxGeometry args={[0.12,0.8,0.12]}/><meshStandardMaterial color="#8294a9"/></mesh>))}
@@ -74,9 +75,9 @@ export function ProcessConveyor3D({process}:{process:ProcessState}) {
         <mesh><boxGeometry args={[0.65,0.78,0.28]}/><meshStandardMaterial color="#b5c5d5" metalness={0.5}/></mesh>
         <mesh position={[0,0.2,0.15]}><boxGeometry args={[0.48,0.27,0.035]}/><meshStandardMaterial color="#122338"/></mesh>
         <mesh position={[-0.15,0.2,0.175]}><sphereGeometry args={[0.045,12,8]}/><meshStandardMaterial color={scene.beltRunning?'#4ade80':'#f59e0b'} emissive={scene.beltRunning?'#166534':'#78350f'}/></mesh>
-        <Text position={[0,0.52,0.17]} fontSize={0.11} color="#0f172a">CONTROL</Text>
+        <SceneLabel position={[0,0.52,0.17]} size={0.11} color="#0f172a">CONTROL</SceneLabel>
       </group>
-      <Text position={[0,1.75,0]} fontSize={0.2} color="#e2e8f0">{scene.jammed?'JAM DETECTED':scene.beltRunning?'BELT MOVING':'BELT STOPPED'} · {scene.packages.length} PRODUCTS</Text>
+      <SceneLabel position={[0,1.75,0]} size={0.2} color="#e2e8f0">{scene.jammed?'JAM DETECTED':scene.beltRunning?'BELT MOVING':'BELT STOPPED'} · {scene.packages.length} PRODUCTS</SceneLabel>
       <OrbitControls makeDefault minDistance={3} maxDistance={12} maxPolarAngle={Math.PI/2.1}/>
     </Canvas>
   </SceneShell>;

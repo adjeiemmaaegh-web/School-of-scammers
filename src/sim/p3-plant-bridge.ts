@@ -14,7 +14,8 @@ import {PLANT_EQUIPMENT} from '../plant/equipment';
 import {composeShape} from '../plant/world/custom-shapes';
 import {paramSpecsOf,paramValue} from '../components/params';
 
-export const isP3Equipment=(kind:string):boolean=>Object.hasOwn(PLANT_EQUIPMENT,kind);
+import {isPlantEquipmentKind} from '../plant/equipment';
+export const isP3Equipment=isPlantEquipmentKind;
 const coordinate=(x:number,y:number):{x:number;y:number;z:number}=>({
  x:Math.round((x+85-540)*10*1e6)/1e6,
  y:Math.round((y+65-290)*10*1e6)/1e6,z:0,
@@ -28,22 +29,7 @@ export function plantPlacements(project:Pick<ProjectFile,'components'|'params'>)
    [spec.key,paramValue(project.params,c.id,spec)])),
  }));
 }
-export function validatePlantFaults(raw:unknown,
- project:Pick<ProjectFile,'components'>):Record<string,string>|undefined{
- if(raw===undefined)return undefined;
- if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('Invalid plant fault dictionary');
- const entries=Object.entries(raw);
- if(entries.length>8)throw new Error('At most 8 active plant equipment faults');
- const faults:Record<string,string>={};
- for(const [id,code] of entries){
-  const comp=project.components.find(c=>c.id===id);
-  if(!comp||!isP3Equipment(comp.kind)||typeof code!=='string'||
-     !PLANT_EQUIPMENT[comp.kind].faults.includes(code))
-   throw new Error('Invalid plant equipment fault '+id);
-  faults[id]=code;
- }
- return Object.keys(faults).length?faults:undefined;
-}
+export {validatePlantFaults} from './project-validation';
 export function freshProjectPlant(project:Pick<ProjectFile,'components'|'params'>,
  seed=1):SceneRuntime{
  return freshRuntime(freshWorld(seed),plantPlacements(project),PLANT_EQUIPMENT);

@@ -24,14 +24,14 @@ import { WorkbenchInspector } from '../ui/sandbox/WorkbenchInspector';
 import {DEVICE_FAMILIES,matchesFamily,supportedFamilies,type DeviceFamily} from '../ui/sandbox/workspace-catalog';
 import { ScenarioPanel } from '../ui/sandbox/ScenarioPanel';
 import { perDeviceLive, plantStatusText } from '../sim/device-state';
-import { isP3Equipment } from '../sim/p3-plant-bridge';
+import { isPlantEquipmentKind as isP3Equipment } from '../plant/equipment';
 import { plcComponents, programOf } from '../sim/plcs';
 import { vesselsOf } from '../sim/stations';
 import { appendEvidence, evidenceFromCommand } from '../exercises/evidence';
 import { scenarioStorageKey, type ScenarioSession } from '../exercises/session';
 import type { AttemptResult, EvidenceEvent, RubricResult } from '../platform/types';
 import type { Command, ProjectFile, RenderSnapshot, WorkerResponse, WorkerTiming } from '../sim/signals';
-import { validateProject } from '../sim/orchestrator';
+import { validateProject } from '../sim/project-validation';
 import { readSandboxProject, persistSandboxProject, sandboxRecoveryKey } from '../platform/sandbox-project-storage';
 import './sandbox.css';
 import './p5-workspace.css';
@@ -46,6 +46,7 @@ import { DEFAULT_SCAN_MS, SCAN_PRESETS_MS, TIME_SCALES, scanMsOf, type ScanTimin
 
 // Loaded on demand so opening the simulator does not download the project dialog, lessons, checklist or report builder.
 const ProjectLibraryPanel = lazy(() => import('../ui/sandbox/ProjectLibraryPanel').then(m => ({ default: m.ProjectLibraryPanel })));
+const SteadyGuideDrawer = lazy(() => import('../steady-guide/GuideDrawer').then(m => ({ default: m.GuideDrawer })));
 const LessonPanel = lazy(() => import('../ui/sandbox/LessonPanel').then(m => ({ default: m.LessonPanel })));
 const FatChecklist = lazy(() => import('../ui/sandbox/FatChecklist').then(m => ({ default: m.FatChecklist })));
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
@@ -156,6 +157,7 @@ export function SandboxPage({ scenario }: { scenario?: ScenarioSession } = {}) {
   const [dockExpanded,setDockExpanded] = useState(!!scenario||initialVisible.dock);
   const [dockFocus,setDockFocus] = useState<'program'|'diagnostics'>('program');
   const [workspaceHelp,setWorkspaceHelp] = useState(false);
+  const [steadyHelpOpen,setSteadyHelpOpen] = useState(false);
   // These affect layout only; they never enter a saved PLC project.
   const [panelSizes,setPanelSizes] = useState<UiPanelSizes>(initialPanelSizes);
   const resizeGesture=useRef<{panel:ResizePanel;pointerId:number;x:number;y:number;size:number}|null>(null);
@@ -815,11 +817,18 @@ export function SandboxPage({ scenario }: { scenario?: ScenarioSession } = {}) {
           </div>}
         </div></details>
         <details><summary>Help</summary><div className="p5-menu-content">
+          <button type="button" data-steady-open-help onClick={()=>setSteadyHelpOpen(true)}>Open Steady Guide help beside my work</button>
+          <Link to="/guide/workspace" data-steady-context="workspace">Steady Guide: find your way around</Link>
+          <Link to="/guide/equipment" data-steady-context="equipment">Steady Guide: explain equipment</Link>
+          <Link to="/guide/topic/wire-safely" data-steady-context="wiring">Steady Guide: wiring and instruments</Link>
+          <Link to="/guide/topic/plc-basics" data-steady-context="plc">Steady Guide: PLC programming</Link>
+          <Link to="/guide/topic/diagnose" data-steady-context="diagnostics">Steady Guide: troubleshooting</Link>
           <button type="button" onClick={()=>setWorkspaceHelp(v=>!v)}>Toggle workspace instructions</button>
           <span>Alt+1 logical · Alt+2 3D · Alt+3 plan · Alt+L library · Alt+I inspector · Alt+D dock · Ctrl+S export · Esc cancel</span>
           <span>Educational model only: no real PLC firmware, certified electrical protection, safety-rated E-stop, or field hardware equivalence.</span>
         </div></details>
       </nav>
+      {steadyHelpOpen&&<Suspense fallback={<span role="status">Loading Steady Guide help…</span>}><SteadyGuideDrawer onClose={()=>setSteadyHelpOpen(false)} activeView={workspaceView} activeTool={activeTool} selectedKind={project?.components.find(c=>c.id===selectedDeviceId)?.kind}/></Suspense>}
       {workspaceHelp&&<aside className="p5-help" aria-label="Workspace instructions">
         Place supported equipment from the library, connect real terminal pairs in Logical/Wiring,
         edit the selected PLC program, then Run or Step. Both views share one project and one

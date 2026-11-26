@@ -5,7 +5,7 @@ import { paramSpecsOf, paramValue, type ParamSpec } from '../../components/param
 import type { PlacedComponent, ProjectFile, RenderSnapshot } from '../../sim/signals';
 import { perDeviceLive, plantStatusText } from '../../sim/device-state';
 import { channelSemantics, readDeviceChannels } from '../../sim/device-channels';
-import { isP3Equipment } from '../../sim/p3-plant-bridge';
+import { isPlantEquipmentKind as isP3Equipment } from '../../plant/equipment';
 import { OPERATOR_KEYS, OPERATOR_KINDS } from '../../sim/operator-values';
 
 type Props = {
