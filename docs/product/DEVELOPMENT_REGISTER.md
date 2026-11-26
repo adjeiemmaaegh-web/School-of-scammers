@@ -28,7 +28,7 @@ all **pending** for every row unless a row says otherwise.
 | 2 | R5.5 / R8.1 process trends | up to four signals (PLC I/O, analog channels, numeric tags, plant signals) recorded from snapshots over model time, 600 scans, CSV | DONE: `src/diagnostics/trend.ts`, `TrendPanel.tsx`, `tests/trend.test.ts` (4, incl. no hidden-fault leak), `scripts/sandbox-r5-trend-browser.cjs` (3/3, in CI) |
 | 3 | R6.2 orthographic view | Orbit mode toggles a parallel-projection camera (zoom matched to the perspective framing; fit, focus and top/front/side presets work); labels keep their size; Fly/First Person stay perspective | DONE: `orthographicZoomFor` (`render/workcell-camera.ts`), `render/label-scale.ts`, `tests/orthographic-view.test.ts` (3), `scripts/sandbox-r6-orthographic-browser.cjs` (in CI; its label-size check fails on the unscaled-label bug) |
 | 4 | R5.5 logic probe | one terminal classified HIGH / LOW / UNDEFINED / FLOATING from the solver's potential (type 1 thresholds), an explicit no-reading state before any solve, supply-short state | DONE: `electrical/logic-probe.ts`, `LogicProbe.tsx`, `tests/logic-probe.test.ts` (2, incl. real solver on a starter panel), `scripts/sandbox-r5-logic-probe-browser.cjs` (3/3, in CI) |
-| 5 | R10.5 contributor templates | `CONTRIBUTING.md`, `CHANGELOG.md` and an issue template exist; no pull-request template | PARTIAL |
+| 5 | R10.5 contributor templates | `CONTRIBUTING.md`, `CHANGELOG.md`, issue template and now `.github/pull_request_template.md` (evidence checklist, honesty and scope) | DONE |
 | 6 | R3.4 first-controller storage | the first classic PLC still keeps its runtime in legacy `WorldState` fields (coils, ladderMemory, stCompiled, tagValues…) mirrored for compatibility; every other PLC uses `plcs[id]` | PARTIAL (documented migration risk; see row R3.4) |
 | 7 | R21/R22 free heading | tanks, robots, palletizers, cranes, pushers, platforms and stairs turn in 90° steps only | PARTIAL |
 | 8 | R10.2 in-app authoring | scene packages export/import with validation (`platform/scene-package.ts`); no in-app editor for scenario objectives | PARTIAL |
@@ -69,7 +69,7 @@ all **pending** for every row unless a row says otherwise.
 | R9.7 | Field test with instructors and students | OWNER | — | yes |
 | R10.1, R10.3, R10.4 | Package schema, generated device docs, doc consolidation | DONE | `scene-package.ts`, `DEVICE_CATALOG.md`, this register | — |
 | R10.2 | In-app authoring mode | PARTIAL (#8) | scene/assembly export-import | — |
-| R10.5 | Contributor templates | PARTIAL (#5) | | — |
+| R10.5 | Contributor templates | DONE | `.github/pull_request_template.md`, `CONTRIBUTING.md`, `CHANGELOG.md` | — |
 | R11.1–R11.4, R11.6, R11.8 | Hardening, routes, CI matrix, flakiness, SBOM, soak | DONE (automated) | CI: Linux, Windows Edge, Firefox/WebKit container, coverage, SBOM; no-retry local matrix | — |
 | R11.5 | Real 8 GB Windows performance | OWNER | bundle budgets only | yes |
 | R11.7 | Independent controls-engineer review | OWNER | — | yes |

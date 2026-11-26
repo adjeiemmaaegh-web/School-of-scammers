@@ -1,17 +1,23 @@
-## What changed and why
+## What changes
 
-## Roadmap task(s)
-<!-- e.g. R2.4, with the state you are claiming: IMPLEMENTED_UNVERIFIED / CI_VERIFIED -->
+<!-- One or two sentences: the behaviour that is different after this PR. -->
+
+## Roadmap item
+
+<!-- R-number(s) from docs/product/MASTER_ROADMAP.md and the row in docs/product/DEVELOPMENT_REGISTER.md this updates. -->
 
 ## Evidence
-- [ ] `npm ci && npx tsc --noEmit && npm test && npm run build && npm run verify:full` (clean install, before Puppeteer)
-- [ ] Budgets: `node scripts/check-performance-budgets.cjs`
-- [ ] New or changed behaviour has unit tests, a determinism replay and a deliberate-break check
-- [ ] Browser script(s) run without retries: ...
-- [ ] Docs regenerated/updated (STATUS.md, DEVICE_CATALOG.md, PLC_SUBSET.md as relevant)
 
-## Data and compatibility
-Saved projects, `formatVersion`, library records, localStorage keys: unchanged / changed (explain and add a migration test).
+- [ ] `npx tsc --noEmit`
+- [ ] `npm test` (number of tests:   )
+- [ ] `npm run build` and `npm run verify:full`
+- [ ] `node scripts/check-performance-budgets.cjs` (no limit raised, or the reason is recorded in STATUS.md)
+- [ ] Browser script(s) for changed UI, added to `.github/workflows/ci.yml`:
+- [ ] New equipment or PLC instructions have tests (CONTRIBUTING.md); critical assertions were mutation-checked
 
-## Not done / not claimed
-<!-- Owner-only gates, known limits, anything unverified. No safety, accuracy or product-equivalence claims. -->
+## Honesty and scope
+
+- [ ] No claim of safety rating, IEC certification, vendor compatibility or physical accuracy beyond the documented model
+- [ ] Frontend-only: no backend, accounts, cloud sync, payments or new paid dependencies
+- [ ] Original assets only
+- [ ] What is still unverified (manual, hardware, owner acceptance) is written here, not implied as done:
