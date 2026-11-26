@@ -66,7 +66,7 @@ describe('Stage 2 per-device signal contract', () => {
     snapshot.plcs.host = { powered: true, io: {
       inputs: [{ terminal: 'I0.0', tag: 'In0', on: true }, { terminal: 'di:I0', tag: 'Expanded', on: true }],
       outputs: [], analogInputs: readings.points,
-    } } as RenderSnapshot['plcs'][string];
+    } } as unknown as RenderSnapshot['plcs'][string];   // a partial view: only the fields readDeviceChannels reads
     const digital = readDeviceChannels(project, snapshot, 'di').channels;
     expect(digital).toHaveLength(1);
     expect(digital[0]).toMatchObject({ deviceId: 'di', controllerId: 'host', endpoint: 'di.I0', value: true });

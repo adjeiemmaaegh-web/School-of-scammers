@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { AttemptResult, EvidenceEvent } from '../../platform/types';
-import { gradeScenario, scenarioObjectives, type GradedCheck } from '../../exercises';
+import { gradeScenario, type GradedCheck } from '../../exercises/grade';
+import { scenarioObjectives } from '../../exercises/types';
 import type { ScenarioSession } from '../../exercises/session';
 import type { ProjectFile } from '../../sim/signals';
 import { RubricReport } from '../RubricReport';

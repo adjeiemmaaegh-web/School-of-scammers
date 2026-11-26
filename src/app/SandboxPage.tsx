@@ -28,8 +28,7 @@ import { isP3Equipment } from '../sim/p3-plant-bridge';
 import { plcComponents, programOf } from '../sim/plcs';
 import { vesselsOf } from '../sim/stations';
 import { appendEvidence, evidenceFromCommand } from '../exercises/evidence';
-import { scenarioStorageKey, type ScenarioRequest, type ScenarioSession } from '../exercises/session';
-import { getScenario } from '../exercises/catalogue';
+import { scenarioStorageKey, type ScenarioSession } from '../exercises/session';
 import type { AttemptResult, EvidenceEvent, RubricResult } from '../platform/types';
 import type { Command, ProjectFile, RenderSnapshot, WorkerResponse, WorkerTiming } from '../sim/signals';
 import { validateProject } from '../sim/orchestrator';
@@ -99,19 +98,13 @@ const reverseWireGuide = 'P4 forward/reverse (21 wires): supply P24 → breaker 
  * worker, the same 3D scene and the same tools, plus a work order, the scenario's starter project,
  * an evidence trail and a headless outcome grader. Answer-revealing helpers are hidden.
  */
-export function SandboxPage({ scenario: request }: { scenario?: ScenarioRequest } = {}) {
-  // Resolved here, inside the lazy workbench chunk, so linking pages stay light.
+export function SandboxPage({ scenario }: { scenario?: ScenarioSession } = {}) {
+  // A scenario arrives already resolved (see ScenarioSandbox), so the open sandbox route never loads the grading benches.
   // Coarse-pointer tablets use explicit tap-to-place rather than unreliable
   // native HTML5 drag (which can consume synthesized touch clicks).
   // Pointer-fine PCs retain genuine draggable equipment tiles.
   const primaryTouch = typeof window !== 'undefined' &&
     window.matchMedia('(pointer: coarse)').matches;
-  const scenario = useMemo<ScenarioSession | undefined>(() => {
-    const def = request ? getScenario(request.scenarioId) : undefined;
-    if (!request || !def) return undefined;
-    const { scenarioId: _id, ...rest } = request;
-    return { ...rest, def };
-  }, [request]);
   const [snapshot, setSnapshot] = useState<RenderSnapshot | null>(null);
   // Pacing only (never saved in a project): how fast model time runs, and the worker's measured scan cost.
   const [timeScale, setTimeScale] = useState(1);
