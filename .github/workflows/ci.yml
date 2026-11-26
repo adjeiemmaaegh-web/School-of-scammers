@@ -74,6 +74,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r22-free-rotation-browser.cjs
       - name: R07/R14 inspector - attach an expansion module, rename a channel, link a belt to a drive
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r07-inspector-browser.cjs
+      - name: R4.1 Ladder editing - duplicate, copy/paste, move, undo/redo with buttons and Ctrl+Z / Ctrl+Y
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r4-ladder-edit-browser.cjs
       - name: R22 grouping - group, whole-group selection, rotate about the centre, ungroup, undo, reload
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r22-groups-browser.cjs
       - name: R12 live operator controls - hold START on the station and watch the process respond
