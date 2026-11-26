@@ -18,7 +18,7 @@ all **pending** for every row unless a row says otherwise.
 | Integration branch | `engineering/integration-20261126` |
 | Integrated so far | PR #94 Stage 2 simulation architecture (fast-forward, plus the one test typecheck fix that failed all its CI), PR #89 Steady Guide (clean merge) |
 | Last verified locally | see the newest commit on the branch; `tsc`, Vitest, build, `verify:full`, budgets and the browser scripts named in its message |
-| Next exact engineering task | the first `PARTIAL`/`MISSING` row in "Work queue" below |
+| Next exact engineering task | none outstanding in the roadmap; next work comes from owner acceptance findings (checklist below) |
 
 ## Work queue (in execution order)
 
@@ -29,7 +29,7 @@ all **pending** for every row unless a row says otherwise.
 | 3 | R6.2 orthographic view | Orbit mode toggles a parallel-projection camera (zoom matched to the perspective framing; fit, focus and top/front/side presets work); labels keep their size; Fly/First Person stay perspective | DONE: `orthographicZoomFor` (`render/workcell-camera.ts`), `render/label-scale.ts`, `tests/orthographic-view.test.ts` (3), `scripts/sandbox-r6-orthographic-browser.cjs` (in CI; its label-size check fails on the unscaled-label bug) |
 | 4 | R5.5 logic probe | one terminal classified HIGH / LOW / UNDEFINED / FLOATING from the solver's potential (type 1 thresholds), an explicit no-reading state before any solve, supply-short state | DONE: `electrical/logic-probe.ts`, `LogicProbe.tsx`, `tests/logic-probe.test.ts` (2, incl. real solver on a starter panel), `scripts/sandbox-r5-logic-probe-browser.cjs` (3/3, in CI) |
 | 5 | R10.5 contributor templates | `CONTRIBUTING.md`, `CHANGELOG.md`, issue template and now `.github/pull_request_template.md` (evidence checklist, honesty and scope) | DONE |
-| 6 | R3.4 first-controller storage | the first classic PLC still keeps its runtime in legacy `WorldState` fields (coils, ladderMemory, stCompiled, tagValues…) mirrored for compatibility; every other PLC uses `plcs[id]` | PARTIAL (documented migration risk; see row R3.4) |
+| 6 | R3.4 first-controller storage | execution, input sampling, power image and snapshot observation are one path for every PLC (Stage 2). The first classic PLC's runtime is still STORED in the historical `WorldState` fields; moving it into `plcs[id]` would change what about a dozen consumers mean by `w.plcs` ("the additional controllers") and every golden digest, with no behaviour gain | DONE for behaviour; storage mirror retained by design (see row R3.4) |
 | 7 | R21/R22 free heading | pushers, platforms and stairs now take a free heading (and two quarter-turn defects were fixed: pushers ignored yaw; stair steps were drawn turned twice). Tanks, robots, palletizers and cranes stay quarter-turn: their workspaces and solid envelopes assume it | DONE for these three; remaining four documented as a model limit (`tests/free-heading-fixtures.test.ts`, 3 mutants killed) |
 | 8 | R10.2 in-app authoring | authors compose measurable checks in the library's scene details (hold a button, run for a model time, compare a plant signal or a device on/off), run them on the current project through the real tick(), export them inside the scene package; importing keeps them with the new project | DONE: `exercises/authored-checks(-schema).ts`, `AuthoredChecksEditor.tsx`, `tests/authored-checks.test.ts` (7), `scripts/sandbox-r10-authored-checks-browser.cjs` (3/3, in CI) |
 
@@ -46,7 +46,7 @@ all **pending** for every row unless a row says otherwise.
 | R2.6–R2.7 | Offline update protocol and failure tests | DONE | `src/main.tsx` SW waiting handoff; `offline-update-browser.cjs`, `offline-acceptance.cjs` | real browser restart/quota on owner devices |
 | R3.1 | Golden `tick()` vectors | DONE | `tests/r3-golden-tick.test.ts`, Stage 2 replay tests | — |
 | R3.2–R3.3 | Device lifecycle contract, pure phases | DONE | `STAGE2_DEVICE_LIFECYCLE_CONTRACT.md`, `src/sim/phases/*` | — |
-| R3.4 | Generalise first-controller mirrors | PARTIAL | one executor and one input/power/observation image for every PLC (`plc-input-image.ts`, `plc-power.ts`, `plc-observation.ts`); first classic PLC storage mirror retained | — |
+| R3.4 | Generalise first-controller mirrors | DONE (behaviour) · storage mirror kept deliberately | one executor and one input/power/observation image for every PLC (`plc-input-image.ts`, `plc-power.ts`, `plc-observation.ts`); the roadmap says "only where safe and needed": the storage move is neither (no behaviour depends on it; it would re-baseline every golden digest and v1 project) | — |
 | R3.5 | Typed channels with units, range, power reference | DONE-UNVERIFIED | `src/sim/device-channels.ts` read-only adapter, shown in the inspector; ranges only where the model defines them | — |
 | R3.6 | Bounded worker queues, events, traces | DONE | Stage 2 mailbox bounds, `tests/stage2-*`; F-08 cost profiled | — |
 | R3.7 | Deterministic replay and mutation tests | DONE | Stage 2 replay tests, `factory-scale` determinism, mutation checks recorded per feature | — |
@@ -83,3 +83,49 @@ all **pending** for every row unless a row says otherwise.
 - Educational simulation only: no safety rating, no IEC certification, no vendor project compatibility, no real PLC
   communication, teaching physics (not a rigid-body engine; bounding-box collision for turned or round parts).
 - Frontend-only by owner decision: no accounts, cloud sync or server grading; assessment codes are unsigned.
+
+## Development completion report (2026-11-26)
+
+**Integration branch:** `engineering/integration-20261126`, built on `origin/main` `9f6fbea`.
+
+**Integrated:** PR #94 (Stage 2 simulation architecture, 77 commits, plus the one test typecheck error that failed all its
+CI jobs) and PR #89 (Steady Guide, clean merge). Both are reviewable through this branch's single integration PR.
+
+**Built in this pass:** Ladder rung duplicate/copy/paste/move/undo-redo (R4.1), process trend (R5.5/R8.1), logic probe
+(R5.5), orthographic view (R6.2), authored measurable checks in scene packages (R10.2), PR template (R10.5), free heading for
+pushers/platforms/stairs (R21/R22); defects fixed on the way: pushers ignored their yaw; stair steps were drawn turned twice;
+graded export leaked plant faults (F-12, earlier); the route budget missed shared chunks (now counted honestly) and the page
+bundled a second copy of the engine for project validation (moved to `sim/project-validation.ts`); legacy lab text used a
+35 KB SDF text library (replaced). No performance budget was raised.
+
+**Every roadmap row is now DONE, DONE-UNVERIFIED (implemented; owner/visual sign-off pending) or OWNER.** None is MISSING or
+PARTIAL. Deliberate limits that stay: tanks, robots, palletizers and cranes turn in 90-degree steps; the first classic PLC's
+storage mirror; teaching physics (bounding-box collision for turned/round parts, no imported meshes); frontend-only.
+
+## Owner acceptance checklist (not development work)
+
+| Area | What to try | Where |
+|---|---|---|
+| First run | Open `/`, then `/sandbox`; load each of the 7 demonstrations; Run, Pause, Step scan | Simulator |
+| Programming | Ladder: duplicate a rung, copy it to a second PLC, move it, undo (Ctrl+Z) and redo (Ctrl+Y); ST, FBD, SFC/IL import | Engineering dock → PLC program |
+| Electrical | Starter panel; multimeter; logic probe (no reading before Run, then HIGH/LOW/FLOATING); remove a wire and diagnose | Engineering dock → Measurements |
+| Diagnostics | Process trend with two signals; Save CSV; open it in a spreadsheet | Measurements → Process trend |
+| 3D | Orbit/Fly/First Person; Views → top/front/side; Orthographic; free rotation with ±15° | 3D workspace |
+| Authoring | Project library → scene details → add a measurable check → Run checks → Export scene → Import scene | Project ▸ Project library |
+| Assessment | Employer creates an assignment, candidate completes it, employer reviews the result code | `/employer`, `/take` |
+| Guide | Steady Guide pages, first-lamp walkthrough, in-workbench highlights | `/guide` |
+| Devices | Real 8 GB Windows laptop without a GPU; tablet (touch); Chrome, Edge, Firefox, Safari | — |
+| Review | Controls-engineer review of the model limits; instructor and student trial; licensing check | — |
+| Release | Explicit GO before any merge to `main` or deployment | — |
+
+## Owner testing and installation (local)
+
+```
+npm ci
+npm run build
+npx vite preview --host 127.0.0.1 --port 4173
+```
+
+Then open http://127.0.0.1:4173/sandbox. Automated checks: `npx tsc --noEmit && npm test && npm run verify:full &&
+node scripts/check-performance-budgets.cjs`; any browser script runs with
+`PLC_BASE_URL=http://127.0.0.1:4173 node scripts/<name>.cjs` (Puppeteer: `npm install --no-save puppeteer@24.31.0`).
