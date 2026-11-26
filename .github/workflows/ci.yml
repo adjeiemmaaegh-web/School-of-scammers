@@ -80,6 +80,8 @@ jobs:
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r5-trend-browser.cjs
       - name: R6.2 orthographic view - projection toggle, refit, label size kept, Fly returns to perspective, project untouched
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r6-orthographic-browser.cjs
+      - name: R5.5 logic probe - no reading before a solve, then HIGH / LOW / FLOATING from the solver
+        run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r5-logic-probe-browser.cjs
       - name: R22 grouping - group, whole-group selection, rotate about the centre, ungroup, undo, reload
         run: PLC_BASE_URL=http://127.0.0.1:4173 node scripts/run-browser-step.cjs scripts/sandbox-r22-groups-browser.cjs
       - name: R12 live operator controls - hold START on the station and watch the process respond

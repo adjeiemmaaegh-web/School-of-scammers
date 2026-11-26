@@ -8,3 +8,13 @@
 .sandbox-trend-legend li { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .sandbox-trend-actions { display:flex; gap:6px; align-items:center; justify-content:flex-end; margin-top:4px; }
 .sandbox-trend-actions small { margin-right:auto; opacity:.75; }
+.sandbox-logic-probe { margin:8px 0; }
+.sandbox-logic-probe summary small { margin-left:6px; opacity:.75; }
+.sandbox-logic-probe label { display:flex; gap:6px; align-items:center; }
+.sandbox-logic-probe select { flex:1; min-width:0; }
+.sandbox-probe-reading { display:flex; align-items:center; gap:6px; font-weight:600; margin:6px 0 0; }
+.sandbox-probe-led { width:12px; height:12px; border-radius:50%; background:#5b6470; flex:none; }
+.sandbox-probe-reading.is-high .sandbox-probe-led { background:#e5534b; box-shadow:0 0 6px #e5534b; }
+.sandbox-probe-reading.is-low .sandbox-probe-led { background:#4c8dff; }
+.sandbox-probe-reading.is-undefined .sandbox-probe-led { background:#f2a541; }
+.sandbox-probe-reading.is-short .sandbox-probe-led { background:#f2a541; }
