@@ -4,16 +4,19 @@
  * unknown fields rejected, every string bounded and rendered as plain text. Import is untrusted input and goes
  * through the same project validator as any other file.
  */
+import { parseAuthoredChecks, type AuthoredCheck } from '../exercises/authored-checks-schema';
 export const SCENE_PACKAGE_KIND = 'efo-scene-package';
 export const MAX_PACKAGE_TEXT = 1_300_000;
 export type SceneLevel = 'beginner' | 'intermediate' | 'advanced';
 export type ScenePackage = {
   kind: typeof SCENE_PACKAGE_KIND; formatVersion: 1; title: string; description: string; level: SceneLevel;
   objectives: string[]; hints: string[]; project: unknown;
+  /** Optional measurable checks (R10.2), data only; omitted when there are none so older packages keep their shape. */
+  checks?: AuthoredCheck[];
 };
 export type PackageResult = { ok: true; pkg: ScenePackage } | { ok: false; message: string };
 
-const KEYS = new Set(['kind', 'formatVersion', 'title', 'description', 'level', 'objectives', 'hints', 'project']);
+const KEYS = new Set(['kind', 'formatVersion', 'title', 'description', 'level', 'objectives', 'hints', 'project', 'checks']);
 const text = (v: unknown, max: number): string | null =>
   typeof v === 'string' && v.length <= max && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(v) ? v : null;
 const list = (v: unknown, count: number, max: number): string[] | null => {
@@ -40,13 +43,17 @@ export function parseScenePackage(raw: string, validate: (project: unknown) => u
   const objectives = list(obj.objectives, 12, 200), hints = list(obj.hints, 12, 300);
   if (!objectives) return { ok: false, message: 'Objectives must be at most 12 non-empty lines of up to 200 characters.' };
   if (!hints) return { ok: false, message: 'Hints must be at most 12 non-empty lines of up to 300 characters.' };
+  const checks = parseAuthoredChecks(obj.checks);
+  if (!checks.ok) return { ok: false, message: checks.message };
   let project: unknown;
   try { project = validate(obj.project); } catch (e) { return { ok: false, message: `The scene's project is not valid: ${e instanceof Error ? e.message : 'invalid'}` }; }
-  return { ok: true, pkg: { kind: SCENE_PACKAGE_KIND, formatVersion: 1, title: title.trim(), description, level: obj.level, objectives, hints, project } };
+  return { ok: true, pkg: { kind: SCENE_PACKAGE_KIND, formatVersion: 1, title: title.trim(), description, level: obj.level, objectives, hints, project,
+    ...(checks.checks.length ? { checks: checks.checks } : {}) } };
 }
 
 export function buildScenePackage(input: Omit<ScenePackage, 'kind' | 'formatVersion'>, validate: (project: unknown) => unknown): string {
-  const candidate = JSON.stringify({ kind: SCENE_PACKAGE_KIND, formatVersion: 1, ...input, project: validate(input.project) }, null, 2);
+  const { checks, ...rest } = input;
+  const candidate = JSON.stringify({ kind: SCENE_PACKAGE_KIND, formatVersion: 1, ...rest, project: validate(input.project), ...(checks?.length ? { checks } : {}) }, null, 2);
   const parsed = parseScenePackage(candidate, validate);
   if (!parsed.ok) throw new Error(parsed.message);
   return candidate;

@@ -948,7 +948,7 @@ export function SandboxPage({ scenario }: { scenario?: ScenarioSession } = {}) {
       </div>}
       {!scenario && (library.status === 'unavailable' || library.status === 'failed') && library.message &&
         <div role="status" className="sandbox-alert ux6-lib-banner" data-library-unavailable>{library.message}</div>}
-      {!scenario && libraryOpen && library.lib && <Suspense fallback={<div role="status" className="sandbox-help">Loading the project library…</div>}><ProjectLibraryPanel lib={library.lib} active={library.active} status={library.status}
+      {!scenario && libraryOpen && library.lib && <Suspense fallback={<div role="status" className="sandbox-help">Loading the project library…</div>}><ProjectLibraryPanel project={project} lib={library.lib} active={library.active} status={library.status}
         editable={editable} onOpen={library.openProject} onNew={library.newProject} onChanged={()=>void library.refreshActive()}
         onSaveVersion={library.saveVersion} onRestoreVersion={library.restoreVersion}
         onClose={()=>setLibraryOpen(false)} onNotice={setClientError} /></Suspense>}

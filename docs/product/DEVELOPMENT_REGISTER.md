@@ -31,7 +31,7 @@ all **pending** for every row unless a row says otherwise.
 | 5 | R10.5 contributor templates | `CONTRIBUTING.md`, `CHANGELOG.md`, issue template and now `.github/pull_request_template.md` (evidence checklist, honesty and scope) | DONE |
 | 6 | R3.4 first-controller storage | the first classic PLC still keeps its runtime in legacy `WorldState` fields (coils, ladderMemory, stCompiled, tagValues…) mirrored for compatibility; every other PLC uses `plcs[id]` | PARTIAL (documented migration risk; see row R3.4) |
 | 7 | R21/R22 free heading | pushers, platforms and stairs now take a free heading (and two quarter-turn defects were fixed: pushers ignored yaw; stair steps were drawn turned twice). Tanks, robots, palletizers and cranes stay quarter-turn: their workspaces and solid envelopes assume it | DONE for these three; remaining four documented as a model limit (`tests/free-heading-fixtures.test.ts`, 3 mutants killed) |
-| 8 | R10.2 in-app authoring | scene packages export/import with validation (`platform/scene-package.ts`); no in-app editor for scenario objectives | PARTIAL |
+| 8 | R10.2 in-app authoring | authors compose measurable checks in the library's scene details (hold a button, run for a model time, compare a plant signal or a device on/off), run them on the current project through the real tick(), export them inside the scene package; importing keeps them with the new project | DONE: `exercises/authored-checks(-schema).ts`, `AuthoredChecksEditor.tsx`, `tests/authored-checks.test.ts` (7), `scripts/sandbox-r10-authored-checks-browser.cjs` (3/3, in CI) |
 
 ## Requirement matrix
 
@@ -68,7 +68,7 @@ all **pending** for every row unless a row says otherwise.
 | R9.1–R9.6 | Learning concepts, progression, gallery, scenarios, feedback, employer flows | DONE | `exercises/*`, `LessonPanel`, `sandbox-r9-lessons-browser.cjs`, `qa-candidate-employer-browser.cjs` | — |
 | R9.7 | Field test with instructors and students | OWNER | — | yes |
 | R10.1, R10.3, R10.4 | Package schema, generated device docs, doc consolidation | DONE | `scene-package.ts`, `DEVICE_CATALOG.md`, this register | — |
-| R10.2 | In-app authoring mode | PARTIAL (#8) | scene/assembly export-import | — |
+| R10.2 | In-app authoring mode | DONE | layout, assemblies, properties and I/O in the sandbox; objectives, hints and measurable checks in scene details; package export/import | self-checks are not authenticated assessment |
 | R10.5 | Contributor templates | DONE | `.github/pull_request_template.md`, `CONTRIBUTING.md`, `CHANGELOG.md` | — |
 | R11.1–R11.4, R11.6, R11.8 | Hardening, routes, CI matrix, flakiness, SBOM, soak | DONE (automated) | CI: Linux, Windows Edge, Firefox/WebKit container, coverage, SBOM; no-retry local matrix | — |
 | R11.5 | Real 8 GB Windows performance | OWNER | bundle budgets only | yes |

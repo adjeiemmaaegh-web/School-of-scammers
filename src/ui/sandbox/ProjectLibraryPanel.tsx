@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import type { ProjectLibrary, ProjectMeta, Snapshot } from '../../platform/project-library';
 import type { ActiveProject, LibraryStatus } from '../../app/useProjectLibrary';
 import { exportableDetails, loadDetails, saveDetails, type SceneDetails } from '../../platform/scene-details';
+import type { ProjectFile } from '../../sim/signals';
+import { AuthoredChecksEditor } from './AuthoredChecksEditor';
 
 type Props = {
   lib: ProjectLibrary;
@@ -15,6 +17,8 @@ type Props = {
   onRestoreVersion: (snapshotId: string) => Promise<void>;
   onClose: () => void;
   onNotice: (message: string | null) => void;
+  /** The working project (for authored checks: device lists and Run checks). */
+  project?: ProjectFile | null;
 };
 
 const download = (name: string, text: string) => {
@@ -25,7 +29,7 @@ const download = (name: string, text: string) => {
 const safeName = (s: string) => s.replace(/[^\w.-]+/g, '-').slice(0, 60) || 'project';
 
 /** Project library dialog: open, create, rename, duplicate, archive, delete (confirmed), export/import, backup, version history. */
-export function ProjectLibraryPanel({ lib, active, status, editable, onOpen, onNew, onChanged, onSaveVersion, onRestoreVersion, onClose, onNotice }: Props) {
+export function ProjectLibraryPanel({ lib, active, status, editable, onOpen, onNew, onChanged, onSaveVersion, onRestoreVersion, onClose, onNotice, project = null }: Props) {
   const [rows, setRows] = useState<ProjectMeta[]>([]);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'recent' | 'name' | 'created'>('recent');
@@ -62,7 +66,9 @@ export function ProjectLibraryPanel({ lib, active, status, editable, onOpen, onN
       const text = await file.text();
       if (kind === 'package') {
         const r = await lib.importScenePackage(text);
-        onNotice(r.ok ? `Imported scene "${r.meta.title}" (${r.level}). Objectives: ${r.objectives.join(' · ') || 'none listed'}${r.hints.length ? ` · ${r.hints.length} hint(s) in the file` : ''}. Open it from the list.` : r.message);
+        // Keep the package's details with the new project, so its objectives, hints and measurable checks travel with it.
+        if (r.ok) saveDetails(r.meta.id, { description: r.description, level: r.level as SceneDetails['level'], objectives: r.objectives.join('\n'), hints: r.hints.join('\n'), ...(r.checks.length ? { checks: r.checks } : {}) });
+        onNotice(r.ok ? `Imported scene "${r.meta.title}" (${r.level}). Objectives: ${r.objectives.join(' · ') || 'none listed'}${r.hints.length ? ` · ${r.hints.length} hint(s) in the file` : ''}${r.checks.length ? ` · ${r.checks.length} measurable check(s)` : ''}. Open it from the list.` : r.message);
       } else if (kind === 'project') {
         const r = await lib.importProject(text);
         onNotice(r.ok ? `Imported "${r.meta.title}" into the library (not opened).` : r.message);
@@ -158,7 +164,9 @@ export function ProjectLibraryPanel({ lib, active, status, editable, onOpen, onN
           onChange={e => { const d = { ...details, objectives: e.target.value }; setDetails(d); saveDetails(active.id, d); }} /></label>
         <label>Hints (one per line, up to 12)<textarea data-scene-hints rows={2} value={details.hints}
           onChange={e => { const d = { ...details, hints: e.target.value }; setDetails(d); saveDetails(active.id, d); }} /></label>
-        <small>The exported file contains only this text plus the project: no scripts, no links followed. Do not put answers in the starter if it will be used for assessment.</small>
+        <AuthoredChecksEditor project={project} checks={details.checks ?? []}
+          onChange={checks => { const d = { ...details, checks }; setDetails(d); saveDetails(active.id, d); }} />
+        <small>The exported file contains only this text, the checks (plain data) and the project: no scripts, no links followed. Do not put answers in the starter if it will be used for assessment.</small>
       </section>}
       <p className="ux6-lib-note">Projects are stored in this browser only (IndexedDB). Clearing site data deletes them: use Back up all to keep a file copy. Export/import never leaves your device.</p>
     </div>
