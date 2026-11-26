@@ -126,3 +126,53 @@ describe('free heading: machine-guard cage', () => {
     expect(Math.hypot(open.x, open.y)).toBeLessThan(10);
   });
 });
+
+describe('pusher orientation (yaw fix) and free heading', () => {
+  const run = (yawDeg: number, headingDeg: number | undefined, bodyAt: { x: number; y: number }) => {
+    const item: EquipmentPlacement = { id: 'p', kind: 'pusher', originMm: vec(0, 0, 0), yawDeg: yawDeg as 0, params: {}, ...(headingDeg ? { headingDeg } : {}) };
+    let r = freshRuntime(spawnBody(freshWorld(), 'b', { size: vec(80, 80, 60), massKg: 1, pos: vec(bodyAt.x, bodyAt.y, 30), supportedBy: null }), [item], PLANT_EQUIPMENT);
+    for (let i = 0; i < 40; i++) r = stepScene(r, [item], PLANT_EQUIPMENT, { p: { extend: true } });
+    return r.world.bodies[0].pos;
+  };
+  it('yaw 0 pushes along +y exactly as before', () => {
+    const p = run(0, undefined, { x: 0, y: 0 });
+    expect(p.x).toBe(0); expect(p.y).toBeGreaterThan(100);
+  });
+  it('a pusher turned 90 degrees pushes along -x (it used to push along +y whatever its yaw)', () => {
+    const p = run(90, undefined, { x: 0, y: 0 });
+    expect(p.x).toBeLessThan(-100); expect(Math.abs(p.y)).toBeLessThan(1);
+  });
+  it('a free heading of 45 degrees pushes diagonally and the ram zone turns with it', () => {
+    const p = run(0, 45, { x: 0, y: 0 });
+    expect(p.x).toBeLessThan(-60); expect(p.y).toBeGreaterThan(60); expect(p.x).toBeCloseTo(-p.y, 0);
+    // a body inside the unturned 260 x 230 zone but outside the turned one is not pushed
+    const outside = run(0, 45, { x: 125, y: 110 });
+    expect(outside).toMatchObject({ x: 125, y: 110 });
+  });
+});
+
+describe('platforms and stairs with a free heading', () => {
+  const person = (x: number, y: number) => ({ x, y });
+  it('a turned platform raises the floor only inside its turned rectangle, not its bounding box', async () => {
+    const { floorHeightAt } = await import('../src/plant/world/operator-walk');
+    const deck: EquipmentPlacement = { id: 'd', kind: 'platform', originMm: vec(0, 0, 0), yawDeg: 0, params: { lengthMm: 2000, widthMm: 400, heightMm: 900 }, headingDeg: 45 };
+    const along = person(600 * Math.SQRT1_2, 600 * Math.SQRT1_2);          // 600 mm along the turned length
+    expect(floorHeightAt([deck], along.x, along.y)).toBe(900);
+    expect(floorHeightAt([deck], 600, -600)).toBe(0);                       // inside the bounding box, outside the deck
+    expect(floorHeightAt([{ ...deck, headingDeg: undefined }], 600, 0)).toBe(900);   // unturned: unchanged behaviour
+  });
+  it('turned stairs rise toward their turned heading end', async () => {
+    const { floorHeightAt } = await import('../src/plant/world/operator-walk');
+    const run: EquipmentPlacement = { id: 's', kind: 'stairs', originMm: vec(0, 0, 0), yawDeg: 0, params: { lengthMm: 1800, widthMm: 900, heightMm: 900 }, headingDeg: 90 };
+    expect(floorHeightAt([run], 0, 800)).toBeGreaterThan(800);             // near the +y end (heading 90)
+    expect(floorHeightAt([run], 0, -800)).toBeLessThan(100);
+    expect(floorHeightAt([run], 800, 0)).toBe(0);                           // beside the 900 mm wide run
+  });
+  it('the stair drawing sizes each step in its own frame and turns it with the run', () => {
+    const drawings = PLANT_EQUIPMENT.stairs.describe(PLANT_EQUIPMENT.stairs.fresh({}), { id: 's', originMm: vec(0, 0, 0), yawDeg: 90, params: {} } as never);
+    expect(drawings[0].size.x).toBeCloseTo(300, 6);                         // 1800 / 6 tread depth along the run
+    expect(drawings[0].size.y).toBe(900);
+    expect(drawings[0].yawDeg).toBe(90);
+    expect(drawings[0].pos.y).toBeLessThan(drawings[5].pos.y);              // rising toward +y
+  });
+});

@@ -30,7 +30,7 @@ all **pending** for every row unless a row says otherwise.
 | 4 | R5.5 logic probe | one terminal classified HIGH / LOW / UNDEFINED / FLOATING from the solver's potential (type 1 thresholds), an explicit no-reading state before any solve, supply-short state | DONE: `electrical/logic-probe.ts`, `LogicProbe.tsx`, `tests/logic-probe.test.ts` (2, incl. real solver on a starter panel), `scripts/sandbox-r5-logic-probe-browser.cjs` (3/3, in CI) |
 | 5 | R10.5 contributor templates | `CONTRIBUTING.md`, `CHANGELOG.md`, issue template and now `.github/pull_request_template.md` (evidence checklist, honesty and scope) | DONE |
 | 6 | R3.4 first-controller storage | the first classic PLC still keeps its runtime in legacy `WorldState` fields (coils, ladderMemory, stCompiled, tagValues…) mirrored for compatibility; every other PLC uses `plcs[id]` | PARTIAL (documented migration risk; see row R3.4) |
-| 7 | R21/R22 free heading | tanks, robots, palletizers, cranes, pushers, platforms and stairs turn in 90° steps only | PARTIAL |
+| 7 | R21/R22 free heading | pushers, platforms and stairs now take a free heading (and two quarter-turn defects were fixed: pushers ignored yaw; stair steps were drawn turned twice). Tanks, robots, palletizers and cranes stay quarter-turn: their workspaces and solid envelopes assume it | DONE for these three; remaining four documented as a model limit (`tests/free-heading-fixtures.test.ts`, 3 mutants killed) |
 | 8 | R10.2 in-app authoring | scene packages export/import with validation (`platform/scene-package.ts`); no in-app editor for scenario objectives | PARTIAL |
 
 ## Requirement matrix

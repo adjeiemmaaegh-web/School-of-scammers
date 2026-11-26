@@ -131,8 +131,8 @@ describe('R21/R22 editing a freely headed belt', () => {
     formatVersion: 1, program: { id: 'p', version: '1', rungs: [{ id: 'r', elements: [{ type: 'contact', tag: 'Start' }], coil: 'Run' }] } as never, components, wires: [] });
   it('belts, rollers, stations, transfer units, curved belts, tables, stoppers, gates, fences and doors may turn freely; tanks, robots and palletizers may not', () => {
     expect(isFreeRotation('belt-conveyor')).toBe(true); expect(isFreeRotation('roller-conveyor')).toBe(true);
-    for (const k of ['process-tank', 'robot-arm', 'palletizer', 'pusher', 'platform', 'stairs']) expect(isFreeRotation(k)).toBe(false);
-    for (const k of ['process-station', 'transfer-unit', 'curved-conveyor', 'turntable', 'index-table', 'stopper', 'safety-fence', 'guard-door', 'diverter-gate', 'merge-gate']) expect(isFreeRotation(k)).toBe(true);
+    for (const k of ['process-tank', 'robot-arm', 'palletizer']) expect(isFreeRotation(k)).toBe(false);
+    for (const k of ['process-station', 'transfer-unit', 'curved-conveyor', 'turntable', 'index-table', 'stopper', 'safety-fence', 'guard-door', 'diverter-gate', 'merge-gate', 'pusher', 'platform', 'stairs']) expect(isFreeRotation(k)).toBe(true);
   });
   it('rotateFree turns a belt, the project keeps it, and the plant placement carries the heading', () => {
     let p = project([comp('b', 'belt-conveyor', 300, 100)]);

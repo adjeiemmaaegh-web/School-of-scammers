@@ -97,11 +97,14 @@ export const stairs:EquipmentDef={
  read:()=>({}),
  describe:(s,ctx)=>{
   const length=param(ctx,'lengthMm',1800),rise=param(ctx,'heightMm',900),width=param(ctx,'widthMm',900),steps=6;
-  const dir=ctx.yawDeg===0?[1,0]:ctx.yawDeg===90?[0,1]:ctx.yawDeg===180?[-1,0]:[0,-1];
+  // Steps run toward the heading end; each box is sized in its own frame (tread depth x stair width) and turned with the run,
+  // like every other drawing. (Earlier the size was swapped for 90/270 AND turned, drawing those steps sideways.)
+  const heading=ctx.yawDeg+(ctx.headingDeg??0),turn=heading*Math.PI/180;
+  const dir=heading===0?[1,0]:heading===90?[0,1]:heading===180?[-1,0]:heading===270?[0,-1]:[Math.cos(turn),Math.sin(turn)];
   return Array.from({length:steps},(_,i)=>{
    const t=(i+.5)/steps,h=rise*(i+1)/steps;
    return {part:'step'+i,shape:'box' as const,pos:{x:ctx.originMm.x+dir[0]*(t-.5)*length,y:ctx.originMm.y+dir[1]*(t-.5)*length,z:ctx.originMm.z+h/2},
-    size:vec(dir[0]?length/steps:width,dir[1]?length/steps:width,h),yawDeg:ctx.yawDeg,colour:'#9aa3ad'};
+    size:vec(length/steps,width,h),yawDeg:heading,colour:'#9aa3ad'};
   });
  },
 };
