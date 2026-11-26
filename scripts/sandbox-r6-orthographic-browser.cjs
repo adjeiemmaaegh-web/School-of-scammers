@@ -24,7 +24,8 @@ const KEY = 'efo-open-sandbox-project-v1';
     const before = await page.evaluate(k => localStorage.getItem(k), KEY);
     // Html labels must keep a sensible on-screen size in both projections (they once scaled by the orthographic zoom)
     const labelWidth = () => page.$$eval('[data-3d-drag-handle]', els => { const w = els.map(e => e.getBoundingClientRect().width).filter(x => x > 0).sort((a, b) => a - b); return w[Math.floor(w.length / 2)] ?? 0; });
-    await new Promise(r => setTimeout(r, 800));
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-3d-drag-handle]')].filter(e => e.getBoundingClientRect().width > 0).length >= 3, { timeout: 10000 });
+    await new Promise(r => setTimeout(r, 400));
     const perspectiveLabel = await labelWidth();
     assert.ok(perspectiveLabel > 0, 'equipment labels are visible');
     assert.equal(await projection(), 'perspective');
@@ -33,7 +34,9 @@ const KEY = 'efo-open-sandbox-project-v1';
     await page.waitForFunction(() => document.querySelector('[data-3d-projection]')?.getAttribute('data-3d-projection') === 'orthographic', { timeout: 8000 });
     await page.waitForSelector('canvas', { timeout: 8000 });
     assert.match(await status(), /ORTHOGRAPHIC/);
-    await new Promise(r => setTimeout(r, 800));
+    // the canvas remounts on a projection change: wait until its labels exist again before measuring
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-3d-drag-handle]')].filter(e => e.getBoundingClientRect().width > 0).length >= 3, { timeout: 10000 });
+    await new Promise(r => setTimeout(r, 400));
     const orthoLabel = await labelWidth();
     assert.ok(orthoLabel > perspectiveLabel * 0.4 && orthoLabel < perspectiveLabel * 2.5, `label size kept: ${perspectiveLabel.toFixed(0)} px vs ${orthoLabel.toFixed(0)} px`);
     // a preset view in orthographic still works (camera only)

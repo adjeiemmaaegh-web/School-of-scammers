@@ -17,7 +17,7 @@ all **pending** for every row unless a row says otherwise.
 | Integrated baseline | `origin/main` `9f6fbea` (PR #95 University Recovery and PR #93 Stage 1 merged) |
 | Integration branch | `engineering/integration-20261126` |
 | Integrated so far | PR #94 Stage 2 simulation architecture (fast-forward, plus the one test typecheck fix that failed all its CI), PR #89 Steady Guide (clean merge) |
-| Last verified locally | see the newest commit on the branch; `tsc`, Vitest, build, `verify:full`, budgets and the browser scripts named in its message |
+| Last verified locally (2026-11-26, final head) | `tsc` pass · Vitest **263 files / 2,200 tests** pass · offline engineering, build, `verify:full` pass · budgets pass with no limit raised (route 582,000 / 593,920; guide 121,790 / 153,600; total JS 868,987 / 875,520 bytes gzip) · no-retry Chromium browser matrix **95 of 96** pass, the one failure a measuring race in the new orthographic script, fixed and then 5/5; Firefox/WebKit run in CI only |
 | Next exact engineering task | none outstanding in the roadmap; next work comes from owner acceptance findings (checklist below) |
 
 ## Work queue (in execution order)

@@ -2,19 +2,13 @@
 
 **Governing plan:** [`MASTER_ROADMAP.md`](MASTER_ROADMAP.md) (R0–R12). This page records what is *verified now*; the roadmap says what to do next. Task states: `NOT_STARTED`, `IMPLEMENTED_UNVERIFIED`, `CI_VERIFIED`, `OWNER_ACCEPTED`, `BLOCKED`, `DEFERRED`.
 
-## 0. Current verified state — 2026-11-24, branch `engineering/r13-university-recovery` with `main` (`7aaeee9`) merged in
+## 0. Current verified state — 2026-11-26, branch `engineering/integration-20261126` (main `9f6fbea` + PR #94 + PR #89 + the remaining roadmap work)
 
-| Item | Value |
-|---|---|
-| Typecheck, offline engineering gate, `verify:full` | pass |
-| Vitest | **251 files, 2,125 tests pass** (heavy factory-scale and multi-PLC demo tests carry a 30 s timeout: they timed out at the 5 s default under CPU load) |
-| Bundle budgets | pass: total JS 871,286 of 875,520 bytes (855 KiB), sandbox route 591,253 of 593,920 (580 KiB). About 4 KB of headroom each; the lasting fix is to load the SFC/IL compilers on demand in the worker (not done: it makes program loading asynchronous and command order there matters) |
-| Local browser matrix, **no retries**, Chromium, software WebGL, 2026-11-24 before the merge | **85 of 86 pass**; the one failure is F-03 (container-only). Firefox/WebKit not runnable here. After merging `main`, the 15 scripts most exposed to the UX8/UX9 library changes and this branch's new UI all pass (one hard-coded kind count in `sandbox-ux2-stage1-browser.cjs` was replaced by the catalogue count) |
-| Windows Edge workflow on this branch | success (run 45390520254) |
-| `npm audit` | 0 vulnerabilities (F-18 is out of date) |
-| University recovery register | all 28 rows DONE with stated limits (`UNIVERSITY_RECOVERY_REGISTER.md`) |
-
-Sections 1–4 below are the 2026-11-17 baseline and are kept as history.
+The live requirement-by-requirement status, the completion report and the owner acceptance checklist are in
+[`DEVELOPMENT_REGISTER.md`](DEVELOPMENT_REGISTER.md). Headline evidence: Vitest 2,200 tests pass; build and `verify:full` pass;
+budgets pass without any limit raised (the route figure now counts statically imported shared chunks); a no-retry Chromium
+matrix of 96 CI browser scripts passed 95 (the one failure was a race in a new script, fixed and re-run 5/5), including
+`browser-acceptance.cjs` (F-03), which used to fail in this container. Sections 1–4 are the 2026-11-17 baseline (history).
 
 ## 1. Baseline (R0.1, R0.3) — measured 2026-11-17 in a fresh checkout
 
