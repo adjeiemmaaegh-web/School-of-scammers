@@ -1,0 +1,10 @@
+.sandbox-trend { margin:8px 0; }
+.sandbox-trend summary small { margin-left:6px; opacity:.75; }
+.sandbox-trend-pick { display:flex; align-items:center; gap:6px; margin:4px 0; }
+.sandbox-trend-pick select { flex:1; min-width:0; }
+.sandbox-trend-swatch { display:inline-block; width:10px; height:10px; border-radius:2px; flex:none; }
+.sandbox-trend-chart { display:block; margin:6px 0; background:rgba(127,127,127,.06); border-radius:4px; }
+.sandbox-trend-legend { list-style:none; padding:0; margin:0; font-size:12px; display:grid; gap:2px; }
+.sandbox-trend-legend li { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.sandbox-trend-actions { display:flex; gap:6px; align-items:center; justify-content:flex-end; margin-top:4px; }
+.sandbox-trend-actions small { margin-right:auto; opacity:.75; }

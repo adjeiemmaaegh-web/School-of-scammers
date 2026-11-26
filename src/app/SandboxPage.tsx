@@ -48,6 +48,7 @@ import { DEFAULT_SCAN_MS, SCAN_PRESETS_MS, TIME_SCALES, scanMsOf, type ScanTimin
 const ProjectLibraryPanel = lazy(() => import('../ui/sandbox/ProjectLibraryPanel').then(m => ({ default: m.ProjectLibraryPanel })));
 const SteadyGuideDrawer = lazy(() => import('../steady-guide/GuideDrawer').then(m => ({ default: m.GuideDrawer })));
 const LessonPanel = lazy(() => import('../ui/sandbox/LessonPanel').then(m => ({ default: m.LessonPanel })));
+const TrendPanel = lazy(() => import('../ui/sandbox/TrendPanel').then(m => ({ default: m.TrendPanel })));
 const FatChecklist = lazy(() => import('../ui/sandbox/FatChecklist').then(m => ({ default: m.FatChecklist })));
 const Sandbox3D = lazy(() => import('../render/Sandbox3D').then(module => ({ default: module.Sandbox3D })));
 const STORAGE_KEY = 'efo-open-sandbox-project-v1';
@@ -1456,6 +1457,7 @@ export function SandboxPage({ scenario }: { scenario?: ScenarioSession } = {}) {
         <aside id="sandbox-stage-test" className="sandbox-instruments panel">
           {project && snapshot && <DiagnosticsOverview project={project} snapshot={snapshot} />}
           <Suspense fallback={null}>
+            {project && snapshot && <TrendPanel project={project} snapshot={snapshot} />}
             {!scenario && project && snapshot && <FatChecklist project={project} snapshot={snapshot} projectKey={library.active?.id ?? 'working-copy'} />}
             {!scenario && project && <LessonPanel project={project} editable={editable} canStart={!!library.lib} onStart={library.createFrom} />}
           </Suspense>
